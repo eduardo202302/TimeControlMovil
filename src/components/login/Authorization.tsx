@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
@@ -43,12 +42,7 @@ const Authorization = ({ onClose }: { onClose: () => void }) => {
     setLoading(true);
     try {
       const response = await authorization(data);
-      if (response.data.success) {
-        await AsyncStorage.setItem("isAuthorized", "true");
-        await AsyncStorage.setItem(
-          "schoolData",
-          JSON.stringify(response.data.data),
-        );
+      if (response) {
         setMensaje({
           texto: "Dispositivo autorizado correctamente.",
           tipo: "success",
@@ -58,7 +52,10 @@ const Authorization = ({ onClose }: { onClose: () => void }) => {
           onClose();
         }, 500);
       } else {
-        setMensaje({ texto: "Clave de registro inválida.", tipo: "error" });
+        setMensaje({
+          texto: "Clave de registro inválida.",
+          tipo: "error",
+        });
       }
     } catch (error) {
       setMensaje({ texto: "Clave de registro inválida.", tipo: "error" });

@@ -98,10 +98,12 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         </View>
       </View>
       <View style={styles.logo}>
-        <Image
-          source={{ uri: `${urlColegio}/${image}` }}
-          style={{ width: 100, height: 100 }}
-        />
+        {urlColegio && image ? (
+          <Image
+            source={{ uri: `${urlColegio}/${image}` }}
+            style={{ width: 100, height: 100 }}
+          />
+        ) : null}
         <Text style={styles.logoTitle}>{name}</Text>
       </View>
       {mensaje && (

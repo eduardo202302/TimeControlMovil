@@ -15,8 +15,8 @@ const LIMIT_OPTIONS = [20, 25, 50];
 
 interface SelectFieldProps {
   label: string;
-  value: string;
-  onValueChange: (value: string) => void;
+  value: string | number;
+  onValueChange: (value: string | number) => void;
   placeholder?: string;
   error?: string;
   labelColor: string;
@@ -50,13 +50,12 @@ const IkarFlatList = ({
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [limitVisible, setLimitVisible] = useState(false);
-  console.log("esto es en el select", data);
 
   useEffect(() => {
     const lista = (data ?? [])
       .filter((item) => item.categoryId === 22)
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((item) => ({ label: item.name, value: item.name }));
+      .map((item) => ({ label: item.name, value: item.id }));
 
     if (value) {
       const seleccionada = lista.filter((c) => c.value === value);
@@ -68,8 +67,11 @@ const IkarFlatList = ({
   }, [data, value]);
 
   useEffect(() => {
-    if (value) setSelectedLabel(value);
-  }, [value]);
+    if (value && opciones.length > 0) {
+      const encontrada = opciones.find((c) => c.value === value);
+      if (encontrada) setSelectedLabel(encontrada.label);
+    }
+  }, [value, opciones]);
 
   useEffect(() => {
     setPage(1);

@@ -10,19 +10,12 @@ import { useSchoolStore } from "../../store/useSchoolStore";
 const Login = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [checking, setChecking] = useState(true);
-  const { school } = useSchoolStore();
+  const { school, urlColegio } = useSchoolStore();
   const { name, logo } = school || {};
-  console.log("Datos de la escuela:", { name, logo });
+
   useEffect(() => {
     const check = async () => {
       const isAuthorized = await SecureStore.getItemAsync("isAuthorized");
-      const urlSchool = await SecureStore.getItemAsync("urlColegio");
-      const schoolDataRaw = await SecureStore.getItemAsync("dataSchool");
-
-      useSchoolStore
-        .getState()
-        .setSchool(schoolDataRaw ? JSON.parse(schoolDataRaw) : null);
-      useSchoolStore.getState().setUrlColegio(urlSchool || "");
 
       if (isAuthorized === "true") {
         setShowAuth(false);

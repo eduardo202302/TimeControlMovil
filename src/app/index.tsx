@@ -1,11 +1,25 @@
 import { Redirect } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import { useEffect, useState } from "react";
 
 export default function Index() {
-  const isLoggedIn = false; // false = no ha iniciado sesión
+  const [target, setTarget] = useState<"/login" | "/home" | null>(null);
 
-  // if (isLoggedIn) {
-  //   return
-  // }
+  useEffect(() => {
+    const check = async () => {
+      const isAuthorized = await SecureStore.getItemAsync("isAuthorized");
+      const token = await SecureStore.getItemAsync("token");
 
-  return <Redirect href="/login" />;
+      if (isAuthorized === "true" && token) {
+        setTarget("/home");
+      } else {
+        setTarget("/login");
+      }
+    };
+    check();
+  }, []);
+
+  if (!target) return null;
+
+  return <Redirect href={target} />;
 }

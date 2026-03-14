@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import {
   Image,
   KeyboardAvoidingView,
@@ -14,21 +15,16 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { registerUser } from "../../api/Login/registerUser";
 import { useSchoolStore } from "../../store/useSchoolStore";
+import { RegisterType } from "../../types/typesLogin/RegisterType";
+import { formatCedula, formatPhone } from "../../utils/metodos";
 
 export default function Register() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [userType, setUserType] = useState("");
-  const [nombre, setNombre] = useState("");
-  const [nombreUsuario, setNombreUsuario] = useState("");
-  const [email, setEmail] = useState("");
-  const [telefono, setTelefono] = useState("");
-  const [password, setPassword] = useState("");
-  const [cedula, setCedula] = useState("");
-  const [showAuth, setShowAuth] = useState(false);
-
   const { school, urlColegio } = useSchoolStore();
   const { name, logo } = school || {};
+  const [showPassword, setShowPassword] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
     const check = async () => {
@@ -42,6 +38,25 @@ export default function Register() {
     };
     check();
   }, []);
+
+  const valuesDefault: RegisterType = {
+    fullName: "",
+    nickName: "",
+    email: "",
+    phone: "",
+    password: "",
+    userType: 0,
+    cedula: "",
+  };
+
+  const { handleSubmit, control } = useForm<RegisterType>({
+    defaultValues: valuesDefault,
+  });
+
+  const onSubmit = async (data: RegisterType) => {
+    const response = await registerUser(data);
+    console.log("Form Data:", data);
+  };
 
   return (
     <KeyboardAvoidingView
@@ -65,77 +80,179 @@ export default function Register() {
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Registro de Usuario</Text>
-
-            <IkarFlatList
-              data={school?.tags}
-              label="Tipo de Usuario"
-              placeholder="Seleccionar"
-              value={userType}
-              onValueChange={setUserType}
-              labelColor="#050101bd"
-              rowColor="#67a2d51a"
-              searchIconColor="#091124b3"
-              modalheight={500}
-              panelColor="#dfeff2"
-              required={true}
-            />
-
-            <InputField
-              icon="person-outline"
-              placeholder="Nombre Completo"
-              value={nombre}
-              onChangeText={setNombre}
-            />
-            <InputField
-              icon="people-outline"
-              placeholder="Usuario"
-              value={nombreUsuario}
-              onChangeText={setNombreUsuario}
-            />
-            <InputField
-              icon="mail-outline"
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-            />
-            <InputField
-              icon="call-outline"
-              placeholder="Teléfono"
-              value={telefono}
-              onChangeText={setTelefono}
-              keyboardType="phone-pad"
-            />
-            <InputField
-              icon="lock-closed-outline"
-              placeholder="Clave"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              rightIcon={
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                >
-                  <Ionicons
-                    name={showPassword ? "eye-off-outline" : "eye-outline"}
-                    size={18}
-                    color="#999"
+            <Controller
+              name="userType"
+              control={control}
+              rules={{ required: "El usuario es requerido" }}
+              render={({ field, fieldState }) => (
+                <>
+                  <IkarFlatList
+                    data={school?.tags}
+                    label="Tipo de Usuario"
+                    placeholder="Seleccionar"
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    labelColor="#050101bd"
+                    rowColor="#67a2d51a"
+                    searchIconColor="#091124b3"
+                    modalheight={500}
+                    panelColor="#dfeff2"
+                    required={true}
                   />
-                </TouchableOpacity>
-              }
+                  {fieldState.error && (
+                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                      {fieldState.error.message}
+                    </Text>
+                  )}
+                </>
+              )}
             />
-            <InputField
-              icon="card-outline"
-              placeholder="Cédula"
-              value={cedula}
-              onChangeText={setCedula}
-              keyboardType="numeric"
-              required={false}
+            <Controller
+              name="fullName"
+              control={control}
+              rules={{ required: "El nombre es requerido" }}
+              render={({ field, fieldState }) => (
+                <>
+                  <InputField
+                    icon="person-outline"
+                    placeholder="Nombre Completo"
+                    value={field.value}
+                    onChangeText={field.onChange}
+                  />
+                  {fieldState.error && (
+                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                      {fieldState.error.message}
+                    </Text>
+                  )}
+                </>
+              )}
+            />
+            <Controller
+              name="nickName"
+              control={control}
+              rules={{ required: "El nombre de usuario es requerido" }}
+              render={({ field, fieldState }) => (
+                <>
+                  <InputField
+                    icon="people-outline"
+                    placeholder="Usuario"
+                    value={field.value}
+                    onChangeText={field.onChange}
+                  />
+                  {fieldState.error && (
+                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                      {fieldState.error.message}
+                    </Text>
+                  )}
+                </>
+              )}
+            />
+            <Controller
+              name="email"
+              control={control}
+              rules={{ required: "El email es requerido" }}
+              render={({ field, fieldState }) => (
+                <>
+                  <InputField
+                    icon="mail-outline"
+                    placeholder="Email"
+                    value={field.value}
+                    onChangeText={field.onChange}
+                    keyboardType="email-address"
+                  />
+                  {fieldState.error && (
+                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                      {fieldState.error.message}
+                    </Text>
+                  )}
+                </>
+              )}
+            />
+            <Controller
+              name="phone"
+              control={control}
+              rules={{ required: "El teléfono es requerido" }}
+              render={({ field, fieldState }) => (
+                <>
+                  <InputField
+                    icon="call-outline"
+                    placeholder="Teléfono"
+                    value={field.value}
+                    onChangeText={(text) => {
+                      field.onChange(formatPhone(text));
+                    }}
+                    keyboardType="phone-pad"
+                  />
+                  {fieldState.error && (
+                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                      {fieldState.error.message}
+                    </Text>
+                  )}
+                </>
+              )}
+            />
+            <Controller
+              name="password"
+              control={control}
+              rules={{ required: "La clave es requerida" }}
+              render={({ field, fieldState }) => (
+                <>
+                  <InputField
+                    icon="lock-closed-outline"
+                    placeholder="Clave"
+                    value={field.value}
+                    onChangeText={field.onChange}
+                    secureTextEntry={!showPassword}
+                    rightIcon={
+                      <TouchableOpacity
+                        onPress={() => setShowPassword(!showPassword)}
+                      >
+                        <Ionicons
+                          name={
+                            showPassword ? "eye-off-outline" : "eye-outline"
+                          }
+                          size={18}
+                          color="#999"
+                        />
+                      </TouchableOpacity>
+                    }
+                  />
+                  {fieldState.error && (
+                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                      {fieldState.error.message}
+                    </Text>
+                  )}
+                </>
+              )}
+            />
+            <Controller
+              name="cedula"
+              control={control}
+              rules={{ required: false }}
+              render={({ field, fieldState }) => (
+                <>
+                  <InputField
+                    icon="card-outline"
+                    placeholder="Cédula"
+                    value={field.value}
+                    onChangeText={(text) => {
+                      field.onChange(formatCedula(text));
+                    }}
+                    keyboardType="numeric"
+                    required={false}
+                  />
+                  {fieldState.error && (
+                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                      {fieldState.error.message}
+                    </Text>
+                  )}
+                </>
+              )}
             />
 
             <TouchableOpacity
               style={styles.button}
-              onPress={() => router.replace("/home")}
+              onPress={handleSubmit(onSubmit)}
             >
               <Text style={styles.buttonText}>Iniciar Sesión</Text>
             </TouchableOpacity>
