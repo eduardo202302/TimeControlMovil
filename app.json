@@ -4,18 +4,18 @@
     "slug": "timeControlMovil",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logos/logo_adaptive.png",
     "scheme": "timecontrolmovil",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.timecontrol.movil",
+      "icon": "./assets/images/logos/logo_adaptive.png",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/logos/logo_adaptive.png",
+        "backgroundColor": "#E6F4FE"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -28,17 +28,30 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#EFEFEF",
           "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
+            "image": "./assets/images/logos/logo_adaptive.png",
+            "imageWidth": 80
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b8ca7a8a-5e7f-4651-bc4d-86fb78e6c908"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/b8ca7a8a-5e7f-4651-bc4d-86fb78e6c908"
     }
   }
 }
