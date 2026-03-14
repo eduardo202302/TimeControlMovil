@@ -1,33 +1,28 @@
 import Authorization from "@/components/login/Authorization";
 import FormLogin from "@/components/login/FormLogin";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BlurView } from "expo-blur";
+import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSchoolStore } from "../../store/useSchoolStore";
 
 const Login = () => {
-  const [showAuth, setShowAuth] = useState(true);
+  const [showAuth, setShowAuth] = useState(false);
   const [checking, setChecking] = useState(true);
-  const [schoolData, setSchoolData] = useState<any | null>(null);
-
+  const { school } = useSchoolStore();
+  const { name, logo } = school || {};
+  console.log("Datos de la escuela:", { name, logo });
   useEffect(() => {
     const check = async () => {
-      const isAuthorized = await AsyncStorage.getItem("isAuthorized");
-      const schoolDataRaw = await AsyncStorage.getItem("schoolData");
-      const schoolData = schoolDataRaw ? JSON.parse(schoolDataRaw) : null;
-      setSchoolData(schoolData);
-      console.log("=== ASYNC STORAGE ===");
-      console.log("image:", schoolData?.logo);
-      console.log("isAuthorized:", isAuthorized);
-      console.log("schoolData completo:", schoolData);
-      console.log("nombre:", schoolData?.name);
-      console.log("id:", schoolData?.id);
-      console.log("url:", schoolData?.tags);
-      console.log("token:", schoolData?.token);
-      console.log("mobilePin:", schoolData?.mobilePin);
-      console.log("settings:", schoolData?.settings);
-      console.log("====================");
+      const isAuthorized = await SecureStore.getItemAsync("isAuthorized");
+      const urlSchool = await SecureStore.getItemAsync("urlColegio");
+      const schoolDataRaw = await SecureStore.getItemAsync("dataSchool");
+
+      useSchoolStore
+        .getState()
+        .setSchool(schoolDataRaw ? JSON.parse(schoolDataRaw) : null);
+      useSchoolStore.getState().setUrlColegio(urlSchool || "");
 
       if (isAuthorized === "true") {
         setShowAuth(false);
@@ -40,11 +35,10 @@ const Login = () => {
   }, []);
 
   if (checking) return null;
-  console.log(schoolData);
 
   return (
     <SafeAreaView style={styles.container}>
-      <FormLogin name={schoolData?.name} image={schoolData?.logo} />
+      <FormLogin name={name} image={logo} />
 
       {showAuth && (
         <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill}>

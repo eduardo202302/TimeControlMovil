@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { loginAuthentication } from "../../../api/Login/loginAuthentication";
+import { useSchoolStore } from "../../../store/useSchoolStore";
 import { LoginType } from "../../../types/typesLogin/LoginType";
 
 interface FormLoginProps {
@@ -26,7 +27,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
   } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(false);
-  const API_URL = process.env.EXPO_PUBLIC_API_URL;
+  const { urlColegio } = useSchoolStore();
 
   const valueDefault: LoginType = {
     usuario: "",
@@ -37,7 +38,6 @@ export default function FormLogin({ name, image }: FormLoginProps) {
     defaultValues: valueDefault,
   });
 
-  // Al cargar el componente verifica si hay credenciales guardadas
   useEffect(() => {
     const cargarCredenciales = async () => {
       const usuarioGuardado = await SecureStore.getItemAsync("usuario");
@@ -54,8 +54,6 @@ export default function FormLogin({ name, image }: FormLoginProps) {
   }, []);
 
   const onSubmit = async (data: LoginType) => {
-    console.log("Datos enviados:", data);
-
     const response = await loginAuthentication(data);
     console.log("Respuesta de autenticación:", response);
 
@@ -75,14 +73,14 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         await SecureStore.deleteItemAsync("recordarme");
       }
     } else {
-      console.error(
-        "Error en la autenticación. Por favor, verifica tus credenciales.",
-      );
       setMensaje({
         texto:
           "Error en la autenticación. Por favor, verifica tus credenciales.",
         tipo: "error",
       });
+      console.error(
+        "Error en la autenticación. Por favor, verifica tus credenciales.",
+      );
     }
   };
 
@@ -101,7 +99,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       </View>
       <View style={styles.logo}>
         <Image
-          source={{ uri: `${API_URL}/${image}` }}
+          source={{ uri: `${urlColegio}/${image}` }}
           style={{ width: 100, height: 100 }}
         />
         <Text style={styles.logoTitle}>{name}</Text>

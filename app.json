@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "timeControlMovil",
-    "slug": "timeControlMovil",
+    "name": "timeControlApp",
+    "slug": "timeControlApp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logos/logo_adaptive.png",

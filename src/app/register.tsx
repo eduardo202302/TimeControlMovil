@@ -1,7 +1,7 @@
 import IkarFlatList from "@/components/login/IkarFlatList";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
 import {
   Image,
@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSchoolStore } from "../../store/useSchoolStore";
 
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
@@ -24,15 +25,20 @@ export default function Register() {
   const [telefono, setTelefono] = useState("");
   const [password, setPassword] = useState("");
   const [cedula, setCedula] = useState("");
+  const [showAuth, setShowAuth] = useState(false);
 
-  const [schoolData, setSchoolData] = useState({});
-  const API_URL = process.env.EXPO_PUBLIC_API_URL;
+  const { school, urlColegio } = useSchoolStore();
+  const { name, logo } = school || {};
 
   useEffect(() => {
     const check = async () => {
-      const schoolDataRaw = await AsyncStorage.getItem("schoolData");
-      const schoolData = schoolDataRaw ? JSON.parse(schoolDataRaw) : null;
-      setSchoolData(schoolData);
+      const isAuthorized = await SecureStore.getItemAsync("isAuthorized");
+
+      if (isAuthorized === "true") {
+        setShowAuth(false);
+      } else {
+        setShowAuth(true);
+      }
     };
     check();
   }, []);
@@ -46,29 +52,22 @@ export default function Register() {
         <View style={styles.phone}>
           <View style={styles.companies}>
             <View>
-              <Image
-                source={require("./../../assets/images/logos/logoMini.png")}
-                style={{ width: 100, height: 100 }}
-              />
-            </View>
-            <View>
               <Text style={styles.logoTitle}>FaceClass</Text>
             </View>
-            <View />
           </View>
           <View style={styles.logo}>
             <Image
-              source={{ uri: `${API_URL}/${schoolData.logo}` }}
+              source={{ uri: `${urlColegio}/${logo}` }}
               style={{ width: 100, height: 100 }}
             />
-            <Text style={styles.logoTitle}>{schoolData.name}</Text>
+            <Text style={styles.logoTitle}>{name}</Text>
           </View>
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Registro de Usuario</Text>
 
             <IkarFlatList
-              data={schoolData.tags}
+              data={school?.tags}
               label="Tipo de Usuario"
               placeholder="Seleccionar"
               value={userType}

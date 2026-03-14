@@ -21,6 +21,7 @@ const Authorization = ({ onClose }: { onClose: () => void }) => {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCard, setShowCard] = useState(true);
+  const valueDefault: ClaveRegistroType = { claveRegistro: "" };
 
   const ripple1 = useRef(new Animated.Value(0)).current;
   const ripple2 = useRef(new Animated.Value(0)).current;
@@ -28,7 +29,7 @@ const Authorization = ({ onClose }: { onClose: () => void }) => {
   const blink = useRef(new Animated.Value(1)).current;
 
   const { handleSubmit, control } = useForm<ClaveRegistroType>({
-    defaultValues: { claveRegistro: "" },
+    defaultValues: valueDefault,
   });
 
   const onSubmit = async (data: ClaveRegistroType) => {
@@ -42,11 +43,12 @@ const Authorization = ({ onClose }: { onClose: () => void }) => {
     setLoading(true);
     try {
       const response = await authorization(data);
-      console.log("success:", response.success); // <-- ver esto
-      if (response.success) {
+      if (response.data.success) {
         await AsyncStorage.setItem("isAuthorized", "true");
-        await AsyncStorage.setItem("schoolData", JSON.stringify(response.data));
-        console.log("Guardado en AsyncStorage");
+        await AsyncStorage.setItem(
+          "schoolData",
+          JSON.stringify(response.data.data),
+        );
         setMensaje({
           texto: "Dispositivo autorizado correctamente.",
           tipo: "success",
@@ -54,12 +56,11 @@ const Authorization = ({ onClose }: { onClose: () => void }) => {
         setTimeout(() => {
           setShowCard(false);
           onClose();
-        }, 1500);
+        }, 500);
       } else {
         setMensaje({ texto: "Clave de registro inválida.", tipo: "error" });
       }
     } catch (error) {
-      console.log("Error:", error);
       setMensaje({ texto: "Clave de registro inválida.", tipo: "error" });
     } finally {
       setLoading(false);
