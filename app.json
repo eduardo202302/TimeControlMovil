@@ -31,7 +31,7 @@
           "backgroundColor": "#EFEFEF",
           "android": {
             "image": "./assets/images/logos/logo_adaptive.png",
-            "imageWidth": 80
+            "imageWidth": 100
           }
         }
       ],
