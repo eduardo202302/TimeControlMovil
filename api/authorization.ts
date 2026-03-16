@@ -11,7 +11,7 @@ const api = axios.create({
 const authorization = async (data: ClaveRegistroType) => {
   const { claveRegistro } = data;
   try {
-    const response = await buscarEmpresaPorPin(claveRegistro);
+    const response = buscarEmpresaPorPin(claveRegistro);
 
     if (!response) throw new Error("Error en la solicitud de autorización.");
 

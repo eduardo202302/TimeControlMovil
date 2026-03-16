@@ -39,10 +39,10 @@ const Authorization = ({ onClose }: { onClose: () => void }) => {
       });
       return;
     }
-    setLoading(true);
     try {
       const response = await authorization(data);
-      if (response) {
+      setLoading(true);
+      if (response.data) {
         setMensaje({
           texto: "Dispositivo autorizado correctamente.",
           tipo: "success",
@@ -52,10 +52,8 @@ const Authorization = ({ onClose }: { onClose: () => void }) => {
           onClose();
         }, 500);
       } else {
-        setMensaje({
-          texto: "Clave de registro inválida.",
-          tipo: "error",
-        });
+        setMensaje({ texto: "Clave de registro inválida.", tipo: "error" });
+        return;
       }
     } catch (error) {
       setMensaje({ texto: "Clave de registro inválida.", tipo: "error" });

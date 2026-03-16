@@ -1,5 +1,6 @@
 import { Stack, router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import * as Updates from "expo-updates";
 import { useEffect } from "react";
 import { useSchoolStore } from "../../store/useSchoolStore";
 
@@ -8,6 +9,18 @@ export default function RootLayout() {
 
   useEffect(() => {
     const checkAuthorization = async () => {
+      // verificar updates primero
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          await Updates.reloadAsync();
+          return; // la app se reinicia, no continúa
+        }
+      } catch (error) {
+        console.log("Error checking update:", error);
+      }
+
       const isAuthorized = await SecureStore.getItemAsync("isAuthorized");
       const schoolDataRaw = await SecureStore.getItemAsync("dataSchool");
       const urlColegio = await SecureStore.getItemAsync("urlColegio");
