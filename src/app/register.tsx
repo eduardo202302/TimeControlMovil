@@ -15,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { registerUser } from "../../api/Login/registerUser";
+import { registerUser } from "../../api/Login/loginAuthentication";
 import { useSchoolStore } from "../../store/useSchoolStore";
 import { RegisterType } from "../../types/typesLogin/RegisterType";
 import { formatCedula, formatPhone } from "../../utils/metodos";
@@ -25,6 +25,10 @@ export default function Register() {
   const { name, logo } = school || {};
   const [showPassword, setShowPassword] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [mensaje, setMensaje] = useState<{
+    texto: string;
+    tipo: "error" | "success";
+  } | null>(null);
 
   useEffect(() => {
     const check = async () => {
@@ -55,7 +59,22 @@ export default function Register() {
 
   const onSubmit = async (data: RegisterType) => {
     const response = await registerUser(data);
-    console.log("Form Data:", data);
+    console.log("Respuesta del registro:", response);
+    if (response.success) {
+      setMensaje({
+        texto: "Registro exitoso. Redirigiendo al login...",
+        tipo: "success",
+      });
+
+      setTimeout(() => {
+        router.push("/login");
+      }, 1500);
+    } else {
+      setMensaje({
+        texto: response.message || "Error en el registro.",
+        tipo: "error",
+      });
+    }
   };
 
   return (
@@ -80,6 +99,18 @@ export default function Register() {
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Registro de Usuario</Text>
+            {mensaje && (
+              <View style={{ marginBottom: 10 }}>
+                <Text
+                  style={{
+                    color: mensaje.tipo === "error" ? "red" : "green",
+                    textAlign: "center",
+                  }}
+                >
+                  {mensaje.texto}
+                </Text>
+              </View>
+            )}
             <Controller
               name="userType"
               control={control}
@@ -422,4 +453,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "500",
   },
+  msg: { marginTop: 10, padding: 8, borderRadius: 6, alignItems: "center" },
+  msgError: {
+    backgroundColor: "#fff8f0",
+    borderWidth: 1,
+    borderColor: "#ffcc80",
+  },
+  msgSuccess: {
+    backgroundColor: "#f0faf5",
+    borderWidth: 1,
+    borderColor: "#a8dfc4",
+  },
+  msgText: { fontSize: 12 },
 });

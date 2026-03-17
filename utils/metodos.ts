@@ -1,9 +1,19 @@
-import empresas from "../empresas.json";
+export async function buscarEmpresaPorPin(pin: string) {
+  try {
+    const response = await fetch(
+      "https://raw.githubusercontent.com/eduardo202302/TimeControlMovil/refs/heads/main/data/empresas.json",
+    );
+    const empresas = await response.json();
 
-export function buscarEmpresaPorPin(pin: string) {
-  return empresas.empresas.find(
-    (empresa: { pin: string }) => empresa.pin === pin,
-  );
+    const empresaEncomntrada = empresas.empresas.find(
+      (empresa: { pin: string }) => empresa.pin === pin,
+    );
+
+    return empresaEncomntrada;
+  } catch (error) {
+    console.error("Error al buscar empresa:", error);
+    return null;
+  }
 }
 
 export const formatPhone = (value: string) => {
