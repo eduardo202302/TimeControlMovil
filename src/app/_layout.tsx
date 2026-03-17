@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { Stack, router, usePathname } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import * as Updates from "expo-updates";
@@ -68,16 +69,45 @@ export default function RootLayout() {
         console.log("Error checking update:", error);
       }
 
+=======
+import { Stack, router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import { useEffect } from "react";
+import { useSchoolStore } from "../../store/useSchoolStore";
+
+export default function RootLayout() {
+  const { setSchool, setUrlColegio, setToken, setMenuResolution } =
+    useSchoolStore();
+
+  useEffect(() => {
+    const checkAuthorization = async () => {
+>>>>>>> main
       const isAuthorized = await SecureStore.getItemAsync("isAuthorized");
       const schoolDataRaw = await SecureStore.getItemAsync("dataSchool");
       const urlColegio = await SecureStore.getItemAsync("urlColegio");
       const token = await SecureStore.getItemAsync("token");
       const userRaw = await SecureStore.getItemAsync("user");
+<<<<<<< HEAD
+=======
+      const menuItemsRaw = await SecureStore.getItemAsync("menuItems");
+>>>>>>> main
 
       if (schoolDataRaw) setSchool(JSON.parse(schoolDataRaw));
       if (urlColegio) setUrlColegio(urlColegio);
       if (token) setToken(token);
+<<<<<<< HEAD
       if (userRaw) setUser(JSON.parse(userRaw));
+=======
+
+      if (isAuthorized === "true" && userRaw && menuItemsRaw) {
+        const user = JSON.parse(userRaw);
+        const menuItems = JSON.parse(menuItemsRaw);
+        setMenuResolution(user, menuItems);
+        const { initialPath } = useSchoolStore.getState();
+        router.replace((initialPath ?? "/login") as never);
+        return;
+      }
+>>>>>>> main
 
       if (isAuthorized !== "true") {
         router.replace("/login");
@@ -88,6 +118,7 @@ export default function RootLayout() {
   }, []);
 
   return (
+<<<<<<< HEAD
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
@@ -249,3 +280,14 @@ const styles = StyleSheet.create({
   },
 
 });
+=======
+    <Stack>
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="register" options={{ headerShown: false }} />
+      <Stack.Screen name="forgotPassword" options={{ headerShown: false }} />
+      <Stack.Screen name="(app)" options={{ headerShown: false }} />
+    </Stack>
+  );
+}
+>>>>>>> main

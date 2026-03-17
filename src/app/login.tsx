@@ -10,7 +10,11 @@ import { useSchoolStore } from "../../store/useSchoolStore";
 const Login = () => {
   const [showAuth, setShowAuth] = useState(false);
   const [checking, setChecking] = useState(true);
+<<<<<<< HEAD
   const { school, urlColegio } = useSchoolStore();
+=======
+  const { school } = useSchoolStore();
+>>>>>>> main
   const { name, logo } = school || {};
 
   useEffect(() => {
