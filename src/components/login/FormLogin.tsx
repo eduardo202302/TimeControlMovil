@@ -69,6 +69,14 @@ export default function FormLogin({ name, image }: FormLoginProps) {
 
       if (response.success) {
         const { token } = response.data;
+        console.log(
+          "userSchedules:",
+          JSON.stringify(response.data.userSchedules, null, 2),
+        );
+        console.log(
+          "punchesToday:",
+          JSON.stringify(response.data.punchesToday, null, 2),
+        );
 
         const currentUrl =
           urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
@@ -92,6 +100,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
             menu: role?.menu ?? [],
           },
           school: useSchoolStore.getState().school ?? {},
+          serSchedules: response.data.userSchedules ?? [],
         };
 
         // Resolver app + ruta + árbol de menú
@@ -158,7 +167,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       <View style={styles.logo}>
         {urlColegio && name ? (
           <Image
-            source={{ uri: `${urlColegio}/${name}` }}
+            source={{ uri: `${urlColegio}/${image}` }}
             style={{ width: 100, height: 100 }}
           />
         ) : null}
