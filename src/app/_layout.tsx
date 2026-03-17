@@ -23,11 +23,9 @@ export default function RootLayout() {
       if (isAuthorized === "true" && userRaw && menuItemsRaw) {
         const user = JSON.parse(userRaw);
         const menuItems = JSON.parse(menuItemsRaw);
-
         setMenuResolution(user, menuItems);
-
         const { initialPath } = useSchoolStore.getState();
-        router.replace((initialPath ?? "/entrada-salida") as never);
+        router.replace((initialPath ?? "/login") as never);
         return;
       }
 
@@ -44,10 +42,8 @@ export default function RootLayout() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="register" options={{ headerShown: false }} />
-      <Stack.Screen name="home" options={{ headerShown: false }} />
       <Stack.Screen name="forgotPassword" options={{ headerShown: false }} />
-      <Stack.Screen name="dashboard" options={{ headerShown: false }} />
-      <Stack.Screen name="punchinout" options={{ headerShown: false }} />
+      <Stack.Screen name="(app)" options={{ headerShown: false }} />
     </Stack>
   );
 }

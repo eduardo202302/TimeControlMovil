@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Slot, usePathname } from "expo-router";
 import React, { useState } from "react";
 import {
     StatusBar,
@@ -8,18 +9,34 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSchoolStore } from "../../store/useSchoolStore";
-import DrawerMenu from "../components/drawer/DrawerMenu";
+import DrawerMenu from "../../components/drawer/DrawerMenu";
 
-export default function Dashboard() {
+const ROUTE_TITLES: Record<string, string> = {
+  "/punchinout": "Entrada y Salida",
+  "/attendancetaking": "Asistencia",
+  "/tardiness": "Tardanzas",
+  "/parentsexcusesscreen": "Excusas",
+  "/timeoff": "Permisos",
+  "/dashboard": "Dashboard",
+  "/users": "Usuarios",
+  "/students": "Estudiantes",
+  "/teachers": "Docentes",
+  "/parents": "Padres / Tutores",
+  "/roles": "Roles",
+  "/entities": "Empresa",
+  "/unauthorized": "Sin acceso",
+};
+
+export default function AppLayout() {
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const { user } = useSchoolStore();
+  const pathname = usePathname();
+  const title = ROUTE_TITLES[pathname] ?? "Time Flow";
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
-      {/* Header */}
+      {/* Header compartido */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => setDrawerVisible(true)}
@@ -28,19 +45,14 @@ export default function Dashboard() {
         >
           <Ionicons name="menu" size={24} color="#111827" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Dashboard</Text>
+        <Text style={styles.headerTitle}>{title}</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Contenido */}
-      <View style={styles.content}>
-        <Text style={styles.welcome}>
-          Hola, {user?.user?.fullName ?? "Usuario"} 👋
-        </Text>
-        <Text style={styles.role}>{user?.role?.name}</Text>
-      </View>
+      {/* Contenido de cada pantalla */}
+      <Slot />
 
-      {/* Sidebar */}
+      {/* Drawer compartido */}
       <DrawerMenu
         isVisible={drawerVisible}
         onClose={() => setDrawerVisible(false)}
@@ -69,12 +81,4 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   headerTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
-  content: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  welcome: { fontSize: 22, fontWeight: "700", color: "#111827" },
-  role: { fontSize: 15, color: "#6B7280" },
 });

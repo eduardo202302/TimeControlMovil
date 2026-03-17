@@ -1,32 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import DrawerMenu from "../components/drawer/DrawerMenu";
 
 export default function AttendanceTaking() {
-  const [drawerVisible, setDrawerVisible] = useState(false);
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => setDrawerVisible(true)}
-          style={styles.menuBtn}
-        >
-          <Ionicons name="menu" size={24} color="#111827" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Asistencia</Text>
-        <View style={{ width: 40 }} />
-      </View>
       <View style={styles.content}>
         <Ionicons name="checkmark-circle-outline" size={48} color="#93C5FD" />
         <Text style={styles.label}>Asistencia</Text>
         <Text style={styles.sub}>Conecta tu API aquí</Text>
       </View>
-      <DrawerMenu
-        isVisible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-      />
     </SafeAreaView>
   );
 }
