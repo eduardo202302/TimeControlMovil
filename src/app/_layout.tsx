@@ -23,7 +23,7 @@ export default function RootLayout() {
 
   const toggleMenu = (menu: string) => {
     setExpandedMenus((prev) =>
-      prev.includes(menu) ? prev.filter((m) => m !== menu) : [...prev, menu],
+      prev.includes(menu) ? prev.filter((m) => m !== menu) : [...prev, menu]
     );
   };
 
@@ -90,115 +90,162 @@ export default function RootLayout() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={{ flex: 1, backgroundColor: "#dfe9ff" }}
+      style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={{ flex: 1, flexDirection: "row" }}>
-          {/* Sidebar */}
-          {sidebarOpen && (
-            <View style={styles.sidebar}>
-              <ScrollView>
-                {menuItems.map((item) => {
-                  const Icon = item.icon;
-                  const expanded = expandedMenus.includes(item.id);
+      <View style={{ flex: 1, flexDirection: "row" }}>
+        
+        {/* SIDEBAR */}
+        {sidebarOpen && (
+          <View style={styles.sidebar}>
+            <ScrollView>
 
-                  return (
-                    <View key={item.id}>
-                      <TouchableOpacity
-                        style={styles.menuButton}
-                        onPress={() => toggleMenu(item.id)}
-                      >
-                        <Icon size={20} color="#2563eb" />
-                        <Text style={styles.menuLabel}>{item.label}</Text>
-                      </TouchableOpacity>
+              <View style={styles.sidebarHeader}>
+                <Text style={styles.logo}>Time Flow</Text>
+                <Text style={styles.subtitle}>Gestión de tiempo</Text>
+              </View>
 
-                      {expanded &&
-                        item.submenu.map((sub) => (
-                          <TouchableOpacity
-                            key={sub.path}
-                            style={[
-                              styles.submenu,
-                              pathname === sub.path && styles.activeSubmenu,
-                            ]}
-                            //onPress={() => router.push(sub.path)}
-                          >
-                            <Text>{sub.label}</Text>
-                          </TouchableOpacity>
-                        ))}
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                const expanded = expandedMenus.includes(item.id);
 
-          {/* Main Area */}
-          <View style={{ flex: 1 }}>
-            {/* Top Bar */}
-            <View style={styles.header}>
-              <TouchableOpacity onPress={() => setSidebarOpen(!sidebarOpen)}>
-                <Menu size={24} color="#333" />
-              </TouchableOpacity>
-              <Text style={styles.headerTitle}>Time Flow</Text>
-            </View>
+                return (
+                  <View key={item.id}>
+                    <TouchableOpacity
+                      style={styles.menuButton}
+                      onPress={() => toggleMenu(item.id)}
+                    >
+                      <Icon size={20} color="#2563eb" />
+                      <Text style={styles.menuLabel}>{item.label}</Text>
+                    </TouchableOpacity>
 
-            {/* Navigation */}
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="login" />
-              <Stack.Screen name="register" />
-              <Stack.Screen name="home" />
-            </Stack>
+                    {expanded &&
+                      item.submenu.map((sub) => (
+                        <TouchableOpacity
+                          key={sub.path}
+                          style={[
+                            styles.submenu,
+                            pathname === sub.path && styles.activeSubmenu,
+                          ]}
+                          onPress={() => {
+                          // router.push(sub.path);
+                            setSidebarOpen(false);
+                          }}
+                        >
+                          <Text style={styles.submenuText}>{sub.label}</Text>
+                        </TouchableOpacity>
+                      ))}
+                  </View>
+                );
+              })}
+            </ScrollView>
           </View>
+        )}
+
+        {/* MAIN CONTENT */}
+        <View style={{ flex: 1 }}>
+
+          {/* HEADER */}
+          <View style={styles.header}>
+            <TouchableOpacity
+              onPress={() => setSidebarOpen((prev) => !prev)}
+            >
+              <Menu size={26} color="#333" />
+            </TouchableOpacity>
+
+            <Text style={styles.headerTitle}>Time Flow</Text>
+          </View>
+
+          {/* STACK NAVIGATION */}
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="login" />
+            <Stack.Screen name="register" />
+            <Stack.Screen name="home" />
+          </Stack>
+
         </View>
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+
+  container: {
+    flex: 1,
+    backgroundColor: "#dfe9ff",
+  },
+
   sidebar: {
-    width: 220,
-    backgroundColor: "white",
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 240,
+    backgroundColor: "#ffffff",
     borderRightWidth: 1,
+    borderColor: "#e5e7eb",
+    zIndex: 1000,
+  },
+
+  sidebarHeader: {
+    padding: 20,
+    borderBottomWidth: 1,
     borderColor: "#eee",
   },
+
+  logo: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#2563eb",
+  },
+
+  subtitle: {
+    fontSize: 12,
+    color: "#666",
+  },
+
   menuButton: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     gap: 10,
   },
+
   menuLabel: {
     fontSize: 16,
     fontWeight: "500",
   },
+
   submenu: {
-    paddingLeft: 40,
-    paddingVertical: 8,
+    paddingLeft: 45,
+    paddingVertical: 10,
   },
+
+  submenuText: {
+    fontSize: 14,
+    color: "#444",
+  },
+
   activeSubmenu: {
     backgroundColor: "#eef2ff",
   },
+
   header: {
-    height: 60,
-    backgroundColor: "white",
+    height: 65,
+    backgroundColor: "#ffffff",
     borderBottomWidth: 1,
-    borderColor: "#eee",
+    borderColor: "#e5e7eb",
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
     gap: 15,
   },
+
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
   },
-  scroll: {
-    flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-    backgroundColor: "#dfe9ff",
-  },
+
 });

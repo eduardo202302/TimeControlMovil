@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import { LogIn, LogOut } from "lucide-react-native";
+import {
+  LogIn,
+  LogOut,
+  Clock,
+  Briefcase,
+  Utensils,
+  Coffee
+} from "lucide-react-native";
 
 export default function EntradaSalida() {
 
   const [hora, setHora] = useState(new Date());
   const [entradaActiva, setEntradaActiva] = useState(false);
+  const [categoria, setCategoria] = useState("jornada");
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -19,12 +27,118 @@ export default function EntradaSalida() {
     setEntradaActiva(!entradaActiva);
   };
 
+  const formatearFecha = (fecha: Date) => {
+    return fecha.toLocaleDateString("es-ES", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+  };
+
   return (
     <View style={styles.container}>
 
-      <Text style={styles.hora}>
-        {hora.toLocaleTimeString()}
-      </Text>
+      {/* TARJETA HORA */}
+      <View style={styles.timeCard}>
+
+        <View style={styles.timeHeader}>
+          <Clock color="white" size={18} />
+          <Text style={styles.timeLabel}>Hora Actual</Text>
+        </View>
+
+        <Text style={styles.hora}>
+          {hora.toLocaleTimeString()}
+        </Text>
+
+        <Text style={styles.fecha}>
+          {formatearFecha(hora)}
+        </Text>
+
+      </View>
+
+
+      {/* SELECCIONAR CATEGORIA */}
+
+      <View style={styles.categoriaCard}>
+
+        <Text style={styles.tituloCategoria}>
+          Seleccionar Categoría
+        </Text>
+
+        <View style={styles.categorias}>
+
+          {/* JORNADA */}
+
+          <TouchableOpacity
+            style={[
+              styles.categoriaBtn,
+              categoria === "jornada" && styles.categoriaActiva
+            ]}
+            onPress={() => setCategoria("jornada")}
+          >
+
+            <Briefcase
+              size={20}
+              color={categoria === "jornada" ? "white" : "#555"}
+            />
+
+            <Text style={categoria === "jornada" ? styles.textoActivo : styles.textoCategoria}>
+              Jornada
+            </Text>
+
+          </TouchableOpacity>
+
+
+          {/* ALMUERZO */}
+
+          <TouchableOpacity
+            style={[
+              styles.categoriaBtn,
+              categoria === "almuerzo" && styles.categoriaActiva
+            ]}
+            onPress={() => setCategoria("almuerzo")}
+          >
+
+            <Utensils
+              size={20}
+              color={categoria === "almuerzo" ? "white" : "#555"}
+            />
+
+            <Text style={categoria === "almuerzo" ? styles.textoActivo : styles.textoCategoria}>
+              Almuerzo
+            </Text>
+
+          </TouchableOpacity>
+
+
+          {/* BREAK */}
+
+          <TouchableOpacity
+            style={[
+              styles.categoriaBtn,
+              categoria === "break" && styles.categoriaActiva
+            ]}
+            onPress={() => setCategoria("break")}
+          >
+
+            <Coffee
+              size={20}
+              color={categoria === "break" ? "white" : "#555"}
+            />
+
+            <Text style={categoria === "break" ? styles.textoActivo : styles.textoCategoria}>
+              Break
+            </Text>
+
+          </TouchableOpacity>
+
+        </View>
+
+      </View>
+
+
+      {/* BOTON REGISTRAR */}
 
       {!entradaActiva ? (
 
@@ -32,8 +146,10 @@ export default function EntradaSalida() {
           style={styles.btnEntrada}
           onPress={registrar}
         >
-          <LogIn color="white" size={30} />
-          <Text style={styles.textBtn}>Registrar Entrada</Text>
+          <LogIn color="white" size={26} />
+          <Text style={styles.textBtn}>
+            Registrar Entrada
+          </Text>
         </TouchableOpacity>
 
       ) : (
@@ -42,8 +158,10 @@ export default function EntradaSalida() {
           style={styles.btnSalida}
           onPress={registrar}
         >
-          <LogOut color="white" size={30} />
-          <Text style={styles.textBtn}>Registrar Salida</Text>
+          <LogOut color="white" size={26} />
+          <Text style={styles.textBtn}>
+            Registrar Salida
+          </Text>
         </TouchableOpacity>
 
       )}
@@ -53,33 +171,109 @@ export default function EntradaSalida() {
 }
 
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center"
+    backgroundColor: "#f5f7fb",
+    padding: 20
+  },
+
+  timeCard: {
+    backgroundColor: "#2563eb",
+    padding: 22,
+    borderRadius: 18,
+    marginBottom: 20
+  },
+
+  timeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    gap: 6
+  },
+
+  timeLabel: {
+    color: "white",
+    fontSize: 16
   },
 
   hora: {
-    fontSize: 40,
-    marginBottom: 40,
+    color: "white",
+    fontSize: 36,
     fontWeight: "bold"
   },
 
+  fecha: {
+    color: "#dbeafe",
+    marginTop: 5
+  },
+
+  categoriaCard: {
+    backgroundColor: "white",
+    padding: 18,
+    borderRadius: 15,
+    marginBottom: 25
+  },
+
+  tituloCategoria: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 14
+  },
+
+  categorias: {
+    flexDirection: "row",
+    justifyContent: "space-between"
+  },
+
+  categoriaBtn: {
+    flex: 1,
+    backgroundColor: "#f1f5f9",
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6
+  },
+
+  categoriaActiva: {
+    backgroundColor: "#2563eb"
+  },
+
+  textoCategoria: {
+    color: "#333"
+  },
+
+  textoActivo: {
+    color: "white",
+    fontWeight: "600"
+  },
+
   btnEntrada: {
-    backgroundColor: "green",
-    padding: 20,
-    borderRadius: 10
+    backgroundColor: "#22c55e",
+    padding: 18,
+    borderRadius: 14,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 10
   },
 
   btnSalida: {
-    backgroundColor: "red",
-    padding: 20,
-    borderRadius: 10
+    backgroundColor: "#ef4444",
+    padding: 18,
+    borderRadius: 14,
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 10
   },
 
   textBtn: {
     color: "white",
-    marginTop: 10,
-    fontWeight: "bold"
+    fontSize: 18,
+    fontWeight: "600"
   }
+
 });
