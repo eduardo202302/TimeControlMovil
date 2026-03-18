@@ -12,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import DrawerMenu from "../../components/drawer/DrawerMenu";
 
 const ROUTE_TITLES: Record<string, string> = {
-  "/punchinout": "Entrada y Salida",
+  "/punchinout": "Registrar Acceso",
   "/attendancetaking": "Asistencia",
   "/tardiness": "Tardanzas",
   "/parentsexcusesscreen": "Excusas",
@@ -80,5 +80,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 10,
   },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
+  headerTitle: { fontSize: 18, fontWeight: "700", color: "#142157" },
 });
