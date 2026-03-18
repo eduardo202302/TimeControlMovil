@@ -93,7 +93,7 @@ function pad(n: number): string {
   return n.toString().padStart(2, "0");
 }
 
-/** "08:45:32 a. m." — reloj principal */
+/**— reloj principal */
 function formatRDTime(date: Date): string {
   const { hours, minutes, seconds } = toRD(date);
   const h12 = hours % 12 === 0 ? 12 : hours % 12;
@@ -101,15 +101,18 @@ function formatRDTime(date: Date): string {
   return `${pad(h12)}:${pad(minutes)}:${pad(seconds)} ${ampm}`;
 }
 
-/** "08:45 a. m." — modal / registros */
+/**  — modal / registros */
 function formatRDTimeShort(date: Date): string {
   const { hours, minutes } = toRD(date);
   const h12 = hours % 12 === 0 ? 12 : hours % 12;
   const ampm = hours < 12 ? "a. m." : "p. m.";
   return `${pad(h12)}:${pad(minutes)} ${ampm}`;
+  
+
 }
 
-/** "martes, 17 de marzo de 2026" */
+
+
 function formatRDDate(date: Date): string {
   const { weekDay, day, month, year } = toRD(date);
   return `${WEEK_DAYS[weekDay]}, ${day} de ${MONTH_NAMES[month]} de ${year}`;
@@ -121,7 +124,7 @@ function getRDMinutes(date: Date): number {
   return hours * 60 + minutes;
 }
 
-/** Día de la semana en RD */
+/** Día de la semana */
 function getRDDayIndex(date: Date): number {
   return toRD(date).weekDay;
 }
@@ -224,16 +227,21 @@ function isAlmuerzoVisible(
 
 export default function PunchInOut() {
   const [now, setNow] = useState(new Date());
-  const [selectedCategory, setSelectedCategory] = useState<Category>("Jornada");
+  const [selectedCategory, setSelectedCategory] = useState<Category>("Jornada"); 
   const [punches, setPunches] = useState<PunchEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingPunches, setLoadingPunches] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
+  const usuario = SecureStore.getItemAsync("user");
   const { user, urlColegio } = useSchoolStore();
   const userSchedules: UserSchedule[] = (user as any)?.userSchedules ?? [];
   const todaySchedule = getTodaySchedule(userSchedules, now);
   const jornadaIniciada = isJornadaActiva(punches);
+
+
+  //console.log("Horario de hoy:", todaySchedule);
+  //console.log("este es usuario",usuario )
+  //console.log("este es user",user?.user.fullName )
 
   // Datos del usuario autenticado
   const userName: string =
@@ -433,7 +441,7 @@ export default function PunchInOut() {
           {/* Info */}
           <View style={styles.profileInfo}>
             <Text style={styles.profileName} numberOfLines={1}>
-              {userName}{userCode ? ` - ${userCode}` : ""}
+             {user?.user.fullName}
             </Text>
             {todaySchedule ? (
               <>
