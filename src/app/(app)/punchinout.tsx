@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
+import * as ImagePicker from "expo-image-picker";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -366,17 +367,43 @@ export default function PunchInOut() {
       return;
     }
 
+    // ── Solicitar permiso de cámara ──
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permiso requerido",
+        "Necesitas permitir el acceso a la cámara para registrar tu asistencia.",
+      );
+      return;
+    }
+
+    // ── Abrir cámara ──
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.6,
+      base64: true,
+    });
+
+    if (result.canceled) return;
+
+    const photo = result.assets[0];
+
     const types = PUNCH_TYPE_MAP[selectedCategory];
     const type = isInicio ? types.inicio : types.fin;
-    const status = selectedCategory === "Break" ? undefined : getEntryStatus();
+    const status2 = selectedCategory === "Break" ? undefined : getEntryStatus();
 
     setLoading(true);
     try {
       const payload: Record<string, any> = { type };
-      if (status !== undefined) payload.status = status;
+      if (status2 !== undefined) payload.status = status2;
+      if (photo.base64) payload.photourl = [photo.base64];
 
       const response = await axios.post(`${urlColegio}/punches`, payload, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       });
 
       if (response.data.success) {
