@@ -401,7 +401,7 @@ export default function PunchInOut() {
   ).filter((cat) => {
     if (!jornadaIniciada && (cat === "Almuerzo" || cat === "Break"))
       return false;
-     if (cat === "Almuerzo")
+    if (cat === "Almuerzo")
       return isAlmuerzoVisible(now, todaySchedule, punches);
     return true;
   });
