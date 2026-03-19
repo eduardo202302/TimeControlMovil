@@ -27,7 +27,7 @@ export default function ParentsExcusesScreen() {
   const [estudiante, setEstudiante] = useState("");
   const [estudiantes, setEstudiantes] = useState<any[]>([]);
 
-  //  CARGAR ESTUDIANTES AUTOMÁTICO
+  // ✅ CARGAR ESTUDIANTES AUTOMÁTICO
   useEffect(() => {
     const cargarEstudiantes = async () => {
       const data = await getStudents();

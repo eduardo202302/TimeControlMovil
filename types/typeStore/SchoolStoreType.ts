@@ -1,7 +1,7 @@
 import { AppType, MenuTree } from "../../utils/resolveRoute";
 import { MenuItem, RoleItem } from "../typesMenu/MenuTypes";
 
-// ─── Tipos existentes (no modificados) ───────────────────────────────────────
+// ─── Tipos existente ───────────────────────────────────────
 
 export interface School {
   id: number;
@@ -62,4 +62,7 @@ export interface SchoolStore {
 
   // Acción nueva
   setMenuResolution: (user: User, menuItems: MenuItem[]) => void;
+
+  // Cerrar sesión
+  logout: () => void;
 }

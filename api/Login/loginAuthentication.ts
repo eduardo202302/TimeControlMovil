@@ -23,11 +23,22 @@ const loginAuthentication = async (data: LoginType) => {
       userName,
       password,
     });
+
     const { success, data: responseData, message } = response.data;
 
     if (success) {
       await SecureStore.setItemAsync("token", responseData.token);
       await SecureStore.setItemAsync("user", JSON.stringify(responseData.user));
+
+      // Guardar foto desde schoolUsers
+      console.log("Datos de schoolUsers:", responseData.user?.schoolUsers?.[0]);
+      const schoolUser = responseData.user?.schoolUsers?.[0];
+      if (schoolUser?.photourl) {
+        await SecureStore.setItemAsync("photourl", schoolUser.photourl);
+      }
+      if (schoolUser?.s3Photo) {
+        await SecureStore.setItemAsync("s3Photo", schoolUser.s3Photo);
+      }
     }
 
     return { success, data: responseData, message };
