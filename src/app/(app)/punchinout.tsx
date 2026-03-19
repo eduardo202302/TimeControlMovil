@@ -93,6 +93,14 @@ function pad(n: number): string {
   return n.toString().padStart(2, "0");
 }
 
+function to12h(timeStr: string): string {
+  if (!timeStr) return "";
+  const [h, m] = timeStr.split(":").map(Number);
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  const ampm = h < 12 ? "a.m." : "p.m.";
+  return `${h12}:${pad(m)} ${ampm}`;
+}
+
 /** "08:45:32 a. m." — reloj principal */
 function formatRDTime(date: Date): string {
   const { hours, minutes, seconds } = toRD(date);
@@ -394,7 +402,7 @@ export default function PunchInOut() {
     if (!jornadaIniciada && (cat === "Almuerzo" || cat === "Break"))
       return false;
     // if (cat === "Almuerzo")
-  //   return isAlmuerzoVisible(now, todaySchedule, punches);
+    //   return isAlmuerzoVisible(now, todaySchedule, punches);
     return true;
   });
 
@@ -452,7 +460,6 @@ export default function PunchInOut() {
         <View style={styles.profileRow}>
           {/* Avatar */}
           <View style={styles.avatarWrap}>
-           
             <View style={styles.avatarFallback}>
               {phoneImagen ? (
                 <Image
@@ -469,7 +476,6 @@ export default function PunchInOut() {
                 <Ionicons name="person" size={28} color="#9CA3AF" />
               )}
             </View>
-
           </View>
 
           {/* Info */}
@@ -477,29 +483,31 @@ export default function PunchInOut() {
             <Text style={styles.profileName} numberOfLines={1}>
               {user?.user.fullName}
             </Text>
+
             {todaySchedule ? (
-              <>
-                <View style={styles.profileScheduleRow}>
-                  <Ionicons name="time-outline" size={13} color="#2563EB" />
-                  <Text style={styles.profileScheduleText}>
-                    Horario: {todaySchedule.workEntryTime?.slice(0, 5)} –{" "}
-                    {todaySchedule.workExitTime?.slice(0, 5)}
+              <View style={styles.scheduleTable}>
+                {/* Cabeceras */}
+                <View style={styles.scheduleTableCol}>
+                  <Text style={styles.scheduleTableHeader}>HORARIO</Text>
+                  <Text style={styles.scheduleTableValue}>
+                    {to12h(todaySchedule.workEntryTime)} –
+                  </Text>
+                  <Text style={styles.scheduleTableValue}>
+                    {to12h(todaySchedule.workExitTime)}
                   </Text>
                 </View>
                 {todaySchedule.lunchEntryTime && (
-                  <View style={styles.profileScheduleRow}>
-                    <Ionicons
-                      name="restaurant-outline"
-                      size={13}
-                      color="#D97706"
-                    />
-                    <Text style={styles.profileScheduleText}>
-                      Almuerzo: {todaySchedule.lunchEntryTime.slice(0, 5)} –{" "}
-                      {todaySchedule.lunchExitTime?.slice(0, 5)}
+                  <View style={styles.scheduleTableCol}>
+                    <Text style={styles.scheduleTableHeader}>ALMUERZO</Text>
+                    <Text style={styles.scheduleTableValue}>
+                      {to12h(todaySchedule.lunchEntryTime)} –
+                    </Text>
+                    <Text style={styles.scheduleTableValue}>
+                      {to12h(todaySchedule.lunchExitTime ?? "")}
                     </Text>
                   </View>
                 )}
-              </>
+              </View>
             ) : (
               <View style={styles.profileScheduleRow}>
                 <Ionicons name="warning-outline" size={13} color="#D97706" />
@@ -536,7 +544,7 @@ export default function PunchInOut() {
                 <Ionicons
                   name={CATEGORY_ICONS[cat]}
                   size={22}
-                  color={selectedCategory === cat ? "#fff" : "#6B7280"}
+                  color={selectedCategory === cat ? "#fff" : "#2563EB"}
                 />
                 <Text
                   style={[
@@ -573,7 +581,7 @@ export default function PunchInOut() {
               />
               <View style={styles.registerTextWrap}>
                 <Text style={styles.registerBtnText}>
-                  {isInicio ? "Registrar Entrada" : "Registrar Salida"}
+                  {isInicio ? "Entrada" : "Salida"}
                 </Text>
                 <Text style={styles.registerBtnSub}>({selectedCategory})</Text>
               </View>
@@ -754,7 +762,27 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#BFDBFE",
   },
-  profileInfo: { flex: 1, gap: 6 },
+  profileInfo: { flex: 1, gap: 4 },
+  profileRoleText: { fontSize: 12, color: "#2563EB", fontWeight: "600" },
+  scheduleTable: {
+    flexDirection: "row",
+    gap: 16,
+    marginTop: 6,
+  },
+  scheduleTableCol: {
+    gap: 2,
+  },
+  scheduleTableHeader: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#9CA3AF",
+    letterSpacing: 0.5,
+  },
+  scheduleTableValue: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#111827",
+  },
   profileName: {
     fontSize: 15,
     fontWeight: "800",
