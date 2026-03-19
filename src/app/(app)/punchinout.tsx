@@ -251,13 +251,13 @@ export default function PunchInOut() {
     return await SecureStore.getItemAsync("token");
   }, []);
 
-  // Reloj en tiempo real — tick cada segundo
+  // Reloj en tiempo real 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Si la categoría seleccionada deja de ser visible → volver a Jornada
+  // Si la categoría seleccionada deja de ser visible - volver a Jornada
   useEffect(() => {
     if (
       selectedCategory === "Almuerzo" &&

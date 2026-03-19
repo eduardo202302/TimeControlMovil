@@ -13,7 +13,7 @@ export default function Tardanza() {
   const [tardanzas, setTardanzas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // AQUÍ LUEGO CONECTAS TU API
+
   const fetchTardanzas = async () => {
     try {
       setLoading(true);
