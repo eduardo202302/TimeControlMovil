@@ -229,6 +229,7 @@ export default function PunchInOut() {
   const [loading, setLoading] = useState(false);
   const [loadingPunches, setLoadingPunches] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [phoneImagen, setPhoneImagen] = useState<string | null>(null);
 
   const { user, urlColegio, logout } = useSchoolStore();
   const userSchedules: UserSchedule[] = (user as any)?.userSchedules ?? [];
@@ -266,6 +267,15 @@ export default function PunchInOut() {
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const loadData = async () => {
+      const foto = await SecureStore.getItemAsync("photourl");
+      console.log("photourl:", foto);
+      setPhoneImagen(foto);
+    };
+    loadData();
   }, []);
 
   // Si la categoría seleccionada deja de ser visible → volver a Jornada
@@ -379,12 +389,12 @@ export default function PunchInOut() {
   };
 
   const visibleCategories = (
-    ["Jornada", "Almuerzo", "Break"] as Category[]
+    ["Jornada", "Break", "Almuerzo"] as Category[]
   ).filter((cat) => {
     if (!jornadaIniciada && (cat === "Almuerzo" || cat === "Break"))
       return false;
-    if (cat === "Almuerzo")
-      return isAlmuerzoVisible(now, todaySchedule, punches);
+    // if (cat === "Almuerzo")
+  //   return isAlmuerzoVisible(now, todaySchedule, punches);
     return true;
   });
 
@@ -442,23 +452,24 @@ export default function PunchInOut() {
         <View style={styles.profileRow}>
           {/* Avatar */}
           <View style={styles.avatarWrap}>
-            {(user as any)?.photo ||
-            (user as any)?.avatar ||
-            (user as any)?.profilePhoto ? (
-              <Image
-                source={{
-                  uri:
-                    (user as any)?.photo ??
-                    (user as any)?.avatar ??
-                    (user as any)?.profilePhoto,
-                }}
-                style={styles.avatar}
-              />
-            ) : (
-              <View style={styles.avatarFallback}>
+           
+            <View style={styles.avatarFallback}>
+              {phoneImagen ? (
+                <Image
+                  source={{
+                    uri: `https://timecontrol.wsmax.net:8600/${phoneImagen}`,
+                  }}
+                  style={{ width: 62, height: 62, borderRadius: 31 }}
+                  onError={(e) =>
+                    console.log("Error imagen:", e.nativeEvent.error)
+                  }
+                  onLoad={() => console.log("Imagen cargó OK")}
+                />
+              ) : (
                 <Ionicons name="person" size={28} color="#9CA3AF" />
-              </View>
-            )}
+              )}
+            </View>
+
           </View>
 
           {/* Info */}
