@@ -5,7 +5,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Modal,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -35,7 +35,7 @@ interface PunchEvent {
   overtime?: number;
 }
 
-const TIMEZONE = "America/Santo_Domingo";
+// Santo Domingo = UTC-4, fijo, sin cambio de horario de verano
 
 const WEEK_DAYS: Record<number, string> = {
   0: "Domingo",
@@ -45,6 +45,21 @@ const WEEK_DAYS: Record<number, string> = {
   4: "Jueves",
   5: "Viernes",
   6: "Sábado",
+};
+
+const MONTH_NAMES: Record<number, string> = {
+  0: "enero",
+  1: "febrero",
+  2: "marzo",
+  3: "abril",
+  4: "mayo",
+  5: "junio",
+  6: "julio",
+  7: "agosto",
+  8: "septiembre",
+  9: "octubre",
+  10: "noviembre",
+  11: "diciembre",
 };
 
 const CATEGORY_ICONS: Record<Category, keyof typeof Ionicons.glyphMap> = {
@@ -59,23 +74,64 @@ const PUNCH_TYPE_MAP: Record<Category, { inicio: string; fin: string }> = {
   Break: { inicio: "InicioBreak", fin: "FinBreak" },
 };
 
-function getRDDayIndex(now: Date): number {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    timeZone: TIMEZONE,
-  });
-  const day = formatter.format(now);
-  const map: Record<string, number> = {
-    Sun: 0,
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
+function toRD(date: Date) {
+  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+  const rd = new Date(utc - 4 * 60 * 60 * 1000);
+
+  return {
+    year: rd.getFullYear(),
+    month: rd.getMonth(),
+    day: rd.getDate(),
+    hours: rd.getHours(),
+    minutes: rd.getMinutes(),
+    seconds: rd.getSeconds(),
+    weekDay: rd.getDay(),
   };
-  return map[day] ?? now.getDay();
 }
+
+function pad(n: number): string {
+  return n.toString().padStart(2, "0");
+}
+
+/** "08:45:32 a. m." — reloj principal */
+function formatRDTime(date: Date): string {
+  const { hours, minutes, seconds } = toRD(date);
+  const h12 = hours % 12 === 0 ? 12 : hours % 12;
+  const ampm = hours < 12 ? "a. m." : "p. m.";
+  return `${pad(h12)}:${pad(minutes)}:${pad(seconds)} ${ampm}`;
+}
+
+/** "08:45 a. m." — modal / registros */
+function formatRDTimeShort(date: Date): string {
+  const { hours, minutes } = toRD(date);
+  const h12 = hours % 12 === 0 ? 12 : hours % 12;
+  const ampm = hours < 12 ? "a. m." : "p. m.";
+  return `${pad(h12)}:${pad(minutes)} ${ampm}`;
+}
+
+/** "martes, 17 de marzo de 2026" */
+function formatRDDate(date: Date): string {
+  const { weekDay, day, month, year } = toRD(date);
+  return `${WEEK_DAYS[weekDay]}, ${day} de ${MONTH_NAMES[month]} de ${year}`;
+}
+
+/** Minutos desde medianoche  */
+function getRDMinutes(date: Date): number {
+  const { hours, minutes } = toRD(date);
+  return hours * 60 + minutes;
+}
+
+/** Día de la semana en RD */
+function getRDDayIndex(date: Date): number {
+  return toRD(date).weekDay;
+}
+
+function timeStrToMinutes(timeStr: string): number {
+  const [h, m] = timeStr.split(":").map(Number);
+  return h * 60 + m;
+}
+
+// ─── Helpers de negocio ───────────────────────────────────────────────────────
 
 function getTodaySchedule(
   schedules: UserSchedule[],
@@ -85,26 +141,10 @@ function getTodaySchedule(
   return schedules.find((s) => s.weekDay === todayName) ?? null;
 }
 
-function getRDMinutes(now: Date): number {
-  const rdTimeStr = now.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: TIMEZONE,
-  });
-  const [h, m] = rdTimeStr.split(":").map(Number);
-  return h * 60 + m;
-}
-
-function timeStrToMinutes(timeStr: string): number {
-  const [h, m] = timeStr.split(":").map(Number);
-  return h * 60 + m;
-}
-
 function getStatusForEntry(
   now: Date,
   entryTimeStr: string,
-  toleranceMinutes: number = 5,
+  toleranceMinutes = 5,
 ): "A Tiempo" | "Tardanza" {
   const diff = getRDMinutes(now) - timeStrToMinutes(entryTimeStr);
   return diff > toleranceMinutes ? "Tardanza" : "A Tiempo";
@@ -113,19 +153,10 @@ function getStatusForEntry(
 function getStatusForExit(
   now: Date,
   exitTimeStr: string,
-  toleranceMinutes: number = 5,
+  toleranceMinutes = 5,
 ): "A Tiempo" | "Anticipada" {
   const diff = timeStrToMinutes(exitTimeStr) - getRDMinutes(now);
   return diff > toleranceMinutes ? "Anticipada" : "A Tiempo";
-}
-
-function formatTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleTimeString("es-DO", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: TIMEZONE,
-  });
 }
 
 function getPunchTypeLabel(type: string): string {
@@ -155,17 +186,41 @@ function getStatusIcon(status: string): keyof typeof Ionicons.glyphMap {
 function getStatusLabel(status: string): string {
   if (status === "Tardanza") return "Tardanza";
   if (status === "Anticipada") return "Salida anticipada";
-  if (status === "A tiempo") return "A tiempo";
+  if (status === "A Tiempo") return "A tiempo";
   return status;
 }
 
 function isJornadaActiva(punches: PunchEvent[]): boolean {
-  const lastJornada = [...punches]
+  const last = [...punches]
     .reverse()
     .find((p) => p.type === "InicioJornada" || p.type === "FinJornada");
-
-  return lastJornada?.type === "InicioJornada";
+  return last?.type === "InicioJornada";
 }
+
+function isAlmuerzoVisible(
+  now: Date,
+  schedule: UserSchedule | null,
+  punches: PunchEvent[],
+): boolean {
+  if (!schedule) return false;
+
+  const lastAlmuerzo = [...punches]
+    .reverse()
+    .find((p) => p.type === "InicioAlmuerzo" || p.type === "FinAlmuerzo");
+
+  if (lastAlmuerzo?.type === "InicioAlmuerzo") return true;
+  if (lastAlmuerzo?.type === "FinAlmuerzo") return false;
+
+  if (!schedule.lunchEntryTime || !schedule.lunchExitTime) return false;
+
+  const current = getRDMinutes(now);
+  const windowStart = timeStrToMinutes(schedule.lunchEntryTime) - 5;
+  const windowEnd = timeStrToMinutes(schedule.lunchExitTime) + 5;
+
+  return current >= windowStart && current <= windowEnd;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function PunchInOut() {
   const [now, setNow] = useState(new Date());
@@ -174,44 +229,58 @@ export default function PunchInOut() {
   const [loading, setLoading] = useState(false);
   const [loadingPunches, setLoadingPunches] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [confirmModal, setConfirmModal] = useState<{
-    visible: boolean;
-    type: string;
-    status: string | undefined;
-    isInicio: boolean;
-    category: Category;
-  } | null>(null);
 
-  const { user, urlColegio } = useSchoolStore();
+  const { user, urlColegio, logout } = useSchoolStore();
   const userSchedules: UserSchedule[] = (user as any)?.userSchedules ?? [];
   const todaySchedule = getTodaySchedule(userSchedules, now);
-  const jornadaActiva = isJornadaActiva(punches);
+  const jornadaIniciada = isJornadaActiva(punches);
+
+  // Datos del usuario autenticado
+  const userName: string =
+    (user as any)?.name
+      ? `${(user as any).name}${(user as any)?.lastName ? " " + (user as any).lastName : ""}`
+      : (user as any)?.username ?? "Usuario";
+  const userCode: string = (user as any)?.code ?? (user as any)?.employeeCode ?? "";
+
   const getToken = useCallback(async (): Promise<string | null> => {
     const storeToken = useSchoolStore.getState().token;
     if (storeToken) return storeToken;
     return await SecureStore.getItemAsync("token");
   }, []);
 
+  const handleLogout = useCallback(() => {
+    Alert.alert(
+      "Cerrar sesión",
+      "¿Estás seguro de que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Cerrar sesión",
+          style: "destructive",
+          onPress: async () => {
+            await SecureStore.deleteItemAsync("token");
+            logout();
+          },
+        },
+      ],
+    );
+  }, [logout]);
+
+  // Reloj en tiempo real — tick cada segundo
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const timeStr = now.toLocaleTimeString("es-DO", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-    timeZone: TIMEZONE,
-  });
-
-  const dateStr = now.toLocaleDateString("es-DO", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: TIMEZONE,
-  });
+  // Si la categoría seleccionada deja de ser visible → volver a Jornada
+  useEffect(() => {
+    if (
+      selectedCategory === "Almuerzo" &&
+      !isAlmuerzoVisible(now, todaySchedule, punches)
+    ) {
+      setSelectedCategory("Jornada");
+    }
+  }, [now, punches, todaySchedule, selectedCategory]);
 
   const fetchTodayPunches = useCallback(async () => {
     try {
@@ -249,14 +318,11 @@ export default function PunchInOut() {
   };
 
   const isInicio = getNextPunchType(selectedCategory) === "inicio";
-  const jornadaIniciada = isJornadaActiva(punches);
 
   const getEntryStatus = (): string => {
-    // Break nunca manda status
     if (selectedCategory === "Break") return "A Tiempo";
 
     if (!isInicio) {
-      // Salidas
       if (selectedCategory === "Jornada" && todaySchedule?.workExitTime)
         return getStatusForExit(now, todaySchedule.workExitTime);
       if (selectedCategory === "Almuerzo" && todaySchedule?.lunchExitTime)
@@ -264,11 +330,8 @@ export default function PunchInOut() {
       return "A Tiempo";
     }
 
-    // Entradas
     if (selectedCategory === "Jornada" && todaySchedule?.workEntryTime)
       return getStatusForEntry(now, todaySchedule.workEntryTime);
-
-    // InicioAlmuerzo → "A tiempo" o "Tardanza"
     if (selectedCategory === "Almuerzo" && todaySchedule?.lunchEntryTime)
       return getStatusForEntry(now, todaySchedule.lunchEntryTime);
 
@@ -281,8 +344,6 @@ export default function PunchInOut() {
       Alert.alert("Error", "No hay conexión activa.");
       return;
     }
-
-    // Validar que haya jornada activa para Almuerzo y Break
     if (
       !jornadaIniciada &&
       (selectedCategory === "Almuerzo" || selectedCategory === "Break")
@@ -293,54 +354,40 @@ export default function PunchInOut() {
 
     const types = PUNCH_TYPE_MAP[selectedCategory];
     const type = isInicio ? types.inicio : types.fin;
-    const isBreak = selectedCategory === "Break";
-    const status = isBreak ? undefined : getEntryStatus();
+    const status = selectedCategory === "Break" ? undefined : getEntryStatus();
 
-    setConfirmModal({
-      visible: true,
-      type,
-      status,
-      isInicio,
-      category: selectedCategory,
-    });
-  };
-
-  const handleConfirm = async () => {
-    if (!confirmModal) return;
-    const token = await getToken();
-    if (!urlColegio || !token) return;
-    setConfirmModal((prev) => (prev ? { ...prev, visible: false } : null));
     setLoading(true);
     try {
-      const payload: Record<string, any> = { type: confirmModal.type };
-      if (confirmModal.status !== undefined)
-        payload.status = confirmModal.status;
-
-      console.log("PAYLOAD:", JSON.stringify(payload));
+      const payload: Record<string, any> = { type };
+      if (status !== undefined) payload.status = status;
 
       const response = await axios.post(`${urlColegio}/punches`, payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      console.log("RESPONSE:", JSON.stringify(response.data));
-
       if (response.data.success) {
         await fetchTodayPunches();
-        Alert.alert(
-          "Registrado",
-          `${getPunchTypeLabel(confirmModal.type)} registrado correctamente.`,
-        );
+        Alert.alert("Registrado", `${getPunchTypeLabel(type)} registrado correctamente.`);
       } else {
         Alert.alert("Error", response.data.message ?? "Intenta de nuevo.");
       }
     } catch (error: any) {
-      console.log("ERROR COMPLETO:", JSON.stringify(error?.response?.data));
       const msg = error?.response?.data?.message ?? "Error de conexión.";
       Alert.alert("Error", typeof msg === "string" ? msg : JSON.stringify(msg));
     } finally {
       setLoading(false);
     }
   };
+
+  const visibleCategories = (
+    ["Jornada", "Almuerzo", "Break"] as Category[]
+  ).filter((cat) => {
+    if (!jornadaIniciada && (cat === "Almuerzo" || cat === "Break"))
+      return false;
+    if (cat === "Almuerzo")
+      return isAlmuerzoVisible(now, todaySchedule, punches);
+    return true;
+  });
 
   return (
     <ScrollView
@@ -357,139 +404,167 @@ export default function PunchInOut() {
         />
       }
     >
-      <View style={styles.clockCard}>
-        <View style={styles.clockRow}>
-          <Ionicons
-            name="time-outline"
-            size={20}
-            color="rgba(255,255,255,0.85)"
-          />
-          <Text style={styles.clockLabel}>Hora Actual</Text>
+      {/* ── Reloj ── */}
+      <View style={styles.floatCard}>
+        <View style={styles.floatLabel}>
+          <Ionicons name="time-outline" size={14} color="#2563EB" />
+        <Text style={styles.floatLabelText}>Hora Actual</Text>
         </View>
-        <Text style={styles.clockTime}>{timeStr}</Text>
-        <Text style={styles.clockDate}>{dateStr}</Text>
+        <View style={styles.clockCard}>
+          <View style={styles.clockTextWrap}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%" }}>
+              <Text style={styles.clockTime}>
+                {formatRDTime(now).split(" ")[0]}
+                </Text>
+                <Text style={styles.clockAmPm}>
+                   {" "}{formatRDTime(now).split(" ").slice(1).join(" ")}
+                   </Text>
+                   </View>
+            <Text style={styles.clockDate}>{formatRDDate(now)}</Text>
+          </View>
+        </View>
       </View>
 
-      {todaySchedule ? (
-        <View style={styles.scheduleCard}>
-          <View style={styles.scheduleRow}>
-            <Ionicons name="calendar-outline" size={16} color="#2563EB" />
-            <Text style={styles.scheduleTitle}>Horario de hoy</Text>
+      {/* ── Perfil + Horario ── */}
+      <View style={styles.floatCard}>
+        <View style={styles.floatLabelRow}>
+          <View style={styles.floatLabel}>
+            <Ionicons name="person-circle-outline" size={14} color="#2563EB" />
+            <Text style={styles.floatLabelText}>Perfil - Time Control</Text>
           </View>
-          <View style={styles.scheduleItems}>
-            <View style={styles.scheduleItem}>
-              <Ionicons name="log-in-outline" size={14} color="#16A34A" />
-              <Text style={styles.scheduleText}>
-                Entrada: {todaySchedule.workEntryTime?.slice(0, 5)}
-              </Text>
-            </View>
-            <View style={styles.scheduleItem}>
-              <Ionicons name="log-out-outline" size={14} color="#DC2626" />
-              <Text style={styles.scheduleText}>
-                Salida: {todaySchedule.workExitTime?.slice(0, 5)}
-              </Text>
-            </View>
-            {todaySchedule.lunchEntryTime && (
-              <View style={styles.scheduleItem}>
-                <Ionicons name="restaurant-outline" size={14} color="#D97706" />
-                <Text style={styles.scheduleText}>
-                  Almuerzo: {todaySchedule.lunchEntryTime.slice(0, 5)} -{" "}
-                  {todaySchedule.lunchExitTime?.slice(0, 5)}
+         
+        </View>
+
+        <View style={styles.profileRow}>
+          {/* Avatar */}
+          <View style={styles.avatarWrap}>
+            {(user as any)?.photo || (user as any)?.avatar || (user as any)?.profilePhoto ? (
+              // eslint-disable-next-line @typescript-eslint/no-var-requires
+              <Image
+                source={{ uri: (user as any)?.photo ?? (user as any)?.avatar ?? (user as any)?.profilePhoto }}
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Ionicons name="person" size={28} color="#9CA3AF" />
+              </View>
+            )}
+          </View>
+
+          {/* Info */}
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileName} numberOfLines={1}>
+               {user?.user.fullName}
+            </Text>
+            {todaySchedule ? (
+              <>
+                <View style={styles.profileScheduleRow}>
+                  <Ionicons name="time-outline" size={13} color="#2563EB" />
+                  <Text style={styles.profileScheduleText}>
+                    Horario: {todaySchedule.workEntryTime?.slice(0, 5)} – {todaySchedule.workExitTime?.slice(0, 5)}
+                  </Text>
+                </View>
+                {todaySchedule.lunchEntryTime && (
+                  <View style={styles.profileScheduleRow}>
+                    <Ionicons name="restaurant-outline" size={13} color="#D97706" />
+                    <Text style={styles.profileScheduleText}>
+                      Almuerzo: {todaySchedule.lunchEntryTime.slice(0, 5)} – {todaySchedule.lunchExitTime?.slice(0, 5)}
+                    </Text>
+                  </View>
+                )}
+              </>
+            ) : (
+              <View style={styles.profileScheduleRow}>
+                <Ionicons name="warning-outline" size={13} color="#D97706" />
+                <Text style={[styles.profileScheduleText, { color: "#D97706" }]}>
+                  Sin horario configurado
                 </Text>
               </View>
             )}
           </View>
         </View>
-      ) : (
-        <View style={styles.noScheduleCard}>
-          <Ionicons name="warning-outline" size={16} color="#D97706" />
-          <Text style={styles.noScheduleText}>
-            Sin horario configurado para hoy
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Seleccionar Categoría</Text>
-        <View style={styles.categories}>
-          {(["Jornada", "Almuerzo", "Break"] as Category[])
-            .filter((cat) => {
-              if (!jornadaIniciada && (cat === "Almuerzo" || cat === "Break")) {
-                return false;
-              }
-              return true;
-            })
-            .map((cat) => {
-              const hasActive = getNextPunchType(cat) === "fin";
-              return (
-                <TouchableOpacity
-                  key={cat}
-                  style={[
-                    styles.categoryBtn,
-                    selectedCategory === cat && styles.categoryBtnActive,
-                  ]}
-                  onPress={() => setSelectedCategory(cat)}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons
-                    name={CATEGORY_ICONS[cat]}
-                    size={22}
-                    color={selectedCategory === cat ? "#fff" : "#6B7280"}
-                  />
-                  <Text
-                    style={[
-                      styles.categoryText,
-                      selectedCategory === cat && styles.categoryTextActive,
-                    ]}
-                  >
-                    {cat}
-                  </Text>
-                  {hasActive && <View style={styles.activeDot} />}
-                </TouchableOpacity>
-              );
-            })}
-        </View>
       </View>
 
-      <TouchableOpacity
-        style={[
-          styles.registerBtn,
-          !isInicio && styles.registerBtnExit,
-          loading && { opacity: 0.7 },
-        ]}
-        onPress={handleRegister}
-        disabled={loading}
-        activeOpacity={0.85}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" size="small" />
-        ) : (
-          <>
-            <Ionicons
-              name={isInicio ? "log-in-outline" : "log-out-outline"}
-              size={26}
-              color="#fff"
-            />
-            <View style={styles.registerTextWrap}>
-              <Text style={styles.registerBtnText}>
-                {isInicio ? "Registrar Entrada" : "Registrar Salida"}
-              </Text>
-              <Text style={styles.registerBtnSub}>({selectedCategory})</Text>
-            </View>
-          </>
-        )}
-      </TouchableOpacity>
-
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.sectionTitle}>Registros de Hoy</Text>
-          <TouchableOpacity
-            onPress={fetchTodayPunches}
-            style={styles.refreshBtn}
-          >
-            <Ionicons name="refresh-outline" size={18} color="#2563EB" />
-          </TouchableOpacity>
+      {/* ── Categoría + Botón registrar (bloque unificado) ── */}
+      <View style={styles.floatCard}>
+        <View style={styles.floatLabel}>
+          <Ionicons name="swap-horizontal-outline" size={14} color="#2563EB" />
+          <Text style={styles.floatLabelText}>Reg. Entrada / Salida</Text>
         </View>
+        <View style={styles.categories}>
+          {visibleCategories.map((cat) => {
+            const hasActive = getNextPunchType(cat) === "fin";
+            return (
+              <TouchableOpacity
+                key={cat}
+                style={[
+                  styles.categoryBtn,
+                  selectedCategory === cat && styles.categoryBtnActive,
+                ]}
+                onPress={() => setSelectedCategory(cat)}
+                activeOpacity={0.75}
+              >
+                <Ionicons
+                  name={CATEGORY_ICONS[cat]}
+                  size={22}
+                  color={selectedCategory === cat ? "#fff" : "#6B7280"}
+                />
+                <Text
+                  style={[
+                    styles.categoryText,
+                    selectedCategory === cat && styles.categoryTextActive,
+                  ]}
+                >
+                  {cat}
+                </Text>
+                {hasActive && <View style={styles.activeDot} />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.registerBtn,
+            !isInicio && styles.registerBtnExit,
+            loading && { opacity: 0.7 },
+          ]}
+          onPress={handleRegister}
+          disabled={loading}
+          activeOpacity={0.85}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Ionicons
+                name={isInicio ? "log-in-outline" : "log-out-outline"}
+                size={26}
+                color="#fff"
+              />
+              <View style={styles.registerTextWrap}>
+                <Text style={styles.registerBtnText}>
+                  {isInicio ? "Registrar Entrada" : "Registrar Salida"}
+                </Text>
+                <Text style={styles.registerBtnSub}>({selectedCategory})</Text>
+              </View>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* ── Registros del día ── */}
+      <View style={styles.floatCard}>
+        <View style={styles.floatLabel}>
+          <Ionicons name="list-outline" size={14} color="#2563EB" />
+          <Text style={styles.floatLabelText}>Historial del Día</Text>
+        </View>
+        <TouchableOpacity
+          onPress={fetchTodayPunches}
+          style={[styles.refreshBtn, { alignSelf: "flex-end", marginBottom: 4 }]}
+        >
+          <Ionicons name="refresh-outline" size={18} color="#2563EB" />
+        </TouchableOpacity>
         {loadingPunches ? (
           <ActivityIndicator color="#2563EB" style={{ marginVertical: 16 }} />
         ) : punches.length === 0 ? (
@@ -554,235 +629,105 @@ export default function PunchInOut() {
                 </View>
               </View>
               <Text style={styles.punchTime}>
-                {formatTime(punch.createdDate)}
+                {formatRDTimeShort(new Date(punch.createdDate))}
               </Text>
             </View>
           ))
         )}
       </View>
 
-      {confirmModal && (
-        <Modal
-          visible={confirmModal.visible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setConfirmModal(null)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <View
-                style={[
-                  styles.modalHeader,
-                  confirmModal.isInicio
-                    ? styles.modalHeaderEntry
-                    : styles.modalHeaderExit,
-                ]}
-              >
-                <Ionicons
-                  name={
-                    confirmModal.isInicio ? "log-in-outline" : "log-out-outline"
-                  }
-                  size={28}
-                  color="#fff"
-                />
-                <Text style={styles.modalHeaderText}>
-                  {confirmModal.isInicio
-                    ? "Registrar Entrada"
-                    : "Registrar Salida"}
-                </Text>
-              </View>
 
-              <View style={styles.modalBody}>
-                <View style={styles.modalRow}>
-                  <Ionicons
-                    name={CATEGORY_ICONS[confirmModal.category]}
-                    size={18}
-                    color="#6B7280"
-                  />
-                  <Text style={styles.modalLabel}>Categoría</Text>
-                  <Text style={styles.modalValue}>{confirmModal.category}</Text>
-                </View>
-
-                <View style={styles.modalRow}>
-                  <Ionicons name="time-outline" size={18} color="#6B7280" />
-                  <Text style={styles.modalLabel}>Hora</Text>
-                  <Text style={styles.modalValue}>
-                    {now.toLocaleTimeString("es-DO", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: true,
-                      timeZone: TIMEZONE,
-                    })}
-                  </Text>
-                </View>
-
-                {/* Estado */}
-                {confirmModal.status && (
-                  <View style={styles.modalRow}>
-                    <Ionicons
-                      name={getStatusIcon(confirmModal.status)}
-                      size={18}
-                      color={getStatusColor(confirmModal.status)}
-                    />
-                    <Text style={styles.modalLabel}>Estado</Text>
-                    <View
-                      style={[
-                        styles.modalStatusBadge,
-                        confirmModal.status === "Tardanza"
-                          ? styles.modalStatusLate
-                          : confirmModal.status === "Anticipada"
-                            ? styles.modalStatusEarly
-                            : styles.modalStatusOnTime,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.modalStatusText,
-                          { color: getStatusColor(confirmModal.status) },
-                        ]}
-                      >
-                        {getStatusLabel(confirmModal.status)}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-
-                {todaySchedule &&
-                  confirmModal.isInicio &&
-                  confirmModal.category === "Jornada" &&
-                  todaySchedule.workEntryTime && (
-                    <View style={styles.modalScheduleRef}>
-                      <Ionicons
-                        name="information-circle-outline"
-                        size={14}
-                        color="#6B7280"
-                      />
-                      <Text style={styles.modalScheduleRefText}>
-                        Hora de entrada:{" "}
-                        {todaySchedule.workEntryTime.slice(0, 5)}
-                      </Text>
-                    </View>
-                  )}
-
-                {todaySchedule &&
-                  !confirmModal.isInicio &&
-                  confirmModal.category === "Jornada" &&
-                  todaySchedule.workExitTime && (
-                    <View style={styles.modalScheduleRef}>
-                      <Ionicons
-                        name="information-circle-outline"
-                        size={14}
-                        color="#6B7280"
-                      />
-                      <Text style={styles.modalScheduleRefText}>
-                        Hora de salida: {todaySchedule.workExitTime.slice(0, 5)}
-                      </Text>
-                    </View>
-                  )}
-
-                {todaySchedule &&
-                  confirmModal.isInicio &&
-                  confirmModal.category === "Almuerzo" &&
-                  todaySchedule.lunchEntryTime && (
-                    <View style={styles.modalScheduleRef}>
-                      <Ionicons
-                        name="information-circle-outline"
-                        size={14}
-                        color="#6B7280"
-                      />
-                      <Text style={styles.modalScheduleRefText}>
-                        Hora de almuerzo:{" "}
-                        {todaySchedule.lunchEntryTime.slice(0, 5)}
-                      </Text>
-                    </View>
-                  )}
-
-                {todaySchedule &&
-                  !confirmModal.isInicio &&
-                  confirmModal.category === "Almuerzo" &&
-                  todaySchedule.lunchExitTime && (
-                    <View style={styles.modalScheduleRef}>
-                      <Ionicons
-                        name="information-circle-outline"
-                        size={14}
-                        color="#6B7280"
-                      />
-                      <Text style={styles.modalScheduleRefText}>
-                        Fin de almuerzo:{" "}
-                        {todaySchedule.lunchExitTime.slice(0, 5)}
-                      </Text>
-                    </View>
-                  )}
-              </View>
-
-              <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  style={styles.modalBtnCancel}
-                  onPress={() => setConfirmModal(null)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.modalBtnCancelText}>Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.modalBtnConfirm,
-                    confirmModal.isInicio
-                      ? styles.modalBtnEntry
-                      : styles.modalBtnExit,
-                  ]}
-                  onPress={handleConfirm}
-                  activeOpacity={0.85}
-                >
-                  <Text
-                    style={[
-                      styles.modalBtnConfirmText,
-                      { color: confirmModal.isInicio ? "#16A34A" : "#DC2626" },
-                    ]}
-                  >
-                    Confirmar
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 14, paddingBottom: 40 },
+  content: { padding: 16, gap: 18, paddingBottom: 40 },
+  /* ── Clock ── */
   clockCard: {
-    backgroundColor: "#2563EB",
-    borderRadius: 16,
-    padding: 20,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EFF6FF",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#BFDBFE",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  clockRow: {
+clockTextWrap: {
+  alignItems: "center", 
+  justifyContent: "center",
+  },
+ clockTime: {
+  color: "#1D4ED8",
+  fontSize: 40,
+  fontWeight: "800",
+  letterSpacing: 0.5,
+  textAlign: "center", 
+   marginLeft: 25
+  },
+  clockAmPm: {
+  fontSize: 14,
+  fontWeight: "600",
+  marginLeft: 4,
+ color: "#142157", 
+},
+ clockDate: {
+  color: "#3B82F6",
+  fontSize: 11,
+  marginTop: 1,
+  textTransform: "capitalize",
+  letterSpacing: 0.2,
+  textAlign: "center",
+  },
+  clockUserRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 12,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  clockUser: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: 0.2,
+  },
+  profileCardHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 6,
+    marginBottom: 12,
   },
-  clockLabel: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 14,
-    fontWeight: "500",
+  profileCardTitle: { fontSize: 14, fontWeight: "600", color: "#2563EB" },
+  profileRow: { flexDirection: "row", alignItems: "center", gap: 14 },
+  avatarWrap: { flexShrink: 0 },
+  avatar: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: "#E5E7EB",
+    borderWidth: 2,
+    borderColor: "#DBEAFE",
   },
-  clockTime: {
-    color: "#fff",
-    fontSize: 40,
-    fontWeight: "800",
-    letterSpacing: 1,
-    lineHeight: 48,
+  avatarFallback: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#BFDBFE",
   },
-  clockDate: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 14,
-    marginTop: 4,
-    textTransform: "capitalize",
-  },
+  profileInfo: { flex: 1, gap: 6 },
+  profileName: { fontSize: 15, fontWeight: "800", color: "#111827", letterSpacing: 0.1 },
+  profileScheduleRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  profileScheduleText: { fontSize: 12, color: "#6B7280" },
   scheduleCard: {
     backgroundColor: "#EFF6FF",
     borderRadius: 12,
@@ -811,6 +756,62 @@ const styles = StyleSheet.create({
   scheduleItems: { gap: 4 },
   scheduleItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   scheduleText: { fontSize: 13, color: "#374151" },
+  /* ── Floating label card ── */
+  floatCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 16,
+    paddingTop: 22,
+    paddingBottom: 18,
+    marginTop: 8,
+    elevation: 0,
+  },
+  floatLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    position: "absolute",
+    top: -11,
+    left: 14,
+   backgroundColor: "#F9FAFB",
+    paddingHorizontal: 7,
+  },
+floatLabelText: {
+  fontSize: 10,
+  fontWeight: "700",
+  color: "#2563EB",
+  letterSpacing: 0.3,
+  textTransform: "none",
+
+  },
+  floatLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+    position: "relative",
+  },
+  logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    position: "absolute",
+    right: 0,
+    top: -6,
+  },
+  logoutBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#DC2626",
+  },
   card: {
     backgroundColor: "#fff",
     borderRadius: 14,
@@ -841,82 +842,85 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 10,
-    backgroundColor: "#F3F4F6",
-    gap: 4,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#F8FAFF",
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    gap: 5,
     position: "relative",
   },
-  categoryBtnActive: { backgroundColor: "#2563EB" },
-  categoryText: { fontSize: 12, fontWeight: "500", color: "#6B7280" },
+  categoryBtnActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+  categoryText: { fontSize: 12, fontWeight: "600", color: "#6B7280" },
   categoryTextActive: { color: "#fff" },
   activeDot: {
     position: "absolute",
-    top: 6,
-    right: 6,
+    top: 7,
+    right: 7,
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#16A34A",
+    backgroundColor: "#22C55E",
+    borderWidth: 1.5,
+    borderColor: "#fff",
   },
   registerBtn: {
-    backgroundColor: "#16A34A",
-    borderRadius: 16,
-    paddingVertical: 20,
+    borderRadius: 14,
+    paddingVertical: 18,
     paddingHorizontal: 24,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 14,
-    elevation: 4,
-    shadowColor: "#16A34A",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    gap: 12,
+    marginTop: 12,
+    backgroundColor: "#16A34A",
   },
-  registerBtnExit: { backgroundColor: "#DC2626", shadowColor: "#DC2626" },
+  registerBtnExit: { backgroundColor: "#DC2626" },
   registerTextWrap: { alignItems: "center" },
-  registerBtnText: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  registerBtnText: { color: "#fff", fontSize: 17, fontWeight: "800", letterSpacing: 0.2 },
   registerBtnSub: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 13,
-    marginTop: 2,
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 12,
+    marginTop: 1,
   },
-  emptyPunches: { alignItems: "center", paddingVertical: 20, gap: 8 },
+  emptyPunches: { alignItems: "center", paddingVertical: 24, gap: 8 },
   emptyText: { fontSize: 14, color: "#9CA3AF" },
   punchRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 10,
+    paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: "#F9FAFB",
+    borderBottomColor: "#F3F4F6",
   },
   punchIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
   },
   punchIconEntry: { backgroundColor: "#DCFCE7" },
   punchIconExit: { backgroundColor: "#FEE2E2" },
   punchInfo: { flex: 1, gap: 4 },
-  punchType: { fontSize: 13, fontWeight: "600", color: "#111827" },
-  punchBadgeRow: { flexDirection: "row", gap: 6 },
+  punchType: { fontSize: 13, fontWeight: "700", color: "#111827" },
+  punchBadgeRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
   punchBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
   badgeOnTime: { backgroundColor: "#DCFCE7" },
   badgeLate: { backgroundColor: "#FEE2E2" },
   badgeEarly: { backgroundColor: "#FEF3C7" },
-  punchBadgeText: { fontSize: 11, fontWeight: "600" },
+  punchBadgeText: { fontSize: 11, fontWeight: "700" },
   badgeLateEntry: {
     backgroundColor: "#FEF3C7",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 20,
   },
-  badgeLateEntryText: { fontSize: 11, fontWeight: "600", color: "#D97706" },
-  punchTime: { fontSize: 13, fontWeight: "600", color: "#374151" },
+  badgeLateEntryText: { fontSize: 11, fontWeight: "700", color: "#D97706" },
+  punchTime: { fontSize: 12, fontWeight: "600", color: "#6B7280" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",

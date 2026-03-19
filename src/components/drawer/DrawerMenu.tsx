@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as SecureStore from "expo-secure-store";
 import { usePathname, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
+  Alert,
   Dimensions,
   Image,
   ScrollView,
@@ -133,7 +135,7 @@ interface DrawerMenuProps {
 export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, menuTree, app, urlColegio } = useSchoolStore();
+  const { user, menuTree, app, urlColegio, logout } = useSchoolStore();
 
   const handleNavigate = useCallback(
     (path: string) => {
@@ -143,6 +145,30 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
     [onClose, router],
   );
 
+  const handleLogout = useCallback(() => {
+    Alert.alert(
+      "Cerrar sesión",
+      "¿Estás seguro de que deseas cerrar sesión?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Cerrar sesión",
+          style: "destructive",
+          onPress: async () => {
+            onClose();
+            // Limpiar TODO el SecureStore
+            await SecureStore.deleteItemAsync("token");
+            await SecureStore.deleteItemAsync("isAuthorized");
+            await SecureStore.deleteItemAsync("user");
+            await SecureStore.deleteItemAsync("menuItems");
+            await SecureStore.deleteItemAsync("urlColegio");
+            logout();
+            router.replace("/login");
+          },
+        },
+      ],
+    );
+  }, [logout, onClose, router]);
   if (!isVisible) return null;
 
   return (
@@ -210,6 +236,14 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
                 {user.role?.name}
               </Text>
             </View>
+            <TouchableOpacity
+              style={styles.logoutBtn}
+              onPress={handleLogout}
+              activeOpacity={0.75}
+            >
+              <Ionicons name="log-out-outline" size={18} color="#DC2626" />
+              <Text style={styles.logoutBtnText}>Cerrar Sesión</Text>
+            </TouchableOpacity>
           </View>
         )}
       </SafeAreaView>
@@ -360,4 +394,21 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginTop: 1,
   },
-});
+ logoutBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  logoutBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#DC2626",
+  },
+  },
+);
