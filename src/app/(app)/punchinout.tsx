@@ -488,7 +488,7 @@ export default function PunchInOut() {
               <View style={styles.scheduleTable}>
                 {/* Cabeceras */}
                 <View style={styles.scheduleTableCol}>
-                  <Text style={styles.scheduleTableHeader}>HORARIO</Text>
+                  <Text style={styles.scheduleTableHeader}>Horario</Text>
                   <Text style={styles.scheduleTableValue}>
                     {to12h(todaySchedule.workEntryTime)} –
                   </Text>
@@ -498,7 +498,7 @@ export default function PunchInOut() {
                 </View>
                 {todaySchedule.lunchEntryTime && (
                   <View style={styles.scheduleTableCol}>
-                    <Text style={styles.scheduleTableHeader}>ALMUERZO</Text>
+                    <Text style={styles.scheduleTableHeader}>Almuerzo</Text>
                     <Text style={styles.scheduleTableValue}>
                       {to12h(todaySchedule.lunchEntryTime)} –
                     </Text>
