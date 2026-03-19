@@ -236,11 +236,11 @@ export default function PunchInOut() {
   const jornadaIniciada = isJornadaActiva(punches);
 
   // Datos del usuario autenticado
-  const userName: string =
-    (user as any)?.name
-      ? `${(user as any).name}${(user as any)?.lastName ? " " + (user as any).lastName : ""}`
-      : (user as any)?.username ?? "Usuario";
-  const userCode: string = (user as any)?.code ?? (user as any)?.employeeCode ?? "";
+  const userName: string = (user as any)?.name
+    ? `${(user as any).name}${(user as any)?.lastName ? " " + (user as any).lastName : ""}`
+    : ((user as any)?.username ?? "Usuario");
+  const userCode: string =
+    (user as any)?.code ?? (user as any)?.employeeCode ?? "";
 
   const getToken = useCallback(async (): Promise<string | null> => {
     const storeToken = useSchoolStore.getState().token;
@@ -249,21 +249,17 @@ export default function PunchInOut() {
   }, []);
 
   const handleLogout = useCallback(() => {
-    Alert.alert(
-      "Cerrar sesión",
-      "¿Estás seguro de que deseas cerrar sesión?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Cerrar sesión",
-          style: "destructive",
-          onPress: async () => {
-            await SecureStore.deleteItemAsync("token");
-            logout();
-          },
+    Alert.alert("Cerrar sesión", "¿Estás seguro de que deseas cerrar sesión?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Cerrar sesión",
+        style: "destructive",
+        onPress: async () => {
+          await SecureStore.deleteItemAsync("token");
+          logout();
         },
-      ],
-    );
+      },
+    ]);
   }, [logout]);
 
   // Reloj en tiempo real — tick cada segundo
@@ -367,7 +363,10 @@ export default function PunchInOut() {
 
       if (response.data.success) {
         await fetchTodayPunches();
-        Alert.alert("Registrado", `${getPunchTypeLabel(type)} registrado correctamente.`);
+        Alert.alert(
+          "Registrado",
+          `${getPunchTypeLabel(type)} registrado correctamente.`,
+        );
       } else {
         Alert.alert("Error", response.data.message ?? "Intenta de nuevo.");
       }
@@ -408,18 +407,26 @@ export default function PunchInOut() {
       <View style={styles.floatCard}>
         <View style={styles.floatLabel}>
           <Ionicons name="time-outline" size={14} color="#2563EB" />
-        <Text style={styles.floatLabelText}>Hora Actual</Text>
+          <Text style={styles.floatLabelText}>Hora Actual</Text>
         </View>
         <View style={styles.clockCard}>
           <View style={styles.clockTextWrap}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", width: "100%" }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+              }}
+            >
               <Text style={styles.clockTime}>
                 {formatRDTime(now).split(" ")[0]}
-                </Text>
-                <Text style={styles.clockAmPm}>
-                   {" "}{formatRDTime(now).split(" ").slice(1).join(" ")}
-                   </Text>
-                   </View>
+              </Text>
+              <Text style={styles.clockAmPm}>
+                {" "}
+                {formatRDTime(now).split(" ").slice(1).join(" ")}
+              </Text>
+            </View>
             <Text style={styles.clockDate}>{formatRDDate(now)}</Text>
           </View>
         </View>
@@ -427,21 +434,24 @@ export default function PunchInOut() {
 
       {/* ── Perfil + Horario ── */}
       <View style={styles.floatCard}>
-        <View style={styles.floatLabelRow}>
-          <View style={styles.floatLabel}>
-            <Ionicons name="person-circle-outline" size={14} color="#2563EB" />
-            <Text style={styles.floatLabelText}>Perfil - Time Control</Text>
-          </View>
-         
+        <View style={styles.floatLabel}>
+          <Ionicons name="person-circle-outline" size={14} color="#2563EB" />
+          <Text style={styles.floatLabelText}>Perfil - Time Control</Text>
         </View>
 
         <View style={styles.profileRow}>
           {/* Avatar */}
           <View style={styles.avatarWrap}>
-            {(user as any)?.photo || (user as any)?.avatar || (user as any)?.profilePhoto ? (
-              // eslint-disable-next-line @typescript-eslint/no-var-requires
+            {(user as any)?.photo ||
+            (user as any)?.avatar ||
+            (user as any)?.profilePhoto ? (
               <Image
-                source={{ uri: (user as any)?.photo ?? (user as any)?.avatar ?? (user as any)?.profilePhoto }}
+                source={{
+                  uri:
+                    (user as any)?.photo ??
+                    (user as any)?.avatar ??
+                    (user as any)?.profilePhoto,
+                }}
                 style={styles.avatar}
               />
             ) : (
@@ -454,21 +464,27 @@ export default function PunchInOut() {
           {/* Info */}
           <View style={styles.profileInfo}>
             <Text style={styles.profileName} numberOfLines={1}>
-               {user?.user.fullName}
+              {user?.user.fullName}
             </Text>
             {todaySchedule ? (
               <>
                 <View style={styles.profileScheduleRow}>
                   <Ionicons name="time-outline" size={13} color="#2563EB" />
                   <Text style={styles.profileScheduleText}>
-                    Horario: {todaySchedule.workEntryTime?.slice(0, 5)} – {todaySchedule.workExitTime?.slice(0, 5)}
+                    Horario: {todaySchedule.workEntryTime?.slice(0, 5)} –{" "}
+                    {todaySchedule.workExitTime?.slice(0, 5)}
                   </Text>
                 </View>
                 {todaySchedule.lunchEntryTime && (
                   <View style={styles.profileScheduleRow}>
-                    <Ionicons name="restaurant-outline" size={13} color="#D97706" />
+                    <Ionicons
+                      name="restaurant-outline"
+                      size={13}
+                      color="#D97706"
+                    />
                     <Text style={styles.profileScheduleText}>
-                      Almuerzo: {todaySchedule.lunchEntryTime.slice(0, 5)} – {todaySchedule.lunchExitTime?.slice(0, 5)}
+                      Almuerzo: {todaySchedule.lunchEntryTime.slice(0, 5)} –{" "}
+                      {todaySchedule.lunchExitTime?.slice(0, 5)}
                     </Text>
                   </View>
                 )}
@@ -476,7 +492,9 @@ export default function PunchInOut() {
             ) : (
               <View style={styles.profileScheduleRow}>
                 <Ionicons name="warning-outline" size={13} color="#D97706" />
-                <Text style={[styles.profileScheduleText, { color: "#D97706" }]}>
+                <Text
+                  style={[styles.profileScheduleText, { color: "#D97706" }]}
+                >
                   Sin horario configurado
                 </Text>
               </View>
@@ -561,7 +579,10 @@ export default function PunchInOut() {
         </View>
         <TouchableOpacity
           onPress={fetchTodayPunches}
-          style={[styles.refreshBtn, { alignSelf: "flex-end", marginBottom: 4 }]}
+          style={[
+            styles.refreshBtn,
+            { alignSelf: "flex-end", marginBottom: 4 },
+          ]}
         >
           <Ionicons name="refresh-outline" size={18} color="#2563EB" />
         </TouchableOpacity>
@@ -635,8 +656,6 @@ export default function PunchInOut() {
           ))
         )}
       </View>
-
-
     </ScrollView>
   );
 }
@@ -655,31 +674,31 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
-clockTextWrap: {
-  alignItems: "center", 
-  justifyContent: "center",
+  clockTextWrap: {
+    alignItems: "center",
+    justifyContent: "center",
   },
- clockTime: {
-  color: "#1D4ED8",
-  fontSize: 40,
-  fontWeight: "800",
-  letterSpacing: 0.5,
-  textAlign: "center", 
-   marginLeft: 25
+  clockTime: {
+    color: "#1D4ED8",
+    fontSize: 40,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    textAlign: "center",
+    marginLeft: 25,
   },
   clockAmPm: {
-  fontSize: 14,
-  fontWeight: "600",
-  marginLeft: 4,
- color: "#142157", 
-},
- clockDate: {
-  color: "#3B82F6",
-  fontSize: 11,
-  marginTop: 1,
-  textTransform: "capitalize",
-  letterSpacing: 0.2,
-  textAlign: "center",
+    fontSize: 14,
+    fontWeight: "600",
+    marginLeft: 4,
+    color: "#142157",
+  },
+  clockDate: {
+    color: "#3B82F6",
+    fontSize: 11,
+    marginTop: 1,
+    textTransform: "capitalize",
+    letterSpacing: 0.2,
+    textAlign: "center",
   },
   clockUserRow: {
     flexDirection: "row",
@@ -725,7 +744,12 @@ clockTextWrap: {
     borderColor: "#BFDBFE",
   },
   profileInfo: { flex: 1, gap: 6 },
-  profileName: { fontSize: 15, fontWeight: "800", color: "#111827", letterSpacing: 0.1 },
+  profileName: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#111827",
+    letterSpacing: 0.1,
+  },
   profileScheduleRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   profileScheduleText: { fontSize: 12, color: "#6B7280" },
   scheduleCard: {
@@ -775,16 +799,15 @@ clockTextWrap: {
     position: "absolute",
     top: -11,
     left: 14,
-   backgroundColor: "#F9FAFB",
+    backgroundColor: "#F9FAFB",
     paddingHorizontal: 7,
   },
-floatLabelText: {
-  fontSize: 10,
-  fontWeight: "700",
-  color: "#2563EB",
-  letterSpacing: 0.3,
-  textTransform: "none",
-
+  floatLabelText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#2563EB",
+    letterSpacing: 0.3,
+    textTransform: "none",
   },
   floatLabelRow: {
     flexDirection: "row",
@@ -880,7 +903,12 @@ floatLabelText: {
   },
   registerBtnExit: { backgroundColor: "#DC2626" },
   registerTextWrap: { alignItems: "center" },
-  registerBtnText: { color: "#fff", fontSize: 17, fontWeight: "800", letterSpacing: 0.2 },
+  registerBtnText: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+  },
   registerBtnSub: {
     color: "rgba(255,255,255,0.75)",
     fontSize: 12,
