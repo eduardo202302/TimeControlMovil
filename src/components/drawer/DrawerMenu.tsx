@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as SecureStore from "expo-secure-store";
 import { usePathname, useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useState } from "react";
 import {
   Alert,
@@ -136,6 +136,7 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, menuTree, app, urlColegio, logout } = useSchoolStore();
+  const [userExpanded, setUserExpanded] = useState(false);
 
   const handleNavigate = useCallback(
     (path: string) => {
@@ -147,21 +148,18 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
 
   const handleLogout = useCallback(() => {
     Alert.alert(
-      "Cerrar sesión",
-      "¿Estás seguro de que deseas cerrar sesión?",
+      "Cerrar Sesión",
+      "¿Estás seguro de que deseas salir de la App?",
       [
         { text: "Cancelar", style: "cancel" },
         {
-          text: "Cerrar sesión",
+          text: "Salir",
           style: "destructive",
           onPress: async () => {
             onClose();
-            // Limpiar TODO el SecureStore
             await SecureStore.deleteItemAsync("token");
-            await SecureStore.deleteItemAsync("isAuthorized");
             await SecureStore.deleteItemAsync("user");
             await SecureStore.deleteItemAsync("menuItems");
-            await SecureStore.deleteItemAsync("urlColegio");
             logout();
             router.replace("/login");
           },
@@ -218,34 +216,47 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
               pathname={pathname}
             />
           ))}
-        </ScrollView>
 
-        {/* Footer */}
-        {user && (
-          <View style={styles.footer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {user.user?.fullName?.charAt(0)?.toUpperCase() ?? "U"}
-              </Text>
+          {/* ── Usuario colapsable ── */}
+          {user && (
+            <View style={styles.userSection}>
+              <TouchableOpacity
+                style={styles.userHeader}
+                onPress={() => setUserExpanded(!userExpanded)}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="person-circle-outline"
+                  size={20}
+                  color="#2563EB"
+                />
+                <Text style={styles.sectionTitle}>Sesión</Text>
+                <Ionicons
+                  name={userExpanded ? "chevron-down" : "chevron-forward"}
+                  size={16}
+                  color="#9CA3AF"
+                />
+              </TouchableOpacity>
+
+              {userExpanded && (
+                <View style={styles.userSubmenu}>
+                  <TouchableOpacity
+                    style={styles.logoutItem}
+                    onPress={handleLogout}
+                    activeOpacity={0.75}
+                  >
+                    <Ionicons
+                      name="log-out-outline"
+                      size={18}
+                      color="#DC2626"
+                    />
+                    <Text style={styles.logoutBtnText}>Cerrar Sesión</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-            <View style={styles.footerInfo}>
-              <Text style={styles.footerName} numberOfLines={1}>
-                {user.user?.fullName}
-              </Text>
-              <Text style={styles.footerRole} numberOfLines={1}>
-                {user.role?.name}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.logoutBtn}
-              onPress={handleLogout}
-              activeOpacity={0.75}
-            >
-              <Ionicons name="log-out-outline" size={18} color="#DC2626" />
-              <Text style={styles.logoutBtnText}>Cerrar Sesión</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          )}
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
@@ -370,6 +381,37 @@ const styles = StyleSheet.create({
     borderTopColor: "#F3F4F6",
     backgroundColor: "#FAFAFA",
   },
+  userSection: {
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+    paddingTop: 4,
+  },
+  userHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 10,
+  },
+  userSubmenu: {
+    marginLeft: 8,
+    marginBottom: 4,
+  },
+  logoutItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingLeft: 38,
+    paddingRight: 12,
+    paddingVertical: 11,
+    borderRadius: 8,
+    marginBottom: 2,
+    borderLeftWidth: 2,
+    borderLeftColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+  },
   avatar: {
     width: 38,
     height: 38,
@@ -394,21 +436,9 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginTop: 1,
   },
- logoutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "#FEF2F2",
-    borderWidth: 1,
-    borderColor: "#FECACA",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
   logoutBtnText: {
     fontSize: 12,
     fontWeight: "700",
     color: "#DC2626",
   },
-  },
-);
+});

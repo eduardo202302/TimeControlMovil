@@ -11,13 +11,13 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   user: null,
   tokenPassword: null,
 
-  // ─── Estado nuevo para routing ──────────
+  // ─── Estado nuevo para routing ──────────────────────────────────────────────
   app: null,
   initialPath: null,
   allowedMenuItems: [],
   menuTree: [],
 
-  // ─── Acciones existentes  ──────────
+  // ─── Acciones existentes (sin cambios) ──────────────────────────────────────
   setSchool: (school) => set({ school }),
   setUrlColegio: (url) => set({ urlColegio: url }),
   setToken: (token) => set({ token }),
@@ -37,11 +37,9 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       menuTree: [],
     }),
 
-  // ─── Cerrar sesión ──────────────────────────────────────────────────────────
+  // ─── Cerrar sesión — conserva urlColegio y school para poder volver a login ─
   logout: () =>
     set({
-      school: null,
-      urlColegio: null,
       token: null,
       user: null,
       tokenPassword: null,
@@ -51,6 +49,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       menuTree: [],
     }),
 
+  // ─── Acción nueva: resuelve app + ruta + menú tras el login ─────────────────
   setMenuResolution: (user, menuItems: MenuItem[]) => {
     const { app, initialPath, allowedItems, menuTree } = resolveRoute(
       user.roleId,
