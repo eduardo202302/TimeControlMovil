@@ -367,37 +367,39 @@ export default function PunchInOut() {
       return;
     }
 
-    // ── Solicitar permiso de cámara ──
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permiso requerido",
-        "Necesitas permitir el acceso a la cámara para registrar tu asistencia.",
-      );
-      return;
-    }
-
-    // ── Abrir cámara ──
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 0.6,
-      base64: true,
-    });
-
-    if (result.canceled) return;
-
-    const photo = result.assets[0];
-
     const types = PUNCH_TYPE_MAP[selectedCategory];
     const type = isInicio ? types.inicio : types.fin;
     const status2 = selectedCategory === "Break" ? undefined : getEntryStatus();
+
+    let photo = null;
+
+    // ── Solo pedir foto en entradas ──
+    if (isInicio) {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permiso requerido",
+          "Necesitas permitir el acceso a la cámara para registrar tu asistencia.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.6,
+        base64: true,
+      });
+
+      if (result.canceled) return;
+      photo = result.assets[0];
+    }
 
     setLoading(true);
     try {
       const payload: Record<string, any> = { type };
       if (status2 !== undefined) payload.status = status2;
-      if (photo.base64) payload.photourl = [photo.base64];
+      if (photo?.base64) payload.photourl = [photo.base64];
 
       const response = await axios.post(`${urlColegio}/punches`, payload, {
         headers: {
