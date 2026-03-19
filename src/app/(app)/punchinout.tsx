@@ -486,9 +486,11 @@ export default function PunchInOut() {
 
             {todaySchedule ? (
               <View style={styles.scheduleTable}>
-                {/* Cabeceras */}
                 <View style={styles.scheduleTableCol}>
-                  <Text style={styles.scheduleTableHeader}>Horario</Text>
+                  <View style={styles.scheduleTableRow}>
+                    <Ionicons name="time-outline" size={13} color="#2563EB" />
+                    <Text style={styles.scheduleTableHeader}>Horario</Text>
+                  </View>
                   <Text style={styles.scheduleTableValue}>
                     {to12h(todaySchedule.workEntryTime)} –
                   </Text>
@@ -498,7 +500,14 @@ export default function PunchInOut() {
                 </View>
                 {todaySchedule.lunchEntryTime && (
                   <View style={styles.scheduleTableCol}>
-                    <Text style={styles.scheduleTableHeader}>Almuerzo</Text>
+                    <View style={styles.scheduleTableRow}>
+                      <Ionicons
+                        name="restaurant-outline"
+                        size={13}
+                        color="#D97706"
+                      />
+                      <Text style={styles.scheduleTableHeader}>Almuerzo</Text>
+                    </View>
                     <Text style={styles.scheduleTableValue}>
                       {to12h(todaySchedule.lunchEntryTime)} –
                     </Text>
@@ -764,25 +773,6 @@ const styles = StyleSheet.create({
   },
   profileInfo: { flex: 1, gap: 4 },
   profileRoleText: { fontSize: 12, color: "#2563EB", fontWeight: "600" },
-  scheduleTable: {
-    flexDirection: "row",
-    gap: 16,
-    marginTop: 6,
-  },
-  scheduleTableCol: {
-    gap: 2,
-  },
-  scheduleTableHeader: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#9CA3AF",
-    letterSpacing: 0.5,
-  },
-  scheduleTableValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#111827",
-  },
   profileName: {
     fontSize: 15,
     fontWeight: "800",
@@ -819,6 +809,22 @@ const styles = StyleSheet.create({
   scheduleItems: { gap: 4 },
   scheduleItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   scheduleText: { fontSize: 13, color: "#374151" },
+  scheduleTable: {
+    flexDirection: "row",
+    gap: 16,
+    marginTop: 6,
+    alignItems: "center",
+  },
+  scheduleTableCol: { gap: 3 },
+  scheduleTableRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  scheduleTableHeader: { fontSize: 11, fontWeight: "700", color: "#6B7280" },
+  scheduleTableValue: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#111827",
+    marginLeft: 13,
+  },
+
   /* ── Floating label card ── */
   floatCard: {
     backgroundColor: "#fff",
