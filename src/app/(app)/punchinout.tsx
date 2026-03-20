@@ -25,6 +25,10 @@ interface UserSchedule {
   workExitTime: string;
   lunchEntryTime: string | null;
   lunchExitTime: string | null;
+  toleranceWorkTimeIn?: number;
+  toleranceLunchTimeIn?: number;
+  toleranceWorkTimeOut?: number;
+  toleranceLunchTimeOut?: number;
 }
 
 interface PunchEvent {
@@ -33,7 +37,9 @@ interface PunchEvent {
   status: string;
   createdDate: string;
   lateEntry?: boolean;
-  overtime?: number;
+  earlyExit?: boolean;
+  overtime?: number | string;
+  toleranceMinutes?: number | null;
 }
 
 // Santo Domingo = UTC-4, fijo, sin cambio de horario de verano
@@ -153,18 +159,24 @@ function getTodaySchedule(
 function getStatusForEntry(
   now: Date,
   entryTimeStr: string,
-  toleranceMinutes = 5,
-): "A Tiempo" | "Tardanza" {
+  toleranceMinutes = 0,
+): "A Tiempo" | "Tardanza" | "Anticipada" {
   const diff = getRDMinutes(now) - timeStrToMinutes(entryTimeStr);
-  return diff > toleranceMinutes ? "Tardanza" : "A Tiempo";
+  if (diff > toleranceMinutes) return "Tardanza";
+  if (diff < -toleranceMinutes) return "Anticipada";
+  return "A Tiempo";
 }
 
 function getStatusForExit(
   now: Date,
   exitTimeStr: string,
-  toleranceMinutes = 5,
+  toleranceMinutes = 0,
 ): "A Tiempo" | "Anticipada" {
   const diff = timeStrToMinutes(exitTimeStr) - getRDMinutes(now);
+  // diff > 0 = salió antes de su hora
+  // diff < 0 = salió después de su hora (horas extras) → A Tiempo
+  // diff > toleranceMinutes = salió demasiado antes → Anticipada
+  if (diff <= 0) return "A Tiempo"; // salió después o exacto → A Tiempo
   return diff > toleranceMinutes ? "Anticipada" : "A Tiempo";
 }
 
@@ -183,6 +195,7 @@ function getPunchTypeLabel(type: string): string {
 function getStatusColor(status: string): string {
   if (status === "Tardanza") return "#DC2626";
   if (status === "Anticipada") return "#D97706";
+  if (status === "Error de Imagen") return "#DC2626";
   return "#16A34A";
 }
 
@@ -202,7 +215,11 @@ function getStatusLabel(status: string): string {
 function isJornadaActiva(punches: PunchEvent[]): boolean {
   const last = [...punches]
     .reverse()
-    .find((p) => p.type === "InicioJornada" || p.type === "FinJornada");
+    .find(
+      (p) =>
+        (p.type === "InicioJornada" || p.type === "FinJornada") &&
+        p.status !== "Error de Imagen",
+    );
   return last?.type === "InicioJornada";
 }
 
@@ -244,6 +261,31 @@ export default function PunchInOut() {
   const userSchedules: UserSchedule[] = (user as any)?.userSchedules ?? [];
   const todaySchedule = getTodaySchedule(userSchedules, now);
   const jornadaIniciada = isJornadaActiva(punches);
+
+  // Tolerancias: primero del schedule, luego del user, luego default 15
+  const tolWorkIn =
+    todaySchedule?.toleranceWorkTimeIn ??
+    (user as any)?.toleranceWorkTimeIn ??
+    0;
+  const tolWorkOut =
+    todaySchedule?.toleranceWorkTimeOut ??
+    (user as any)?.toleranceWorkTimeOut ??
+    0;
+  const tolLunchIn =
+    todaySchedule?.toleranceLunchTimeIn ??
+    (user as any)?.toleranceLunchTimeIn ??
+    0;
+  const tolLunchOut =
+    todaySchedule?.toleranceLunchTimeOut ??
+    (user as any)?.toleranceLunchTimeOut ??
+    0;
+  console.log("[Tolerancias]", {
+    tolWorkIn,
+    tolWorkOut,
+    tolLunchIn,
+    tolLunchOut,
+    todaySchedule,
+  });
 
   // Datos del usuario autenticado
   const userName: string = (user as any)?.name
@@ -327,7 +369,11 @@ export default function PunchInOut() {
     const types = PUNCH_TYPE_MAP[category];
     const last = [...punches]
       .reverse()
-      .find((p) => p.type === types.inicio || p.type === types.fin);
+      .find(
+        (p) =>
+          (p.type === types.inicio || p.type === types.fin) &&
+          p.status !== "Error de Imagen",
+      );
     if (!last) return "inicio";
     return last.type === types.inicio ? "fin" : "inicio";
   };
@@ -339,16 +385,16 @@ export default function PunchInOut() {
 
     if (!isInicio) {
       if (selectedCategory === "Jornada" && todaySchedule?.workExitTime)
-        return getStatusForExit(now, todaySchedule.workExitTime);
+        return getStatusForExit(now, todaySchedule.workExitTime, tolWorkOut);
       if (selectedCategory === "Almuerzo" && todaySchedule?.lunchExitTime)
-        return getStatusForExit(now, todaySchedule.lunchExitTime);
+        return getStatusForExit(now, todaySchedule.lunchExitTime, tolLunchOut);
       return "A Tiempo";
     }
 
     if (selectedCategory === "Jornada" && todaySchedule?.workEntryTime)
-      return getStatusForEntry(now, todaySchedule.workEntryTime);
+      return getStatusForEntry(now, todaySchedule.workEntryTime, tolWorkIn);
     if (selectedCategory === "Almuerzo" && todaySchedule?.lunchEntryTime)
-      return getStatusForEntry(now, todaySchedule.lunchEntryTime);
+      return getStatusForEntry(now, todaySchedule.lunchEntryTime, tolLunchIn);
 
     return "A Tiempo";
   };
@@ -367,37 +413,40 @@ export default function PunchInOut() {
       return;
     }
 
-    // ── Solicitar permiso de cámara ──
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permiso requerido",
-        "Necesitas permitir el acceso a la cámara para registrar tu asistencia.",
-      );
-      return;
-    }
-
-    // ── Abrir cámara ──
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 0.6,
-      base64: true,
-    });
-
-    if (result.canceled) return;
-
-    const photo = result.assets[0];
-
     const types = PUNCH_TYPE_MAP[selectedCategory];
     const type = isInicio ? types.inicio : types.fin;
     const status2 = selectedCategory === "Break" ? undefined : getEntryStatus();
+
+    let photo = null;
+
+    // ── Solo pedir foto en entradas ──
+    if (isInicio) {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permiso requerido",
+          "Necesitas permitir el acceso a la galería para registrar tu asistencia.",
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.4,
+        base64: true,
+      });
+
+      if (result.canceled) return;
+      photo = result.assets[0];
+    }
 
     setLoading(true);
     try {
       const payload: Record<string, any> = { type };
       if (status2 !== undefined) payload.status = status2;
-      if (photo.base64) payload.photourl = [photo.base64];
+      if (photo?.base64) payload.photourl = [photo.base64];
 
       const response = await axios.post(`${urlColegio}/punches`, payload, {
         headers: {
@@ -408,6 +457,14 @@ export default function PunchInOut() {
 
       if (response.data.success) {
         await fetchTodayPunches();
+        // ── Si el punch fue creado pero con Error de Imagen ──
+        if (response.data.data?.status === "Error de Imagen") {
+          Alert.alert(
+            "Verificación fallida",
+            "Tu rostro no coincide con el registrado. No se pudo iniciar la jornada. Intenta de nuevo o contacta al administrador.",
+          );
+          return;
+        }
         Alert.alert(
           "Registrado",
           `${getPunchTypeLabel(type)} registrado correctamente.`,
@@ -649,14 +706,21 @@ export default function PunchInOut() {
             <Text style={styles.emptyText}>Sin registros hoy</Text>
           </View>
         ) : (
-          punches.map((punch) => (
+          [...punches].reverse().map((punch) => (
             <View key={punch.id} style={styles.punchRow}>
               <View
                 style={[
                   styles.punchIcon,
-                  punch.type.startsWith("Inicio")
-                    ? styles.punchIconEntry
-                    : styles.punchIconExit,
+                  punch.status === "Error de Imagen" ||
+                  punch.status === "Tardanza"
+                    ? styles.punchIconError
+                    : punch.status === "Anticipada"
+                      ? styles.punchIconEarly
+                      : punch.type.startsWith("Inicio")
+                        ? styles.punchIconEntry
+                        : parseFloat(String(punch.overtime ?? 0)) > 0
+                          ? styles.punchIconOvertime
+                          : styles.punchIconExitOnTime,
                 ]}
               >
                 <Ionicons
@@ -667,7 +731,16 @@ export default function PunchInOut() {
                   }
                   size={16}
                   color={
-                    punch.type.startsWith("Inicio") ? "#16A34A" : "#DC2626"
+                    punch.status === "Error de Imagen" ||
+                    punch.status === "Tardanza"
+                      ? "#DC2626"
+                      : punch.status === "Anticipada"
+                        ? "#D97706"
+                        : punch.type.startsWith("Inicio")
+                          ? "#16A34A"
+                          : parseFloat(String(punch.overtime ?? 0)) > 0
+                            ? "#2563EB"
+                            : "#16A34A"
                   }
                 />
               </View>
@@ -676,31 +749,37 @@ export default function PunchInOut() {
                   {getPunchTypeLabel(punch.type)}
                 </Text>
                 <View style={styles.punchBadgeRow}>
-                  {punch.status && (
-                    <View
-                      style={[
-                        styles.punchBadge,
-                        punch.status === "Tardanza"
-                          ? styles.badgeLate
-                          : punch.status === "Anticipada"
-                            ? styles.badgeEarly
-                            : styles.badgeOnTime,
-                      ]}
-                    >
-                      <Text
+                  {punch.type.startsWith("Fin") &&
+                  parseFloat(String(punch.overtime ?? 0)) > 0 ? (
+                    /* Salida con overtime → solo "Horas extras", el status es irrelevante */
+                    <View style={styles.badgeOvertime}>
+                      <Text style={styles.badgeOvertimeText}>Horas extras</Text>
+                    </View>
+                  ) : (
+                    /* Sin overtime → mostrar status normal */
+                    punch.status && (
+                      <View
                         style={[
-                          styles.punchBadgeText,
-                          { color: getStatusColor(punch.status) },
+                          styles.punchBadge,
+                          punch.status === "Tardanza"
+                            ? styles.badgeLate
+                            : punch.status === "Anticipada"
+                              ? styles.badgeEarly
+                              : punch.status === "Error de Imagen"
+                                ? styles.badgeLate
+                                : styles.badgeOnTime,
                         ]}
                       >
-                        {punch.status}
-                      </Text>
-                    </View>
-                  )}
-                  {punch.lateEntry && (
-                    <View style={styles.badgeLateEntry}>
-                      <Text style={styles.badgeLateEntryText}>Tardanza</Text>
-                    </View>
+                        <Text
+                          style={[
+                            styles.punchBadgeText,
+                            { color: getStatusColor(punch.status) },
+                          ]}
+                        >
+                          {punch.status}
+                        </Text>
+                      </View>
+                    )
                   )}
                 </View>
               </View>
@@ -1004,7 +1083,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   punchIconEntry: { backgroundColor: "#DCFCE7" },
-  punchIconExit: { backgroundColor: "#FEE2E2" },
+  punchIconExit: { backgroundColor: "#DBEAFE" },
+  punchIconExitOnTime: { backgroundColor: "#DCFCE7" },
+  punchIconOvertime: { backgroundColor: "#DBEAFE" },
+  punchIconEarly: { backgroundColor: "#FEF3C7" },
+  punchIconError: { backgroundColor: "#FEE2E2" },
   punchInfo: { flex: 1, gap: 4 },
   punchType: { fontSize: 13, fontWeight: "700", color: "#111827" },
   punchBadgeRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
@@ -1020,6 +1103,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   badgeLateEntryText: { fontSize: 11, fontWeight: "700", color: "#D97706" },
+  badgeOvertime: {
+    backgroundColor: "#EFF6FF",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 20,
+  },
+  badgeOvertimeText: { fontSize: 11, fontWeight: "700", color: "#2563EB" },
   punchTime: { fontSize: 12, fontWeight: "600", color: "#6B7280" },
   modalOverlay: {
     flex: 1,
