@@ -262,30 +262,13 @@ export default function PunchInOut() {
   const todaySchedule = getTodaySchedule(userSchedules, now);
   const jornadaIniciada = isJornadaActiva(punches);
 
-  // Tolerancias: primero del schedule, luego del user, luego default 15
-  const tolWorkIn =
-    todaySchedule?.toleranceWorkTimeIn ??
-    (user as any)?.toleranceWorkTimeIn ??
-    1;
-  const tolWorkOut =
-    todaySchedule?.toleranceWorkTimeOut ??
-    (user as any)?.toleranceWorkTimeOut ??
-    0;
-  const tolLunchIn =
-    todaySchedule?.toleranceLunchTimeIn ??
-    (user as any)?.toleranceLunchTimeIn ??
-    1;
-  const tolLunchOut =
-    todaySchedule?.toleranceLunchTimeOut ??
-    (user as any)?.toleranceLunchTimeOut ??
-    0;
-  console.log("[Tolerancias]", {
-    tolWorkIn,
-    tolWorkOut,
-    tolLunchIn,
-    tolLunchOut,
-    todaySchedule,
-  });
+  // Tolerancias: del schedule, luego de school.settings, luego fallback
+  const schoolSettings = (user as any)?.school?.settings;
+  const isImageRequired: boolean = schoolSettings?.isImageRequired ?? false;
+  const tolWorkIn   = 1;
+  const tolWorkOut  = 1;
+  const tolLunchIn  = 1;
+  const tolLunchOut = 1;
 
   // Datos del usuario autenticado
   const userName: string = (user as any)?.name
@@ -413,16 +396,16 @@ export default function PunchInOut() {
       return;
     }
 
+
     const types = PUNCH_TYPE_MAP[selectedCategory];
     const type = isInicio ? types.inicio : types.fin;
     const status2 = selectedCategory === "Break" ? undefined : getEntryStatus();
 
     let photo = null;
 
-    // ── Solo pedir foto en entradas ──
-    if (isInicio) {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+    // ── Foto solo si el perfil la requiere y es entrada ──
+    if (isInicio && isImageRequired) {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
           "Permiso requerido",
@@ -430,14 +413,12 @@ export default function PunchInOut() {
         );
         return;
       }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
         quality: 0.4,
         base64: true,
       });
-
       if (result.canceled) return;
       photo = result.assets[0];
     }
@@ -455,16 +436,8 @@ export default function PunchInOut() {
         },
       });
 
-      if (response.data.success) {
+   if (response.data.success) {
         await fetchTodayPunches();
-        // ── Si el punch fue creado pero con Error de Imagen ──
-        if (response.data.data?.status === "Error de Imagen") {
-          Alert.alert(
-            "Verificación fallida",
-            "Tu rostro no coincide con el registrado. No se pudo iniciar la jornada. Intenta de nuevo o contacta al administrador.",
-          );
-          return;
-        }
         Alert.alert(
           "Registrado",
           `${getPunchTypeLabel(type)} registrado correctamente.`,
@@ -711,16 +684,15 @@ export default function PunchInOut() {
               <View
                 style={[
                   styles.punchIcon,
-                  punch.status === "Error de Imagen" ||
-                  punch.status === "Tardanza"
+                  punch.status === "Error de Imagen" || punch.status === "Tardanza"
                     ? styles.punchIconError
                     : punch.status === "Anticipada"
-                      ? styles.punchIconEarly
-                      : punch.type.startsWith("Inicio")
-                        ? styles.punchIconEntry
-                        : parseFloat(String(punch.overtime ?? 0)) > 0
-                          ? styles.punchIconOvertime
-                          : styles.punchIconExitOnTime,
+                    ? styles.punchIconEarly
+                    : punch.type.startsWith("Inicio")
+                    ? styles.punchIconEntry
+                    : parseFloat(String(punch.overtime ?? 0)) > 0
+                    ? styles.punchIconOvertime
+                    : styles.punchIconExitOnTime,
                 ]}
               >
                 <Ionicons
@@ -731,16 +703,15 @@ export default function PunchInOut() {
                   }
                   size={16}
                   color={
-                    punch.status === "Error de Imagen" ||
-                    punch.status === "Tardanza"
+                    punch.status === "Error de Imagen" || punch.status === "Tardanza"
                       ? "#DC2626"
                       : punch.status === "Anticipada"
-                        ? "#D97706"
-                        : punch.type.startsWith("Inicio")
-                          ? "#16A34A"
-                          : parseFloat(String(punch.overtime ?? 0)) > 0
-                            ? "#2563EB"
-                            : "#16A34A"
+                      ? "#D97706"
+                      : punch.type.startsWith("Inicio")
+                      ? "#16A34A"
+                      : parseFloat(String(punch.overtime ?? 0)) > 0
+                      ? "#2563EB"
+                      : "#16A34A"
                   }
                 />
               </View>
@@ -749,8 +720,7 @@ export default function PunchInOut() {
                   {getPunchTypeLabel(punch.type)}
                 </Text>
                 <View style={styles.punchBadgeRow}>
-                  {punch.type.startsWith("Fin") &&
-                  parseFloat(String(punch.overtime ?? 0)) > 0 ? (
+                  {punch.type.startsWith("Fin") && parseFloat(String(punch.overtime ?? 0)) > 0 ? (
                     /* Salida con overtime → solo "Horas extras", el status es irrelevante */
                     <View style={styles.badgeOvertime}>
                       <Text style={styles.badgeOvertimeText}>Horas extras</Text>
@@ -764,10 +734,10 @@ export default function PunchInOut() {
                           punch.status === "Tardanza"
                             ? styles.badgeLate
                             : punch.status === "Anticipada"
-                              ? styles.badgeEarly
-                              : punch.status === "Error de Imagen"
-                                ? styles.badgeLate
-                                : styles.badgeOnTime,
+                            ? styles.badgeEarly
+                            : punch.status === "Error de Imagen"
+                            ? styles.badgeLate
+                            : styles.badgeOnTime,
                         ]}
                       >
                         <Text
@@ -1167,7 +1137,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#F3F4F6",
   },
-  modalBtnCancel: {
+  modalBtnCancel: { 
     flex: 1,
     paddingVertical: 16,
     alignItems: "center",
