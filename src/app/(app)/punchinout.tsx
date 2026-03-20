@@ -265,9 +265,9 @@ export default function PunchInOut() {
   // Tolerancias: del schedule, luego de school.settings, luego fallback
   const schoolSettings = (user as any)?.school?.settings;
   const isImageRequired: boolean = schoolSettings?.isImageRequired ?? false;
-  const tolWorkIn   = 1;
-  const tolWorkOut  = 1;
-  const tolLunchIn  = 1;
+  const tolWorkIn = 1;
+  const tolWorkOut = 1;
+  const tolLunchIn = 1;
   const tolLunchOut = 1;
 
   // Datos del usuario autenticado
@@ -376,8 +376,7 @@ export default function PunchInOut() {
 
     if (selectedCategory === "Jornada" && todaySchedule?.workEntryTime)
       return getStatusForEntry(now, todaySchedule.workEntryTime, tolWorkIn);
-    if (selectedCategory === "Almuerzo" && todaySchedule?.lunchEntryTime)
-      return getStatusForEntry(now, todaySchedule.lunchEntryTime, tolLunchIn);
+    if (selectedCategory === "Almuerzo") return "A Tiempo";
 
     return "A Tiempo";
   };
@@ -396,7 +395,6 @@ export default function PunchInOut() {
       return;
     }
 
-
     const types = PUNCH_TYPE_MAP[selectedCategory];
     const type = isInicio ? types.inicio : types.fin;
     const status2 = selectedCategory === "Break" ? undefined : getEntryStatus();
@@ -405,7 +403,8 @@ export default function PunchInOut() {
 
     // ── Foto solo si el perfil la requiere y es entrada ──
     if (isInicio && isImageRequired) {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
           "Permiso requerido",
@@ -436,7 +435,7 @@ export default function PunchInOut() {
         },
       });
 
-   if (response.data.success) {
+      if (response.data.success) {
         await fetchTodayPunches();
         Alert.alert(
           "Registrado",
@@ -684,15 +683,16 @@ export default function PunchInOut() {
               <View
                 style={[
                   styles.punchIcon,
-                  punch.status === "Error de Imagen" || punch.status === "Tardanza"
+                  punch.status === "Error de Imagen" ||
+                  punch.status === "Tardanza"
                     ? styles.punchIconError
                     : punch.status === "Anticipada"
-                    ? styles.punchIconEarly
-                    : punch.type.startsWith("Inicio")
-                    ? styles.punchIconEntry
-                    : parseFloat(String(punch.overtime ?? 0)) > 0
-                    ? styles.punchIconOvertime
-                    : styles.punchIconExitOnTime,
+                      ? styles.punchIconEarly
+                      : punch.type.startsWith("Inicio")
+                        ? styles.punchIconEntry
+                        : parseFloat(String(punch.overtime ?? 0)) > 0
+                          ? styles.punchIconOvertime
+                          : styles.punchIconExitOnTime,
                 ]}
               >
                 <Ionicons
@@ -703,15 +703,16 @@ export default function PunchInOut() {
                   }
                   size={16}
                   color={
-                    punch.status === "Error de Imagen" || punch.status === "Tardanza"
+                    punch.status === "Error de Imagen" ||
+                    punch.status === "Tardanza"
                       ? "#DC2626"
                       : punch.status === "Anticipada"
-                      ? "#D97706"
-                      : punch.type.startsWith("Inicio")
-                      ? "#16A34A"
-                      : parseFloat(String(punch.overtime ?? 0)) > 0
-                      ? "#2563EB"
-                      : "#16A34A"
+                        ? "#D97706"
+                        : punch.type.startsWith("Inicio")
+                          ? "#16A34A"
+                          : parseFloat(String(punch.overtime ?? 0)) > 0
+                            ? "#2563EB"
+                            : "#16A34A"
                   }
                 />
               </View>
@@ -720,7 +721,8 @@ export default function PunchInOut() {
                   {getPunchTypeLabel(punch.type)}
                 </Text>
                 <View style={styles.punchBadgeRow}>
-                  {punch.type.startsWith("Fin") && parseFloat(String(punch.overtime ?? 0)) > 0 ? (
+                  {punch.type.startsWith("Fin") &&
+                  parseFloat(String(punch.overtime ?? 0)) > 0 ? (
                     /* Salida con overtime → solo "Horas extras", el status es irrelevante */
                     <View style={styles.badgeOvertime}>
                       <Text style={styles.badgeOvertimeText}>Horas extras</Text>
@@ -734,10 +736,10 @@ export default function PunchInOut() {
                           punch.status === "Tardanza"
                             ? styles.badgeLate
                             : punch.status === "Anticipada"
-                            ? styles.badgeEarly
-                            : punch.status === "Error de Imagen"
-                            ? styles.badgeLate
-                            : styles.badgeOnTime,
+                              ? styles.badgeEarly
+                              : punch.status === "Error de Imagen"
+                                ? styles.badgeLate
+                                : styles.badgeOnTime,
                         ]}
                       >
                         <Text
@@ -1137,7 +1139,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#F3F4F6",
   },
-  modalBtnCancel: { 
+  modalBtnCancel: {
     flex: 1,
     paddingVertical: 16,
     alignItems: "center",
