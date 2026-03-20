@@ -266,7 +266,7 @@ export default function PunchInOut() {
   const tolWorkIn =
     todaySchedule?.toleranceWorkTimeIn ??
     (user as any)?.toleranceWorkTimeIn ??
-    0;
+    1;
   const tolWorkOut =
     todaySchedule?.toleranceWorkTimeOut ??
     (user as any)?.toleranceWorkTimeOut ??
@@ -274,7 +274,7 @@ export default function PunchInOut() {
   const tolLunchIn =
     todaySchedule?.toleranceLunchTimeIn ??
     (user as any)?.toleranceLunchTimeIn ??
-    0;
+    1;
   const tolLunchOut =
     todaySchedule?.toleranceLunchTimeOut ??
     (user as any)?.toleranceLunchTimeOut ??
