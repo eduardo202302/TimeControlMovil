@@ -223,6 +223,38 @@ function isJornadaActiva(punches: PunchEvent[]): boolean {
   return last?.type === "InicioJornada";
 }
 
+function isJornadaVisible(
+  now: Date,
+  schedule: UserSchedule | null,
+  isInicio: boolean,
+  tolWorkIn: number,
+  tolWorkOut: number,
+  punches: PunchEvent[],
+): boolean {
+  if (!schedule) return true;
+
+  const current = getRDMinutes(now);
+  const lastJornada = [...punches]
+    .reverse()
+    .find((p) => p.type === "InicioJornada" || p.type === "FinJornada");
+
+  if (isInicio) {
+    // Si ya poncho InicioJornada (jornada activa) -> ocultar
+    if (lastJornada?.type === "InicioJornada") return false;
+    // Si ya poncho FinJornada hoy -> ocultar permanentemente
+    if (lastJornada?.type === "FinJornada") return false;
+    // Sin ponche -> visible solo 1 min antes de entrada
+    const windowStart = timeStrToMinutes(schedule.workEntryTime) - tolWorkIn;
+    return current >= windowStart;
+  } else {
+    // Ya poncho FinJornada -> ocultar
+    if (lastJornada?.type === "FinJornada") return false;
+    // Salida: visible solo desde 1 min antes de workExitTime
+    const windowStart = timeStrToMinutes(schedule.workExitTime) - tolWorkOut;
+    return current >= windowStart;
+  }
+}
+
 function isAlmuerzoVisible(
   now: Date,
   schedule: UserSchedule | null,
@@ -437,10 +469,6 @@ export default function PunchInOut() {
 
       if (response.data.success) {
         await fetchTodayPunches();
-        Alert.alert(
-          "Registrado",
-          `${getPunchTypeLabel(type)} registrado correctamente.`,
-        );
       } else {
         Alert.alert("Error", response.data.message ?? "Intenta de nuevo.");
       }
@@ -459,6 +487,15 @@ export default function PunchInOut() {
       return false;
     if (cat === "Almuerzo")
       return isAlmuerzoVisible(now, todaySchedule, punches);
+    if (cat === "Jornada")
+      return isJornadaVisible(
+        now,
+        todaySchedule,
+        getNextPunchType("Jornada") === "inicio",
+        tolWorkIn,
+        tolWorkOut,
+        punches,
+      );
     return true;
   });
 
