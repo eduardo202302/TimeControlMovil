@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -12,11 +13,9 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
-import { router } from "expo-router";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 
 type Category = "Jornada" | "Almuerzo" | "Break";
@@ -224,7 +223,8 @@ function isJornadaActiva(punches: PunchEvent[]): boolean {
       (p) =>
         (p.type === "InicioJornada" || p.type === "FinJornada") &&
         p.status !== "Error de Imagen" &&
-        !p.hasOpenDay && p.hasOpenDay !== ("true" as any),
+        !p.hasOpenDay &&
+        p.hasOpenDay !== ("true" as any),
     );
   return last?.type === "InicioJornada";
 }
@@ -243,9 +243,11 @@ function isJornadaVisible(
   const current = getRDMinutes(now);
   const lastJornada = [...punches]
     .reverse()
-    .find((p) =>
-      (p.type === "InicioJornada" || p.type === "FinJornada") &&
-      !p.hasOpenDay && p.hasOpenDay !== ("true" as any)
+    .find(
+      (p) =>
+        (p.type === "InicioJornada" || p.type === "FinJornada") &&
+        !p.hasOpenDay &&
+        p.hasOpenDay !== ("true" as any),
     );
 
   if (isInicio) {
@@ -299,12 +301,18 @@ export default function PunchInOut() {
   const [refreshing, setRefreshing] = useState(false);
   const [phoneImagen, setPhoneImagen] = useState<string | null>(null);
   const [nextDayExitModal, setNextDayExitModal] = useState(false);
-  const [nextDayExitPunch, setNextDayExitPunch] = useState<PunchEvent | null>(null);
+  const [nextDayExitPunch, setNextDayExitPunch] = useState<PunchEvent | null>(
+    null,
+  );
   const [nextDayExitTime, setNextDayExitTime] = useState("");
   const [submittingExit, setSubmittingExit] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [selectedHour, setSelectedHour] = useState(() => toRD(new Date()).hours);
-  const [selectedMinute, setSelectedMinute] = useState(() => toRD(new Date()).minutes);
+  const [selectedHour, setSelectedHour] = useState(
+    () => toRD(new Date()).hours,
+  );
+  const [selectedMinute, setSelectedMinute] = useState(
+    () => toRD(new Date()).minutes,
+  );
 
   const { user, urlColegio, logout } = useSchoolStore();
   const userSchedules: UserSchedule[] = (user as any)?.userSchedules ?? [];
@@ -395,7 +403,7 @@ export default function PunchInOut() {
   // ── Polling: detecta cambios de horario en tiempo real ──────────────────────
   useEffect(() => {
     const initialSchedulesJson = JSON.stringify(
-      (user as any)?.userSchedules ?? []
+      (user as any)?.userSchedules ?? [],
     );
     const schoolId = (user as any)?.school?.id;
     const baseUrl = urlColegio;
@@ -419,16 +427,23 @@ export default function PunchInOut() {
 
         if (!res.data?.success) return;
 
-        const freshSchedules: UserSchedule[] = res.data?.data?.userSchedules ?? [];
+        const freshSchedules: UserSchedule[] =
+          res.data?.data?.userSchedules ?? [];
 
         // Comparar solo los campos relevantes (ignorar createdDate y campos extra)
         const normalize = (s: UserSchedule[]) =>
           s
-            .map((x) => `${x.weekDay}|${x.workEntryTime}|${x.workExitTime}|${x.lunchEntryTime ?? ""}|${x.lunchExitTime ?? ""}`)
+            .map(
+              (x) =>
+                `${x.weekDay}|${x.workEntryTime}|${x.workExitTime}|${x.lunchEntryTime ?? ""}|${x.lunchExitTime ?? ""}`,
+            )
             .sort()
             .join(";");
 
-        if (normalize(freshSchedules) !== normalize(JSON.parse(initialSchedulesJson))) {
+        if (
+          normalize(freshSchedules) !==
+          normalize(JSON.parse(initialSchedulesJson))
+        ) {
           alertShown = true;
           Alert.alert(
             "Horario actualizado",
@@ -445,7 +460,7 @@ export default function PunchInOut() {
     checkScheduleChange();
     const schedulePoller = setInterval(checkScheduleChange, 10_000);
     return () => clearInterval(schedulePoller);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlColegio, forceLogout, user]);
 
   // Reloj en tiempo real — tick cada segundo
@@ -484,7 +499,9 @@ export default function PunchInOut() {
       if (response.data.success) {
         const data: PunchEvent[] = response.data.data ?? [];
         setPunches(data);
-        const pending = data.find((p) => p.hasOpenDay === true || p.hasOpenDay === ("true" as any));
+        const pending = data.find(
+          (p) => p.hasOpenDay === true || p.hasOpenDay === ("true" as any),
+        );
         if (pending) {
           setNextDayExitPunch(pending);
           setNextDayExitModal(true);
@@ -679,7 +696,9 @@ export default function PunchInOut() {
   });
 
   const pendingDate = nextDayExitPunch
-    ? formatRDDate(new Date(nextDayExitPunch.openDayDate ?? nextDayExitPunch.createdDate))
+    ? formatRDDate(
+        new Date(nextDayExitPunch.openDayDate ?? nextDayExitPunch.createdDate),
+      )
     : "";
 
   return (
@@ -699,8 +718,9 @@ export default function PunchInOut() {
             <View style={styles.ndModalBody}>
               <Text style={styles.ndModalMsg}>
                 No completaste la salida del día{" "}
-                <Text style={{ fontWeight: "700" }}>{pendingDate}</Text>.{" "}
-                Esto afecta tu puntuación del mes. Selecciona la hora a la que saliste para cerrar la jornada.
+                <Text style={{ fontWeight: "700" }}>{pendingDate}</Text>. Esto
+                afecta tu puntuación del mes. Selecciona la hora a la que
+                saliste para cerrar la jornada.
               </Text>
 
               {/* Hora seleccionada */}
@@ -711,7 +731,9 @@ export default function PunchInOut() {
               >
                 <Ionicons name="time-outline" size={20} color="#D97706" />
                 <Text style={styles.ndTimeBtnText}>
-                  {nextDayExitTime ? nextDayExitTime : "Seleccionar hora de salida"}
+                  {nextDayExitTime
+                    ? nextDayExitTime
+                    : "Seleccionar hora de salida"}
                 </Text>
                 <Ionicons name="chevron-down" size={16} color="#D97706" />
               </TouchableOpacity>
@@ -721,14 +743,27 @@ export default function PunchInOut() {
                   <View style={styles.nativePickerRow}>
                     <View style={styles.nativePickerCol}>
                       <Text style={styles.nativePickerLabel}>Hora</Text>
-                      <ScrollView style={styles.nativePickerScroll} showsVerticalScrollIndicator={false}>
+                      <ScrollView
+                        style={styles.nativePickerScroll}
+                        showsVerticalScrollIndicator={false}
+                      >
                         {Array.from({ length: 24 }, (_, i) => (
                           <TouchableOpacity
                             key={i}
-                            style={[styles.nativePickerItem, selectedHour === i && styles.nativePickerItemActive]}
+                            style={[
+                              styles.nativePickerItem,
+                              selectedHour === i &&
+                                styles.nativePickerItemActive,
+                            ]}
                             onPress={() => setSelectedHour(i)}
                           >
-                            <Text style={[styles.nativePickerItemText, selectedHour === i && styles.nativePickerItemTextActive]}>
+                            <Text
+                              style={[
+                                styles.nativePickerItemText,
+                                selectedHour === i &&
+                                  styles.nativePickerItemTextActive,
+                              ]}
+                            >
                               {i.toString().padStart(2, "0")}
                             </Text>
                           </TouchableOpacity>
@@ -738,14 +773,27 @@ export default function PunchInOut() {
                     <Text style={styles.nativePickerColon}>:</Text>
                     <View style={styles.nativePickerCol}>
                       <Text style={styles.nativePickerLabel}>Min</Text>
-                      <ScrollView style={styles.nativePickerScroll} showsVerticalScrollIndicator={false}>
+                      <ScrollView
+                        style={styles.nativePickerScroll}
+                        showsVerticalScrollIndicator={false}
+                      >
                         {Array.from({ length: 60 }, (_, i) => (
                           <TouchableOpacity
                             key={i}
-                            style={[styles.nativePickerItem, selectedMinute === i && styles.nativePickerItemActive]}
+                            style={[
+                              styles.nativePickerItem,
+                              selectedMinute === i &&
+                                styles.nativePickerItemActive,
+                            ]}
                             onPress={() => setSelectedMinute(i)}
                           >
-                            <Text style={[styles.nativePickerItemText, selectedMinute === i && styles.nativePickerItemTextActive]}>
+                            <Text
+                              style={[
+                                styles.nativePickerItemText,
+                                selectedMinute === i &&
+                                  styles.nativePickerItemTextActive,
+                              ]}
+                            >
                               {i.toString().padStart(2, "0")}
                             </Text>
                           </TouchableOpacity>
@@ -762,7 +810,9 @@ export default function PunchInOut() {
                       setShowTimePicker(false);
                     }}
                   >
-                    <Text style={styles.nativePickerConfirmText}>Confirmar hora</Text>
+                    <Text style={styles.nativePickerConfirmText}>
+                      Confirmar hora
+                    </Text>
                   </TouchableOpacity>
                 </View>
               )}
