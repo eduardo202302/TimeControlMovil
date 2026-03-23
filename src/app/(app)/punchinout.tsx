@@ -231,7 +231,8 @@ function isJornadaVisible(
   tolWorkOut: number,
   punches: PunchEvent[],
 ): boolean {
-  if (!schedule) return true;
+  // Sin horario -> ocultar siempre
+  if (!schedule) return false;
 
   const current = getRDMinutes(now);
   const lastJornada = [...punches]
@@ -239,19 +240,19 @@ function isJornadaVisible(
     .find((p) => p.type === "InicioJornada" || p.type === "FinJornada");
 
   if (isInicio) {
-    // Si ya poncho InicioJornada (jornada activa) -> ocultar
+    // Ya poncho entrada -> ocultar (jornada activa)
     if (lastJornada?.type === "InicioJornada") return false;
-    // Si ya poncho FinJornada hoy -> ocultar permanentemente
+    // Ya salio hoy -> ocultar
     if (lastJornada?.type === "FinJornada") return false;
-    // Sin ponche -> visible solo 1 min antes de entrada
-    const windowStart = timeStrToMinutes(schedule.workEntryTime) - tolWorkIn;
-    return current >= windowStart;
+    // Sin ponche -> visible desde 1 min antes de entrada, sin limite superior
+    const entryStart = timeStrToMinutes(schedule.workEntryTime) - tolWorkIn;
+    return current >= entryStart;
   } else {
-    // Ya poncho FinJornada -> ocultar
+    // Ya salio hoy -> ocultar
     if (lastJornada?.type === "FinJornada") return false;
-    // Salida: visible solo desde 1 min antes de workExitTime
-    const windowStart = timeStrToMinutes(schedule.workExitTime) - tolWorkOut;
-    return current >= windowStart;
+    // Visible desde 1 min antes de salida, sin limite superior (horas extras)
+    const exitStart = timeStrToMinutes(schedule.workExitTime) - tolWorkOut;
+    return current >= exitStart;
   }
 }
 
@@ -487,15 +488,7 @@ export default function PunchInOut() {
       return false;
     if (cat === "Almuerzo")
       return isAlmuerzoVisible(now, todaySchedule, punches);
-    if (cat === "Jornada")
-      return isJornadaVisible(
-        now,
-        todaySchedule,
-        getNextPunchType("Jornada") === "inicio",
-        tolWorkIn,
-        tolWorkOut,
-        punches,
-      );
+    if (cat === "Jornada") return true;
     return true;
   });
 
@@ -662,34 +655,46 @@ export default function PunchInOut() {
           })}
         </View>
 
-        <TouchableOpacity
-          style={[
-            styles.registerBtn,
-            !isInicio && styles.registerBtnExit,
-            loading && { opacity: 0.7 },
-          ]}
-          onPress={handleRegister}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <>
-              <Ionicons
-                name={isInicio ? "log-in-outline" : "log-out-outline"}
-                size={26}
-                color="#fff"
-              />
-              <View style={styles.registerTextWrap}>
-                <Text style={styles.registerBtnText}>
-                  {isInicio ? "Entrada" : "Salida"}
-                </Text>
-                <Text style={styles.registerBtnSub}>({selectedCategory})</Text>
-              </View>
-            </>
-          )}
-        </TouchableOpacity>
+        {(selectedCategory !== "Jornada" ||
+          isJornadaVisible(
+            now,
+            todaySchedule,
+            getNextPunchType("Jornada") === "inicio",
+            tolWorkIn,
+            tolWorkOut,
+            punches,
+          )) && (
+          <TouchableOpacity
+            style={[
+              styles.registerBtn,
+              !isInicio && styles.registerBtnExit,
+              loading && { opacity: 0.7 },
+            ]}
+            onPress={handleRegister}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Ionicons
+                  name={isInicio ? "log-in-outline" : "log-out-outline"}
+                  size={26}
+                  color="#fff"
+                />
+                <View style={styles.registerTextWrap}>
+                  <Text style={styles.registerBtnText}>
+                    {isInicio ? "Entrada" : "Salida"}
+                  </Text>
+                  <Text style={styles.registerBtnSub}>
+                    ({selectedCategory})
+                  </Text>
+                </View>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* ── Registros del día ── */}
