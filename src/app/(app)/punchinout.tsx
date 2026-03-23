@@ -7,13 +7,16 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { router } from "expo-router";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 
 type Category = "Jornada" | "Almuerzo" | "Break";
@@ -40,6 +43,8 @@ interface PunchEvent {
   earlyExit?: boolean;
   overtime?: number | string;
   toleranceMinutes?: number | null;
+  hasOpenDay?: boolean | string;
+  openDayDate?: string;
 }
 
 // Santo Domingo = UTC-4, fijo, sin cambio de horario de verano
@@ -218,7 +223,8 @@ function isJornadaActiva(punches: PunchEvent[]): boolean {
     .find(
       (p) =>
         (p.type === "InicioJornada" || p.type === "FinJornada") &&
-        p.status !== "Error de Imagen",
+        p.status !== "Error de Imagen" &&
+        !p.hasOpenDay && p.hasOpenDay !== ("true" as any),
     );
   return last?.type === "InicioJornada";
 }
@@ -237,7 +243,10 @@ function isJornadaVisible(
   const current = getRDMinutes(now);
   const lastJornada = [...punches]
     .reverse()
-    .find((p) => p.type === "InicioJornada" || p.type === "FinJornada");
+    .find((p) =>
+      (p.type === "InicioJornada" || p.type === "FinJornada") &&
+      !p.hasOpenDay && p.hasOpenDay !== ("true" as any)
+    );
 
   if (isInicio) {
     // Ya poncho entrada -> ocultar (jornada activa)
@@ -289,6 +298,13 @@ export default function PunchInOut() {
   const [loadingPunches, setLoadingPunches] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [phoneImagen, setPhoneImagen] = useState<string | null>(null);
+  const [nextDayExitModal, setNextDayExitModal] = useState(false);
+  const [nextDayExitPunch, setNextDayExitPunch] = useState<PunchEvent | null>(null);
+  const [nextDayExitTime, setNextDayExitTime] = useState("");
+  const [submittingExit, setSubmittingExit] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [selectedHour, setSelectedHour] = useState(() => toRD(new Date()).hours);
+  const [selectedMinute, setSelectedMinute] = useState(() => toRD(new Date()).minutes);
 
   const { user, urlColegio, logout } = useSchoolStore();
   const userSchedules: UserSchedule[] = (user as any)?.userSchedules ?? [];
@@ -323,12 +339,114 @@ export default function PunchInOut() {
         text: "Cerrar sesión",
         style: "destructive",
         onPress: async () => {
-          await SecureStore.deleteItemAsync("token");
+          await Promise.all([
+            SecureStore.deleteItemAsync("token"),
+            SecureStore.deleteItemAsync("user"),
+            SecureStore.deleteItemAsync("menuItems"),
+            // isAuthorized NO se borra — es la autorización del dispositivo físico
+          ]);
           logout();
+          router.replace("/login");
         },
       },
     ]);
   }, [logout]);
+
+  const forceLogout = useCallback(async () => {
+    // Limpiar SecureStore y store, luego navegar a login directamente
+    await Promise.all([
+      SecureStore.deleteItemAsync("token"),
+      SecureStore.deleteItemAsync("user"),
+      SecureStore.deleteItemAsync("menuItems"),
+      // isAuthorized NO se borra — es la autorización del dispositivo físico,
+      // no de la sesión del usuario.
+    ]);
+    logout();
+    router.replace("/login");
+  }, [logout]);
+
+  // Interceptor — detecta sesión expirada en cualquier llamada axios
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const status = error?.response?.status;
+        const message: string = error?.response?.data?.message ?? "";
+        const isExpired =
+          status === 401 ||
+          message.toLowerCase().includes("expir") ||
+          message.toLowerCase().includes("unauthorized") ||
+          message.toLowerCase().includes("sesión");
+
+        if (isExpired) {
+          Alert.alert(
+            "Sesión expirada",
+            "Tienes cambios en el horario, inicia sesión nuevamente.",
+            [{ text: "Aceptar", onPress: forceLogout }],
+            { cancelable: false },
+          );
+        }
+        return Promise.reject(error);
+      },
+    );
+    return () => axios.interceptors.response.eject(interceptor);
+  }, [forceLogout]);
+
+  // ── Polling: detecta cambios de horario en tiempo real ──────────────────────
+  useEffect(() => {
+    const initialSchedulesJson = JSON.stringify(
+      (user as any)?.userSchedules ?? []
+    );
+    const schoolId = (user as any)?.school?.id;
+    const baseUrl = urlColegio;
+    let alertShown = false;
+
+    if (!schoolId || !baseUrl) return;
+
+    const checkScheduleChange = async () => {
+      if (alertShown) return;
+      try {
+        // Leer token directo de SecureStore — evita race condition con el store
+        const token = await SecureStore.getItemAsync("token");
+        if (!token) return;
+
+        const rawAxios = axios.create();
+        const res = await rawAxios.post(
+          `${baseUrl}/authentication/chooseschool`,
+          { schoolId },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+
+        if (!res.data?.success) return;
+
+        const freshSchedules: UserSchedule[] = res.data?.data?.userSchedules ?? [];
+
+        // Comparar solo los campos relevantes (ignorar createdDate y campos extra)
+        const normalize = (s: UserSchedule[]) =>
+          s
+            .map((x) => `${x.weekDay}|${x.workEntryTime}|${x.workExitTime}|${x.lunchEntryTime ?? ""}|${x.lunchExitTime ?? ""}`)
+            .sort()
+            .join(";");
+
+        if (normalize(freshSchedules) !== normalize(JSON.parse(initialSchedulesJson))) {
+          alertShown = true;
+          Alert.alert(
+            "Horario actualizado",
+            "Un administrador modificó tu horario. Debes iniciar sesión nuevamente para aplicar los cambios.",
+            [{ text: "Aceptar", onPress: forceLogout }],
+            { cancelable: false },
+          );
+        }
+      } catch {
+        // Silencioso — errores de red no deben desloguear
+      }
+    };
+
+    checkScheduleChange();
+    const schedulePoller = setInterval(checkScheduleChange, 10_000);
+    return () => clearInterval(schedulePoller);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlColegio, forceLogout, user]);
 
   // Reloj en tiempo real — tick cada segundo
   useEffect(() => {
@@ -364,7 +482,16 @@ export default function PunchInOut() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.data.success) {
-        setPunches(response.data.data ?? []);
+        const data: PunchEvent[] = response.data.data ?? [];
+        setPunches(data);
+        const pending = data.find((p) => p.hasOpenDay === true || p.hasOpenDay === ("true" as any));
+        if (pending) {
+          setNextDayExitPunch(pending);
+          setNextDayExitModal(true);
+        } else {
+          setNextDayExitModal(false);
+          setNextDayExitPunch(null);
+        }
       }
     } catch (error: any) {
       console.error(
@@ -414,6 +541,51 @@ export default function PunchInOut() {
     return "A Tiempo";
   };
 
+  const handleSubmitNextDayExit = async () => {
+    if (!nextDayExitTime.trim()) {
+      Alert.alert("Error", "Por favor ingresa la hora de salida.");
+      return;
+    }
+    const timeRegex = /^([01]?\d|2[0-3]):[0-5]\d$/;
+    if (!timeRegex.test(nextDayExitTime.trim())) {
+      Alert.alert("Error", "Formato inv\u00e1lido. Usa HH:MM (ej: 17:30)");
+      return;
+    }
+    const token = await getToken();
+    if (!urlColegio || !token) return;
+    setSubmittingExit(true);
+    try {
+      const response = await axios.post(
+        `${urlColegio}/punches`,
+        {
+          type: "FinJornada",
+          status: "A Tiempo",
+          recordedDate: String(nextDayExitTime.trim()),
+          nextDayExit: true,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      if (response.data.success) {
+        setNextDayExitModal(false);
+        setNextDayExitTime("");
+        setNextDayExitPunch(null);
+        await fetchTodayPunches();
+      } else {
+        Alert.alert("Error", response.data.message ?? "Intenta de nuevo.");
+      }
+    } catch (error: any) {
+      const msg = error?.response?.data?.message ?? "Error de conexi\u00f3n.";
+      Alert.alert("Error", typeof msg === "string" ? msg : JSON.stringify(msg));
+    } finally {
+      setSubmittingExit(false);
+    }
+  };
+
   const handleRegister = async () => {
     const token = await getToken();
     if (!urlColegio || !token) {
@@ -460,6 +632,7 @@ export default function PunchInOut() {
       const payload: Record<string, any> = { type };
       if (status2 !== undefined) payload.status = status2;
       if (photo?.base64) payload.photourl = [photo.base64];
+      if (todaySchedule) payload.schedule = todaySchedule;
 
       const response = await axios.post(`${urlColegio}/punches`, payload, {
         headers: {
@@ -471,7 +644,20 @@ export default function PunchInOut() {
       if (response.data.success) {
         await fetchTodayPunches();
       } else {
-        Alert.alert("Error", response.data.message ?? "Intenta de nuevo.");
+        const msg: string = response.data.message ?? "Intenta de nuevo.";
+        if (msg.includes("InicioJornada activo")) {
+          // Jornada del día anterior sin cerrar → mostrar modal
+          setNextDayExitModal(true);
+        } else if (msg.includes("cambios en el horario")) {
+          Alert.alert(
+            "Horario modificado",
+            msg,
+            [{ text: "Aceptar", onPress: forceLogout }],
+            { cancelable: false },
+          );
+        } else {
+          Alert.alert("Error", msg);
+        }
       }
     } catch (error: any) {
       const msg = error?.response?.data?.message ?? "Error de conexión.";
@@ -492,319 +678,428 @@ export default function PunchInOut() {
     return true;
   });
 
+  const pendingDate = nextDayExitPunch
+    ? formatRDDate(new Date(nextDayExitPunch.openDayDate ?? nextDayExitPunch.createdDate))
+    : "";
+
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={() => {
-            setRefreshing(true);
-            fetchTodayPunches();
-          }}
-          colors={["#2563EB"]}
-        />
-      }
-    >
-      {/* ── Reloj ── */}
-      <View style={styles.floatCard}>
-        <View style={styles.floatLabel}>
-          <Ionicons name="time-outline" size={14} color="#2563EB" />
-          <Text style={styles.floatLabelText}>Hora Actual</Text>
-        </View>
-        <View style={styles.clockCard}>
-          <View style={styles.clockTextWrap}>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "100%",
-              }}
-            >
-              <Text style={styles.clockTime}>
-                {formatRDTime(now).split(" ")[0]}
-              </Text>
-              <Text style={styles.clockAmPm}>
-                {" "}
-                {formatRDTime(now).split(" ").slice(1).join(" ")}
-              </Text>
+    <View style={{ flex: 1 }}>
+      <Modal
+        visible={nextDayExitModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.ndModalOverlay}>
+          <View style={styles.ndModalCard}>
+            <View style={styles.ndModalHeader}>
+              <Ionicons name="warning-outline" size={24} color="#fff" />
+              <Text style={styles.ndModalTitle}>Jornada Incompleta</Text>
             </View>
-            <Text style={styles.clockDate}>{formatRDDate(now)}</Text>
+            <View style={styles.ndModalBody}>
+              <Text style={styles.ndModalMsg}>
+                No completaste la salida del día{" "}
+                <Text style={{ fontWeight: "700" }}>{pendingDate}</Text>.{" "}
+                Esto afecta tu puntuación del mes. Selecciona la hora a la que saliste para cerrar la jornada.
+              </Text>
+
+              {/* Hora seleccionada */}
+              <TouchableOpacity
+                style={styles.ndTimeBtn}
+                onPress={() => setShowTimePicker(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="time-outline" size={20} color="#D97706" />
+                <Text style={styles.ndTimeBtnText}>
+                  {nextDayExitTime ? nextDayExitTime : "Seleccionar hora de salida"}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color="#D97706" />
+              </TouchableOpacity>
+
+              {showTimePicker && (
+                <View style={styles.nativePickerContainer}>
+                  <View style={styles.nativePickerRow}>
+                    <View style={styles.nativePickerCol}>
+                      <Text style={styles.nativePickerLabel}>Hora</Text>
+                      <ScrollView style={styles.nativePickerScroll} showsVerticalScrollIndicator={false}>
+                        {Array.from({ length: 24 }, (_, i) => (
+                          <TouchableOpacity
+                            key={i}
+                            style={[styles.nativePickerItem, selectedHour === i && styles.nativePickerItemActive]}
+                            onPress={() => setSelectedHour(i)}
+                          >
+                            <Text style={[styles.nativePickerItemText, selectedHour === i && styles.nativePickerItemTextActive]}>
+                              {i.toString().padStart(2, "0")}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                    <Text style={styles.nativePickerColon}>:</Text>
+                    <View style={styles.nativePickerCol}>
+                      <Text style={styles.nativePickerLabel}>Min</Text>
+                      <ScrollView style={styles.nativePickerScroll} showsVerticalScrollIndicator={false}>
+                        {Array.from({ length: 60 }, (_, i) => (
+                          <TouchableOpacity
+                            key={i}
+                            style={[styles.nativePickerItem, selectedMinute === i && styles.nativePickerItemActive]}
+                            onPress={() => setSelectedMinute(i)}
+                          >
+                            <Text style={[styles.nativePickerItemText, selectedMinute === i && styles.nativePickerItemTextActive]}>
+                              {i.toString().padStart(2, "0")}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.nativePickerConfirm}
+                    onPress={() => {
+                      const h = String(selectedHour).padStart(2, "0");
+                      const m = String(selectedMinute).padStart(2, "0");
+                      setNextDayExitTime(`${h}:${m}`);
+                      setShowTimePicker(false);
+                    }}
+                  >
+                    <Text style={styles.nativePickerConfirmText}>Confirmar hora</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.ndModalBtn, submittingExit && { opacity: 0.7 }]}
+              onPress={handleSubmitNextDayExit}
+              disabled={submittingExit}
+            >
+              {submittingExit ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.ndModalBtnText}>Finalizar Jornada</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
-      </View>
-
-      {/* ── Perfil + Horario ── */}
-      <View style={styles.floatCard}>
-        <View style={styles.floatLabel}>
-          <Ionicons name="person-circle-outline" size={14} color="#2563EB" />
-          <Text style={styles.floatLabelText}>Perfil - Time Control</Text>
+      </Modal>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              fetchTodayPunches();
+            }}
+            colors={["#2563EB"]}
+          />
+        }
+      >
+        {/* ── Reloj ── */}
+        <View style={styles.floatCard}>
+          <View style={styles.floatLabel}>
+            <Ionicons name="time-outline" size={14} color="#2563EB" />
+            <Text style={styles.floatLabelText}>Hora Actual</Text>
+          </View>
+          <View style={styles.clockCard}>
+            <View style={styles.clockTextWrap}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "100%",
+                }}
+              >
+                <Text style={styles.clockTime}>
+                  {formatRDTime(now).split(" ")[0]}
+                </Text>
+                <Text style={styles.clockAmPm}>
+                  {" "}
+                  {formatRDTime(now).split(" ").slice(1).join(" ")}
+                </Text>
+              </View>
+              <Text style={styles.clockDate}>{formatRDDate(now)}</Text>
+            </View>
+          </View>
         </View>
 
-        <View style={styles.profileRow}>
-          {/* Avatar */}
-          <View style={styles.avatarWrap}>
-            <View style={styles.avatarFallback}>
-              {phoneImagen ? (
-                <Image
-                  source={{
-                    uri: `https://timecontrol.wsmax.net:8600/${phoneImagen}`,
-                  }}
-                  style={{ width: 62, height: 62, borderRadius: 31 }}
-                  onError={(e) =>
-                    console.log("Error imagen:", e.nativeEvent.error)
-                  }
-                  onLoad={() => console.log("Imagen cargó OK")}
-                />
+        {/* ── Perfil + Horario ── */}
+        <View style={styles.floatCard}>
+          <View style={styles.floatLabel}>
+            <Ionicons name="person-circle-outline" size={14} color="#2563EB" />
+            <Text style={styles.floatLabelText}>Perfil - Time Control</Text>
+          </View>
+
+          <View style={styles.profileRow}>
+            {/* Avatar */}
+            <View style={styles.avatarWrap}>
+              <View style={styles.avatarFallback}>
+                {phoneImagen ? (
+                  <Image
+                    source={{
+                      uri: `https://timecontrol.wsmax.net:8600/${phoneImagen}`,
+                    }}
+                    style={{ width: 62, height: 62, borderRadius: 31 }}
+                    onError={(e) =>
+                      console.log("Error imagen:", e.nativeEvent.error)
+                    }
+                    onLoad={() => console.log("Imagen cargó OK")}
+                  />
+                ) : (
+                  <Ionicons name="person" size={28} color="#9CA3AF" />
+                )}
+              </View>
+            </View>
+
+            {/* Info */}
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName} numberOfLines={1}>
+                {user?.user.fullName}
+              </Text>
+
+              {todaySchedule ? (
+                <View style={styles.scheduleTable}>
+                  <View style={styles.scheduleTableCol}>
+                    <View style={styles.scheduleTableRow}>
+                      <Ionicons name="time-outline" size={13} color="#2563EB" />
+                      <Text style={styles.scheduleTableHeader}>Horario</Text>
+                    </View>
+                    <Text style={styles.scheduleTableValue}>
+                      {to12h(todaySchedule.workEntryTime)} –
+                    </Text>
+                    <Text style={styles.scheduleTableValue}>
+                      {to12h(todaySchedule.workExitTime)}
+                    </Text>
+                  </View>
+                  {todaySchedule.lunchEntryTime && (
+                    <View style={styles.scheduleTableCol}>
+                      <View style={styles.scheduleTableRow}>
+                        <Ionicons
+                          name="restaurant-outline"
+                          size={13}
+                          color="#D97706"
+                        />
+                        <Text style={styles.scheduleTableHeader}>Almuerzo</Text>
+                      </View>
+                      <Text style={styles.scheduleTableValue}>
+                        {to12h(todaySchedule.lunchEntryTime)} –
+                      </Text>
+                      <Text style={styles.scheduleTableValue}>
+                        {to12h(todaySchedule.lunchExitTime ?? "")}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               ) : (
-                <Ionicons name="person" size={28} color="#9CA3AF" />
+                <View style={styles.profileScheduleRow}>
+                  <Ionicons name="warning-outline" size={13} color="#D97706" />
+                  <Text
+                    style={[styles.profileScheduleText, { color: "#D97706" }]}
+                  >
+                    Sin horario configurado
+                  </Text>
+                </View>
               )}
             </View>
           </View>
+        </View>
 
-          {/* Info */}
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName} numberOfLines={1}>
-              {user?.user.fullName}
-            </Text>
-
-            {todaySchedule ? (
-              <View style={styles.scheduleTable}>
-                <View style={styles.scheduleTableCol}>
-                  <View style={styles.scheduleTableRow}>
-                    <Ionicons name="time-outline" size={13} color="#2563EB" />
-                    <Text style={styles.scheduleTableHeader}>Horario</Text>
-                  </View>
-                  <Text style={styles.scheduleTableValue}>
-                    {to12h(todaySchedule.workEntryTime)} –
-                  </Text>
-                  <Text style={styles.scheduleTableValue}>
-                    {to12h(todaySchedule.workExitTime)}
-                  </Text>
-                </View>
-                {todaySchedule.lunchEntryTime && (
-                  <View style={styles.scheduleTableCol}>
-                    <View style={styles.scheduleTableRow}>
-                      <Ionicons
-                        name="restaurant-outline"
-                        size={13}
-                        color="#D97706"
-                      />
-                      <Text style={styles.scheduleTableHeader}>Almuerzo</Text>
-                    </View>
-                    <Text style={styles.scheduleTableValue}>
-                      {to12h(todaySchedule.lunchEntryTime)} –
-                    </Text>
-                    <Text style={styles.scheduleTableValue}>
-                      {to12h(todaySchedule.lunchExitTime ?? "")}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            ) : (
-              <View style={styles.profileScheduleRow}>
-                <Ionicons name="warning-outline" size={13} color="#D97706" />
-                <Text
-                  style={[styles.profileScheduleText, { color: "#D97706" }]}
-                >
-                  Sin horario configurado
-                </Text>
-              </View>
-            )}
+        {/* ── Categoría + Botón registrar (bloque unificado) ── */}
+        <View style={styles.floatCard}>
+          <View style={styles.floatLabel}>
+            <Ionicons
+              name="swap-horizontal-outline"
+              size={14}
+              color="#2563EB"
+            />
+            <Text style={styles.floatLabelText}>Reg. Entrada / Salida</Text>
           </View>
-        </View>
-      </View>
-
-      {/* ── Categoría + Botón registrar (bloque unificado) ── */}
-      <View style={styles.floatCard}>
-        <View style={styles.floatLabel}>
-          <Ionicons name="swap-horizontal-outline" size={14} color="#2563EB" />
-          <Text style={styles.floatLabelText}>Reg. Entrada / Salida</Text>
-        </View>
-        <View style={styles.categories}>
-          {visibleCategories.map((cat) => {
-            const hasActive = getNextPunchType(cat) === "fin";
-            return (
-              <TouchableOpacity
-                key={cat}
-                style={[
-                  styles.categoryBtn,
-                  selectedCategory === cat && styles.categoryBtnActive,
-                ]}
-                onPress={() => setSelectedCategory(cat)}
-                activeOpacity={0.75}
-              >
-                <Ionicons
-                  name={CATEGORY_ICONS[cat]}
-                  size={22}
-                  color={selectedCategory === cat ? "#fff" : "#2563EB"}
-                />
-                <Text
+          <View style={styles.categories}>
+            {visibleCategories.map((cat) => {
+              const hasActive = getNextPunchType(cat) === "fin";
+              return (
+                <TouchableOpacity
+                  key={cat}
                   style={[
-                    styles.categoryText,
-                    selectedCategory === cat && styles.categoryTextActive,
+                    styles.categoryBtn,
+                    selectedCategory === cat && styles.categoryBtnActive,
                   ]}
+                  onPress={() => setSelectedCategory(cat)}
+                  activeOpacity={0.75}
                 >
-                  {cat}
-                </Text>
-                {hasActive && <View style={styles.activeDot} />}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {(selectedCategory !== "Jornada" ||
-          isJornadaVisible(
-            now,
-            todaySchedule,
-            getNextPunchType("Jornada") === "inicio",
-            tolWorkIn,
-            tolWorkOut,
-            punches,
-          )) && (
-          <TouchableOpacity
-            style={[
-              styles.registerBtn,
-              !isInicio && styles.registerBtnExit,
-              loading && { opacity: 0.7 },
-            ]}
-            onPress={handleRegister}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <>
-                <Ionicons
-                  name={isInicio ? "log-in-outline" : "log-out-outline"}
-                  size={26}
-                  color="#fff"
-                />
-                <View style={styles.registerTextWrap}>
-                  <Text style={styles.registerBtnText}>
-                    {isInicio ? "Entrada" : "Salida"}
+                  <Ionicons
+                    name={CATEGORY_ICONS[cat]}
+                    size={22}
+                    color={selectedCategory === cat ? "#fff" : "#2563EB"}
+                  />
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      selectedCategory === cat && styles.categoryTextActive,
+                    ]}
+                  >
+                    {cat}
                   </Text>
-                  <Text style={styles.registerBtnSub}>
-                    ({selectedCategory})
-                  </Text>
-                </View>
-              </>
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* ── Registros del día ── */}
-      <View style={styles.floatCard}>
-        <View style={styles.floatLabel}>
-          <Ionicons name="list-outline" size={14} color="#2563EB" />
-          <Text style={styles.floatLabelText}>Historial del Día</Text>
-        </View>
-        <TouchableOpacity
-          onPress={fetchTodayPunches}
-          style={[
-            styles.refreshBtn,
-            { alignSelf: "flex-end", marginBottom: 4 },
-          ]}
-        >
-          <Ionicons name="refresh-outline" size={18} color="#2563EB" />
-        </TouchableOpacity>
-        {loadingPunches ? (
-          <ActivityIndicator color="#2563EB" style={{ marginVertical: 16 }} />
-        ) : punches.length === 0 ? (
-          <View style={styles.emptyPunches}>
-            <Ionicons name="time-outline" size={32} color="#D1D5DB" />
-            <Text style={styles.emptyText}>Sin registros hoy</Text>
+                  {hasActive && <View style={styles.activeDot} />}
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        ) : (
-          [...punches].reverse().map((punch) => (
-            <View key={punch.id} style={styles.punchRow}>
-              <View
-                style={[
-                  styles.punchIcon,
-                  punch.status === "Error de Imagen" ||
-                  punch.status === "Tardanza"
-                    ? styles.punchIconError
-                    : punch.status === "Anticipada"
-                      ? styles.punchIconEarly
-                      : punch.type.startsWith("Inicio")
-                        ? styles.punchIconEntry
-                        : parseFloat(String(punch.overtime ?? 0)) > 0
-                          ? styles.punchIconOvertime
-                          : styles.punchIconExitOnTime,
-                ]}
-              >
-                <Ionicons
-                  name={
-                    punch.type.startsWith("Inicio")
-                      ? "log-in-outline"
-                      : "log-out-outline"
-                  }
-                  size={16}
-                  color={
+
+          {(selectedCategory !== "Jornada" ||
+            isJornadaVisible(
+              now,
+              todaySchedule,
+              getNextPunchType("Jornada") === "inicio",
+              tolWorkIn,
+              tolWorkOut,
+              punches,
+            )) && (
+            <TouchableOpacity
+              style={[
+                styles.registerBtn,
+                !isInicio && styles.registerBtnExit,
+                loading && { opacity: 0.7 },
+              ]}
+              onPress={handleRegister}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Ionicons
+                    name={isInicio ? "log-in-outline" : "log-out-outline"}
+                    size={26}
+                    color="#fff"
+                  />
+                  <View style={styles.registerTextWrap}>
+                    <Text style={styles.registerBtnText}>
+                      {isInicio ? "Entrada" : "Salida"}
+                    </Text>
+                    <Text style={styles.registerBtnSub}>
+                      ({selectedCategory})
+                    </Text>
+                  </View>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* ── Registros del día ── */}
+        <View style={styles.floatCard}>
+          <View style={styles.floatLabel}>
+            <Ionicons name="list-outline" size={14} color="#2563EB" />
+            <Text style={styles.floatLabelText}>Historial del Día</Text>
+          </View>
+          <TouchableOpacity
+            onPress={fetchTodayPunches}
+            style={[
+              styles.refreshBtn,
+              { alignSelf: "flex-end", marginBottom: 4 },
+            ]}
+          >
+            <Ionicons name="refresh-outline" size={18} color="#2563EB" />
+          </TouchableOpacity>
+          {loadingPunches ? (
+            <ActivityIndicator color="#2563EB" style={{ marginVertical: 16 }} />
+          ) : punches.length === 0 ? (
+            <View style={styles.emptyPunches}>
+              <Ionicons name="time-outline" size={32} color="#D1D5DB" />
+              <Text style={styles.emptyText}>Sin registros hoy</Text>
+            </View>
+          ) : (
+            [...punches].reverse().map((punch) => (
+              <View key={punch.id} style={styles.punchRow}>
+                <View
+                  style={[
+                    styles.punchIcon,
                     punch.status === "Error de Imagen" ||
                     punch.status === "Tardanza"
-                      ? "#DC2626"
+                      ? styles.punchIconError
                       : punch.status === "Anticipada"
-                        ? "#D97706"
+                        ? styles.punchIconEarly
                         : punch.type.startsWith("Inicio")
-                          ? "#16A34A"
+                          ? styles.punchIconEntry
                           : parseFloat(String(punch.overtime ?? 0)) > 0
-                            ? "#2563EB"
-                            : "#16A34A"
-                  }
-                />
-              </View>
-              <View style={styles.punchInfo}>
-                <Text style={styles.punchType}>
-                  {getPunchTypeLabel(punch.type)}
-                </Text>
-                <View style={styles.punchBadgeRow}>
-                  {punch.type.startsWith("Fin") &&
-                  parseFloat(String(punch.overtime ?? 0)) > 0 ? (
-                    /* Salida con overtime → solo "Horas extras", el status es irrelevante */
-                    <View style={styles.badgeOvertime}>
-                      <Text style={styles.badgeOvertimeText}>Horas extras</Text>
-                    </View>
-                  ) : (
-                    /* Sin overtime → mostrar status normal */
-                    punch.status && (
-                      <View
-                        style={[
-                          styles.punchBadge,
-                          punch.status === "Tardanza"
-                            ? styles.badgeLate
-                            : punch.status === "Anticipada"
-                              ? styles.badgeEarly
-                              : punch.status === "Error de Imagen"
-                                ? styles.badgeLate
-                                : styles.badgeOnTime,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.punchBadgeText,
-                            { color: getStatusColor(punch.status) },
-                          ]}
-                        >
-                          {punch.status}
+                            ? styles.punchIconOvertime
+                            : styles.punchIconExitOnTime,
+                  ]}
+                >
+                  <Ionicons
+                    name={
+                      punch.type.startsWith("Inicio")
+                        ? "log-in-outline"
+                        : "log-out-outline"
+                    }
+                    size={16}
+                    color={
+                      punch.status === "Error de Imagen" ||
+                      punch.status === "Tardanza"
+                        ? "#DC2626"
+                        : punch.status === "Anticipada"
+                          ? "#D97706"
+                          : punch.type.startsWith("Inicio")
+                            ? "#16A34A"
+                            : parseFloat(String(punch.overtime ?? 0)) > 0
+                              ? "#2563EB"
+                              : "#16A34A"
+                    }
+                  />
+                </View>
+                <View style={styles.punchInfo}>
+                  <Text style={styles.punchType}>
+                    {getPunchTypeLabel(punch.type)}
+                  </Text>
+                  <View style={styles.punchBadgeRow}>
+                    {punch.type.startsWith("Fin") &&
+                    parseFloat(String(punch.overtime ?? 0)) > 0 ? (
+                      /* Salida con overtime → solo "Horas extras", el status es irrelevante */
+                      <View style={styles.badgeOvertime}>
+                        <Text style={styles.badgeOvertimeText}>
+                          Horas extras
                         </Text>
                       </View>
-                    )
-                  )}
+                    ) : (
+                      /* Sin overtime → mostrar status normal */
+                      punch.status && (
+                        <View
+                          style={[
+                            styles.punchBadge,
+                            punch.status === "Tardanza"
+                              ? styles.badgeLate
+                              : punch.status === "Anticipada"
+                                ? styles.badgeEarly
+                                : punch.status === "Error de Imagen"
+                                  ? styles.badgeLate
+                                  : styles.badgeOnTime,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.punchBadgeText,
+                              { color: getStatusColor(punch.status) },
+                            ]}
+                          >
+                            {punch.status}
+                          </Text>
+                        </View>
+                      )
+                    )}
+                  </View>
                 </View>
+                <Text style={styles.punchTime}>
+                  {formatRDTimeShort(new Date(punch.createdDate))}
+                </Text>
               </View>
-              <Text style={styles.punchTime}>
-                {formatRDTimeShort(new Date(punch.createdDate))}
-              </Text>
-            </View>
-          ))
-        )}
-      </View>
-    </ScrollView>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -1193,4 +1488,107 @@ const styles = StyleSheet.create({
   modalBtnEntry: { backgroundColor: "#F0FDF4" },
   modalBtnExit: { backgroundColor: "#FEF2F2" },
   modalBtnConfirmText: { fontSize: 15, fontWeight: "700" },
+  /* NextDayExit Modal */
+  ndModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  ndModalCard: {
+    width: "100%",
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    overflow: "hidden",
+    elevation: 10,
+  },
+  ndModalHeader: {
+    backgroundColor: "#D97706",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  ndModalTitle: { fontSize: 17, fontWeight: "700", color: "#fff" },
+  ndModalBody: { padding: 20, gap: 16 },
+  ndModalMsg: { fontSize: 14, color: "#374151", lineHeight: 22 },
+  ndTimeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1.5,
+    borderColor: "#FCD34D",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  ndTimeBtnText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#D97706",
+  },
+  ndTimeInput: {
+    color: "#111827",
+    backgroundColor: "#F9FAFB",
+  },
+  ndModalBtn: {
+    backgroundColor: "#D97706",
+    margin: 20,
+    marginTop: 0,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  ndModalBtnText: { fontSize: 15, fontWeight: "700", color: "#fff" },
+  /* Native Time Picker */
+  nativePickerContainer: {
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1.5,
+    borderColor: "#FCD34D",
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+  },
+  nativePickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  nativePickerCol: { alignItems: "center", flex: 1 },
+  nativePickerLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#D97706",
+    marginBottom: 4,
+    letterSpacing: 0.5,
+  },
+  nativePickerScroll: { height: 160 },
+  nativePickerItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  nativePickerItemActive: { backgroundColor: "#D97706" },
+  nativePickerItemText: { fontSize: 18, fontWeight: "600", color: "#374151" },
+  nativePickerItemTextActive: { color: "#fff" },
+  nativePickerColon: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#D97706",
+    marginTop: 20,
+  },
+  nativePickerConfirm: {
+    marginTop: 12,
+    backgroundColor: "#D97706",
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  nativePickerConfirmText: { fontSize: 14, fontWeight: "700", color: "#fff" },
 });

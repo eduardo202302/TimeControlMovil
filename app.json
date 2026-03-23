@@ -12,7 +12,9 @@
     },
     "android": {
       "package": "com.timecontrol.movil",
-      "permissions": ["CAMERA"],
+      "permissions": [
+        "CAMERA"
+      ],
       "icon": "./assets/images/logos/logo_adaptive.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logos/logo_adaptive.png",
@@ -37,7 +39,8 @@
         }
       ],
       "expo-secure-store",
-      "expo-image-picker"
+      "expo-image-picker",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
