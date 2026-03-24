@@ -6,6 +6,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -65,6 +66,7 @@ function MenuSection({ section, onNavigate, pathname }: SectionProps) {
   const [expanded, setExpanded] = useState(true);
   const sectionIcon = getIcon(section.parent.icon);
   const hasChildren = section.children.length > 0;
+  
 
   if (!hasChildren) {
     const isActive = pathname === section.parent.path;
@@ -137,6 +139,8 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
   const pathname = usePathname();
   const { user, menuTree, app, urlColegio, logout } = useSchoolStore();
   const [userExpanded, setUserExpanded] = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  
 
   const handleNavigate = useCallback(
     (path: string) => {
@@ -147,26 +151,18 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
   );
 
   const handleLogout = useCallback(() => {
-    Alert.alert(
-      "Cerrar Sesión",
-      "¿Estás seguro de que deseas salir de la App?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Salir",
-          style: "destructive",
-          onPress: async () => {
-            onClose();
-            await SecureStore.deleteItemAsync("token");
-            await SecureStore.deleteItemAsync("user");
-            await SecureStore.deleteItemAsync("menuItems");
-            logout();
-            router.replace("/login");
-          },
-        },
-      ],
-    );
-  }, [logout, onClose, router]);
+  setLogoutModalVisible(true);
+}, []);
+
+const confirmLogout = useCallback(async () => {
+  setLogoutModalVisible(false);
+  onClose();
+  await SecureStore.deleteItemAsync("token");
+  await SecureStore.deleteItemAsync("user");
+  await SecureStore.deleteItemAsync("menuItems");
+  logout();
+  router.replace("/login");
+}, [logout, onClose, router]);
   if (!isVisible) return null;
 
   return (
@@ -240,6 +236,31 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
 
               {userExpanded && (
                 <View style={styles.userSubmenu}>
+                  <Modal
+                    transparent
+                    visible={logoutModalVisible}
+                    animationType="fade"
+                    onRequestClose={() => setLogoutModalVisible(false)}
+                  >
+                    <View style={styles.modalOverlay}>
+                      <View style={styles.modalBox}>
+                        <Text style={styles.logoutBtnText}>Cerrar Sesión</Text>
+                        <Text style={styles.modalMessage}>
+                          ¿Estás seguro de que deseas salir de la App?
+                        </Text>
+                        <View style={styles.modalButtons}>
+                          <TouchableOpacity
+                            onPress={() => setLogoutModalVisible(false)}
+                          >
+                            <Text style={styles.modalCancel}>Cancelar</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={confirmLogout}>
+                            <Text style={styles.modalConfirm}>Salir</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  </Modal>
                   <TouchableOpacity
                     style={styles.logoutItem}
                     onPress={handleLogout}
@@ -250,7 +271,7 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
                       size={18}
                       color="#DC2626"
                     />
-                    <Text style={styles.logoutBtnText}>Cerrar Sesión</Text>
+                    <Text>Cerrar Sesión</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -441,4 +462,44 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#DC2626",
   },
+
+  modalOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.5)',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+modalBox: {
+  backgroundColor: '#fff',
+  borderRadius: 8,
+  padding: 24,
+  width: '80%',
+  elevation: 5,
+},
+modalTitle: {
+  fontSize: 18,
+  fontWeight: '600',
+  marginBottom: 12,
+  color: '#111',
+},
+modalMessage: {
+  fontSize: 14,
+  color: '#444',
+  marginBottom: 24,
+},
+modalButtons: {
+  flexDirection: 'row',
+  justifyContent: 'flex-end',
+  gap: 20,
+},
+modalCancel: {
+  color: '#6B7280',
+  fontWeight: '600',
+  fontSize: 14,
+},
+modalConfirm: {
+  color: '#DC2626',
+  fontWeight: '600',
+  fontSize: 14,
+},
 });
