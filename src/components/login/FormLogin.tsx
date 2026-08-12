@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
@@ -19,6 +18,7 @@ import { getRoleById } from "../../../api/Roles/getRoles";
 >>>>>>> main
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { LoginType } from "../../../types/typesLogin/LoginType";
+import { storageDeleteItem, storageGetItem, storageSetItem } from "../../utils/storage";
 
 interface FormLoginProps {
   name?: string;
@@ -66,6 +66,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
 
   useEffect(() => {
     const cargarCredenciales = async () => {
+<<<<<<< Updated upstream
       const usuarioGuardado = await SecureStore.getItemAsync("usuario");
       const passwordGuardado = await SecureStore.getItemAsync("password");
       const recordar = await SecureStore.getItemAsync("recordarme");
@@ -73,6 +74,11 @@ export default function FormLogin({ name, image }: FormLoginProps) {
 
 =======
 >>>>>>> main
+=======
+      const usuarioGuardado = await storageGetItem("usuario");
+      const passwordGuardado = await storageGetItem("password");
+      const recordar = await storageGetItem("recordarme");
+>>>>>>> Stashed changes
       if (recordar === "true" && usuarioGuardado && passwordGuardado) {
         setValue("usuario", usuarioGuardado);
         setValue("password", passwordGuardado);
@@ -153,11 +159,11 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         console.log("menuTree:", JSON.stringify(menuTree, null, 2));
 
         // Persistir en SecureStore
-        await SecureStore.setItemAsync("isAuthorized", "true");
-        await SecureStore.setItemAsync("token", token);
-        await SecureStore.setItemAsync("urlColegio", currentUrl);
-        await SecureStore.setItemAsync("user", JSON.stringify(fullUser));
-        await SecureStore.setItemAsync("menuItems", JSON.stringify(menuItems));
+        await storageSetItem("isAuthorized", "true");
+        await storageSetItem("token", token);
+        await storageSetItem("urlColegio", currentUrl);
+        await storageSetItem("user", JSON.stringify(fullUser));
+        await storageSetItem("menuItems", JSON.stringify(menuItems));
 
         setMensaje({
           texto: "Autenticación exitosa. Redirigiendo...",
@@ -167,13 +173,13 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         router.replace((initialPath ?? "/entrada-salida") as never);
 
         if (remember) {
-          await SecureStore.setItemAsync("usuario", data.usuario);
-          await SecureStore.setItemAsync("password", data.password);
-          await SecureStore.setItemAsync("recordarme", "true");
+          await storageSetItem("usuario", data.usuario);
+          await storageSetItem("password", data.password);
+          await storageSetItem("recordarme", "true");
         } else {
-          await SecureStore.deleteItemAsync("usuario");
-          await SecureStore.deleteItemAsync("password");
-          await SecureStore.deleteItemAsync("recordarme");
+          await storageDeleteItem("usuario");
+          await storageDeleteItem("password");
+          await storageDeleteItem("recordarme");
         }
       } else {
         setMensaje({

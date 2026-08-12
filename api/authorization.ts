@@ -1,8 +1,8 @@
 import axios from "axios";
-import * as SecureStore from "expo-secure-store";
 import { useSchoolStore } from "../store/useSchoolStore";
 import { ClaveRegistroType } from "../types/typesAuthorization/claveRegistroType";
 import { buscarEmpresaPorPin } from "../utils/metodos";
+import { storageSetItem } from "../src/utils/storage";
 
 const api = axios.create({
   headers: { "Content-Type": "application/json" },
@@ -28,13 +28,13 @@ const authorization = async (data: ClaveRegistroType) => {
     const { success, data: responseData, message } = peticion.data;
 
     if (success) {
-      await SecureStore.setItemAsync(
+      await storageSetItem(
         "dataSchool",
         JSON.stringify(responseData),
       );
-      await SecureStore.setItemAsync("claveRegistro", claveRegistro);
-      await SecureStore.setItemAsync("urlColegio", response.url);
-      await SecureStore.setItemAsync("isAuthorized", "true");
+      await storageSetItem("claveRegistro", claveRegistro);
+      await storageSetItem("urlColegio", response.url);
+      await storageSetItem("isAuthorized", "true");
 
       useSchoolStore.getState().setSchool(responseData);
       useSchoolStore.getState().setUrlColegio(response.url);

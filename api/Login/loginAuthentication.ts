@@ -1,9 +1,12 @@
 import axios from "axios";
-import * as SecureStore from "expo-secure-store";
 import { useSchoolStore } from "../../store/useSchoolStore";
+<<<<<<< Updated upstream
 <<<<<<< HEAD
 import { LoginType } from "../../types/typesLogin/LoginType";
 =======
+=======
+import { storageSetItem } from "../../src/utils/storage";
+>>>>>>> Stashed changes
 import {
   ValidaPin,
   ValidateUser,
@@ -30,8 +33,23 @@ const loginAuthentication = async (data: LoginType) => {
     const { success, data: responseData, message } = response.data;
 
     if (success) {
+<<<<<<< Updated upstream
       await SecureStore.setItemAsync("token", responseData.token);
       await SecureStore.setItemAsync("user", JSON.stringify(responseData.user));
+=======
+      await storageSetItem("token", responseData.token);
+      await storageSetItem("user", JSON.stringify(responseData.user));
+
+      // Guardar foto desde schoolUsers
+      console.log("Datos de schoolUsers:", responseData.user?.schoolUsers?.[0]);
+      const schoolUser = responseData.user?.schoolUsers?.[0];
+      if (schoolUser?.photourl) {
+        await storageSetItem("photourl", schoolUser.photourl);
+      }
+      if (schoolUser?.s3Photo) {
+        await storageSetItem("s3Photo", schoolUser.s3Photo);
+      }
+>>>>>>> Stashed changes
     }
 
     return { success, data: responseData, message };
@@ -74,8 +92,8 @@ const registerUser = async (data: RegisterType) => {
     const { success, data: responseData, message } = response.data;
 
     if (success) {
-      await SecureStore.setItemAsync("token", responseData.token);
-      await SecureStore.setItemAsync("user", JSON.stringify(responseData.user));
+      await storageSetItem("token", responseData.token);
+      await storageSetItem("user", JSON.stringify(responseData.user));
     }
 
     return { success, data: responseData, message };

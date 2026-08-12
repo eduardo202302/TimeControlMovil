@@ -1,8 +1,8 @@
 import IkarFlatList from "@/components/login/IkarFlatList";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
+import { storageGetItem } from "../utils/storage";
 import { Controller, useForm } from "react-hook-form";
 import {
   Image,
@@ -39,7 +39,7 @@ export default function Register() {
 
   useEffect(() => {
     const check = async () => {
-      const isAuthorized = await SecureStore.getItemAsync("isAuthorized");
+      const isAuthorized = await storageGetItem("isAuthorized");
 
       if (isAuthorized === "true") {
         setShowAuth(false);

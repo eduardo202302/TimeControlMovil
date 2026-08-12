@@ -71,9 +71,14 @@ export default function RootLayout() {
 
 =======
 import { Stack, router } from "expo-router";
+<<<<<<< Updated upstream
 import * as SecureStore from "expo-secure-store";
 import { useEffect } from "react";
+=======
+import { useEffect, useRef } from "react";
+>>>>>>> Stashed changes
 import { useSchoolStore } from "../../store/useSchoolStore";
+import { storageDeleteItem, storageGetItem } from "../utils/storage";
 
 export default function RootLayout() {
   const { setSchool, setUrlColegio, setToken, setMenuResolution } =
@@ -81,6 +86,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     const checkAuthorization = async () => {
+<<<<<<< Updated upstream
 >>>>>>> main
       const isAuthorized = await SecureStore.getItemAsync("isAuthorized");
       const schoolDataRaw = await SecureStore.getItemAsync("dataSchool");
@@ -91,6 +97,14 @@ export default function RootLayout() {
 =======
       const menuItemsRaw = await SecureStore.getItemAsync("menuItems");
 >>>>>>> main
+=======
+      const isAuthorized = await storageGetItem("isAuthorized");
+      const schoolDataRaw = await storageGetItem("dataSchool");
+      const urlColegio = await storageGetItem("urlColegio");
+      const token = await storageGetItem("token");
+      const userRaw = await storageGetItem("user");
+      const menuItemsRaw = await storageGetItem("menuItems");
+>>>>>>> Stashed changes
 
       if (schoolDataRaw) setSchool(JSON.parse(schoolDataRaw));
       if (urlColegio) setUrlColegio(urlColegio);
@@ -117,6 +131,30 @@ export default function RootLayout() {
     checkAuthorization();
   }, []);
 
+<<<<<<< Updated upstream
+=======
+  // ── Observar logout: cuando token pasa a null DESPUÉS de la carga inicial ────
+  useEffect(() => {
+    const unsubscribe = useSchoolStore.subscribe(async (state, prevState) => {
+      // Solo actuar si: ya cargamos, el token pasó de algo a null
+      if (!initialLoadDone.current) return;
+      if (prevState.token !== null && state.token === null) {
+        // Limpiar todas las claves de SecureStore que el layout usa
+        await Promise.all([
+          storageDeleteItem("token"),
+          storageDeleteItem("user"),
+          storageDeleteItem("menuItems"),
+          // isAuthorized NO se borra — es la autorización del dispositivo físico,
+          // no de la sesión del usuario. Solo se borra si el dispositivo se revocan.
+        ]);
+        router.replace("/login");
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+>>>>>>> Stashed changes
   return (
 <<<<<<< HEAD
     <KeyboardAvoidingView
@@ -287,6 +325,7 @@ const styles = StyleSheet.create({
       <Stack.Screen name="register" options={{ headerShown: false }} />
       <Stack.Screen name="forgotPassword" options={{ headerShown: false }} />
       <Stack.Screen name="(app)" options={{ headerShown: false }} />
+      <Stack.Screen name="+not-found" options={{ headerShown: false }} />
     </Stack>
   );
 }

@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { MenuTree } from "../../../utils/resolveRoute";
+import { storageDeleteItem } from "../../utils/storage";
 
 const { width } = Dimensions.get("window");
 const DRAWER_WIDTH = Math.min(width * 0.78, 320);
@@ -143,6 +144,22 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
     [onClose, router],
   );
 
+<<<<<<< Updated upstream
+=======
+  const handleLogout = useCallback(() => {
+  setLogoutModalVisible(true);
+}, []);
+
+const confirmLogout = useCallback(async () => {
+  setLogoutModalVisible(false);
+  onClose();
+  await storageDeleteItem("token");
+  await storageDeleteItem("user");
+  await storageDeleteItem("menuItems");
+  logout();
+  router.replace("/login");
+}, [logout, onClose, router]);
+>>>>>>> Stashed changes
   if (!isVisible) return null;
 
   return (
