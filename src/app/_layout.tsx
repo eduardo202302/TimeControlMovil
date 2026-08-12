@@ -30,7 +30,7 @@ export default function RootLayout() {
         setMenuResolution(user, menuItems);
         const { initialPath } = useSchoolStore.getState();
         initialLoadDone.current = true;
-        router.replace((initialPath ?? "/login") as never);
+        router.replace("/punchinout" as never);
         return;
       }
 

@@ -285,7 +285,7 @@ const confirmLogout = useCallback(async () => {
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 999,
     flexDirection: "row",
   },

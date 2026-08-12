@@ -315,12 +315,20 @@ export default function PunchInOut() {
   );
 
   const { user, urlColegio, logout } = useSchoolStore();
-  const userSchedules: UserSchedule[] = (user as any)?.userSchedules ?? [];
+
+  // El login devuelve los horarios en user.schoolUsers[0].userSchedules
+  const schoolUser = (user as any)?.user?.schoolUsers?.[0];
+  const userSchedules: UserSchedule[] =
+    schoolUser?.userSchedules ??
+    (user as any)?.userSchedules ??
+    [];
   const todaySchedule = getTodaySchedule(userSchedules, now);
   const jornadaIniciada = isJornadaActiva(punches);
 
   // Tolerancias: del schedule, luego de school.settings, luego fallback
-  const schoolSettings = (user as any)?.school?.settings;
+  const schoolSettings =
+    schoolUser?.school?.settings ??
+    (user as any)?.school?.settings;
   const isImageRequired: boolean = schoolSettings?.isImageRequired ?? false;
   const tolWorkIn = 1;
   const tolWorkOut = 1;
@@ -402,10 +410,8 @@ export default function PunchInOut() {
 
   // ── Polling: detecta cambios de horario en tiempo real ──────────────────────
   useEffect(() => {
-    const initialSchedulesJson = JSON.stringify(
-      (user as any)?.userSchedules ?? [],
-    );
-    const schoolId = (user as any)?.school?.id;
+    const initialSchedulesJson = JSON.stringify(userSchedules);
+    const schoolId = schoolUser?.schoolId ?? (user as any)?.school?.id;
     const baseUrl = urlColegio;
     let alertShown = false;
 

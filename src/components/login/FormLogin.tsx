@@ -69,10 +69,11 @@ export default function FormLogin({ name, image }: FormLoginProps) {
 
       if (response.success) {
         const { token } = response.data;
-        console.log(
-          "userSchedules:",
-          JSON.stringify(response.data.userSchedules, null, 2),
-        );
+        const schedules =
+          response.data.user?.schoolUsers?.[0]?.userSchedules ??
+          response.data.userSchedules ??
+          [];
+        console.log("userSchedules:", JSON.stringify(schedules, null, 2));
         console.log(
           "punchesToday:",
           JSON.stringify(response.data.punchesToday, null, 2),
@@ -100,7 +101,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
             menu: role?.menu ?? [],
           },
           school: useSchoolStore.getState().school ?? {},
-          serSchedules: response.data.userSchedules ?? [],
+          userSchedules: schedules,
         };
 
         // Resolver app + ruta + árbol de menú
@@ -122,7 +123,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
           tipo: "success",
         });
 
-        router.replace((initialPath ?? "/entrada-salida") as never);
+        router.replace("/punchinout" as never);
 
         if (remember) {
           await SecureStore.setItemAsync("usuario", data.usuario);
