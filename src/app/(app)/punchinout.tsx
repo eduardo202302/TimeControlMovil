@@ -17,21 +17,12 @@ import {
   View
 } from "react-native";
 import { useSchoolStore } from "../../../store/useSchoolStore";
+import type {
+  SchoolUser,
+  UserSchedule,
+} from "../../../types/typeStore/SchoolStoreType";
 
 type Category = "Jornada" | "Almuerzo" | "Break";
-
-interface UserSchedule {
-  id: number;
-  weekDay: string;
-  workEntryTime: string;
-  workExitTime: string;
-  lunchEntryTime: string | null;
-  lunchExitTime: string | null;
-  toleranceWorkTimeIn?: number;
-  toleranceLunchTimeIn?: number;
-  toleranceWorkTimeOut?: number;
-  toleranceLunchTimeOut?: number;
-}
 
 interface PunchEvent {
   id: number;
@@ -44,6 +35,12 @@ interface PunchEvent {
   toleranceMinutes?: number | null;
   hasOpenDay?: boolean | string;
   openDayDate?: string;
+}
+
+interface PunchPayload {
+  type: string;
+  photourl?: string[];
+  schedule?: UserSchedule;
 }
 
 // Santo Domingo = UTC-4, fijo, sin cambio de horario de verano
@@ -160,30 +157,6 @@ function getTodaySchedule(
   return schedules.find((s) => s.weekDay === todayName) ?? null;
 }
 
-function getStatusForEntry(
-  now: Date,
-  entryTimeStr: string,
-  toleranceMinutes = 0,
-): "A Tiempo" | "Tardanza" | "Anticipada" {
-  const diff = getRDMinutes(now) - timeStrToMinutes(entryTimeStr);
-  if (diff > toleranceMinutes) return "Tardanza";
-  if (diff < -toleranceMinutes) return "Anticipada";
-  return "A Tiempo";
-}
-
-function getStatusForExit(
-  now: Date,
-  exitTimeStr: string,
-  toleranceMinutes = 0,
-): "A Tiempo" | "Anticipada" {
-  const diff = timeStrToMinutes(exitTimeStr) - getRDMinutes(now);
-  // diff > 0 = salió antes de su hora
-  // diff < 0 = salió después de su hora (horas extras) → A Tiempo
-  // diff > toleranceMinutes = salió demasiado antes → Anticipada
-  if (diff <= 0) return "A Tiempo"; // salió después o exacto → A Tiempo
-  return diff > toleranceMinutes ? "Anticipada" : "A Tiempo";
-}
-
 function getPunchTypeLabel(type: string): string {
   const labels: Record<string, string> = {
     InicioJornada: "Entrada Jornada",
@@ -233,19 +206,19 @@ function isJornadaVisible(
   now: Date,
   schedule: UserSchedule | null,
   isInicio: boolean,
-  tolWorkIn: number,
-  tolWorkOut: number,
   punches: PunchEvent[],
 ): boolean {
   // Sin horario -> ocultar siempre
   if (!schedule) return false;
 
   const current = getRDMinutes(now);
+  // Los intentos rechazados por imagen no cuentan como jornada iniciada
   const lastJornada = [...punches]
     .reverse()
     .find(
       (p) =>
         (p.type === "InicioJornada" || p.type === "FinJornada") &&
+        p.status !== "Error de Imagen" &&
         !p.hasOpenDay &&
         p.hasOpenDay !== ("true" as any),
     );
@@ -256,13 +229,13 @@ function isJornadaVisible(
     // Ya salio hoy -> ocultar
     if (lastJornada?.type === "FinJornada") return false;
     // Sin ponche -> visible desde 1 min antes de entrada, sin limite superior
-    const entryStart = timeStrToMinutes(schedule.workEntryTime) - tolWorkIn;
+    const entryStart = timeStrToMinutes(schedule.workEntryTime) - 1;
     return current >= entryStart;
   } else {
     // Ya salio hoy -> ocultar
     if (lastJornada?.type === "FinJornada") return false;
     // Visible desde 1 min antes de salida, sin limite superior (horas extras)
-    const exitStart = timeStrToMinutes(schedule.workExitTime) - tolWorkOut;
+    const exitStart = timeStrToMinutes(schedule.workExitTime) - 1;
     return current >= exitStart;
   }
 }
@@ -317,23 +290,21 @@ export default function PunchInOut() {
   const { user, urlColegio, logout } = useSchoolStore();
 
   // El login devuelve los horarios en user.schoolUsers[0].userSchedules
-  const schoolUser = (user as any)?.user?.schoolUsers?.[0];
+  const schoolUser: SchoolUser | undefined = user?.user?.schoolUsers?.[0];
   const userSchedules: UserSchedule[] =
     schoolUser?.userSchedules ??
-    (user as any)?.userSchedules ??
+    user?.userSchedules ??
     [];
   const todaySchedule = getTodaySchedule(userSchedules, now);
   const jornadaIniciada = isJornadaActiva(punches);
 
-  // Tolerancias: del schedule, luego de school.settings, luego fallback
-  const schoolSettings =
-    schoolUser?.school?.settings ??
-    (user as any)?.school?.settings;
-  const isImageRequired: boolean = schoolSettings?.isImageRequired ?? false;
-  const tolWorkIn = 1;
-  const tolWorkOut = 1;
-  const tolLunchIn = 1;
-  const tolLunchOut = 1;
+  // Configuración de la escuela (school.settings) y del usuario (schoolUser.settings)
+  const schoolSettings = schoolUser?.school?.settings ?? user?.school?.settings;
+  const schoolUserSettings = schoolUser?.settings;
+  // La foto es obligatoria solo si AMBOS settings lo exigen
+  const isImageRequired: boolean =
+    Boolean(schoolSettings?.isImageRequired) &&
+    Boolean(schoolUserSettings?.isImageRequired);
 
   // Datos del usuario autenticado
   const userName: string = (user as any)?.name
@@ -546,24 +517,6 @@ export default function PunchInOut() {
 
   const isInicio = getNextPunchType(selectedCategory) === "inicio";
 
-  const getEntryStatus = (): string => {
-    if (selectedCategory === "Break") return "A Tiempo";
-
-    if (!isInicio) {
-      if (selectedCategory === "Jornada" && todaySchedule?.workExitTime)
-        return getStatusForExit(now, todaySchedule.workExitTime, tolWorkOut);
-      if (selectedCategory === "Almuerzo" && todaySchedule?.lunchExitTime)
-        return getStatusForExit(now, todaySchedule.lunchExitTime, tolLunchOut);
-      return "A Tiempo";
-    }
-
-    if (selectedCategory === "Jornada" && todaySchedule?.workEntryTime)
-      return getStatusForEntry(now, todaySchedule.workEntryTime, tolWorkIn);
-    if (selectedCategory === "Almuerzo") return "A Tiempo";
-
-    return "A Tiempo";
-  };
-
   const handleSubmitNextDayExit = async () => {
     if (!nextDayExitTime.trim()) {
       Alert.alert("Error", "Por favor ingresa la hora de salida.");
@@ -582,7 +535,6 @@ export default function PunchInOut() {
         `${urlColegio}/punches`,
         {
           type: "FinJornada",
-          status: "A Tiempo",
           recordedDate: String(nextDayExitTime.trim()),
           nextDayExit: true,
         },
@@ -625,12 +577,14 @@ export default function PunchInOut() {
 
     const types = PUNCH_TYPE_MAP[selectedCategory];
     const type = isInicio ? types.inicio : types.fin;
-    const status2 = selectedCategory === "Break" ? undefined : getEntryStatus();
 
-    let photo = null;
+    // La foto solo se exige en la entrada (InicioJornada) y si ambos settings lo permiten;
+    // al marcar salida nunca se pide foto
+    const imageRequiredForType = isImageRequired && type === "InicioJornada";
 
-    // ── Foto solo si el perfil la requiere y es entrada ──
-    if (isInicio && isImageRequired) {
+    let photo: ImagePicker.ImagePickerAsset | null = null;
+
+    if (imageRequiredForType) {
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
@@ -647,13 +601,21 @@ export default function PunchInOut() {
         base64: true,
       });
       if (result.canceled) return;
-      photo = result.assets[0];
+      photo = result.assets[0] ?? null;
+    }
+
+    // Si la foto es obligatoria, no se envía el POST sin ella
+    if (imageRequiredForType && !photo?.base64) {
+      Alert.alert(
+        "Foto requerida",
+        "Debes seleccionar una foto para registrar la jornada.",
+      );
+      return;
     }
 
     setLoading(true);
     try {
-      const payload: Record<string, any> = { type };
-      if (status2 !== undefined) payload.status = status2;
+      const payload: PunchPayload = { type };
       if (photo?.base64) payload.photourl = [photo.base64];
       if (todaySchedule) payload.schedule = todaySchedule;
 
@@ -668,6 +630,9 @@ export default function PunchInOut() {
         await fetchTodayPunches();
       } else {
         const msg: string = response.data.message ?? "Intenta de nuevo.";
+        // El backend pudo registrar el intento con "Error de Imagen"; sincronizar
+        // para que el botón de entrada vuelva a quedar visible y habilitado.
+        await fetchTodayPunches();
         if (msg.includes("InicioJornada activo")) {
           // Jornada del día anterior sin cerrar → mostrar modal
           setNextDayExitModal(true);
@@ -684,6 +649,8 @@ export default function PunchInOut() {
       }
     } catch (error: any) {
       const msg = error?.response?.data?.message ?? "Error de conexión.";
+      // Sincronizar igualmente en errores de red/servidor para no dejar la UI trabada
+      await fetchTodayPunches();
       Alert.alert("Error", typeof msg === "string" ? msg : JSON.stringify(msg));
     } finally {
       setLoading(false);
@@ -1008,8 +975,6 @@ export default function PunchInOut() {
               now,
               todaySchedule,
               getNextPunchType("Jornada") === "inicio",
-              tolWorkIn,
-              tolWorkOut,
               punches,
             )) && (
             <TouchableOpacity

@@ -3,13 +3,61 @@ import { MenuItem, RoleItem } from "../typesMenu/MenuTypes";
 
 // ─── Tipos existente ───────────────────────────────────────
 
+export interface SchoolSettings {
+  isImageRequired?: boolean;
+  [key: string]: unknown;
+}
+
+export interface UserSchedule {
+  id: number;
+  weekDay: string;
+  workEntryTime: string;
+  workExitTime: string;
+  lunchEntryTime: string | null;
+  lunchExitTime: string | null;
+  toleranceWorkTimeIn?: number;
+  toleranceLunchTimeIn?: number;
+  toleranceWorkTimeOut?: number;
+  toleranceLunchTimeOut?: number;
+  [key: string]: unknown;
+}
+
 export interface School {
   id: number;
   name: string;
   logo: string;
   email: string | null;
   phone: string;
-  settings: Record<string, unknown>;
+  settings: SchoolSettings;
+  [key: string]: unknown;
+}
+
+export interface UserInfo {
+  id: number;
+  email: string;
+  fullName: string;
+  nickName: string;
+  phone: string;
+  pin: string | null;
+  cedula: string | null;
+  schoolUsers?: SchoolUser[];
+  [key: string]: unknown;
+}
+
+export interface SchoolUser {
+  id: number;
+  schoolId: number;
+  userId: number;
+  roleId: number;
+  code: string;
+  isActive: boolean;
+  photourl: string | null;
+  s3Photo: string | null;
+  user: UserInfo;
+  role: RoleItem;
+  school: School;
+  settings?: SchoolSettings;
+  userSchedules?: UserSchedule[];
   [key: string]: unknown;
 }
 
@@ -22,17 +70,11 @@ export interface User {
   isActive: boolean;
   photourl: string | null;
   s3Photo: string | null;
-  user: {
-    id: number;
-    email: string;
-    fullName: string;
-    nickName: string;
-    phone: string;
-    pin: string | null;
-    cedula: string | null;
-  };
+  user: UserInfo;
   role: RoleItem;
   school: School;
+  settings?: SchoolSettings;
+  userSchedules?: UserSchedule[];
   [key: string]: unknown;
 }
 
