@@ -1,3 +1,6 @@
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
@@ -9,6 +12,7 @@ import {
   Alert,
   Image,
   Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -36,6 +40,7 @@ interface PunchEvent {
   toleranceMinutes?: number | null;
   hasOpenDay?: boolean | string;
   openDayDate?: string;
+  date?: string;
 }
 
 interface PunchPayload {
@@ -285,12 +290,7 @@ export default function PunchInOut() {
   const [nextDayExitTime, setNextDayExitTime] = useState("");
   const [submittingExit, setSubmittingExit] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [selectedHour, setSelectedHour] = useState(
-    () => toRD(new Date()).hours,
-  );
-  const [selectedMinute, setSelectedMinute] = useState(
-    () => toRD(new Date()).minutes,
-  );
+  const [selectedTime, setSelectedTime] = useState(() => new Date());
 
   const { user, urlColegio, logout } = useSchoolStore();
 
@@ -551,20 +551,50 @@ export default function PunchInOut() {
     if (!urlColegio || !token) return;
     setSubmittingExit(true);
     try {
-      const response = await axios.post(
-        `${urlColegio}/punches`,
-        {
-          type: "FinJornada",
-          recordedDate: String(nextDayExitTime.trim()),
-          nextDayExit: true,
+      let baseDateStr = "";
+
+      const raw =
+        nextDayExitPunch?.openDayDate ??
+        nextDayExitPunch?.createdDate ??
+        nextDayExitPunch?.date ??
+        "";
+      if (raw) {
+        baseDateStr = String(raw).split("T")[0];
+      } else {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yyyy = yesterday.getFullYear();
+        const mm = String(yesterday.getMonth() + 1).padStart(2, "0");
+        const dd = String(yesterday.getDate()).padStart(2, "0");
+        baseDateStr = `${yyyy}-${mm}-${dd}`;
+      }
+
+      const [rawHour, rawMinute] = nextDayExitTime.trim().split(":");
+      const hour = pad(Number(rawHour));
+      const minute = pad(Number(rawMinute));
+
+      const finalDateTime = `${baseDateStr}T${hour}:${minute}:00-04:00`;
+
+      const payload = {
+        type: "FinJornada" as const,
+        createdDate: finalDateTime,
+        recordedDate: finalDateTime,
+        nextDayExit: true,
+      };
+
+      console.log("PAYLOAD NEXT DAY EXIT:", {
+        type: "FinJornada",
+        createdDate: finalDateTime,
+        nextDayExit: true,
+      });
+
+      const response = await axios.post(`${urlColegio}/punches`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        },
-      );
+      });
+      console.log("RESPUESTA BACKEND:", response.data);
       if (response.data.success) {
         setNextDayExitModal(false);
         setNextDayExitTime("");
@@ -580,6 +610,20 @@ export default function PunchInOut() {
       setSubmittingExit(false);
     }
   };
+
+  const handleTimeChange = useCallback(
+    (event: DateTimePickerEvent, date?: Date) => {
+      if (Platform.OS === "android") {
+        setShowTimePicker(false);
+        if (event.type !== "set" || !date) return;
+      }
+      if (!date) return;
+      const { hours, minutes } = toRD(date);
+      setSelectedTime(date);
+      setNextDayExitTime(`${pad(hours)}:${pad(minutes)}`);
+    },
+    [],
+  );
 
   const handleRegister = async () => {
     const token = await getToken();
@@ -615,7 +659,7 @@ export default function PunchInOut() {
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         allowsEditing: false,
         quality: 0.4,
         base64: true,
@@ -653,25 +697,42 @@ export default function PunchInOut() {
         // El backend pudo registrar el intento con "Error de Imagen"; sincronizar
         // para que el botón de entrada vuelva a quedar visible y habilitado.
         await fetchTodayPunches();
-        if (msg.includes("InicioJornada activo")) {
-          // Jornada del día anterior sin cerrar → mostrar modal
+        const lowerMsg = msg.toLowerCase();
+        if (
+          lowerMsg.includes("inicio de jornada activo") ||
+          lowerMsg.includes("cerrar la jornada")
+        ) {
+          // Jornada del día anterior sin cerrar → mostrar modal, sin Alert genérico
           setNextDayExitModal(true);
-        } else if (msg.includes("cambios en el horario")) {
+          return;
+        } else if (lowerMsg.includes("cambios en el horario")) {
           Alert.alert(
             "Horario modificado",
             msg,
             [{ text: "Aceptar", onPress: forceLogout }],
             { cancelable: false },
           );
+          return;
         } else {
           Alert.alert("Error", msg);
         }
       }
     } catch (error: any) {
-      const msg = error?.response?.data?.message ?? "Error de conexión.";
+      const rawMsg = error?.response?.data?.message ?? "Error de conexión.";
+      const msg: string =
+        typeof rawMsg === "string" ? rawMsg : JSON.stringify(rawMsg);
       // Sincronizar igualmente en errores de red/servidor para no dejar la UI trabada
       await fetchTodayPunches();
-      Alert.alert("Error", typeof msg === "string" ? msg : JSON.stringify(msg));
+      const lowerMsg = msg.toLowerCase();
+      if (
+        lowerMsg.includes("inicio de jornada activo") ||
+        lowerMsg.includes("cerrar la jornada")
+      ) {
+        // Jornada del día anterior sin cerrar → mostrar modal, sin Alert genérico
+        setNextDayExitModal(true);
+        return;
+      }
+      Alert.alert("Error", msg);
     } finally {
       setLoading(false);
     }
@@ -705,120 +766,64 @@ export default function PunchInOut() {
         <View style={styles.ndModalOverlay}>
           <View style={styles.ndModalCard}>
             <View style={styles.ndModalHeader}>
-              <Ionicons name="warning-outline" size={24} color="#fff" />
+              <View style={styles.ndModalIconWrap}>
+                <Ionicons name="time-outline" size={22} color="#D97706" />
+              </View>
               <Text style={styles.ndModalTitle}>Jornada Incompleta</Text>
             </View>
             <View style={styles.ndModalBody}>
               <Text style={styles.ndModalMsg}>
-                No completaste la salida del día{" "}
-                <Text style={{ fontWeight: "700" }}>{pendingDate}</Text>. Esto
-                afecta tu puntuación del mes. Selecciona la hora a la que
-                saliste para cerrar la jornada.
+                No completaste la salida{" "}
+                {pendingDate ? (
+                  <>
+                    del día{" "}
+                    <Text style={{ fontWeight: "700" }}>{pendingDate}</Text>
+                  </>
+                ) : (
+                  "de la jornada anterior"
+                )}
+                . Esto afecta tu puntuación del mes. Selecciona la hora a la
+                que saliste para cerrar la jornada.
               </Text>
 
-              {/* Hora seleccionada */}
               <TouchableOpacity
                 style={styles.ndTimeBtn}
                 onPress={() => setShowTimePicker(true)}
                 activeOpacity={0.8}
               >
                 <Ionicons name="time-outline" size={20} color="#D97706" />
-                <Text style={styles.ndTimeBtnText}>
+                <Text
+                  style={[
+                    styles.ndTimeBtnText,
+                    nextDayExitTime && styles.ndTimeBtnTextValue,
+                  ]}
+                >
                   {nextDayExitTime
-                    ? nextDayExitTime
+                    ? to12h(nextDayExitTime)
                     : "Seleccionar hora de salida"}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color="#D97706" />
+                <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
               </TouchableOpacity>
 
               {showTimePicker && (
-                <View style={styles.nativePickerContainer}>
-                  <View style={styles.nativePickerRow}>
-                    <View style={styles.nativePickerCol}>
-                      <Text style={styles.nativePickerLabel}>Hora</Text>
-                      <ScrollView
-                        style={styles.nativePickerScroll}
-                        showsVerticalScrollIndicator={false}
-                      >
-                        {Array.from({ length: 24 }, (_, i) => (
-                          <TouchableOpacity
-                            key={i}
-                            style={[
-                              styles.nativePickerItem,
-                              selectedHour === i &&
-                                styles.nativePickerItemActive,
-                            ]}
-                            onPress={() => setSelectedHour(i)}
-                          >
-                            <Text
-                              style={[
-                                styles.nativePickerItemText,
-                                selectedHour === i &&
-                                  styles.nativePickerItemTextActive,
-                              ]}
-                            >
-                              {i.toString().padStart(2, "0")}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    </View>
-                    <Text style={styles.nativePickerColon}>:</Text>
-                    <View style={styles.nativePickerCol}>
-                      <Text style={styles.nativePickerLabel}>Min</Text>
-                      <ScrollView
-                        style={styles.nativePickerScroll}
-                        showsVerticalScrollIndicator={false}
-                      >
-                        {Array.from({ length: 60 }, (_, i) => (
-                          <TouchableOpacity
-                            key={i}
-                            style={[
-                              styles.nativePickerItem,
-                              selectedMinute === i &&
-                                styles.nativePickerItemActive,
-                            ]}
-                            onPress={() => setSelectedMinute(i)}
-                          >
-                            <Text
-                              style={[
-                                styles.nativePickerItemText,
-                                selectedMinute === i &&
-                                  styles.nativePickerItemTextActive,
-                              ]}
-                            >
-                              {i.toString().padStart(2, "0")}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </ScrollView>
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.nativePickerConfirm}
-                    onPress={() => {
-                      const h = String(selectedHour).padStart(2, "0");
-                      const m = String(selectedMinute).padStart(2, "0");
-                      setNextDayExitTime(`${h}:${m}`);
-                      setShowTimePicker(false);
-                    }}
-                  >
-                    <Text style={styles.nativePickerConfirmText}>
-                      Confirmar hora
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                <DateTimePicker
+                  value={selectedTime}
+                  mode="time"
+                  display={Platform.OS === "ios" ? "spinner" : "default"}
+                  onChange={handleTimeChange}
+                />
               )}
             </View>
             <TouchableOpacity
               style={[styles.ndModalBtn, submittingExit && { opacity: 0.7 }]}
               onPress={handleSubmitNextDayExit}
               disabled={submittingExit}
+              activeOpacity={0.85}
             >
               {submittingExit ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text style={styles.ndModalBtnText}>Finalizar Jornada</Text>
+                <Text style={styles.ndModalBtnText}>Cerrar Jornada</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -1548,36 +1553,47 @@ const styles = StyleSheet.create({
   /* NextDayExit Modal */
   ndModalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
   },
   ndModalCard: {
     width: "100%",
+    maxWidth: 400,
     backgroundColor: "#fff",
     borderRadius: 20,
-    overflow: "hidden",
+    padding: 24,
     elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
   },
   ndModalHeader: {
-    backgroundColor: "#D97706",
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    gap: 12,
+    marginBottom: 14,
   },
-  ndModalTitle: { fontSize: 17, fontWeight: "700", color: "#fff" },
-  ndModalBody: { padding: 20, gap: 16 },
-  ndModalMsg: { fontSize: 14, color: "#374151", lineHeight: 22 },
+  ndModalIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: "#FFFBEB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ndModalTitle: { fontSize: 18, fontWeight: "700", color: "#333" },
+  ndModalBody: { gap: 16 },
+  ndModalMsg: { fontSize: 14, color: "#666", lineHeight: 22 },
   ndTimeBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#FFFBEB",
-    borderWidth: 1.5,
-    borderColor: "#FCD34D",
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -1586,66 +1602,16 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: "600",
-    color: "#D97706",
+    color: "#9CA3AF",
   },
-  ndTimeInput: {
-    color: "#111827",
-    backgroundColor: "#F9FAFB",
-  },
+  ndTimeBtnTextValue: { color: "#111827" },
   ndModalBtn: {
-    backgroundColor: "#D97706",
-    margin: 20,
-    marginTop: 0,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  ndModalBtnText: { fontSize: 15, fontWeight: "700", color: "#fff" },
-  /* Native Time Picker */
-  nativePickerContainer: {
-    backgroundColor: "#FFFBEB",
-    borderWidth: 1.5,
-    borderColor: "#FCD34D",
-    borderRadius: 12,
-    padding: 12,
     marginTop: 8,
-  },
-  nativePickerRow: {
-    flexDirection: "row",
+    backgroundColor: "#2563EB",
+    borderRadius: 12,
+    paddingVertical: 15,
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
   },
-  nativePickerCol: { alignItems: "center", flex: 1 },
-  nativePickerLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#D97706",
-    marginBottom: 4,
-    letterSpacing: 0.5,
-  },
-  nativePickerScroll: { height: 160 },
-  nativePickerItem: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  nativePickerItemActive: { backgroundColor: "#D97706" },
-  nativePickerItemText: { fontSize: 18, fontWeight: "600", color: "#374151" },
-  nativePickerItemTextActive: { color: "#fff" },
-  nativePickerColon: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#D97706",
-    marginTop: 20,
-  },
-  nativePickerConfirm: {
-    marginTop: 12,
-    backgroundColor: "#D97706",
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  nativePickerConfirmText: { fontSize: 14, fontWeight: "700", color: "#fff" },
+  ndModalBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
 });
