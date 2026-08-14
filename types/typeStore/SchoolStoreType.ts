@@ -5,6 +5,10 @@ import { MenuItem, RoleItem } from "../typesMenu/MenuTypes";
 
 export interface SchoolSettings {
   isImageRequired?: boolean;
+  toleranceWorkTimeIn?: number;
+  toleranceWorkTimeOut?: number;
+  toleranceLunchTimeIn?: number;
+  toleranceLunchTimeOut?: number;
   [key: string]: unknown;
 }
 

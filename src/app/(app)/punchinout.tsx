@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import type {
+  SchoolSettings,
   SchoolUser,
   UserSchedule,
 } from "../../../types/typeStore/SchoolStoreType";
@@ -206,6 +207,8 @@ function isJornadaVisible(
   now: Date,
   schedule: UserSchedule | null,
   isInicio: boolean,
+  tolWorkIn: number,
+  tolWorkOut: number,
   punches: PunchEvent[],
 ): boolean {
   // Sin horario -> ocultar siempre
@@ -228,14 +231,14 @@ function isJornadaVisible(
     if (lastJornada?.type === "InicioJornada") return false;
     // Ya salio hoy -> ocultar
     if (lastJornada?.type === "FinJornada") return false;
-    // Sin ponche -> visible desde 1 min antes de entrada, sin limite superior
-    const entryStart = timeStrToMinutes(schedule.workEntryTime) - 1;
+    // Sin ponche -> visible desde N min antes de entrada (tolerancia), sin limite superior
+    const entryStart = timeStrToMinutes(schedule.workEntryTime) - tolWorkIn;
     return current >= entryStart;
   } else {
     // Ya salio hoy -> ocultar
     if (lastJornada?.type === "FinJornada") return false;
-    // Visible desde 1 min antes de salida, sin limite superior (horas extras)
-    const exitStart = timeStrToMinutes(schedule.workExitTime) - 1;
+    // Visible desde N min antes de salida, sin limite superior (horas extras)
+    const exitStart = timeStrToMinutes(schedule.workExitTime) - tolWorkOut;
     return current >= exitStart;
   }
 }
@@ -243,6 +246,8 @@ function isJornadaVisible(
 function isAlmuerzoVisible(
   now: Date,
   schedule: UserSchedule | null,
+  tolLunchIn: number,
+  tolLunchOut: number,
   punches: PunchEvent[],
 ): boolean {
   if (!schedule) return false;
@@ -257,8 +262,8 @@ function isAlmuerzoVisible(
   if (!schedule.lunchEntryTime || !schedule.lunchExitTime) return false;
 
   const current = getRDMinutes(now);
-  const windowStart = timeStrToMinutes(schedule.lunchEntryTime) - 5;
-  const windowEnd = timeStrToMinutes(schedule.lunchExitTime) + 5;
+  const windowStart = timeStrToMinutes(schedule.lunchEntryTime) - tolLunchIn;
+  const windowEnd = timeStrToMinutes(schedule.lunchExitTime) + tolLunchOut;
 
   return current >= windowStart && current <= windowEnd;
 }
@@ -299,12 +304,20 @@ export default function PunchInOut() {
   const jornadaIniciada = isJornadaActiva(punches);
 
   // Configuración de la escuela (school.settings) y del usuario (schoolUser.settings)
-  const schoolSettings = schoolUser?.school?.settings ?? user?.school?.settings;
+  const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | undefined>(
+    () => schoolUser?.school?.settings ?? user?.school?.settings,
+  );
   const schoolUserSettings = schoolUser?.settings;
   // La foto es obligatoria solo si AMBOS settings lo exigen
   const isImageRequired: boolean =
     Boolean(schoolSettings?.isImageRequired) &&
     Boolean(schoolUserSettings?.isImageRequired);
+
+  // Tolerancias de tiempo desde school.settings (backend). Fallback UX: 1 min jornada, 5 min almuerzo
+  const tolWorkIn = schoolSettings?.toleranceWorkTimeIn ?? 1;
+  const tolWorkOut = schoolSettings?.toleranceWorkTimeOut ?? 1;
+  const tolLunchIn = schoolSettings?.toleranceLunchTimeIn ?? 5;
+  const tolLunchOut = schoolSettings?.toleranceLunchTimeOut ?? 5;
 
   // Datos del usuario autenticado
   const userName: string = (user as any)?.name
@@ -407,6 +420,13 @@ export default function PunchInOut() {
         const freshSchedules: UserSchedule[] =
           res.data?.data?.userSchedules ?? [];
 
+        // Mantener los settings frescos del backend (tolerancias, etc.)
+        const freshSettings =
+          (res.data?.data?.school ?? res.data?.school)?.settings as
+            | SchoolSettings
+            | undefined;
+        if (freshSettings) setSchoolSettings(freshSettings);
+
         // Comparar solo los campos relevantes (ignorar createdDate y campos extra)
         const normalize = (s: UserSchedule[]) =>
           s
@@ -459,7 +479,7 @@ export default function PunchInOut() {
   useEffect(() => {
     if (
       selectedCategory === "Almuerzo" &&
-      !isAlmuerzoVisible(now, todaySchedule, punches)
+      !isAlmuerzoVisible(now, todaySchedule, tolLunchIn, tolLunchOut, punches)
     ) {
       setSelectedCategory("Jornada");
     }
@@ -663,7 +683,7 @@ export default function PunchInOut() {
     if (!jornadaIniciada && (cat === "Almuerzo" || cat === "Break"))
       return false;
     if (cat === "Almuerzo")
-      return isAlmuerzoVisible(now, todaySchedule, punches);
+      return isAlmuerzoVisible(now, todaySchedule, tolLunchIn, tolLunchOut, punches);
     if (cat === "Jornada") return true;
     return true;
   });
@@ -975,6 +995,8 @@ export default function PunchInOut() {
               now,
               todaySchedule,
               getNextPunchType("Jornada") === "inicio",
+              tolWorkIn,
+              tolWorkOut,
               punches,
             )) && (
             <TouchableOpacity
@@ -1033,90 +1055,104 @@ export default function PunchInOut() {
               <Text style={styles.emptyText}>Sin registros hoy</Text>
             </View>
           ) : (
-            [...punches].reverse().map((punch) => (
-              <View key={punch.id} style={styles.punchRow}>
-                <View
-                  style={[
-                    styles.punchIcon,
-                    punch.status === "Error de Imagen" ||
-                    punch.status === "Tardanza"
-                      ? styles.punchIconError
-                      : punch.status === "Anticipada"
-                        ? styles.punchIconEarly
-                        : punch.type.startsWith("Inicio")
-                          ? styles.punchIconEntry
-                          : parseFloat(String(punch.overtime ?? 0)) > 0
-                            ? styles.punchIconOvertime
-                            : styles.punchIconExitOnTime,
-                  ]}
-                >
-                  <Ionicons
-                    name={
-                      punch.type.startsWith("Inicio")
-                        ? "log-in-outline"
-                        : "log-out-outline"
-                    }
-                    size={16}
-                    color={
-                      punch.status === "Error de Imagen" ||
-                      punch.status === "Tardanza"
-                        ? "#DC2626"
-                        : punch.status === "Anticipada"
-                          ? "#D97706"
+            [...punches].reverse().map((punch) => {
+              const hasOvertime = parseFloat(String(punch.overtime ?? 0)) > 0;
+              // Solo FinJornada puede generar horas extras
+              const isJornadaOvertime = punch.type === "FinJornada" && hasOvertime;
+              // Regresar tarde del almuerzo nunca es horas extras → Tardanza
+              const isLunchLate = punch.type === "FinAlmuerzo" && hasOvertime;
+              // El break no tiene tiempo definido → siempre a tiempo
+              const displayStatus = isJornadaOvertime
+                ? "Horas extras"
+                : isLunchLate
+                  ? "Tardanza"
+                  : punch.type === "FinBreak" && hasOvertime
+                    ? "A Tiempo"
+                    : punch.status;
+              const isLateBadge =
+                displayStatus === "Tardanza" || displayStatus === "Error de Imagen";
+              const isEarlyBadge = displayStatus === "Anticipada";
+
+              return (
+                <View key={punch.id} style={styles.punchRow}>
+                  <View
+                    style={[
+                      styles.punchIcon,
+                      isLateBadge
+                        ? styles.punchIconError
+                        : isEarlyBadge
+                          ? styles.punchIconEarly
                           : punch.type.startsWith("Inicio")
-                            ? "#16A34A"
-                            : parseFloat(String(punch.overtime ?? 0)) > 0
-                              ? "#2563EB"
-                              : "#16A34A"
-                    }
-                  />
-                </View>
-                <View style={styles.punchInfo}>
-                  <Text style={styles.punchType}>
-                    {getPunchTypeLabel(punch.type)}
-                  </Text>
-                  <View style={styles.punchBadgeRow}>
-                    {punch.type.startsWith("Fin") &&
-                    parseFloat(String(punch.overtime ?? 0)) > 0 ? (
-                      /* Salida con overtime → solo "Horas extras", el status es irrelevante */
-                      <View style={styles.badgeOvertime}>
-                        <Text style={styles.badgeOvertimeText}>
-                          Horas extras
-                        </Text>
-                      </View>
-                    ) : (
-                      /* Sin overtime → mostrar status normal */
-                      punch.status && (
-                        <View
-                          style={[
-                            styles.punchBadge,
-                            punch.status === "Tardanza"
-                              ? styles.badgeLate
-                              : punch.status === "Anticipada"
-                                ? styles.badgeEarly
-                                : punch.status === "Error de Imagen"
-                                  ? styles.badgeLate
-                                  : styles.badgeOnTime,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.punchBadgeText,
-                              { color: getStatusColor(punch.status) },
-                            ]}
-                          >
-                            {punch.status}
+                            ? styles.punchIconEntry
+                            : isJornadaOvertime
+                              ? styles.punchIconOvertime
+                              : styles.punchIconExitOnTime,
+                    ]}
+                  >
+                    <Ionicons
+                      name={
+                        punch.type.startsWith("Inicio")
+                          ? "log-in-outline"
+                          : "log-out-outline"
+                      }
+                      size={16}
+                      color={
+                        isLateBadge
+                          ? "#DC2626"
+                          : isEarlyBadge
+                            ? "#D97706"
+                            : punch.type.startsWith("Inicio")
+                              ? "#16A34A"
+                              : isJornadaOvertime
+                                ? "#2563EB"
+                                : "#16A34A"
+                      }
+                    />
+                  </View>
+                  <View style={styles.punchInfo}>
+                    <Text style={styles.punchType}>
+                      {getPunchTypeLabel(punch.type)}
+                    </Text>
+                    <View style={styles.punchBadgeRow}>
+                      {isJornadaOvertime ? (
+                        /* Solo FinJornada con overtime → "Horas extras" */
+                        <View style={styles.badgeOvertime}>
+                          <Text style={styles.badgeOvertimeText}>
+                            Horas extras
                           </Text>
                         </View>
-                      )
-                    )}
+                      ) : (
+                        /* Resto → status normal (almuerzo/break fuera de horario = Tardanza) */
+                        displayStatus && (
+                          <View
+                            style={[
+                              styles.punchBadge,
+                              isLateBadge
+                                ? styles.badgeLate
+                                : isEarlyBadge
+                                  ? styles.badgeEarly
+                                  : styles.badgeOnTime,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.punchBadgeText,
+                                { color: getStatusColor(displayStatus) },
+                              ]}
+                            >
+                              {displayStatus}
+                            </Text>
+                          </View>
+                        )
+                      )}
+                    </View>
                   </View>
+                  <Text style={styles.punchTime}>
+                    {formatRDTimeShort(new Date(punch.createdDate))}
+                  </Text>
                 </View>
-                <Text style={styles.punchTime}>
-                  {formatRDTimeShort(new Date(punch.createdDate))}
-                </Text>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
       </ScrollView>
