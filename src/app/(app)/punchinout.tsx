@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import type {
+  School,
   SchoolSettings,
   SchoolUser,
   UserSchedule,
@@ -349,6 +350,26 @@ function getPunctuality(
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Distancia en metros entre dos coordenadas (fórmula de Haversine). */
+const getDistanceInMeters = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number => {
+  const R = 6371e3; // Radio de la Tierra en metros
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
 const getCurrentCoordinates = async (): Promise<{
   latitude: number;
   longitude: number;
@@ -427,6 +448,26 @@ export default function PunchInOut() {
   const tolWorkOut = schoolSettings?.toleranceWorkTimeOut ?? 1;
   const tolLunchIn = schoolSettings?.toleranceLunchTimeIn ?? 5;
   const tolLunchOut = schoolSettings?.toleranceLunchTimeOut ?? 5;
+
+  // Geocerca: coordenadas de la sede y radio permitido (metros, default 100m)
+  const schoolObj: School | undefined = schoolUser?.school ?? user?.school;
+  const schoolLatitude: number = Number(
+    schoolObj?.schoolLatitude ??
+      schoolObj?.latitude ??
+      schoolSettings?.schoolLatitude,
+  );
+  const schoolLongitude: number = Number(
+    schoolObj?.schoolLongitude ??
+      schoolObj?.longitude ??
+      schoolSettings?.schoolLongitude,
+  );
+  const geofenceRadiusMeters: number = Number(
+    schoolSettings?.toleranceRadius ??
+      schoolSettings?.radioPermitido ??
+      schoolObj?.toleranceRadius ??
+      schoolObj?.radioPermitido ??
+      100,
+  );
 
   // Datos del usuario autenticado
   const userName: string = (user as any)?.name
@@ -773,7 +814,59 @@ export default function PunchInOut() {
       tolLunchOut,
     });
 
-    // ── 1) Validación de FOTO (si es obligatoria) ─────────────────────────────
+    // ── 1) Validación de UBICACIÓN + GEOCERCA (si la institución la exige) ───
+    // Pre-validación antes del POST: si el usuario está fuera del radio permitido
+    // se aborta inmediatamente, sin ejecutar la captura de foto ni el axios.post.
+    let coords: { latitude: number; longitude: number } | null = null;
+    if (locationRequired) {
+      coords = await getCurrentCoordinates();
+      if (!coords) {
+        console.warn(
+          "BLOQUEO: Ubicación requerida sin coordenadas — se aborta el ponche",
+        );
+        return;
+      }
+      console.log("COORDENADAS OBTENIDAS:", coords);
+
+      // Cálculo de geocerca: solo si la sede tiene coordenadas configuradas
+      if (Number.isFinite(schoolLatitude) && Number.isFinite(schoolLongitude)) {
+        const distanciaMetros = getDistanceInMeters(
+          coords.latitude,
+          coords.longitude,
+          schoolLatitude,
+          schoolLongitude,
+        );
+        const radioPermitido = geofenceRadiusMeters;
+        const dentroDeGeocerca = distanciaMetros <= radioPermitido;
+
+        console.log("📏 DISTANCIA A LA SEDE:", {
+          userCoords: coords,
+          schoolCoords: { lat: schoolLatitude, lng: schoolLongitude },
+          distanciaMetros: Math.round(distanciaMetros),
+          radioPermitido,
+          dentroDeGeocerca,
+        });
+
+        if (!dentroDeGeocerca) {
+          console.warn(
+            "BLOQUEO GEOCERCA: Usuario fuera del radio permitido — se aborta el ponche",
+            { distanciaMetros: Math.round(distanciaMetros), radioPermitido },
+          );
+          Alert.alert(
+            "Ubicación No Válida",
+            "Te encuentras fuera del área permitida para registrar tu asistencia. Acércate a la institución.",
+          );
+          return;
+        }
+      } else {
+        console.warn(
+          "GEOCERCA: No hay coordenadas de sede configuradas — se omite la validación de distancia",
+          { schoolLatitude, schoolLongitude },
+        );
+      }
+    }
+
+    // ── 2) Validación de FOTO (si es obligatoria) ─────────────────────────────
     // Bloqueo estricto: si la captura falla, se cancela o no hay base64,
     // se aborta inmediatamente y NO se envía el POST /punches.
     let photo: ImagePicker.ImagePickerAsset | null = null;
@@ -839,19 +932,6 @@ export default function PunchInOut() {
       });
     }
 
-    // ── 2) Validación de UBICACIÓN (si la institución la exige) ───────────────
-    let coords: { latitude: number; longitude: number } | null = null;
-    if (locationRequired) {
-      coords = await getCurrentCoordinates();
-      if (!coords) {
-        console.warn(
-          "BLOQUEO: Ubicación requerida sin coordenadas — se aborta el ponche",
-        );
-        return;
-      }
-      console.log("COORDENADAS OBTENIDAS:", coords);
-    }
-
     // ── 3) Ambas validaciones resueltas → construir payload y enviar ──────────
     setLoading(true);
     try {
@@ -876,10 +956,34 @@ export default function PunchInOut() {
         await fetchTodayPunches();
       } else {
         const msg: string = response.data.message ?? "Intenta de nuevo.";
+        const lowerMsg = msg.toLowerCase();
+
+        // Post-validación: si el backend rechaza por ubicación fuera de área,
+        // no se actualiza el historial y se lanza la alerta correspondiente.
+        const outOfAreaRejected =
+          isValidLocation &&
+          (response.data.isOutOfArea === true ||
+            response.data.status === "OUT_OF_AREA" ||
+            lowerMsg.includes("fuera de área") ||
+            lowerMsg.includes("fuera del área") ||
+            lowerMsg.includes("fuera del area") ||
+            lowerMsg.includes("out of area"));
+
+        if (outOfAreaRejected) {
+          console.warn(
+            "BLOQUEO POST-VALIDACIÓN: El backend rechazó el ponche por ubicación fuera de área",
+            { message: msg, response: response.data },
+          );
+          Alert.alert(
+            "Ubicación No Válida",
+            "Te encuentras fuera del área permitida para registrar tu asistencia. Acércate a la institución.",
+          );
+          return;
+        }
+
         // El backend pudo registrar el intento con "Error de Imagen"; sincronizar
         // para que el botón de entrada vuelva a quedar visible y habilitado.
         await fetchTodayPunches();
-        const lowerMsg = msg.toLowerCase();
         if (
           lowerMsg.includes("inicio de jornada activo") ||
           lowerMsg.includes("cerrar la jornada")

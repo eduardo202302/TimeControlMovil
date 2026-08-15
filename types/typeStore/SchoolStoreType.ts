@@ -10,6 +10,10 @@ export interface SchoolSettings {
   toleranceWorkTimeOut?: number;
   toleranceLunchTimeIn?: number;
   toleranceLunchTimeOut?: number;
+  schoolLatitude?: number;
+  schoolLongitude?: number;
+  toleranceRadius?: number;
+  radioPermitido?: number;
   [key: string]: unknown;
 }
 
@@ -34,6 +38,12 @@ export interface School {
   email: string | null;
   phone: string;
   settings: SchoolSettings;
+  schoolLatitude?: number;
+  schoolLongitude?: number;
+  latitude?: number;
+  longitude?: number;
+  toleranceRadius?: number;
+  radioPermitido?: number;
   [key: string]: unknown;
 }
 
