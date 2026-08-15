@@ -4,6 +4,7 @@ import DateTimePicker, {
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import React, { useCallback, useEffect, useState } from "react";
@@ -47,6 +48,11 @@ interface PunchPayload {
   type: string;
   photourl?: string[];
   schedule?: UserSchedule;
+  latitude?: number;
+  longitude?: number;
+  createdDate?: string;
+  recordedDate?: string;
+  nextDayExit?: boolean;
 }
 
 // Santo Domingo = UTC-4, fijo, sin cambio de horario de verano
@@ -274,6 +280,37 @@ function isAlmuerzoVisible(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+const getCurrentCoordinates = async (): Promise<{
+  latitude: number;
+  longitude: number;
+} | null> => {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permiso Denegado",
+        "Se requiere acceso a la ubicación para registrar el ponche dentro del área permitida.",
+      );
+      return null;
+    }
+
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Highest,
+    });
+
+    return {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+    };
+  } catch (error) {
+    Alert.alert(
+      "Error de Ubicación",
+      "No se pudo obtener tu ubicación actual. Asegúrate de tener el GPS activado.",
+    );
+    return null;
+  }
+};
 
 export default function PunchInOut() {
   const [now, setNow] = useState(new Date());
@@ -679,9 +716,19 @@ export default function PunchInOut() {
 
     setLoading(true);
     try {
+      const coords = await getCurrentCoordinates();
+      if (!coords) {
+        setLoading(false);
+        return;
+      }
+
       const payload: PunchPayload = { type };
       if (photo?.base64) payload.photourl = [photo.base64];
       if (todaySchedule) payload.schedule = todaySchedule;
+      payload.latitude = coords.latitude;
+      payload.longitude = coords.longitude;
+
+      console.log("PAYLOAD CON GPS:", payload);
 
       const response = await axios.post(`${urlColegio}/punches`, payload, {
         headers: {
