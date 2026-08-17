@@ -31,6 +31,12 @@ export interface UserSchedule {
   [key: string]: unknown;
 }
 
+export interface Address {
+  latitude?: number;
+  longitude?: number;
+  [key: string]: unknown;
+}
+
 export interface School {
   id: number;
   name: string;
@@ -44,6 +50,8 @@ export interface School {
   longitude?: number;
   toleranceRadius?: number;
   radioPermitido?: number;
+  // La sede guarda su ubicación como objeto (no array, a diferencia de SchoolUser/User)
+  address?: Address;
   [key: string]: unknown;
 }
 
@@ -76,6 +84,8 @@ export interface SchoolUser {
   latitude?: number;
   longitude?: number;
   toleranceRadius?: number;
+  // Ubicación designada del usuario: arreglo (a diferencia de School.address, que es objeto)
+  address?: Address[];
   [key: string]: unknown;
 }
 
@@ -96,6 +106,7 @@ export interface User {
   latitude?: number;
   longitude?: number;
   toleranceRadius?: number;
+  address?: Address[];
   [key: string]: unknown;
 }
 

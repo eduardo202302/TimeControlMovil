@@ -31,7 +31,6 @@ const loginAuthentication = async (data: LoginType) => {
       await Storage.setItemAsync("user", JSON.stringify(responseData.user));
 
       // Guardar foto desde schoolUsers
-      console.log("Datos de schoolUsers:", responseData.user?.schoolUsers?.[0]);
       const schoolUser = responseData.user?.schoolUsers?.[0];
       if (schoolUser?.photourl) {
         await Storage.setItemAsync("photourl", schoolUser.photourl);

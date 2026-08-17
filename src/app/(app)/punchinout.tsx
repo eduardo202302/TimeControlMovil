@@ -450,31 +450,47 @@ export default function PunchInOut() {
     SchoolSettings | undefined
   >(() => schoolUser?.school?.settings ?? user?.school?.settings);
   const schoolUserSettings = schoolUser?.settings;
-  // La foto es obligatoria solo si AMBOS settings lo exigen
-  const isImageRequired: boolean =
-    Boolean(schoolSettings?.isImageRequired) &&
-    Boolean(schoolUserSettings?.isImageRequired);
-  // La ubicación se valida solo si AMBOS settings lo exigen
-  const isValidLocation: boolean =
-    Boolean(schoolSettings?.isValidLocation) &&
-    Boolean(schoolUserSettings?.isValidLocation);
+  // Los settings son individuales por usuario (schoolUserSettings) — esa es la
+  // fuente de verdad. schoolSettings (sede) es solo el default general cuando
+  // el usuario no tiene el campo configurado. NUNCA usar AND entre ambos: un
+  // usuario con isImageRequired=false explícito no debe heredar el true de la sede.
+  const isImageRequired: boolean = Boolean(
+    schoolUserSettings?.isImageRequired ?? schoolSettings?.isImageRequired,
+  );
+  const isValidLocation: boolean = Boolean(
+    schoolUserSettings?.isValidLocation ?? schoolSettings?.isValidLocation,
+  );
 
-  // Tolerancias de tiempo desde school.settings (backend). Fallback UX: 1 min jornada, 5 min almuerzo
-  const tolWorkIn = schoolSettings?.toleranceWorkTimeIn ?? 1;
-  const tolWorkOut = schoolSettings?.toleranceWorkTimeOut ?? 1;
-  const tolLunchIn = schoolSettings?.toleranceLunchTimeIn ?? 5;
-  const tolLunchOut = schoolSettings?.toleranceLunchTimeOut ?? 5;
+  // Tolerancias de tiempo: usuario → sede → default UX (1 min jornada, 5 min almuerzo)
+  const tolWorkIn =
+    schoolUserSettings?.toleranceWorkTimeIn ??
+    schoolSettings?.toleranceWorkTimeIn ??
+    1;
+  const tolWorkOut =
+    schoolUserSettings?.toleranceWorkTimeOut ??
+    schoolSettings?.toleranceWorkTimeOut ??
+    1;
+  const tolLunchIn =
+    schoolUserSettings?.toleranceLunchTimeIn ??
+    schoolSettings?.toleranceLunchTimeIn ??
+    5;
+  const tolLunchOut =
+    schoolUserSettings?.toleranceLunchTimeOut ??
+    schoolSettings?.toleranceLunchTimeOut ??
+    5;
 
-  // Geocerca: coordenadas de la sede y radio permitido (metros, default 100m)
+  // Geocerca: coordenadas de la sede y radio permitido (metros, default 200m)
   const schoolObj: School | undefined = schoolUser?.school ?? user?.school;
   const schoolLatitude: number = Number(
     schoolObj?.schoolLatitude ??
       schoolObj?.latitude ??
+      schoolObj?.address?.latitude ??
       schoolSettings?.schoolLatitude,
   );
   const schoolLongitude: number = Number(
     schoolObj?.schoolLongitude ??
       schoolObj?.longitude ??
+      schoolObj?.address?.longitude ??
       schoolSettings?.schoolLongitude,
   );
   const geofenceRadiusMeters: number = Number(
@@ -482,7 +498,7 @@ export default function PunchInOut() {
       schoolSettings?.radioPermitido ??
       schoolObj?.toleranceRadius ??
       schoolObj?.radioPermitido ??
-      100,
+      200,
   );
 
   // ── Resolución jerárquica de geocerca ────────────────────────────────────
@@ -497,8 +513,14 @@ export default function PunchInOut() {
   }
 
   const getTargetGeofenceLocation = (): GeofenceTarget => {
-    const userLat = Number(schoolUser?.latitude ?? user?.latitude);
-    const userLng = Number(schoolUser?.longitude ?? user?.longitude);
+    // La ubicación designada del usuario vive en address[0] (arreglo), no en
+    // latitude/longitude sueltos — forma distinta a la de School.address (objeto).
+    const userLat = Number(
+      schoolUser?.address?.[0]?.latitude ?? user?.address?.[0]?.latitude,
+    );
+    const userLng = Number(
+      schoolUser?.address?.[0]?.longitude ?? user?.address?.[0]?.longitude,
+    );
     const hasUserLocation =
       !isNaN(userLat) && !isNaN(userLng) && userLat !== 0 && userLng !== 0;
 
@@ -696,6 +718,10 @@ export default function PunchInOut() {
       const response = await axios.get(`${urlColegio}/punches/today`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      console.log("TODAY PUNCHES RESPONSE:", {
+        clientTimestamp: new Date().toISOString(),
+        data: response.data,
+      });
       if (response.data.success) {
         const data: PunchEvent[] = response.data.data ?? [];
         setPunches(data);
@@ -845,10 +871,9 @@ export default function PunchInOut() {
     const types = PUNCH_TYPE_MAP[selectedCategory];
     const type = isInicio ? types.inicio : types.fin;
 
-    // La foto solo se exige en la entrada (InicioJornada) y si ambos settings lo permiten;
-    // al marcar salida nunca se pide foto
-    const imageRequiredForType = isImageRequired && type === "InicioJornada";
-    // La ubicación solo se exige si la institución la exige en ambos settings
+    // La foto solo se exige en entrada (cualquier categoría: Jornada, Almuerzo,
+    // Break), nunca en salida — confirmado con negocio.
+    const imageRequiredForType = isImageRequired && isInicio;
     const locationRequired = isValidLocation;
 
     console.log("CONFIG SEDE:", {
@@ -927,11 +952,24 @@ export default function PunchInOut() {
           );
           return;
         }
-      } else if (targetGeo.source === "COMPANY_HEADQUARTERS") {
-        console.warn(
-          "GEOCERCA: La empresa/sede no tiene coordenadas configuradas — se omite la validación de distancia",
-          { schoolLatitude, schoolLongitude },
+      } else {
+        // isValidLocation es una exigencia explícita — sin coordenadas de
+        // referencia (ni usuario ni sede) no se puede validar, así que se
+        // bloquea el ponche en vez de omitir la validación en silencio.
+        console.error(
+          "BLOQUEO GEOCERCA: Sin coordenadas de referencia (usuario ni sede) para validar — se aborta el ponche",
+          {
+            source: targetGeo.source,
+            schoolLatitude,
+            schoolLongitude,
+            targetGeo,
+          },
         );
+        Alert.alert(
+          "Error de Configuración",
+          "No se pudo determinar el área permitida, contacta al administrador.",
+        );
+        return;
       }
     }
 
@@ -1012,16 +1050,24 @@ export default function PunchInOut() {
         payload.longitude = coords.longitude;
       }
 
-      console.log(
-        "PAYLOAD COMPLETO QUE SALE:",
-        JSON.stringify(payload, null, 2),
-      );
+      console.log("PUNCH REQUEST:", {
+        type,
+        clientTimestamp: new Date().toISOString(),
+        payload,
+      });
 
       const response = await axios.post(`${urlColegio}/punches`, payload, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+      });
+
+      console.log("PUNCH RESPONSE:", {
+        type,
+        clientTimestamp: new Date().toISOString(),
+        status: response.status,
+        data: response.data,
       });
 
       if (response.data.success) {
@@ -1056,6 +1102,26 @@ export default function PunchInOut() {
         // El backend pudo registrar el intento con "Error de Imagen"; sincronizar
         // para que el botón de entrada vuelva a quedar visible y habilitado.
         await fetchTodayPunches();
+
+        // El backend rechazó por foto no coincidente con el perfil — interpretar
+        // su respuesta con un mensaje claro en vez del Alert genérico.
+        const imageMismatchRejected =
+          isImageRequired &&
+          (response.data.status === "Error de Imagen" ||
+            lowerMsg.includes("imagen"));
+
+        if (imageMismatchRejected) {
+          console.warn(
+            "BLOQUEO POST-VALIDACIÓN: El backend rechazó el ponche por foto no coincidente con el perfil",
+            { message: msg, response: response.data },
+          );
+          Alert.alert(
+            "Foto No Válida",
+            "La foto no coincide con tu perfil. Intenta de nuevo con una foto más clara.",
+          );
+          return;
+        }
+
         if (
           lowerMsg.includes("inicio de jornada activo") ||
           lowerMsg.includes("cerrar la jornada")
