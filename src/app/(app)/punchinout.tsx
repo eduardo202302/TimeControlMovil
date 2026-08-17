@@ -469,6 +469,45 @@ export default function PunchInOut() {
       100,
   );
 
+  // ── Resolución jerárquica de geocerca ────────────────────────────────────
+  // Prioridad: coordenadas del usuario (schoolUser → user) → fallback a sede/empresa
+  type GeofenceSource = "USER_CUSTOM_LOCATION" | "COMPANY_HEADQUARTERS";
+
+  interface GeofenceTarget {
+    targetLatitude: number;
+    targetLongitude: number;
+    source: GeofenceSource;
+    radius: number;
+  }
+
+  const getTargetGeofenceLocation = (): GeofenceTarget => {
+    const userLat = Number(schoolUser?.latitude ?? user?.latitude);
+    const userLng = Number(schoolUser?.longitude ?? user?.longitude);
+    const hasUserLocation =
+      !isNaN(userLat) && !isNaN(userLng) && userLat !== 0 && userLng !== 0;
+
+    if (hasUserLocation) {
+      return {
+        targetLatitude: userLat,
+        targetLongitude: userLng,
+        source: "USER_CUSTOM_LOCATION",
+        radius: Number(
+          schoolUser?.toleranceRadius ??
+            user?.toleranceRadius ??
+            geofenceRadiusMeters,
+        ),
+      };
+    }
+
+    // Fallback a la empresa / sede
+    return {
+      targetLatitude: schoolLatitude,
+      targetLongitude: schoolLongitude,
+      source: "COMPANY_HEADQUARTERS",
+      radius: geofenceRadiusMeters,
+    };
+  };
+
   // Datos del usuario autenticado
   const userName: string = (user as any)?.name
     ? `${(user as any).name}${(user as any)?.lastName ? " " + (user as any).lastName : ""}`
@@ -828,39 +867,55 @@ export default function PunchInOut() {
       }
       console.log("COORDENADAS OBTENIDAS:", coords);
 
-      // Cálculo de geocerca: solo si la sede tiene coordenadas configuradas
-      if (Number.isFinite(schoolLatitude) && Number.isFinite(schoolLongitude)) {
-        const distanciaMetros = getDistanceInMeters(
+      // Resolución jerárquica de geocerca: usuario → sede/empresa
+      const targetGeo = getTargetGeofenceLocation();
+      const hasValidTarget =
+        Number.isFinite(targetGeo.targetLatitude) &&
+        Number.isFinite(targetGeo.targetLongitude) &&
+        targetGeo.targetLatitude !== 0 &&
+        targetGeo.targetLongitude !== 0;
+
+      if (hasValidTarget) {
+        const distanceMeters = getDistanceInMeters(
           coords.latitude,
           coords.longitude,
-          schoolLatitude,
-          schoolLongitude,
+          targetGeo.targetLatitude,
+          targetGeo.targetLongitude,
         );
-        const radioPermitido = geofenceRadiusMeters;
-        const dentroDeGeocerca = distanciaMetros <= radioPermitido;
+        const dentroDeGeocerca = distanceMeters <= targetGeo.radius;
 
-        console.log("📏 DISTANCIA A LA SEDE:", {
-          userCoords: coords,
-          schoolCoords: { lat: schoolLatitude, lng: schoolLongitude },
-          distanciaMetros: Math.round(distanciaMetros),
-          radioPermitido,
+        console.log("🎯 REFERENCIA DE GEOCERCA APLICADA:", {
+          source: targetGeo.source,
+          targetCoords: {
+            lat: targetGeo.targetLatitude,
+            lng: targetGeo.targetLongitude,
+          },
+          userRealCoords: coords,
+          distanceMeters: Math.round(distanceMeters),
+          maxRadius: targetGeo.radius,
           dentroDeGeocerca,
         });
 
         if (!dentroDeGeocerca) {
           console.warn(
             "BLOQUEO GEOCERCA: Usuario fuera del radio permitido — se aborta el ponche",
-            { distanciaMetros: Math.round(distanciaMetros), radioPermitido },
+            {
+              source: targetGeo.source,
+              distanceMeters: Math.round(distanceMeters),
+              maxRadius: targetGeo.radius,
+            },
           );
           Alert.alert(
             "Ubicación No Válida",
-            "Te encuentras fuera del área permitida para registrar tu asistencia. Acércate a la institución.",
+            targetGeo.source === "USER_CUSTOM_LOCATION"
+              ? "Te encuentras fuera del área permitida para registrar tu asistencia. Acércate a la ubicación asignada."
+              : "Te encuentras fuera del área permitida para registrar tu asistencia. Acércate a la institución.",
           );
           return;
         }
-      } else {
+      } else if (targetGeo.source === "COMPANY_HEADQUARTERS") {
         console.warn(
-          "GEOCERCA: No hay coordenadas de sede configuradas — se omite la validación de distancia",
+          "GEOCERCA: La empresa/sede no tiene coordenadas configuradas — se omite la validación de distancia",
           { schoolLatitude, schoolLongitude },
         );
       }

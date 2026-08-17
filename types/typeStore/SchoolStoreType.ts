@@ -73,6 +73,9 @@ export interface SchoolUser {
   school: School;
   settings?: SchoolSettings;
   userSchedules?: UserSchedule[];
+  latitude?: number;
+  longitude?: number;
+  toleranceRadius?: number;
   [key: string]: unknown;
 }
 
@@ -90,6 +93,9 @@ export interface User {
   school: School;
   settings?: SchoolSettings;
   userSchedules?: UserSchedule[];
+  latitude?: number;
+  longitude?: number;
+  toleranceRadius?: number;
   [key: string]: unknown;
 }
 
