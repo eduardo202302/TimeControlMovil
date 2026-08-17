@@ -4,6 +4,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
+import * as Location from "expo-location";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -367,6 +368,55 @@ const getDistanceInMeters = (
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
+};
+
+/**
+ * Obtiene las coordenadas actuales con un timeout de 10s.
+ * Si el GPS no responde a tiempo, se aborta (null) en lugar de
+ * dejar la promesa colgada y el botón en carga infinita.
+ */
+const getCurrentCoordinates = async (): Promise<{
+  latitude: number;
+  longitude: number;
+} | null> => {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permiso Denegado",
+        "Se requiere acceso a la ubicación para registrar el ponche dentro del área permitida.",
+      );
+      return null;
+    }
+
+    const location = await Promise.race([
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      }),
+      new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), 10_000),
+      ),
+    ]);
+
+    if (!location) {
+      Alert.alert(
+        "Error de Ubicación",
+        "No se pudo obtener tu ubicación en el tiempo esperado. Asegúrate de tener el GPS activado y buena señal.",
+      );
+      return null;
+    }
+
+    return {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+    };
+  } catch (error) {
+    Alert.alert(
+      "Error de Ubicación",
+      "No se pudo obtener tu ubicación actual. Asegúrate de tener el GPS activado.",
+    );
+    return null;
+  }
 };
 
 export default function PunchInOut() {
@@ -817,6 +867,74 @@ export default function PunchInOut() {
       tolLunchOut,
     });
 
+    // ── 1) Validación de UBICACIÓN + GEOCERCA (si la institución la exige) ───
+    // Pre-validación antes del POST: si el usuario está fuera del radio permitido
+    // se aborta inmediatamente, sin ejecutar la captura de foto ni el axios.post.
+    let coords: { latitude: number; longitude: number } | null = null;
+    if (locationRequired) {
+      coords = await getCurrentCoordinates();
+      if (!coords) {
+        console.warn(
+          "BLOQUEO: Ubicación requerida sin coordenadas — se aborta el ponche",
+        );
+        return;
+      }
+      console.log("COORDENADAS OBTENIDAS:", coords);
+
+      // Resolución jerárquica de geocerca: usuario → sede/empresa
+      const targetGeo = getTargetGeofenceLocation();
+      const hasValidTarget =
+        Number.isFinite(targetGeo.targetLatitude) &&
+        Number.isFinite(targetGeo.targetLongitude) &&
+        targetGeo.targetLatitude !== 0 &&
+        targetGeo.targetLongitude !== 0;
+
+      if (hasValidTarget) {
+        const distanceMeters = getDistanceInMeters(
+          coords.latitude,
+          coords.longitude,
+          targetGeo.targetLatitude,
+          targetGeo.targetLongitude,
+        );
+        const dentroDeGeocerca = distanceMeters <= targetGeo.radius;
+
+        console.log("🎯 REFERENCIA DE GEOCERCA APLICADA:", {
+          source: targetGeo.source,
+          targetCoords: {
+            lat: targetGeo.targetLatitude,
+            lng: targetGeo.targetLongitude,
+          },
+          userRealCoords: coords,
+          distanceMeters: Math.round(distanceMeters),
+          maxRadius: targetGeo.radius,
+          dentroDeGeocerca,
+        });
+
+        if (!dentroDeGeocerca) {
+          console.warn(
+            "BLOQUEO GEOCERCA: Usuario fuera del radio permitido — se aborta el ponche",
+            {
+              source: targetGeo.source,
+              distanceMeters: Math.round(distanceMeters),
+              maxRadius: targetGeo.radius,
+            },
+          );
+          Alert.alert(
+            "Ubicación No Válida",
+            targetGeo.source === "USER_CUSTOM_LOCATION"
+              ? "Te encuentras fuera del área permitida para registrar tu asistencia. Acércate a la ubicación asignada."
+              : "Te encuentras fuera del área permitida para registrar tu asistencia. Acércate a la institución.",
+          );
+          return;
+        }
+      } else if (targetGeo.source === "COMPANY_HEADQUARTERS") {
+        console.warn(
+          "GEOCERCA: La empresa/sede no tiene coordenadas configuradas — se omite la validación de distancia",
+          { schoolLatitude, schoolLongitude },
+        );
+      }
+    }
+
     // ── 2) Validación de FOTO (si es obligatoria) ─────────────────────────────
     // Bloqueo estricto: si la captura falla, se cancela o no hay base64,
     // se aborta inmediatamente y NO se envía el POST /punches.
@@ -885,6 +1003,97 @@ export default function PunchInOut() {
 
     // ── 3) Ambas validaciones resueltas → construir payload y enviar ──────────
     setLoading(true);
+    try {
+      const payload: PunchPayload = { type };
+      if (photo?.base64) payload.photourl = [photo.base64];
+      if (todaySchedule) payload.schedule = todaySchedule;
+      if (coords) {
+        payload.latitude = coords.latitude;
+        payload.longitude = coords.longitude;
+      }
+
+      console.log(
+        "PAYLOAD COMPLETO QUE SALE:",
+        JSON.stringify(payload, null, 2),
+      );
+
+      const response = await axios.post(`${urlColegio}/punches`, payload, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.data.success) {
+        await fetchTodayPunches();
+      } else {
+        const msg: string = response.data.message ?? "Intenta de nuevo.";
+        const lowerMsg = msg.toLowerCase();
+
+        // Post-validación: si el backend rechaza por ubicación fuera de área,
+        // no se actualiza el historial y se lanza la alerta correspondiente.
+        const outOfAreaRejected =
+          isValidLocation &&
+          (response.data.isOutOfArea === true ||
+            response.data.status === "OUT_OF_AREA" ||
+            lowerMsg.includes("fuera de área") ||
+            lowerMsg.includes("fuera del área") ||
+            lowerMsg.includes("fuera del area") ||
+            lowerMsg.includes("out of area"));
+
+        if (outOfAreaRejected) {
+          console.warn(
+            "BLOQUEO POST-VALIDACIÓN: El backend rechazó el ponche por ubicación fuera de área",
+            { message: msg, response: response.data },
+          );
+          Alert.alert(
+            "Ubicación No Válida",
+            "Te encuentras fuera del área permitida para registrar tu asistencia. Acércate a la institución.",
+          );
+          return;
+        }
+
+        // El backend pudo registrar el intento con "Error de Imagen"; sincronizar
+        // para que el botón de entrada vuelva a quedar visible y habilitado.
+        await fetchTodayPunches();
+        if (
+          lowerMsg.includes("inicio de jornada activo") ||
+          lowerMsg.includes("cerrar la jornada")
+        ) {
+          // Jornada del día anterior sin cerrar → mostrar modal, sin Alert genérico
+          setNextDayExitModal(true);
+          return;
+        } else if (lowerMsg.includes("cambios en el horario")) {
+          Alert.alert(
+            "Horario modificado",
+            msg,
+            [{ text: "Aceptar", onPress: forceLogout }],
+            { cancelable: false },
+          );
+          return;
+        } else {
+          Alert.alert("Error", msg);
+        }
+      }
+    } catch (error: any) {
+      const rawMsg = error?.response?.data?.message ?? "Error de conexión.";
+      const msg: string =
+        typeof rawMsg === "string" ? rawMsg : JSON.stringify(rawMsg);
+      // Sincronizar igualmente en errores de red/servidor para no dejar la UI trabada
+      await fetchTodayPunches();
+      const lowerMsg = msg.toLowerCase();
+      if (
+        lowerMsg.includes("inicio de jornada activo") ||
+        lowerMsg.includes("cerrar la jornada")
+      ) {
+        // Jornada del día anterior sin cerrar → mostrar modal, sin Alert genérico
+        setNextDayExitModal(true);
+        return;
+      }
+      Alert.alert("Error", msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const visibleCategories = (
