@@ -1,5 +1,5 @@
 import axios from "axios";
-import * as SecureStore from "expo-secure-store";
+import * as Storage from "../../src/utils/storage";
 import { useSchoolStore } from "../../store/useSchoolStore";
 import {
   ValidaPin,
@@ -27,17 +27,17 @@ const loginAuthentication = async (data: LoginType) => {
     const { success, data: responseData, message } = response.data;
 
     if (success) {
-      await SecureStore.setItemAsync("token", responseData.token);
-      await SecureStore.setItemAsync("user", JSON.stringify(responseData.user));
+      await Storage.setItemAsync("token", responseData.token);
+      await Storage.setItemAsync("user", JSON.stringify(responseData.user));
 
       // Guardar foto desde schoolUsers
       console.log("Datos de schoolUsers:", responseData.user?.schoolUsers?.[0]);
       const schoolUser = responseData.user?.schoolUsers?.[0];
       if (schoolUser?.photourl) {
-        await SecureStore.setItemAsync("photourl", schoolUser.photourl);
+        await Storage.setItemAsync("photourl", schoolUser.photourl);
       }
       if (schoolUser?.s3Photo) {
-        await SecureStore.setItemAsync("s3Photo", schoolUser.s3Photo);
+        await Storage.setItemAsync("s3Photo", schoolUser.s3Photo);
       }
     }
 
@@ -78,8 +78,8 @@ const registerUser = async (data: RegisterType) => {
     const { success, data: responseData, message } = response.data;
 
     if (success) {
-      await SecureStore.setItemAsync("token", responseData.token);
-      await SecureStore.setItemAsync("user", JSON.stringify(responseData.user));
+      await Storage.setItemAsync("token", responseData.token);
+      await Storage.setItemAsync("user", JSON.stringify(responseData.user));
     }
 
     return { success, data: responseData, message };

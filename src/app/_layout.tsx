@@ -1,5 +1,5 @@
 import { Stack, router } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+import * as Storage from "../utils/storage";
 import { useEffect, useRef } from "react";
 import { useSchoolStore } from "../../store/useSchoolStore";
 
@@ -13,12 +13,12 @@ export default function RootLayout() {
   // ── Carga inicial: hidratar store desde SecureStore ──────────────────────────
   useEffect(() => {
     const checkAuthorization = async () => {
-      const isAuthorized = await SecureStore.getItemAsync("isAuthorized");
-      const schoolDataRaw = await SecureStore.getItemAsync("dataSchool");
-      const urlColegio = await SecureStore.getItemAsync("urlColegio");
-      const token = await SecureStore.getItemAsync("token");
-      const userRaw = await SecureStore.getItemAsync("user");
-      const menuItemsRaw = await SecureStore.getItemAsync("menuItems");
+      const isAuthorized = await Storage.getItemAsync("isAuthorized");
+      const schoolDataRaw = await Storage.getItemAsync("dataSchool");
+      const urlColegio = await Storage.getItemAsync("urlColegio");
+      const token = await Storage.getItemAsync("token");
+      const userRaw = await Storage.getItemAsync("user");
+      const menuItemsRaw = await Storage.getItemAsync("menuItems");
 
       if (schoolDataRaw) setSchool(JSON.parse(schoolDataRaw));
       if (urlColegio) setUrlColegio(urlColegio);
@@ -49,9 +49,9 @@ export default function RootLayout() {
       if (prevState.token !== null && state.token === null) {
         // Limpiar todas las claves de SecureStore que el layout usa
         await Promise.all([
-          SecureStore.deleteItemAsync("token"),
-          SecureStore.deleteItemAsync("user"),
-          SecureStore.deleteItemAsync("menuItems"),
+          Storage.deleteItemAsync("token"),
+          Storage.deleteItemAsync("user"),
+          Storage.deleteItemAsync("menuItems"),
           // isAuthorized NO se borra — es la autorización del dispositivo físico,
           // no de la sesión del usuario. Solo se borra si el dispositivo se revocan.
         ]);

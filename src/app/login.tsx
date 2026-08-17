@@ -2,7 +2,7 @@ import Authorization from "@/components/login/Authorization";
 import FormLogin from "@/components/login/FormLogin";
 import { BlurView } from "expo-blur";
 import { useFocusEffect } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+import * as Storage from "../utils/storage";
 import React, { useCallback, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -22,7 +22,7 @@ const Login = () => {
     useCallback(() => {
       const check = async () => {
         setChecking(true);
-        const isAuthorized = await SecureStore.getItemAsync("isAuthorized");
+        const isAuthorized = await Storage.getItemAsync("isAuthorized");
         // Si isAuthorized fue borrado por el logout → mostrar login directo
         setShowAuth(isAuthorized !== "true");
         setChecking(false);

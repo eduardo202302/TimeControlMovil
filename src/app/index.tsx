@@ -1,5 +1,5 @@
 import { Redirect } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+import * as Storage from "../utils/storage";
 import { useEffect, useState } from "react";
 
 export default function Index() {
@@ -7,8 +7,8 @@ export default function Index() {
 
   useEffect(() => {
     const check = async () => {
-      const isAuthorized = await SecureStore.getItemAsync("isAuthorized");
-      const token = await SecureStore.getItemAsync("token");
+      const isAuthorized = await Storage.getItemAsync("isAuthorized");
+      const token = await Storage.getItemAsync("token");
 
       if (isAuthorized === "true" && token) {
         setTarget("/home");

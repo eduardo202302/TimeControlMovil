@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { usePathname, useRouter } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+import * as Storage from "../../utils/storage";
 import React, { useCallback, useState } from "react";
 import {
   Alert,
@@ -157,9 +157,9 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
 const confirmLogout = useCallback(async () => {
   setLogoutModalVisible(false);
   onClose();
-  await SecureStore.deleteItemAsync("token");
-  await SecureStore.deleteItemAsync("user");
-  await SecureStore.deleteItemAsync("menuItems");
+  await Storage.deleteItemAsync("token");
+  await Storage.deleteItemAsync("user");
+  await Storage.deleteItemAsync("menuItems");
   logout();
   router.replace("/login");
 }, [logout, onClose, router]);

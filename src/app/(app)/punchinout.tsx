@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+import * as Storage from "../../utils/storage";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -329,7 +329,7 @@ export default function PunchInOut() {
   const getToken = useCallback(async (): Promise<string | null> => {
     const storeToken = useSchoolStore.getState().token;
     if (storeToken) return storeToken;
-    return await SecureStore.getItemAsync("token");
+    return await Storage.getItemAsync("token");
   }, []);
 
   const handleLogout = useCallback(() => {
@@ -340,9 +340,9 @@ export default function PunchInOut() {
         style: "destructive",
         onPress: async () => {
           await Promise.all([
-            SecureStore.deleteItemAsync("token"),
-            SecureStore.deleteItemAsync("user"),
-            SecureStore.deleteItemAsync("menuItems"),
+            Storage.deleteItemAsync("token"),
+            Storage.deleteItemAsync("user"),
+            Storage.deleteItemAsync("menuItems"),
             // isAuthorized NO se borra — es la autorización del dispositivo físico
           ]);
           logout();
@@ -355,9 +355,9 @@ export default function PunchInOut() {
   const forceLogout = useCallback(async () => {
     // Limpiar SecureStore y store, luego navegar a login directamente
     await Promise.all([
-      SecureStore.deleteItemAsync("token"),
-      SecureStore.deleteItemAsync("user"),
-      SecureStore.deleteItemAsync("menuItems"),
+      Storage.deleteItemAsync("token"),
+      Storage.deleteItemAsync("user"),
+      Storage.deleteItemAsync("menuItems"),
       // isAuthorized NO se borra — es la autorización del dispositivo físico,
       // no de la sesión del usuario.
     ]);
@@ -405,7 +405,7 @@ export default function PunchInOut() {
       if (alertShown) return;
       try {
         // Leer token directo de SecureStore — evita race condition con el store
-        const token = await SecureStore.getItemAsync("token");
+        const token = await Storage.getItemAsync("token");
         if (!token) return;
 
         const rawAxios = axios.create();
@@ -468,7 +468,7 @@ export default function PunchInOut() {
 
   useEffect(() => {
     const loadData = async () => {
-      const foto = await SecureStore.getItemAsync("photourl");
+      const foto = await Storage.getItemAsync("photourl");
       console.log("photourl:", foto);
       setPhoneImagen(foto);
     };

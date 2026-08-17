@@ -1,11 +1,11 @@
 import axios from "axios";
-import * as SecureStore from "expo-secure-store";
+import * as Storage from "../utils/storage";
 
 export const getStudents = async () => {
   try {
     // 🔐 obtener datos guardados del login
-    const url = await SecureStore.getItemAsync("urlColegio");
-    const token = await SecureStore.getItemAsync("token");
+    const url = await Storage.getItemAsync("urlColegio");
+    const token = await Storage.getItemAsync("token");
 
     // 🚀 petición al backend
     const response = await axios.get(`${url}/students`, {

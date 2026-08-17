@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import * as SecureStore from "expo-secure-store";
+import * as Storage from "../../utils/storage";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
@@ -48,9 +48,9 @@ export default function FormLogin({ name, image }: FormLoginProps) {
 
   useEffect(() => {
     const cargarCredenciales = async () => {
-      const usuarioGuardado = await SecureStore.getItemAsync("usuario");
-      const passwordGuardado = await SecureStore.getItemAsync("password");
-      const recordar = await SecureStore.getItemAsync("recordarme");
+      const usuarioGuardado = await Storage.getItemAsync("usuario");
+      const passwordGuardado = await Storage.getItemAsync("password");
+      const recordar = await Storage.getItemAsync("recordarme");
       if (recordar === "true" && usuarioGuardado && passwordGuardado) {
         setValue("usuario", usuarioGuardado);
         setValue("password", passwordGuardado);
@@ -112,11 +112,11 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         console.log("menuTree:", JSON.stringify(menuTree, null, 2));
 
         // Persistir en SecureStore
-        await SecureStore.setItemAsync("isAuthorized", "true");
-        await SecureStore.setItemAsync("token", token);
-        await SecureStore.setItemAsync("urlColegio", currentUrl);
-        await SecureStore.setItemAsync("user", JSON.stringify(fullUser));
-        await SecureStore.setItemAsync("menuItems", JSON.stringify(menuItems));
+        await Storage.setItemAsync("isAuthorized", "true");
+        await Storage.setItemAsync("token", token);
+        await Storage.setItemAsync("urlColegio", currentUrl);
+        await Storage.setItemAsync("user", JSON.stringify(fullUser));
+        await Storage.setItemAsync("menuItems", JSON.stringify(menuItems));
 
         setMensaje({
           texto: "Autenticación exitosa. Redirigiendo...",
@@ -126,13 +126,13 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         router.replace("/punchinout" as never);
 
         if (remember) {
-          await SecureStore.setItemAsync("usuario", data.usuario);
-          await SecureStore.setItemAsync("password", data.password);
-          await SecureStore.setItemAsync("recordarme", "true");
+          await Storage.setItemAsync("usuario", data.usuario);
+          await Storage.setItemAsync("password", data.password);
+          await Storage.setItemAsync("recordarme", "true");
         } else {
-          await SecureStore.deleteItemAsync("usuario");
-          await SecureStore.deleteItemAsync("password");
-          await SecureStore.deleteItemAsync("recordarme");
+          await Storage.deleteItemAsync("usuario");
+          await Storage.deleteItemAsync("password");
+          await Storage.deleteItemAsync("recordarme");
         }
       } else {
         setMensaje({
