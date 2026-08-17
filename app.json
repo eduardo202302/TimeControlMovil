@@ -48,9 +48,6 @@
       "@react-native-community/datetimepicker",
       "expo-font",
       "expo-image",
-<<<<<<< HEAD
-      "expo-web-browser"
-=======
       "expo-status-bar",
       "expo-web-browser",
       [
@@ -59,7 +56,6 @@
           "locationWhenInUsePermission": "Esta aplicación requiere acceso a tu ubicación para validar que el ponche se realice dentro del área permitida de la institución."
         }
       ]
->>>>>>> e14914a3ef83ba38efde4755311e24ad94a4c2e1
     ],
     "experiments": {
       "typedRoutes": true,
