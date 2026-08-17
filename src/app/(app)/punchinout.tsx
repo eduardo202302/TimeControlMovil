@@ -1,12 +1,11 @@
+import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
-import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import * as Storage from "../../utils/storage";
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -18,14 +17,16 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import type {
+  School,
   SchoolSettings,
   SchoolUser,
   UserSchedule,
 } from "../../../types/typeStore/SchoolStoreType";
+import * as Storage from "../../utils/storage";
 
 type Category = "Jornada" | "Almuerzo" | "Break";
 
@@ -47,6 +48,11 @@ interface PunchPayload {
   type: string;
   photourl?: string[];
   schedule?: UserSchedule;
+  latitude?: number;
+  longitude?: number;
+  createdDate?: string;
+  recordedDate?: string;
+  nextDayExit?: boolean;
 }
 
 // Santo Domingo = UTC-4, fijo, sin cambio de horario de verano
@@ -273,7 +279,95 @@ function isAlmuerzoVisible(
   return current >= windowStart && current <= windowEnd;
 }
 
+// ─── Puntualidad del ponche ──────────────────────────────────────────────────
+
+interface ToleranceConfig {
+  workIn: number;
+  workOut: number;
+  lunchIn: number;
+  lunchOut: number;
+}
+
+type PunctualityStatus = "Tardanza" | "Anticipada" | "A Tiempo";
+
+function getScheduleForDay(
+  schedules: UserSchedule[],
+  date: Date,
+): UserSchedule | null {
+  const dayName = WEEK_DAYS[getRDDayIndex(date)];
+  return schedules.find((s) => s.weekDay === dayName) ?? null;
+}
+
+/**
+ * Calcula la puntualidad del ponche comparando la hora registrada (en RD)
+ * contra el horario del día correspondiente. Devuelve null cuando no hay
+ * horario aplicable (ej. Break, días sin schedule) para dejar que la UI
+ * use el estado que devuelva el backend.
+ */
+function getPunctuality(
+  punch: PunchEvent,
+  schedules: UserSchedule[],
+  defaults: ToleranceConfig,
+): PunctualityStatus | null {
+  const punchDate = new Date(punch.createdDate);
+  const schedule = getScheduleForDay(schedules, punchDate);
+  if (!schedule) return null;
+
+  const punchMinutes = getRDMinutes(punchDate);
+
+  switch (punch.type) {
+    case "InicioJornada":
+      return punchMinutes >
+        timeStrToMinutes(schedule.workEntryTime) +
+          (schedule.toleranceWorkTimeIn ?? defaults.workIn)
+        ? "Tardanza"
+        : "A Tiempo";
+    case "FinJornada":
+      return punchMinutes <
+        timeStrToMinutes(schedule.workExitTime) -
+          (schedule.toleranceWorkTimeOut ?? defaults.workOut)
+        ? "Anticipada"
+        : "A Tiempo";
+    case "InicioAlmuerzo":
+      if (!schedule.lunchEntryTime) return null;
+      return punchMinutes >
+        timeStrToMinutes(schedule.lunchEntryTime) +
+          (schedule.toleranceLunchTimeIn ?? defaults.lunchIn)
+        ? "Tardanza"
+        : "A Tiempo";
+    case "FinAlmuerzo":
+      if (!schedule.lunchExitTime) return null;
+      return punchMinutes >
+        timeStrToMinutes(schedule.lunchExitTime) +
+          (schedule.toleranceLunchTimeOut ?? defaults.lunchOut)
+        ? "Tardanza"
+        : "A Tiempo";
+    default:
+      return null;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Distancia en metros entre dos coordenadas (fórmula de Haversine). */
+const getDistanceInMeters = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number => {
+  const R = 6371e3; // Radio de la Tierra en metros
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
 
 export default function PunchInOut() {
   const [now, setNow] = useState(new Date());
@@ -297,27 +391,88 @@ export default function PunchInOut() {
   // El login devuelve los horarios en user.schoolUsers[0].userSchedules
   const schoolUser: SchoolUser | undefined = user?.user?.schoolUsers?.[0];
   const userSchedules: UserSchedule[] =
-    schoolUser?.userSchedules ??
-    user?.userSchedules ??
-    [];
+    schoolUser?.userSchedules ?? user?.userSchedules ?? [];
   const todaySchedule = getTodaySchedule(userSchedules, now);
   const jornadaIniciada = isJornadaActiva(punches);
 
   // Configuración de la escuela (school.settings) y del usuario (schoolUser.settings)
-  const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | undefined>(
-    () => schoolUser?.school?.settings ?? user?.school?.settings,
-  );
+  const [schoolSettings, setSchoolSettings] = useState<
+    SchoolSettings | undefined
+  >(() => schoolUser?.school?.settings ?? user?.school?.settings);
   const schoolUserSettings = schoolUser?.settings;
   // La foto es obligatoria solo si AMBOS settings lo exigen
   const isImageRequired: boolean =
     Boolean(schoolSettings?.isImageRequired) &&
     Boolean(schoolUserSettings?.isImageRequired);
+  // La ubicación se valida solo si AMBOS settings lo exigen
+  const isValidLocation: boolean =
+    Boolean(schoolSettings?.isValidLocation) &&
+    Boolean(schoolUserSettings?.isValidLocation);
 
   // Tolerancias de tiempo desde school.settings (backend). Fallback UX: 1 min jornada, 5 min almuerzo
   const tolWorkIn = schoolSettings?.toleranceWorkTimeIn ?? 1;
   const tolWorkOut = schoolSettings?.toleranceWorkTimeOut ?? 1;
   const tolLunchIn = schoolSettings?.toleranceLunchTimeIn ?? 5;
   const tolLunchOut = schoolSettings?.toleranceLunchTimeOut ?? 5;
+
+  // Geocerca: coordenadas de la sede y radio permitido (metros, default 100m)
+  const schoolObj: School | undefined = schoolUser?.school ?? user?.school;
+  const schoolLatitude: number = Number(
+    schoolObj?.schoolLatitude ??
+      schoolObj?.latitude ??
+      schoolSettings?.schoolLatitude,
+  );
+  const schoolLongitude: number = Number(
+    schoolObj?.schoolLongitude ??
+      schoolObj?.longitude ??
+      schoolSettings?.schoolLongitude,
+  );
+  const geofenceRadiusMeters: number = Number(
+    schoolSettings?.toleranceRadius ??
+      schoolSettings?.radioPermitido ??
+      schoolObj?.toleranceRadius ??
+      schoolObj?.radioPermitido ??
+      100,
+  );
+
+  // ── Resolución jerárquica de geocerca ────────────────────────────────────
+  // Prioridad: coordenadas del usuario (schoolUser → user) → fallback a sede/empresa
+  type GeofenceSource = "USER_CUSTOM_LOCATION" | "COMPANY_HEADQUARTERS";
+
+  interface GeofenceTarget {
+    targetLatitude: number;
+    targetLongitude: number;
+    source: GeofenceSource;
+    radius: number;
+  }
+
+  const getTargetGeofenceLocation = (): GeofenceTarget => {
+    const userLat = Number(schoolUser?.latitude ?? user?.latitude);
+    const userLng = Number(schoolUser?.longitude ?? user?.longitude);
+    const hasUserLocation =
+      !isNaN(userLat) && !isNaN(userLng) && userLat !== 0 && userLng !== 0;
+
+    if (hasUserLocation) {
+      return {
+        targetLatitude: userLat,
+        targetLongitude: userLng,
+        source: "USER_CUSTOM_LOCATION",
+        radius: Number(
+          schoolUser?.toleranceRadius ??
+            user?.toleranceRadius ??
+            geofenceRadiusMeters,
+        ),
+      };
+    }
+
+    // Fallback a la empresa / sede
+    return {
+      targetLatitude: schoolLatitude,
+      targetLongitude: schoolLongitude,
+      source: "COMPANY_HEADQUARTERS",
+      radius: geofenceRadiusMeters,
+    };
+  };
 
   // Datos del usuario autenticado
   const userName: string = (user as any)?.name
@@ -421,10 +576,8 @@ export default function PunchInOut() {
           res.data?.data?.userSchedules ?? [];
 
         // Mantener los settings frescos del backend (tolerancias, etc.)
-        const freshSettings =
-          (res.data?.data?.school ?? res.data?.school)?.settings as
-            | SchoolSettings
-            | undefined;
+        const freshSettings = (res.data?.data?.school ?? res.data?.school)
+          ?.settings as SchoolSettings | undefined;
         if (freshSettings) setSchoolSettings(freshSettings);
 
         // Comparar solo los campos relevantes (ignorar createdDate y campos extra)
@@ -645,97 +798,93 @@ export default function PunchInOut() {
     // La foto solo se exige en la entrada (InicioJornada) y si ambos settings lo permiten;
     // al marcar salida nunca se pide foto
     const imageRequiredForType = isImageRequired && type === "InicioJornada";
+    // La ubicación solo se exige si la institución la exige en ambos settings
+    const locationRequired = isValidLocation;
 
+    console.log("CONFIG SEDE:", {
+      isImageRequired: schoolSettings?.isImageRequired,
+      isValidLocation: schoolSettings?.isValidLocation,
+      schoolUserIsImageRequired: schoolUserSettings?.isImageRequired,
+      schoolUserIsValidLocation: schoolUserSettings?.isValidLocation,
+      imageRequiredForType,
+      locationRequired,
+    });
+    console.log("SCHEDULE SELECCIONADO:", todaySchedule);
+    console.log("TOLERANCIAS:", {
+      tolWorkIn,
+      tolWorkOut,
+      tolLunchIn,
+      tolLunchOut,
+    });
+
+    // ── 2) Validación de FOTO (si es obligatoria) ─────────────────────────────
+    // Bloqueo estricto: si la captura falla, se cancela o no hay base64,
+    // se aborta inmediatamente y NO se envía el POST /punches.
     let photo: ImagePicker.ImagePickerAsset | null = null;
-
     if (imageRequiredForType) {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
+      try {
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          console.warn(
+            "BLOQUEO: Permiso de galería denegado — se aborta el ponche",
+          );
+          Alert.alert(
+            "Permiso requerido",
+            "Necesitas permitir el acceso a la galería para registrar tu asistencia.",
+          );
+          return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images"],
+          allowsEditing: false,
+          quality: 0.4,
+          base64: true,
+        });
+        if (result.canceled) {
+          console.warn(
+            "BLOQUEO: Captura cancelada por el usuario — se aborta el ponche",
+          );
+          Alert.alert(
+            "Foto requerida",
+            "Debes seleccionar una foto para registrar la jornada.",
+          );
+          return;
+        }
+        photo = result.assets[0] ?? null;
+      } catch (error) {
+        console.error("ERROR CAPTURA IMAGEN:", error);
         Alert.alert(
-          "Permiso requerido",
-          "Necesitas permitir el acceso a la galería para registrar tu asistencia.",
+          "Error de Imagen",
+          "No se pudo capturar la imagen. Intenta de nuevo.",
         );
         return;
       }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: false,
-        quality: 0.4,
-        base64: true,
-      });
-      if (result.canceled) return;
-      photo = result.assets[0] ?? null;
-    }
 
-    // Si la foto es obligatoria, no se envía el POST sin ella
-    if (imageRequiredForType && !photo?.base64) {
-      Alert.alert(
-        "Foto requerida",
-        "Debes seleccionar una foto para registrar la jornada.",
-      );
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const payload: PunchPayload = { type };
-      if (photo?.base64) payload.photourl = [photo.base64];
-      if (todaySchedule) payload.schedule = todaySchedule;
-
-      const response = await axios.post(`${urlColegio}/punches`, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (response.data.success) {
-        await fetchTodayPunches();
-      } else {
-        const msg: string = response.data.message ?? "Intenta de nuevo.";
-        // El backend pudo registrar el intento con "Error de Imagen"; sincronizar
-        // para que el botón de entrada vuelva a quedar visible y habilitado.
-        await fetchTodayPunches();
-        const lowerMsg = msg.toLowerCase();
-        if (
-          lowerMsg.includes("inicio de jornada activo") ||
-          lowerMsg.includes("cerrar la jornada")
-        ) {
-          // Jornada del día anterior sin cerrar → mostrar modal, sin Alert genérico
-          setNextDayExitModal(true);
-          return;
-        } else if (lowerMsg.includes("cambios en el horario")) {
-          Alert.alert(
-            "Horario modificado",
-            msg,
-            [{ text: "Aceptar", onPress: forceLogout }],
-            { cancelable: false },
-          );
-          return;
-        } else {
-          Alert.alert("Error", msg);
-        }
-      }
-    } catch (error: any) {
-      const rawMsg = error?.response?.data?.message ?? "Error de conexión.";
-      const msg: string =
-        typeof rawMsg === "string" ? rawMsg : JSON.stringify(rawMsg);
-      // Sincronizar igualmente en errores de red/servidor para no dejar la UI trabada
-      await fetchTodayPunches();
-      const lowerMsg = msg.toLowerCase();
-      if (
-        lowerMsg.includes("inicio de jornada activo") ||
-        lowerMsg.includes("cerrar la jornada")
-      ) {
-        // Jornada del día anterior sin cerrar → mostrar modal, sin Alert genérico
-        setNextDayExitModal(true);
+      // Sin base64 → no se puede adjuntar la foto → abortar sin POST
+      if (!photo?.base64) {
+        console.warn(
+          "BLOQUEO: Foto obligatoria sin base64 — se aborta el ponche",
+        );
+        Alert.alert(
+          "Foto requerida",
+          "Debes seleccionar una foto para registrar la jornada.",
+        );
         return;
       }
-      Alert.alert("Error", msg);
-    } finally {
-      setLoading(false);
+
+      console.log("DATOS IMAGEN CAPTURADA:", {
+        photourl: [photo.base64],
+        uri: photo.uri,
+        mimeType: photo.mimeType,
+        width: photo.width,
+        height: photo.height,
+        fileSize: photo.fileSize,
+      });
     }
+
+    // ── 3) Ambas validaciones resueltas → construir payload y enviar ──────────
+    setLoading(true);
   };
 
   const visibleCategories = (
@@ -744,7 +893,13 @@ export default function PunchInOut() {
     if (!jornadaIniciada && (cat === "Almuerzo" || cat === "Break"))
       return false;
     if (cat === "Almuerzo")
-      return isAlmuerzoVisible(now, todaySchedule, tolLunchIn, tolLunchOut, punches);
+      return isAlmuerzoVisible(
+        now,
+        todaySchedule,
+        tolLunchIn,
+        tolLunchOut,
+        punches,
+      );
     if (cat === "Jornada") return true;
     return true;
   });
@@ -782,8 +937,8 @@ export default function PunchInOut() {
                 ) : (
                   "de la jornada anterior"
                 )}
-                . Esto afecta tu puntuación del mes. Selecciona la hora a la
-                que saliste para cerrar la jornada.
+                . Esto afecta tu puntuación del mes. Selecciona la hora a la que
+                saliste para cerrar la jornada.
               </Text>
 
               <TouchableOpacity
@@ -1063,19 +1218,33 @@ export default function PunchInOut() {
             [...punches].reverse().map((punch) => {
               const hasOvertime = parseFloat(String(punch.overtime ?? 0)) > 0;
               // Solo FinJornada puede generar horas extras
-              const isJornadaOvertime = punch.type === "FinJornada" && hasOvertime;
-              // Regresar tarde del almuerzo nunca es horas extras → Tardanza
-              const isLunchLate = punch.type === "FinAlmuerzo" && hasOvertime;
-              // El break no tiene tiempo definido → siempre a tiempo
+              const isJornadaOvertime =
+                punch.type === "FinJornada" && hasOvertime;
+              // Puntualidad calculada localmente (corrige estados erróneos del backend)
+              const punctuality = getPunctuality(punch, userSchedules, {
+                workIn: tolWorkIn,
+                workOut: tolWorkOut,
+                lunchIn: tolLunchIn,
+                lunchOut: tolLunchOut,
+              });
+              // Prioridad: horas extras > error de imagen > puntualidad local >
+              // flags del backend (lateEntry/earlyExit) > status del backend
               const displayStatus = isJornadaOvertime
                 ? "Horas extras"
-                : isLunchLate
-                  ? "Tardanza"
-                  : punch.type === "FinBreak" && hasOvertime
-                    ? "A Tiempo"
-                    : punch.status;
+                : punch.status === "Error de Imagen"
+                  ? "Error de Imagen"
+                  : punctuality !== null
+                    ? punctuality
+                    : punch.lateEntry
+                      ? "Tardanza"
+                      : punch.earlyExit
+                        ? "Anticipada"
+                        : punch.type === "FinBreak"
+                          ? "A Tiempo"
+                          : punch.status || "A Tiempo";
               const isLateBadge =
-                displayStatus === "Tardanza" || displayStatus === "Error de Imagen";
+                displayStatus === "Tardanza" ||
+                displayStatus === "Error de Imagen";
               const isEarlyBadge = displayStatus === "Anticipada";
 
               return (

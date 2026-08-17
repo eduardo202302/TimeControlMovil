@@ -5,10 +5,15 @@ import { MenuItem, RoleItem } from "../typesMenu/MenuTypes";
 
 export interface SchoolSettings {
   isImageRequired?: boolean;
+  isValidLocation?: boolean;
   toleranceWorkTimeIn?: number;
   toleranceWorkTimeOut?: number;
   toleranceLunchTimeIn?: number;
   toleranceLunchTimeOut?: number;
+  schoolLatitude?: number;
+  schoolLongitude?: number;
+  toleranceRadius?: number;
+  radioPermitido?: number;
   [key: string]: unknown;
 }
 
@@ -33,6 +38,12 @@ export interface School {
   email: string | null;
   phone: string;
   settings: SchoolSettings;
+  schoolLatitude?: number;
+  schoolLongitude?: number;
+  latitude?: number;
+  longitude?: number;
+  toleranceRadius?: number;
+  radioPermitido?: number;
   [key: string]: unknown;
 }
 
@@ -62,6 +73,9 @@ export interface SchoolUser {
   school: School;
   settings?: SchoolSettings;
   userSchedules?: UserSchedule[];
+  latitude?: number;
+  longitude?: number;
+  toleranceRadius?: number;
   [key: string]: unknown;
 }
 
@@ -79,6 +93,9 @@ export interface User {
   school: School;
   settings?: SchoolSettings;
   userSchedules?: UserSchedule[];
+  latitude?: number;
+  longitude?: number;
+  toleranceRadius?: number;
   [key: string]: unknown;
 }
 

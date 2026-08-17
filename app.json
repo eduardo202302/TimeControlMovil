@@ -8,12 +8,17 @@
     "scheme": "timecontrolapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Esta aplicación requiere acceso a tu ubicación para validar que el ponche se realice dentro del área permitida de la institución."
+      }
     },
     "android": {
       "package": "com.timecontrol.movil",
       "permissions": [
-        "CAMERA"
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
       ],
       "icon": "./assets/images/logos/logo_adaptive.png",
       "adaptiveIcon": {
@@ -43,7 +48,18 @@
       "@react-native-community/datetimepicker",
       "expo-font",
       "expo-image",
+<<<<<<< HEAD
       "expo-web-browser"
+=======
+      "expo-status-bar",
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Esta aplicación requiere acceso a tu ubicación para validar que el ponche se realice dentro del área permitida de la institución."
+        }
+      ]
+>>>>>>> e14914a3ef83ba38efde4755311e24ad94a4c2e1
     ],
     "experiments": {
       "typedRoutes": true,
