@@ -95,6 +95,19 @@ const PUNCH_TYPE_MAP: Record<Category, { inicio: string; fin: string }> = {
   Break: { inicio: "InicioBreak", fin: "FinBreak" },
 };
 
+// Sesión máxima antes de forzar relogin en la primera Entrada Jornada del día,
+// para confirmar permisos/settings que un admin pudo haber cambiado.
+const SESSION_MAX_HOURS_FOR_FIRST_ENTRY = 12;
+
+function decodeJWT(token: string): Record<string, any> {
+  try {
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(base64));
+  } catch {
+    return {};
+  }
+}
+
 function toRD(date: Date) {
   const utc = date.getTime() + date.getTimezoneOffset() * 60000;
   const rd = new Date(utc - 4 * 60 * 60 * 1000);
@@ -393,9 +406,7 @@ const getCurrentCoordinates = async (): Promise<{
       Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       }),
-      new Promise<null>((resolve) =>
-        setTimeout(() => resolve(null), 10_000),
-      ),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
     ]);
 
     if (!location) {
@@ -871,9 +882,48 @@ export default function PunchInOut() {
     const types = PUNCH_TYPE_MAP[selectedCategory];
     const type = isInicio ? types.inicio : types.fin;
 
-    // La foto solo se exige en entrada (cualquier categoría: Jornada, Almuerzo,
-    // Break), nunca en salida — confirmado con negocio.
-    const imageRequiredForType = isImageRequired && isInicio;
+    // Si hay una jornada del día anterior sin cerrar, ese modal debe resolverse
+    // primero — el relogin por sesión vieja es el segundo paso, no el primero,
+    // cuando ambos casos coinciden.
+    const hasPendingOpenDay =
+      nextDayExitModal ||
+      punches.some(
+        (p) => p.hasOpenDay === true || p.hasOpenDay === ("true" as any),
+      );
+
+    // Antes de la primera Entrada Jornada del día: si la sesión actual lleva
+    // más de SESSION_MAX_HOURS_FOR_FIRST_ENTRY horas abierta, forzar relogin
+    // para confirmar permisos/settings que un admin pudo haber cambiado desde
+    // entonces. Solo aplica a esta transición — no a Almuerzo/Break/salida.
+    const isFirstJornadaEntryToday =
+      type === "InicioJornada" &&
+      !punches.some((p) => p.type === "InicioJornada") &&
+      !hasPendingOpenDay;
+
+    if (isFirstJornadaEntryToday) {
+      const jwtPayload = decodeJWT(token);
+      const iat = jwtPayload?.iat;
+      if (typeof iat === "number") {
+        const hoursSinceLogin = (Date.now() / 1000 - iat) / 3600;
+        if (hoursSinceLogin > SESSION_MAX_HOURS_FOR_FIRST_ENTRY) {
+          console.warn(
+            "BLOQUEO: Sesión desactualizada antes de la primera Entrada Jornada",
+            { hoursSinceLogin, iat },
+          );
+          Alert.alert(
+            "Sesión desactualizada",
+            "Debes iniciar sesión nuevamente para confirmar tus permisos de hoy.",
+            [{ text: "Aceptar", onPress: forceLogout }],
+            { cancelable: false },
+          );
+          return;
+        }
+      }
+    }
+
+    // La foto solo se exige en InicioJornada — no en Almuerzo/Break ni en
+    // ninguna salida — confirmado con negocio.
+    const imageRequiredForType = isImageRequired && type === "InicioJornada";
     const locationRequired = isValidLocation;
 
     console.log("CONFIG SEDE:", {
