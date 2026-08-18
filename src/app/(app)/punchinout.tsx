@@ -54,7 +54,16 @@ interface PunchPayload {
   createdDate?: string;
   recordedDate?: string;
   nextDayExit?: boolean;
+  tagId?: number;
 }
+
+interface Tag {
+  id: number;
+  name: string;
+  category?: { id?: number; name?: string } | null;
+}
+
+const BREAK_TAG_CATEGORY_NAME = "Tipos de Break";
 
 // Santo Domingo = UTC-4, fijo, sin cambio de horario de verano
 
@@ -446,6 +455,11 @@ export default function PunchInOut() {
   const [submittingExit, setSubmittingExit] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedTime, setSelectedTime] = useState(() => new Date());
+  const [breakTags, setBreakTags] = useState<Tag[]>([]);
+  const [selectedBreakTagId, setSelectedBreakTagId] = useState<number | null>(
+    null,
+  );
+  const [breakTagModalVisible, setBreakTagModalVisible] = useState(false);
 
   const { user, urlColegio, logout } = useSchoolStore();
 
@@ -721,6 +735,12 @@ export default function PunchInOut() {
     }
   }, [now, punches, todaySchedule, selectedCategory]);
 
+  // Motivo de break no debe sobrevivir un cambio de categoría — evita que un
+  // motivo elegido para un Break anterior quede preseleccionado en el siguiente.
+  useEffect(() => {
+    setSelectedBreakTagId(null);
+  }, [selectedCategory]);
+
   const fetchTodayPunches = useCallback(async () => {
     try {
       setLoadingPunches(true);
@@ -761,6 +781,35 @@ export default function PunchInOut() {
   useEffect(() => {
     fetchTodayPunches();
   }, [fetchTodayPunches]);
+
+  // Motivos de Break se traen frescos cada vez que se abre la pantalla — no se
+  // cachean entre sesiones, mismo criterio ya usado para settings de la sede.
+  const fetchBreakTags = useCallback(async () => {
+    try {
+      const token = await getToken();
+      if (!urlColegio || !token) return;
+      const response = await axios.get(`${urlColegio}/tags/all`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.data.success) {
+        const allTags: Tag[] = response.data.data ?? [];
+        setBreakTags(
+          allTags.filter(
+            (tag) => tag.category?.name === BREAK_TAG_CATEGORY_NAME,
+          ),
+        );
+      }
+    } catch (error: any) {
+      console.error(
+        "fetchBreakTags:",
+        error?.response?.data?.message ?? error?.message,
+      );
+    }
+  }, [urlColegio, getToken]);
+
+  useEffect(() => {
+    fetchBreakTags();
+  }, [fetchBreakTags]);
 
   const getNextPunchType = (category: Category): "inicio" | "fin" => {
     const types = PUNCH_TYPE_MAP[category];
@@ -881,6 +930,15 @@ export default function PunchInOut() {
 
     const types = PUNCH_TYPE_MAP[selectedCategory];
     const type = isInicio ? types.inicio : types.fin;
+
+    // Motivo de break obligatorio solo cuando la escuela tiene la categoría
+    // "Tipos de Break" configurada. Si breakTags viene vacío, es una decisión
+    // temporal explícita: no bloquear el Break hasta que se defina qué hacer
+    // con escuelas sin esta categoría configurada.
+    if (type === "InicioBreak" && breakTags.length > 0 && !selectedBreakTagId) {
+      Alert.alert("Motivo requerido", "Selecciona el motivo del break.");
+      return;
+    }
 
     // Si hay una jornada del día anterior sin cerrar, ese modal debe resolverse
     // primero — el relogin por sesión vieja es el segundo paso, no el primero,
@@ -1099,6 +1157,9 @@ export default function PunchInOut() {
         payload.latitude = coords.latitude;
         payload.longitude = coords.longitude;
       }
+      if (type === "InicioBreak" && selectedBreakTagId) {
+        payload.tagId = selectedBreakTagId;
+      }
 
       console.log("PUNCH REQUEST:", {
         type,
@@ -1121,6 +1182,7 @@ export default function PunchInOut() {
       });
 
       if (response.data.success) {
+        if (type === "InicioBreak") setSelectedBreakTagId(null);
         await fetchTodayPunches();
       } else {
         const msg: string = response.data.message ?? "Intenta de nuevo.";
@@ -1301,6 +1363,43 @@ export default function PunchInOut() {
           </View>
         </View>
       </Modal>
+      <Modal
+        visible={breakTagModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBreakTagModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.ndModalOverlay}
+          activeOpacity={1}
+          onPress={() => setBreakTagModalVisible(false)}
+        >
+          <View style={styles.ndModalCard}>
+            <View style={styles.ndModalHeader}>
+              <View style={styles.ndModalIconWrap}>
+                <Ionicons name="cafe-outline" size={22} color="#D97706" />
+              </View>
+              <Text style={styles.ndModalTitle}>Motivo del Break</Text>
+            </View>
+            {breakTags.map((tag) => (
+              <TouchableOpacity
+                key={tag.id}
+                style={styles.breakTagOption}
+                onPress={() => {
+                  setSelectedBreakTagId(tag.id);
+                  setBreakTagModalVisible(false);
+                }}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.breakTagOptionText}>{tag.name}</Text>
+                {selectedBreakTagId === tag.id && (
+                  <Ionicons name="checkmark" size={18} color="#2563EB" />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
       {showTimePicker && (
         <DateTimePicker
           value={selectedTime}
@@ -1474,6 +1573,30 @@ export default function PunchInOut() {
               );
             })}
           </View>
+
+          {selectedCategory === "Break" && isInicio && breakTags.length > 0 && (
+            <View style={styles.breakTagWrap}>
+              <Text style={styles.breakTagLabel}>Motivo del break</Text>
+              <TouchableOpacity
+                style={styles.breakTagSelector}
+                onPress={() => setBreakTagModalVisible(true)}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.breakTagSelectorText,
+                    selectedBreakTagId != null &&
+                      styles.breakTagSelectorTextValue,
+                  ]}
+                >
+                  {selectedBreakTagId
+                    ? breakTags.find((t) => t.id === selectedBreakTagId)?.name
+                    : "Selecciona un motivo"}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+          )}
 
           {(selectedCategory !== "Jornada" ||
             isJornadaVisible(
@@ -2108,4 +2231,34 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   ndModalBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
+  /* Break tag selector */
+  breakTagWrap: { marginTop: 12 },
+  breakTagLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6B7280",
+    marginBottom: 6,
+  },
+  breakTagSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  breakTagSelectorText: { fontSize: 15, fontWeight: "600", color: "#9CA3AF" },
+  breakTagSelectorTextValue: { color: "#111827" },
+  breakTagOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  breakTagOptionText: { fontSize: 15, fontWeight: "600", color: "#111827" },
 });
