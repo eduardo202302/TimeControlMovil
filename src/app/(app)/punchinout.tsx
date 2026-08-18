@@ -1285,14 +1285,6 @@ export default function PunchInOut() {
                 <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
               </TouchableOpacity>
 
-              {showTimePicker && (
-                <DateTimePicker
-                  value={selectedTime}
-                  mode="time"
-                  display={Platform.OS === "ios" ? "spinner" : "default"}
-                  onChange={handleTimeChange}
-                />
-              )}
             </View>
             <TouchableOpacity
               style={[styles.ndModalBtn, submittingExit && { opacity: 0.7 }]}
@@ -1309,6 +1301,14 @@ export default function PunchInOut() {
           </View>
         </View>
       </Modal>
+      {showTimePicker && (
+        <DateTimePicker
+          value={selectedTime}
+          mode="time"
+          display={Platform.OS === "ios" ? "spinner" : "default"}
+          onChange={handleTimeChange}
+        />
+      )}
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
