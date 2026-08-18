@@ -63,7 +63,7 @@ interface SectionProps {
 }
 
 function MenuSection({ section, onNavigate, pathname }: SectionProps) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const sectionIcon = getIcon(section.parent.icon);
   const hasChildren = section.children.length > 0;
   
@@ -108,6 +108,7 @@ function MenuSection({ section, onNavigate, pathname }: SectionProps) {
         <View style={styles.submenu}>
           {section.children.map((child) => {
             const isActive = pathname === child.path;
+            const childIcon = getIcon(child.icon);
             return (
               <TouchableOpacity
                 key={child.id}
@@ -115,6 +116,11 @@ function MenuSection({ section, onNavigate, pathname }: SectionProps) {
                 onPress={() => onNavigate(child.path)}
                 activeOpacity={0.7}
               >
+                <Ionicons
+                  name={childIcon}
+                  size={16}
+                  color={isActive ? "#2563EB" : "#9CA3AF"}
+                />
                 <Text
                   style={[styles.childText, isActive && styles.activeChildText]}
                 >
@@ -167,12 +173,6 @@ const confirmLogout = useCallback(async () => {
 
   return (
     <View style={styles.overlay}>
-      <TouchableOpacity
-        style={styles.backdrop}
-        activeOpacity={1}
-        onPress={onClose}
-      />
-
       <SafeAreaView style={styles.drawer}>
         {/* Header */}
         <View style={styles.header}>
@@ -279,6 +279,12 @@ const confirmLogout = useCallback(async () => {
           )}
         </ScrollView>
       </SafeAreaView>
+
+      <TouchableOpacity
+        style={styles.backdrop}
+        activeOpacity={1}
+        onPress={onClose}
+      />
     </View>
   );
 }
@@ -298,7 +304,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     elevation: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 2, height: 0 },
+    shadowOffset: { width: -2, height: 0 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
   },
@@ -357,6 +363,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 10,
     gap: 10,
+    backgroundColor: "#F3F4F6",
   },
   sectionTitle: {
     flex: 1,
@@ -372,7 +379,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   childItem: {
-    paddingLeft: 38,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingLeft: 28,
     paddingRight: 12,
     paddingVertical: 11,
     borderRadius: 8,
