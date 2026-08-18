@@ -265,9 +265,12 @@ function isJornadaVisible(
     if (lastJornada?.type === "InicioJornada") return false;
     // Ya salio hoy -> ocultar
     if (lastJornada?.type === "FinJornada") return false;
-    // Sin ponche -> visible desde N min antes de entrada (tolerancia), sin limite superior
+    // Sin ponche -> visible desde N min antes de entrada (tolerancia) hasta el
+    // fin exacto de la jornada (workExitTime, sin tolerancia extra — la ventana
+    // completa de la jornada ya es el margen)
     const entryStart = timeStrToMinutes(schedule.workEntryTime) - tolWorkIn;
-    return current >= entryStart;
+    const entryEnd = timeStrToMinutes(schedule.workExitTime);
+    return current >= entryStart && current < entryEnd;
   } else {
     // Ya salio hoy -> ocultar
     if (lastJornada?.type === "FinJornada") return false;
