@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { usePathname, useRouter } from "expo-router";
 import * as Storage from "../../utils/storage";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -14,8 +14,23 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  FadeOutUp,
+  LinearTransition,
+  SlideInLeft,
+  SlideOutLeft,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { MenuTree } from "../../../utils/resolveRoute";
+
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const { width } = Dimensions.get("window");
 const DRAWER_WIDTH = Math.min(width * 0.78, 320);
@@ -66,12 +81,20 @@ function MenuSection({ section, onNavigate, pathname }: SectionProps) {
   const [expanded, setExpanded] = useState(false);
   const sectionIcon = getIcon(section.parent.icon);
   const hasChildren = section.children.length > 0;
-  
+  const chevronRotation = useSharedValue(0);
+
+  useEffect(() => {
+    chevronRotation.value = withTiming(expanded ? 90 : 0, { duration: 200 });
+  }, [expanded, chevronRotation]);
+
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${chevronRotation.value}deg` }],
+  }));
 
   if (!hasChildren) {
     const isActive = pathname === section.parent.path;
     return (
-      <View style={styles.section}>
+      <Animated.View style={styles.section} layout={LinearTransition.duration(200)}>
         <TouchableOpacity
           style={styles.sectionHeader}
           onPress={() => onNavigate(section.parent.path)}
@@ -84,12 +107,12 @@ function MenuSection({ section, onNavigate, pathname }: SectionProps) {
             {section.parent.name}
           </Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     );
   }
 
   return (
-    <View style={styles.section}>
+    <Animated.View style={styles.section} layout={LinearTransition.duration(200)}>
       <TouchableOpacity
         style={styles.sectionHeader}
         onPress={() => setExpanded(!expanded)}
@@ -97,15 +120,18 @@ function MenuSection({ section, onNavigate, pathname }: SectionProps) {
       >
         <Ionicons name={sectionIcon} size={20} color="#2563EB" />
         <Text style={styles.sectionTitle}>{section.parent.name}</Text>
-        <Ionicons
-          name={expanded ? "chevron-down" : "chevron-forward"}
-          size={16}
-          color="#9CA3AF"
-        />
+        <Animated.View style={chevronStyle}>
+          <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+        </Animated.View>
       </TouchableOpacity>
 
       {expanded && (
-        <View style={styles.submenu}>
+        <Animated.View
+          style={styles.submenu}
+          entering={FadeInDown.duration(220).easing(Easing.out(Easing.quad))}
+          exiting={FadeOutUp.duration(180).easing(Easing.in(Easing.quad))}
+          layout={LinearTransition.duration(200)}
+        >
           {section.children.map((child) => {
             const isActive = pathname === child.path;
             const childIcon = getIcon(child.icon);
@@ -129,9 +155,9 @@ function MenuSection({ section, onNavigate, pathname }: SectionProps) {
               </TouchableOpacity>
             );
           })}
-        </View>
+        </Animated.View>
       )}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -146,7 +172,17 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
   const { user, menuTree, app, urlColegio, logout } = useSchoolStore();
   const [userExpanded, setUserExpanded] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  
+  const userChevronRotation = useSharedValue(0);
+
+  useEffect(() => {
+    userChevronRotation.value = withTiming(userExpanded ? 90 : 0, {
+      duration: 200,
+    });
+  }, [userExpanded, userChevronRotation]);
+
+  const userChevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${userChevronRotation.value}deg` }],
+  }));
 
   const handleNavigate = useCallback(
     (path: string) => {
@@ -173,7 +209,20 @@ const confirmLogout = useCallback(async () => {
 
   return (
     <View style={styles.overlay}>
-      <SafeAreaView style={styles.drawer}>
+      <AnimatedTouchable
+        style={styles.backdrop}
+        activeOpacity={1}
+        onPress={onClose}
+        entering={FadeIn.duration(280).easing(Easing.out(Easing.cubic))}
+        exiting={FadeOut.duration(220).easing(Easing.in(Easing.cubic))}
+      />
+
+      <Animated.View
+        entering={SlideInLeft.duration(280).easing(Easing.out(Easing.cubic))}
+        exiting={SlideOutLeft.duration(220).easing(Easing.in(Easing.cubic))}
+        style={styles.drawer}
+      >
+        <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -215,7 +264,10 @@ const confirmLogout = useCallback(async () => {
 
           {/* ── Usuario colapsable ── */}
           {user && (
-            <View style={styles.userSection}>
+            <Animated.View
+              style={styles.userSection}
+              layout={LinearTransition.duration(200)}
+            >
               <TouchableOpacity
                 style={styles.userHeader}
                 onPress={() => setUserExpanded(!userExpanded)}
@@ -227,15 +279,18 @@ const confirmLogout = useCallback(async () => {
                   color="#2563EB"
                 />
                 <Text style={styles.sectionTitle}>Sesión</Text>
-                <Ionicons
-                  name={userExpanded ? "chevron-down" : "chevron-forward"}
-                  size={16}
-                  color="#9CA3AF"
-                />
+                <Animated.View style={userChevronStyle}>
+                  <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                </Animated.View>
               </TouchableOpacity>
 
               {userExpanded && (
-                <View style={styles.userSubmenu}>
+                <Animated.View
+                  style={styles.userSubmenu}
+                  entering={FadeInDown.duration(220).easing(Easing.out(Easing.quad))}
+                  exiting={FadeOutUp.duration(180).easing(Easing.in(Easing.quad))}
+                  layout={LinearTransition.duration(200)}
+                >
                   <Modal
                     transparent
                     visible={logoutModalVisible}
@@ -273,18 +328,13 @@ const confirmLogout = useCallback(async () => {
                     />
                     <Text>Cerrar Sesión</Text>
                   </TouchableOpacity>
-                </View>
+                </Animated.View>
               )}
-            </View>
+            </Animated.View>
           )}
         </ScrollView>
-      </SafeAreaView>
-
-      <TouchableOpacity
-        style={styles.backdrop}
-        activeOpacity={1}
-        onPress={onClose}
-      />
+        </SafeAreaView>
+      </Animated.View>
     </View>
   );
 }
@@ -293,14 +343,18 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFill,
     zIndex: 999,
-    flexDirection: "row",
   },
   backdrop: {
-    flex: 1,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.45)",
   },
   drawer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    height: "100%",
     width: DRAWER_WIDTH,
+    zIndex: 1,
     backgroundColor: "#FFFFFF",
     elevation: 16,
     shadowColor: "#000",

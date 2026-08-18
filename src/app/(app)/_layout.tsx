@@ -53,10 +53,12 @@ export default function AppLayout() {
       <Slot />
 
       {/* Drawer compartido */}
-      <DrawerMenu
-        isVisible={drawerVisible}
-        onClose={() => setDrawerVisible(false)}
-      />
+      {drawerVisible && (
+        <DrawerMenu
+          isVisible={drawerVisible}
+          onClose={() => setDrawerVisible(false)}
+        />
+      )}
     </SafeAreaView>
   );
 }
