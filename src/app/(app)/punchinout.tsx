@@ -27,23 +27,20 @@ import type {
   SchoolUser,
   UserSchedule,
 } from "../../../types/typeStore/SchoolStoreType";
+import {
+  getRDDayIndex,
+  getRDMinutes,
+  isAlmuerzoVisible,
+  isJornadaVisible,
+  timeStrToMinutes,
+  toRD,
+  type PunchEvent,
+  type Tag,
+  type UserDayPermission,
+} from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
 
 type Category = "Jornada" | "Almuerzo" | "Break";
-
-interface PunchEvent {
-  id: number;
-  type: string;
-  status: string;
-  createdDate: string;
-  lateEntry?: boolean;
-  earlyExit?: boolean;
-  overtime?: number | string;
-  toleranceMinutes?: number | null;
-  hasOpenDay?: boolean | string;
-  openDayDate?: string;
-  date?: string;
-}
 
 interface PunchPayload {
   type: string;
@@ -57,15 +54,7 @@ interface PunchPayload {
   tagId?: number;
 }
 
-interface Tag {
-  id: number;
-  name: string;
-  category?: { id?: number; name?: string } | null;
-}
-
 const BREAK_TAG_CATEGORY_NAME = "Tipos de Break";
-
-// Santo Domingo = UTC-4, fijo, sin cambio de horario de verano
 
 const WEEK_DAYS: Record<number, string> = {
   0: "Domingo",
@@ -117,21 +106,6 @@ function decodeJWT(token: string): Record<string, any> {
   }
 }
 
-function toRD(date: Date) {
-  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
-  const rd = new Date(utc - 4 * 60 * 60 * 1000);
-
-  return {
-    year: rd.getFullYear(),
-    month: rd.getMonth(),
-    day: rd.getDate(),
-    hours: rd.getHours(),
-    minutes: rd.getMinutes(),
-    seconds: rd.getSeconds(),
-    weekDay: rd.getDay(),
-  };
-}
-
 function pad(n: number): string {
   return n.toString().padStart(2, "0");
 }
@@ -164,22 +138,6 @@ function formatRDTimeShort(date: Date): string {
 function formatRDDate(date: Date): string {
   const { weekDay, day, month, year } = toRD(date);
   return `${WEEK_DAYS[weekDay]}, ${day} de ${MONTH_NAMES[month]} de ${year}`;
-}
-
-/** Minutos desde medianoche  */
-function getRDMinutes(date: Date): number {
-  const { hours, minutes } = toRD(date);
-  return hours * 60 + minutes;
-}
-
-/** Día de la semana en RD */
-function getRDDayIndex(date: Date): number {
-  return toRD(date).weekDay;
-}
-
-function timeStrToMinutes(timeStr: string): number {
-  const [h, m] = timeStr.split(":").map(Number);
-  return h * 60 + m;
 }
 
 // ─── Helpers de negocio ───────────────────────────────────────────────────────
@@ -235,74 +193,6 @@ function isJornadaActiva(punches: PunchEvent[]): boolean {
         p.hasOpenDay !== ("true" as any),
     );
   return last?.type === "InicioJornada";
-}
-
-function isJornadaVisible(
-  now: Date,
-  schedule: UserSchedule | null,
-  isInicio: boolean,
-  tolWorkIn: number,
-  tolWorkOut: number,
-  punches: PunchEvent[],
-): boolean {
-  // Sin horario -> ocultar siempre
-  if (!schedule) return false;
-
-  const current = getRDMinutes(now);
-  // Los intentos rechazados por imagen no cuentan como jornada iniciada
-  const lastJornada = [...punches]
-    .reverse()
-    .find(
-      (p) =>
-        (p.type === "InicioJornada" || p.type === "FinJornada") &&
-        p.status !== "Error de Imagen" &&
-        !p.hasOpenDay &&
-        p.hasOpenDay !== ("true" as any),
-    );
-
-  if (isInicio) {
-    // Ya poncho entrada -> ocultar (jornada activa)
-    if (lastJornada?.type === "InicioJornada") return false;
-    // Ya salio hoy -> ocultar
-    if (lastJornada?.type === "FinJornada") return false;
-    // Sin ponche -> visible desde N min antes de entrada (tolerancia) hasta el
-    // fin exacto de la jornada (workExitTime, sin tolerancia extra — la ventana
-    // completa de la jornada ya es el margen)
-    const entryStart = timeStrToMinutes(schedule.workEntryTime) - tolWorkIn;
-    const entryEnd = timeStrToMinutes(schedule.workExitTime);
-    return current >= entryStart && current < entryEnd;
-  } else {
-    // Ya salio hoy -> ocultar
-    if (lastJornada?.type === "FinJornada") return false;
-    // Visible desde N min antes de salida, sin limite superior (horas extras)
-    const exitStart = timeStrToMinutes(schedule.workExitTime) - tolWorkOut;
-    return current >= exitStart;
-  }
-}
-
-function isAlmuerzoVisible(
-  now: Date,
-  schedule: UserSchedule | null,
-  tolLunchIn: number,
-  tolLunchOut: number,
-  punches: PunchEvent[],
-): boolean {
-  if (!schedule) return false;
-
-  const lastAlmuerzo = [...punches]
-    .reverse()
-    .find((p) => p.type === "InicioAlmuerzo" || p.type === "FinAlmuerzo");
-
-  if (lastAlmuerzo?.type === "InicioAlmuerzo") return true;
-  if (lastAlmuerzo?.type === "FinAlmuerzo") return false;
-
-  if (!schedule.lunchEntryTime || !schedule.lunchExitTime) return false;
-
-  const current = getRDMinutes(now);
-  const windowStart = timeStrToMinutes(schedule.lunchEntryTime) - tolLunchIn;
-  const windowEnd = timeStrToMinutes(schedule.lunchExitTime) + tolLunchOut;
-
-  return current >= windowStart && current <= windowEnd;
 }
 
 // ─── Puntualidad del ponche ──────────────────────────────────────────────────
@@ -442,6 +332,38 @@ const getCurrentCoordinates = async (): Promise<{
   }
 };
 
+/**
+ * Permisos aprobados/pendientes del día. Nunca lanza: si falla, devuelve []
+ * para no romper el render del ponchador (el interceptor global de axios ya se
+ * encarga de la sesión expirada).
+ */
+async function fetchTodayPermissions(
+  baseUrl: string,
+  schoolUserId: number,
+  token: string,
+): Promise<UserDayPermission[]> {
+  try {
+    const response = await axios.get(
+      `${baseUrl}/userdaypermissions/today/${schoolUserId}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    console.log("TODAY PERMISSIONS RESPONSE:", {
+      clientTimestamp: new Date().toISOString(),
+      data: response.data,
+    });
+    if (response.data?.success) {
+      return (response.data.data as UserDayPermission[]) ?? [];
+    }
+    return [];
+  } catch (error: any) {
+    console.error(
+      "fetchTodayPermissions:",
+      error?.response?.data?.message ?? error?.message,
+    );
+    return [];
+  }
+}
+
 export default function PunchInOut() {
   const [now, setNow] = useState(new Date());
   const [selectedCategory, setSelectedCategory] = useState<Category>("Jornada");
@@ -463,6 +385,7 @@ export default function PunchInOut() {
     null,
   );
   const [breakTagModalVisible, setBreakTagModalVisible] = useState(false);
+  const [permissions, setPermissions] = useState<UserDayPermission[]>([]);
 
   const { user, urlColegio, logout } = useSchoolStore();
 
@@ -732,11 +655,18 @@ export default function PunchInOut() {
   useEffect(() => {
     if (
       selectedCategory === "Almuerzo" &&
-      !isAlmuerzoVisible(now, todaySchedule, tolLunchIn, tolLunchOut, punches)
+      !isAlmuerzoVisible(
+        now,
+        todaySchedule,
+        tolLunchIn,
+        tolLunchOut,
+        punches,
+        permissions,
+      )
     ) {
       setSelectedCategory("Jornada");
     }
-  }, [now, punches, todaySchedule, selectedCategory]);
+  }, [now, punches, todaySchedule, selectedCategory, permissions]);
 
   // Motivo de break no debe sobrevivir un cambio de categoría — evita que un
   // motivo elegido para un Break anterior quede preseleccionado en el siguiente.
@@ -813,6 +743,21 @@ export default function PunchInOut() {
   useEffect(() => {
     fetchBreakTags();
   }, [fetchBreakTags]);
+
+  // Permisos del día — igual que los motivos de Break, se refrescan al entrar a
+  // la pantalla y en el pull-to-refresh. Un fallo aquí no bloquea el ponchador.
+  const loadTodayPermissions = useCallback(async () => {
+    const token = await getToken();
+    const schoolUserId = schoolUser?.id ?? user?.id;
+    if (!urlColegio || !token || !schoolUserId) return;
+    setPermissions(
+      await fetchTodayPermissions(urlColegio, schoolUserId, token),
+    );
+  }, [urlColegio, getToken, schoolUser?.id, user?.id]);
+
+  useEffect(() => {
+    loadTodayPermissions();
+  }, [loadTodayPermissions]);
 
   const getNextPunchType = (category: Category): "inicio" | "fin" => {
     const types = PUNCH_TYPE_MAP[category];
@@ -1289,6 +1234,7 @@ export default function PunchInOut() {
         tolLunchIn,
         tolLunchOut,
         punches,
+        permissions,
       );
     if (cat === "Jornada") return true;
     return true;
@@ -1420,6 +1366,7 @@ export default function PunchInOut() {
             onRefresh={() => {
               setRefreshing(true);
               fetchTodayPunches();
+              loadTodayPermissions();
             }}
             colors={["#2563EB"]}
           />
@@ -1609,6 +1556,7 @@ export default function PunchInOut() {
               tolWorkIn,
               tolWorkOut,
               punches,
+              permissions,
             )) && (
             <TouchableOpacity
               style={[
