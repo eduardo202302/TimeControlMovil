@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import * as Storage from "../../utils/storage";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
@@ -16,6 +15,7 @@ import { getMenuItems } from "../../../api/menu/getMenuItems";
 import { getRoleById } from "../../../api/Roles/getRoles";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { LoginType } from "../../../types/typesLogin/LoginType";
+import * as Storage from "../../utils/storage";
 
 interface FormLoginProps {
   name?: string;
@@ -40,7 +40,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { urlColegio, setMenuResolution } = useSchoolStore();
+  const { urlColegio, setMenuResolution, setRole } = useSchoolStore();
 
   const { handleSubmit, control, setValue } = useForm<LoginType>({
     defaultValues: { usuario: "", password: "" },
@@ -73,11 +73,6 @@ export default function FormLogin({ name, image }: FormLoginProps) {
           response.data.user?.schoolUsers?.[0]?.userSchedules ??
           response.data.userSchedules ??
           [];
-        console.log("userSchedules:", JSON.stringify(schedules, null, 2));
-        console.log(
-          "punchesToday:",
-          JSON.stringify(response.data.punchesToday, null, 2),
-        );
 
         const currentUrl =
           urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
@@ -87,8 +82,11 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         // Llamar getMenuItems y getRoleById en paralelo
         const [menuItems, role] = await Promise.all([
           getMenuItems(currentUrl, token),
-          getRoleById(currentUrl, token, jwtPayload.roleId),
+          getRoleById(currentUrl, token, jwtPayload.roleId), // Guardar el rol en el store
         ]);
+        if (role) {
+          setRole(role);
+        }
 
         // Armar user completo con menu real del rol
         const fullUser = {
@@ -107,10 +105,6 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         // Resolver app + ruta + árbol de menú
         setMenuResolution(fullUser as any, menuItems);
 
-        const { initialPath, menuTree } = useSchoolStore.getState();
-        console.log("initialPath:", initialPath);
-        console.log("menuTree:", JSON.stringify(menuTree, null, 2));
-
         // Persistir en SecureStore
         await Storage.setItemAsync("isAuthorized", "true");
         await Storage.setItemAsync("token", token);
@@ -123,7 +117,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
           tipo: "success",
         });
 
-        router.replace("/punchinout" as never);
+        router.replace(role?.defaultMenu?.path as never);
 
         if (remember) {
           await Storage.setItemAsync("usuario", data.usuario);

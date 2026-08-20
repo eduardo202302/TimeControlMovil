@@ -125,6 +125,7 @@ export interface SchoolStore {
   initialPath: string | null;
   allowedMenuItems: MenuItem[];
   menuTree: MenuTree[];
+  role: RoleItem | null;
 
   // Acciones existentes
   setSchool: (school: School) => void;
@@ -136,6 +137,7 @@ export interface SchoolStore {
 
   // Acción nueva
   setMenuResolution: (user: User, menuItems: MenuItem[]) => void;
+  setRole: (role: RoleItem) => void;
 
   // Cerrar sesión
   logout: () => void;

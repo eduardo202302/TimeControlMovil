@@ -1,10 +1,10 @@
 import { Stack, router } from "expo-router";
-import * as Storage from "../utils/storage";
 import { useEffect, useRef } from "react";
 import { useSchoolStore } from "../../store/useSchoolStore";
+import * as Storage from "../utils/storage";
 
 export default function RootLayout() {
-  const { setSchool, setUrlColegio, setToken, setMenuResolution } =
+  const { setSchool, setUrlColegio, setToken, setMenuResolution, role } =
     useSchoolStore();
 
   // Guardar si ya hicimos la carga inicial — para distinguirla del logout
@@ -28,9 +28,8 @@ export default function RootLayout() {
         const user = JSON.parse(userRaw);
         const menuItems = JSON.parse(menuItemsRaw);
         setMenuResolution(user, menuItems);
-        const { initialPath } = useSchoolStore.getState();
         initialLoadDone.current = true;
-        router.replace("/punchinout" as never);
+        router.replace(role?.defaultMenu.path as never);
         return;
       }
 

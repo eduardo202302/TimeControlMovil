@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { SchoolStore } from "../types/typeStore/SchoolStoreType";
-import { MenuItem } from "../types/typesMenu/MenuTypes";
+import { MenuItem, RoleItem } from "../types/typesMenu/MenuTypes";
 import { resolveRoute } from "../utils/resolveRoute";
 
 export const useSchoolStore = create<SchoolStore>((set) => ({
@@ -16,6 +16,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   initialPath: null,
   allowedMenuItems: [],
   menuTree: [],
+  role: null,
 
   // ─── Acciones existentes (sin cambios) ──────────────────────────────────────
   setSchool: (school) => set({ school }),
@@ -35,6 +36,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       initialPath: null,
       allowedMenuItems: [],
       menuTree: [],
+      role: null,
     }),
 
   // ─── Cerrar sesión — conserva urlColegio y school para poder volver a login ─
@@ -47,6 +49,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       initialPath: null,
       allowedMenuItems: [],
       menuTree: [],
+      role: null,
     }),
 
   // ─── Acción nueva: resuelve app + ruta + menú tras el login ─────────────────
@@ -64,4 +67,6 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       menuTree,
     });
   },
+
+  setRole: (role) => set({ role }),
 }));

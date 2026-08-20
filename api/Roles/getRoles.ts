@@ -5,6 +5,15 @@ interface Role {
   name: string;
   permissions: Record<string, unknown>;
   menu: number[];
+  defaultMenu: {
+    icon: string;
+    id: number;
+    name: string;
+    order: number;
+    parentId: number;
+    path: string;
+    type: string;
+  };
 }
 
 interface RolesResponse {
@@ -24,11 +33,6 @@ export async function getRoleById(
     const response = await axios.get<RolesResponse>(`${urlColegio}/roles`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-
-    console.log(
-      "getRoleById response:",
-      JSON.stringify(response.data, null, 2),
-    );
 
     if (response.data.success) {
       const role = response.data.data.items.find((r) => r.id === roleId);

@@ -121,7 +121,6 @@ const validatePin = async (pin: ValidaPin) => {
       pin: pin.pin.trim(),
     });
     useSchoolStore.getState().setTokenPassword(response.data.data);
-    console.log("Token de validación PIN almacenado:", response.data.data);
 
     return response.data;
   } catch (error) {
@@ -145,7 +144,6 @@ const resetPassword = async (data: { password: string }) => {
       token: token,
     });
 
-    console.log("Respuesta de reset password (API):", response.data);
     return response.data;
   } catch (error) {
     console.error("Error al restablecer la contraseña:", error);

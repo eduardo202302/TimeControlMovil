@@ -14,4 +14,13 @@ export interface RoleItem {
   name: string;
   permissions: Record<string, unknown>;
   menu: number[];
+  defaultMenu: {
+    icon: string;
+    id: number;
+    name: string;
+    order: number;
+    parentId: number;
+    path: string;
+    type: string;
+  };
 }
