@@ -96,6 +96,7 @@ const PUNCH_TYPE_MAP: Record<Category, { inicio: string; fin: string }> = {
 // Sesión máxima antes de forzar relogin en la primera Entrada Jornada del día,
 // para confirmar permisos/settings que un admin pudo haber cambiado.
 const SESSION_MAX_HOURS_FOR_FIRST_ENTRY = 12;
+const HISTORY_COLLAPSED_LIMIT = 3;
 
 function decodeJWT(token: string): Record<string, any> {
   try {
@@ -372,6 +373,8 @@ export default function PunchInOut() {
   const [loadingPunches, setLoadingPunches] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [phoneImagen, setPhoneImagen] = useState<string | null>(null);
+  const [historyExpanded, setHistoryExpanded] = useState(true);
+  const [historyShowAll, setHistoryShowAll] = useState(false);
   const [nextDayExitModal, setNextDayExitModal] = useState(false);
   const [nextDayExitPunch, setNextDayExitPunch] = useState<PunchEvent | null>(
     null,
@@ -1593,28 +1596,40 @@ export default function PunchInOut() {
 
         {/* ── Registros del día ── */}
         <View style={styles.floatCard}>
-          <View style={styles.floatLabel}>
-            <Ionicons name="list-outline" size={14} color="#2563EB" />
-            <Text style={styles.floatLabelText}>Historial del Día</Text>
-          </View>
           <TouchableOpacity
-            onPress={fetchTodayPunches}
-            style={[
-              styles.refreshBtn,
-              { alignSelf: "flex-end", marginBottom: 4 },
-            ]}
+            style={styles.historyHeader}
+            onPress={() => setHistoryExpanded(!historyExpanded)}
+            activeOpacity={0.7}
           >
-            <Ionicons name="refresh-outline" size={18} color="#2563EB" />
-          </TouchableOpacity>
-          {loadingPunches ? (
-            <ActivityIndicator color="#2563EB" style={{ marginVertical: 16 }} />
-          ) : punches.length === 0 ? (
-            <View style={styles.emptyPunches}>
-              <Ionicons name="time-outline" size={32} color="#D1D5DB" />
-              <Text style={styles.emptyText}>Sin registros hoy</Text>
+            <View style={styles.floatLabelInline}>
+              <Ionicons name="list-outline" size={14} color="#2563EB" />
+              <Text style={styles.floatLabelText}>Historial del Día</Text>
             </View>
-          ) : (
-            [...punches].reverse().map((punch) => {
+            <View style={styles.historyChevronBtn}>
+              <Ionicons
+                name={historyExpanded ? "chevron-up" : "chevron-down"}
+                size={16}
+                color="#2563EB"
+              />
+            </View>
+          </TouchableOpacity>
+          {historyExpanded && (
+            <>
+              {loadingPunches ? (
+                <ActivityIndicator
+                  color="#2563EB"
+                  style={{ marginVertical: 16 }}
+                />
+              ) : punches.length === 0 ? (
+                <View style={styles.emptyPunches}>
+                  <Ionicons name="time-outline" size={32} color="#D1D5DB" />
+                  <Text style={styles.emptyText}>Sin registros hoy</Text>
+                </View>
+              ) : (
+                [...punches]
+                  .reverse()
+                  .slice(0, historyShowAll ? undefined : HISTORY_COLLAPSED_LIMIT)
+                  .map((punch) => {
               const hasOvertime = parseFloat(String(punch.overtime ?? 0)) > 0;
               // Solo FinJornada puede generar horas extras
               const isJornadaOvertime =
@@ -1725,7 +1740,21 @@ export default function PunchInOut() {
                   </Text>
                 </View>
               );
-            })
+                  })
+              )}
+              {punches.length > HISTORY_COLLAPSED_LIMIT && (
+                <TouchableOpacity
+                  style={styles.historyToggleBtn}
+                  onPress={() => setHistoryShowAll(!historyShowAll)}
+                >
+                  <Text style={styles.historyToggleText}>
+                    {historyShowAll
+                      ? "Ver menos"
+                      : `Ver todos (${punches.length})`}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
           )}
         </View>
       </ScrollView>
@@ -1898,6 +1927,41 @@ const styles = StyleSheet.create({
     color: "#2563EB",
     letterSpacing: 0.3,
     textTransform: "none",
+  },
+  floatLabelInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "#F9FAFB",
+    paddingHorizontal: 7,
+  },
+  historyHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    position: "absolute",
+    top: -11,
+    left: 14,
+    right: 14,
+  },
+  historyChevronBtn: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  historyToggleBtn: {
+    alignSelf: "center",
+    marginTop: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  historyToggleText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2563EB",
   },
   floatLabelRow: {
     flexDirection: "row",
