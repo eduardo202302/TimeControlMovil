@@ -25,12 +25,12 @@ export default function RootLayout() {
       if (token) setToken(token);
 
       if (isAuthorized === "true" && userRaw && menuItemsRaw) {
-        const { role } = useSchoolStore.getState();
         const user = JSON.parse(userRaw);
         const menuItems = JSON.parse(menuItemsRaw);
         setMenuResolution(user, menuItems);
         initialLoadDone.current = true;
-        router.replace(role?.defaultMenu.path as never);
+        const { role } = useSchoolStore.getState();
+        router.replace((role?.defaultMenu?.path ?? "/login") as never);
         return;
       }
 

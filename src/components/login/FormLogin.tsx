@@ -97,6 +97,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
             name: jwtPayload.roleName,
             permissions: {},
             menu: role?.menu ?? [],
+            defaultMenu: role?.defaultMenu ?? null,
           },
           school: useSchoolStore.getState().school ?? {},
           userSchedules: schedules,
@@ -117,7 +118,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
           tipo: "success",
         });
 
-        router.replace(role?.defaultMenu?.path as never);
+        router.replace((useSchoolStore.getState().role?.defaultMenu?.path ?? "/login") as never);
 
         if (remember) {
           await Storage.setItemAsync("usuario", data.usuario);

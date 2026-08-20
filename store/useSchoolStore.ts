@@ -61,6 +61,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
     );
     set({
       user,
+      role: user.role,
       app,
       initialPath,
       allowedMenuItems: allowedItems,
