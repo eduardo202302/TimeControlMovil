@@ -4,7 +4,7 @@ import { useSchoolStore } from "../../store/useSchoolStore";
 import * as Storage from "../utils/storage";
 
 export default function RootLayout() {
-  const { setSchool, setUrlColegio, setToken, setMenuResolution, role } =
+  const { setSchool, setUrlColegio, setToken, setMenuResolution } =
     useSchoolStore();
 
   // Guardar si ya hicimos la carga inicial — para distinguirla del logout
@@ -25,6 +25,7 @@ export default function RootLayout() {
       if (token) setToken(token);
 
       if (isAuthorized === "true" && userRaw && menuItemsRaw) {
+        const { role } = useSchoolStore.getState();
         const user = JSON.parse(userRaw);
         const menuItems = JSON.parse(menuItemsRaw);
         setMenuResolution(user, menuItems);
