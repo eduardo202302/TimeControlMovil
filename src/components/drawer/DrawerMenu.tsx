@@ -169,10 +169,16 @@ interface DrawerMenuProps {
 export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, menuTree, app, urlColegio, logout } = useSchoolStore();
+  const { user, menuTree, app, logout } = useSchoolStore();
   const [userExpanded, setUserExpanded] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const userChevronRotation = useSharedValue(0);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    Storage.getItemAsync("photourl").then(setUserPhoto);
+  }, [isVisible]);
 
   useEffect(() => {
     userChevronRotation.value = withTiming(userExpanded ? 90 : 0, {
@@ -226,20 +232,26 @@ const confirmLogout = useCallback(async () => {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <View style={styles.logoContainer}>
-              {user?.school?.logo && urlColegio ? (
+            <View style={styles.avatarContainer}>
+              {userPhoto ? (
                 <Image
-                  source={{ uri: `${urlColegio}/${user.school.logo}` }}
-                  style={styles.logoImage}
-                  resizeMode="contain"
+                  source={{
+                    uri: `https://timecontrol.wsmax.net:8600/${userPhoto}`,
+                  }}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
                 />
               ) : (
-                <Ionicons name="time-outline" size={22} color="#fff" />
+                <Ionicons name="person" size={22} color="#fff" />
               )}
             </View>
             <View>
-              <Text style={styles.appName}>Time Flow</Text>
-              <Text style={styles.appSubtitle}>Gestión de tiempo</Text>
+              <Text style={styles.appName} numberOfLines={1}>
+                {user?.user?.fullName ?? "Usuario"}
+              </Text>
+              <Text style={styles.appSubtitle} numberOfLines={1}>
+                {user?.role?.name ?? ""}
+              </Text>
             </View>
           </View>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -375,23 +387,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
   },
-  logoContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+  avatarContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
-  logoImage: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   appName: {
     color: "#FFFFFF",
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "700",
+    maxWidth: DRAWER_WIDTH - 110,
   },
   appSubtitle: {
     color: "rgba(255,255,255,0.8)",
