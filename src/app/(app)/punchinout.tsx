@@ -1249,6 +1249,34 @@ export default function PunchInOut() {
       )
     : "";
 
+  // Hora de salida sugerida: horario del USUARIO correspondiente al día que
+  // quedó pendiente (no necesariamente el de "hoy" — la jornada abierta pudo
+  // ser un día distinto, con otro workExitTime). Se recalcula solo con
+  // userSchedules, así que si un admin cambia el horario, la sugerencia se
+  // actualiza automáticamente al relogin.
+  // nextDayExitPunch puede venir null: este modal también se abre cuando el
+  // backend RECHAZA un ponche con "cerrar la jornada" (ver handleRegister),
+  // sin devolver el punch original. En ese caso, igual que ya hace
+  // handleSubmitNextDayExit más arriba, se asume que el día pendiente es ayer.
+  const pendingPunchDate = nextDayExitPunch
+    ? new Date(nextDayExitPunch.openDayDate ?? nextDayExitPunch.createdDate)
+    : (() => {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        return yesterday;
+      })();
+  const pendingSchedule = getScheduleForDay(userSchedules, pendingPunchDate);
+  const suggestedExitTime = pendingSchedule?.workExitTime ?? null;
+
+  const handleUseSuggestedExitTime = () => {
+    if (!suggestedExitTime) return;
+    const [h, m] = suggestedExitTime.split(":").map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    setSelectedTime(d);
+    setNextDayExitTime(`${pad(h)}:${pad(m)}`);
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <Modal
@@ -1259,11 +1287,19 @@ export default function PunchInOut() {
       >
         <View style={styles.ndModalOverlay}>
           <View style={styles.ndModalCard}>
-            <View style={styles.ndModalHeader}>
-              <View style={styles.ndModalIconWrap}>
-                <Ionicons name="time-outline" size={22} color="#D97706" />
+            <View style={styles.ndModalHeaderRow}>
+              <View style={styles.ndModalHeaderLeft}>
+                <View style={styles.ndModalIconWrap}>
+                  <Ionicons name="time-outline" size={22} color="#D97706" />
+                </View>
+                <Text style={styles.ndModalTitle}>Jornada Incompleta</Text>
               </View>
-              <Text style={styles.ndModalTitle}>Jornada Incompleta</Text>
+              <TouchableOpacity
+                onPress={() => setNextDayExitModal(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={22} color="#9CA3AF" />
+              </TouchableOpacity>
             </View>
             <View style={styles.ndModalBody}>
               <Text style={styles.ndModalMsg}>
@@ -1299,6 +1335,22 @@ export default function PunchInOut() {
                 <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
               </TouchableOpacity>
 
+              {suggestedExitTime && (
+                <TouchableOpacity
+                  style={styles.ndSuggestionRow}
+                  onPress={handleUseSuggestedExitTime}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="bulb-outline" size={16} color="#2563EB" />
+                  <Text style={styles.ndSuggestionText}>
+                    Hora sugerida según tu horario:{" "}
+                    <Text style={styles.ndSuggestionTextValue}>
+                      {to12h(suggestedExitTime)}
+                    </Text>
+                  </Text>
+                  <Text style={styles.ndSuggestionAction}>Usar</Text>
+                </TouchableOpacity>
+              )}
             </View>
             <TouchableOpacity
               style={[styles.ndModalBtn, submittingExit && { opacity: 0.7 }]}
@@ -2208,6 +2260,17 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 14,
   },
+  ndModalHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 14,
+  },
+  ndModalHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
   ndModalIconWrap: {
     width: 42,
     height: 42,
@@ -2237,6 +2300,29 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
   },
   ndTimeBtnTextValue: { color: "#111827" },
+  ndSuggestionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#EFF6FF",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  ndSuggestionText: {
+    flex: 1,
+    fontSize: 12,
+    color: "#1D4ED8",
+  },
+  ndSuggestionTextValue: {
+    fontWeight: "700",
+  },
+  ndSuggestionAction: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#2563EB",
+    textDecorationLine: "underline",
+  },
   ndModalBtn: {
     marginTop: 8,
     backgroundColor: "#2563EB",
