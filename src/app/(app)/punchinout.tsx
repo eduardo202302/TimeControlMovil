@@ -163,6 +163,16 @@ function getPunchTypeLabel(type: string): string {
   return labels[type] ?? type;
 }
 
+/** Deriva la categoría (Jornada/Almuerzo/Break) a partir del punch.type, para
+ * reutilizar el mismo ícono de CATEGORY_ICONS que ya usan los botones de
+ * arriba — así el historial usa la misma forma que la persona ya asocia con
+ * cada categoría al ponchear. */
+function getPunchCategory(type: string): Category {
+  if (type.includes("Jornada")) return "Jornada";
+  if (type.includes("Almuerzo")) return "Almuerzo";
+  return "Break";
+}
+
 function getStatusColor(status: string): string {
   if (status === "Tardanza") return "#DC2626";
   if (status === "Anticipada") return "#D97706";
@@ -1730,11 +1740,7 @@ export default function PunchInOut() {
                     ]}
                   >
                     <Ionicons
-                      name={
-                        punch.type.startsWith("Inicio")
-                          ? "log-in-outline"
-                          : "log-out-outline"
-                      }
+                      name={CATEGORY_ICONS[getPunchCategory(punch.type)]}
                       size={16}
                       color={
                         isLateBadge
