@@ -10,6 +10,15 @@ export interface SchoolSettings {
   toleranceWorkTimeOut?: number;
   toleranceLunchTimeIn?: number;
   toleranceLunchTimeOut?: number;
+  // "Ver Botón" — minutos antes del horario en que el botón de acción se
+  // hace visible. Distinto de toleranceWorkTimeIn/Out (que solo determina
+  // la etiqueta Tardanza/Anticipada/A Tiempo). Confirmado por consulta
+  // directa a schools.settings — no vienen declarados en el schema formal
+  // del backend, solo existen como claves sueltas (additionalProperties).
+  lblWorkTimeIn?: number;
+  lblWorkTimeOut?: number;
+  lblLunchTimeIn?: number;
+  lblLunchTimeOut?: number;
   schoolLatitude?: number;
   schoolLongitude?: number;
   toleranceRadius?: number;

@@ -243,12 +243,13 @@ function getPunctuality(
   const punchMinutes = getRDMinutes(punchDate);
 
   switch (punch.type) {
-    case "InicioJornada":
-      return punchMinutes >
-        timeStrToMinutes(schedule.workEntryTime) +
-          (schedule.toleranceWorkTimeIn ?? defaults.workIn)
-        ? "Tardanza"
-        : "A Tiempo";
+    case "InicioJornada": {
+      const entryTime = timeStrToMinutes(schedule.workEntryTime);
+      const tolerance = schedule.toleranceWorkTimeIn ?? defaults.workIn;
+      if (punchMinutes > entryTime + tolerance) return "Tardanza";
+      if (punchMinutes < entryTime - tolerance) return "Anticipada";
+      return "A Tiempo";
+    }
     case "FinJornada":
       return punchMinutes <
         timeStrToMinutes(schedule.workExitTime) -
@@ -385,6 +386,7 @@ export default function PunchInOut() {
   const [phoneImagen, setPhoneImagen] = useState<string | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(true);
   const [historyShowAll, setHistoryShowAll] = useState(false);
+  const [tolerancesExpanded, setTolerancesExpanded] = useState(true);
   const [nextDayExitModal, setNextDayExitModal] = useState(false);
   const [nextDayExitPunch, setNextDayExitPunch] = useState<PunchEvent | null>(
     null,
@@ -442,6 +444,30 @@ export default function PunchInOut() {
     schoolUserSettings?.toleranceLunchTimeOut ??
     schoolSettings?.toleranceLunchTimeOut ??
     5;
+
+  // "Ver Botón" — minutos antes del horario en que el botón de acción se
+  // hace VISIBLE (distinto de tolWorkIn/etc., que solo decide la etiqueta
+  // Tardanza/Anticipada/A Tiempo). Campos confirmados por consulta directa
+  // a la BD: lblWorkTimeIn/lblWorkTimeOut/lblLunchTimeIn/lblLunchTimeOut.
+  // Si no está configurado, cae al valor de Tolerancia (comportamiento
+  // idéntico al actual — sin ventana "Anticipada" visible — para no
+  // romper cuentas que aún no configuraron "Ver Botón").
+  const btnVisWorkIn =
+    schoolUserSettings?.lblWorkTimeIn ??
+    schoolSettings?.lblWorkTimeIn ??
+    tolWorkIn;
+  const btnVisWorkOut =
+    schoolUserSettings?.lblWorkTimeOut ??
+    schoolSettings?.lblWorkTimeOut ??
+    tolWorkOut;
+  const btnVisLunchIn =
+    schoolUserSettings?.lblLunchTimeIn ??
+    schoolSettings?.lblLunchTimeIn ??
+    tolLunchIn;
+  const btnVisLunchOut =
+    schoolUserSettings?.lblLunchTimeOut ??
+    schoolSettings?.lblLunchTimeOut ??
+    tolLunchOut;
 
   // Geocerca: coordenadas de la sede y radio permitido (metros, default 200m)
   const schoolObj: School | undefined = schoolUser?.school ?? user?.school;
@@ -671,8 +697,8 @@ export default function PunchInOut() {
       !isAlmuerzoVisible(
         now,
         todaySchedule,
-        tolLunchIn,
-        tolLunchOut,
+        btnVisLunchIn,
+        btnVisLunchOut,
         punches,
         permissions,
       )
@@ -1244,8 +1270,8 @@ export default function PunchInOut() {
       return isAlmuerzoVisible(
         now,
         todaySchedule,
-        tolLunchIn,
-        tolLunchOut,
+        btnVisLunchIn,
+        btnVisLunchOut,
         punches,
         permissions,
       );
@@ -1618,8 +1644,8 @@ export default function PunchInOut() {
               now,
               todaySchedule,
               getNextPunchType("Jornada") === "inicio",
-              tolWorkIn,
-              tolWorkOut,
+              btnVisWorkIn,
+              btnVisWorkOut,
               punches,
               permissions,
             )) && (
@@ -1653,6 +1679,55 @@ export default function PunchInOut() {
                 </>
               )}
             </TouchableOpacity>
+          )}
+        </View>
+
+        {/* ── Tolerancias de visibilidad de botones ── */}
+        <View style={styles.floatCard}>
+          <TouchableOpacity
+            style={styles.historyHeader}
+            onPress={() => setTolerancesExpanded((prev) => !prev)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.floatLabelInline}>
+              <Ionicons name="hourglass-outline" size={14} color="#2563EB" />
+              <Text style={styles.floatLabelText}>Ver Botones de Acciones</Text>
+            </View>
+            <View style={styles.historyChevronBtn}>
+              <Ionicons
+                name={tolerancesExpanded ? "chevron-up" : "chevron-down"}
+                size={16}
+                color="#2563EB"
+              />
+            </View>
+          </TouchableOpacity>
+          {tolerancesExpanded && (
+            <View style={styles.toleranceGrid}>
+              <View style={styles.toleranceCell}>
+                <Text style={styles.toleranceCellLabel}>Entrada Jornada</Text>
+                <Text style={styles.toleranceCellValue}>
+                  {btnVisWorkIn} min antes
+                </Text>
+              </View>
+              <View style={styles.toleranceCell}>
+                <Text style={styles.toleranceCellLabel}>Entrada Almuerzo</Text>
+                <Text style={styles.toleranceCellValue}>
+                  {btnVisLunchIn} min antes
+                </Text>
+              </View>
+              <View style={styles.toleranceCell}>
+                <Text style={styles.toleranceCellLabel}>Salida Jornada</Text>
+                <Text style={styles.toleranceCellValue}>
+                  {btnVisWorkOut} min antes
+                </Text>
+              </View>
+              <View style={styles.toleranceCell}>
+                <Text style={styles.toleranceCellLabel}>Salida Almuerzo</Text>
+                <Text style={styles.toleranceCellValue}>
+                  {btnVisLunchOut} min antes
+                </Text>
+              </View>
+            </View>
           )}
         </View>
 
@@ -2018,6 +2093,30 @@ const styles = StyleSheet.create({
   },
   historyToggleText: {
     fontSize: 12,
+    fontWeight: "700",
+    color: "#2563EB",
+  },
+  toleranceGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  toleranceCell: {
+    flexBasis: "47%",
+    flexGrow: 1,
+    backgroundColor: "#F8FAFF",
+    borderRadius: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+  },
+  toleranceCellLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#6B7280",
+    marginBottom: 1,
+  },
+  toleranceCellValue: {
+    fontSize: 13,
     fontWeight: "700",
     color: "#2563EB",
   },
