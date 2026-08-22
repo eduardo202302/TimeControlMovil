@@ -30,6 +30,7 @@ import type {
 import {
   getRDDayIndex,
   getRDMinutes,
+  isAlmuerzoButtonVisible,
   isAlmuerzoVisible,
   isJornadaVisible,
   timeStrToMinutes,
@@ -1639,16 +1640,27 @@ export default function PunchInOut() {
             </View>
           )}
 
-          {(selectedCategory !== "Jornada" ||
-            isJornadaVisible(
-              now,
-              todaySchedule,
-              getNextPunchType("Jornada") === "inicio",
-              btnVisWorkIn,
-              btnVisWorkOut,
-              punches,
-              permissions,
-            )) && (
+          {(selectedCategory === "Break" ||
+            (selectedCategory === "Jornada" &&
+              isJornadaVisible(
+                now,
+                todaySchedule,
+                getNextPunchType("Jornada") === "inicio",
+                btnVisWorkIn,
+                btnVisWorkOut,
+                punches,
+                permissions,
+              )) ||
+            (selectedCategory === "Almuerzo" &&
+              isAlmuerzoButtonVisible(
+                now,
+                todaySchedule,
+                getNextPunchType("Almuerzo") === "inicio",
+                btnVisLunchIn,
+                btnVisLunchOut,
+                punches,
+                permissions,
+              ))) && (
             <TouchableOpacity
               style={[
                 styles.registerBtn,

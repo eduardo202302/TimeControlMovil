@@ -278,3 +278,87 @@ export function isAlmuerzoVisible(
 
   return current >= windowStart && current <= windowEnd;
 }
+
+/**
+ * Visibilidad del BOTÓN de acción de Almuerzo (Entrada/Salida) — distinta de
+ * isAlmuerzoVisible (que solo decide si la PESTAÑA "Almuerzo" aparece en el
+ * selector de categorías).
+ *
+ * Entrada: visible desde N min antes de lunchEntryTime hasta N min después
+ * de lunchExitTime — es decir, todo el bloque de almuerzo con margen en
+ * ambas puntas, no una ventana angosta alrededor de la hora de entrada. Así,
+ * alguien que llega tarde a marcar su entrada todavía puede tomar el resto
+ * de su almuerzo, en vez de perder el acceso a los pocos minutos.
+ *
+ * Salida: ventana simétrica alrededor de lunchExitTime (± Ver Botón).
+ *
+ * La etiqueta de puntualidad (Tardanza/A Tiempo) se sigue calculando aparte
+ * con Tolerancia (getPunctuality) — ensanchar esta ventana no ensancha esa
+ * tolerancia.
+ */
+export function isAlmuerzoButtonVisible(
+  now: Date,
+  schedule: UserSchedule | null,
+  isInicio: boolean,
+  btnVisLunchIn: number,
+  btnVisLunchOut: number,
+  punches: PunchEvent[],
+  permissions: UserDayPermission[],
+): boolean {
+  // Ausencia aprobada -> nada disponible mientras dure el permiso
+  if (getApprovedPermission(permissions, PERMISSION_ACTION.AUSENCIA, now)) {
+    return false;
+  }
+  if (!schedule) return false;
+
+  const current = getRDMinutes(now);
+  const lastAlmuerzo = [...punches]
+    .reverse()
+    .find((p) => p.type === "InicioAlmuerzo" || p.type === "FinAlmuerzo");
+
+  // Un permiso de almuerzo aprobado reemplaza la ventana del horario (mismo
+  // criterio que ya usa isAlmuerzoVisible), con el mismo margen simétrico.
+  const [almuerzoPermission] = getApprovedPermissionsByAction(
+    permissions,
+    PERMISSION_ACTION.ALMUERZO,
+  );
+
+  if (isInicio) {
+    // Ya entró o ya salió de almorzar hoy -> ocultar entrada
+    if (lastAlmuerzo) return false;
+
+    // El límite superior de Entrada NO es "entrada + margen" — es
+    // "salida + margen de salida". Así alguien que llega tarde a marcar su
+    // entrada todavía puede tomar el resto de su bloque de almuerzo, en vez
+    // de quedar sin acceso apenas pasan los primeros minutos.
+    const entryTime = almuerzoPermission
+      ? timeStrToMinutes(almuerzoPermission.fromTime)
+      : schedule.lunchEntryTime
+        ? timeStrToMinutes(schedule.lunchEntryTime)
+        : null;
+    const exitTime = almuerzoPermission
+      ? timeStrToMinutes(almuerzoPermission.toTime)
+      : schedule.lunchExitTime
+        ? timeStrToMinutes(schedule.lunchExitTime)
+        : null;
+    if (entryTime === null || exitTime === null) return false;
+    return (
+      current >= entryTime - btnVisLunchIn &&
+      current <= exitTime + btnVisLunchOut
+    );
+  } else {
+    // No inició almuerzo, o ya lo cerró -> ocultar salida
+    if (lastAlmuerzo?.type !== "InicioAlmuerzo") return false;
+
+    const exitTime = almuerzoPermission
+      ? timeStrToMinutes(almuerzoPermission.toTime)
+      : schedule.lunchExitTime
+        ? timeStrToMinutes(schedule.lunchExitTime)
+        : null;
+    if (exitTime === null) return false;
+    return (
+      current >= exitTime - btnVisLunchOut &&
+      current <= exitTime + btnVisLunchOut
+    );
+  }
+}
