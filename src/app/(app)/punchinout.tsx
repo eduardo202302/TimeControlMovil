@@ -412,6 +412,7 @@ export default function PunchInOut() {
     schoolUser?.userSchedules ?? user?.userSchedules ?? [];
   const todaySchedule = getTodaySchedule(userSchedules, now);
   const jornadaIniciada = isJornadaActiva(punches);
+  const lastPunch = punches[punches.length - 1];
 
   // Configuración de la escuela (school.settings) y del usuario (schoolUser.settings)
   const [schoolSettings, setSchoolSettings] = useState<
@@ -1499,7 +1500,7 @@ export default function PunchInOut() {
         </View>
 
         {/* ── Perfil + Horario ── */}
-        <View style={styles.floatCard}>
+        <View style={styles.profileFloatCard}>
           <View style={styles.floatLabel}>
             <Ionicons name="person-circle-outline" size={14} color="#2563EB" />
             <Text style={styles.floatLabelText}>Perfil - Time Control</Text>
@@ -1514,16 +1515,22 @@ export default function PunchInOut() {
                     source={{
                       uri: `https://timecontrol.wsmax.net:8600/${phoneImagen}`,
                     }}
-                    style={{ width: 62, height: 62, borderRadius: 31 }}
+                    style={{ width: 78, height: 78, borderRadius: 39 }}
                     onError={(e) =>
                       console.log("Error imagen:", e.nativeEvent.error)
                     }
                     onLoad={() => console.log("Imagen cargó OK")}
                   />
                 ) : (
-                  <Ionicons name="person" size={28} color="#9CA3AF" />
+                  <Ionicons name="person" size={34} color="#9CA3AF" />
                 )}
               </View>
+              <View
+                style={[
+                  styles.avatarStatusDot,
+                  { backgroundColor: jornadaIniciada ? "#22C55E" : "#9CA3AF" },
+                ]}
+              />
             </View>
 
             {/* Info */}
@@ -1532,51 +1539,96 @@ export default function PunchInOut() {
                 {user?.user.fullName}
               </Text>
 
-              {todaySchedule ? (
-                <View style={styles.scheduleTable}>
-                  <View style={styles.scheduleTableCol}>
-                    <View style={styles.scheduleTableRow}>
-                      <Ionicons name="time-outline" size={13} color="#2563EB" />
-                      <Text style={styles.scheduleTableHeader}>Horario</Text>
-                    </View>
-                    <Text style={styles.scheduleTableValue}>
-                      {to12h(todaySchedule.workEntryTime)} –
-                    </Text>
-                    <Text style={styles.scheduleTableValue}>
-                      {to12h(todaySchedule.workExitTime)}
+              {/* Último ponche registrado */}
+              <View
+                style={[
+                  styles.lastPunchPill,
+                  !lastPunch
+                    ? styles.lastPunchPillNeutral
+                    : lastPunch.type.startsWith("Inicio")
+                      ? styles.lastPunchPillEntry
+                      : styles.lastPunchPillExit,
+                ]}
+              >
+                <Ionicons
+                  name="time-outline"
+                  size={11}
+                  color={
+                    !lastPunch
+                      ? "#6B7280"
+                      : lastPunch.type.startsWith("Inicio")
+                        ? "#16A34A"
+                        : "#2563EB"
+                  }
+                />
+                <Text
+                  style={[
+                    styles.lastPunchPillText,
+                    {
+                      color: !lastPunch
+                        ? "#6B7280"
+                        : lastPunch.type.startsWith("Inicio")
+                          ? "#16A34A"
+                          : "#2563EB",
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {lastPunch
+                    ? `${getPunchTypeLabel(lastPunch.type)} · ${formatRDTimeShort(new Date(lastPunch.createdDate))}`
+                    : "Sin ponches hoy"}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {todaySchedule ? (
+            <View style={styles.scheduleTable}>
+              <View style={[styles.scheduleTableCol, styles.scheduleChipWork]}>
+                <View style={styles.scheduleTableRow}>
+                  <Ionicons name="time-outline" size={14} color="#2563EB" />
+                  <Text
+                    style={[styles.scheduleTableHeader, { color: "#1D4ED8" }]}
+                  >
+                    Horario
+                  </Text>
+                </View>
+                <Text style={styles.scheduleTableValue}>
+                  {to12h(todaySchedule.workEntryTime)} –{" "}
+                  {to12h(todaySchedule.workExitTime)}
+                </Text>
+              </View>
+              {todaySchedule.lunchEntryTime && (
+                <View
+                  style={[styles.scheduleTableCol, styles.scheduleChipLunch]}
+                >
+                  <View style={styles.scheduleTableRow}>
+                    <Ionicons
+                      name="restaurant-outline"
+                      size={14}
+                      color="#D97706"
+                    />
+                    <Text
+                      style={[styles.scheduleTableHeader, { color: "#92400E" }]}
+                    >
+                      Almuerzo
                     </Text>
                   </View>
-                  {todaySchedule.lunchEntryTime && (
-                    <View style={styles.scheduleTableCol}>
-                      <View style={styles.scheduleTableRow}>
-                        <Ionicons
-                          name="restaurant-outline"
-                          size={13}
-                          color="#D97706"
-                        />
-                        <Text style={styles.scheduleTableHeader}>Almuerzo</Text>
-                      </View>
-                      <Text style={styles.scheduleTableValue}>
-                        {to12h(todaySchedule.lunchEntryTime)} –
-                      </Text>
-                      <Text style={styles.scheduleTableValue}>
-                        {to12h(todaySchedule.lunchExitTime ?? "")}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              ) : (
-                <View style={styles.profileScheduleRow}>
-                  <Ionicons name="warning-outline" size={13} color="#D97706" />
-                  <Text
-                    style={[styles.profileScheduleText, { color: "#D97706" }]}
-                  >
-                    Sin horario configurado
+                  <Text style={styles.scheduleTableValue}>
+                    {to12h(todaySchedule.lunchEntryTime)} –{" "}
+                    {to12h(todaySchedule.lunchExitTime ?? "")}
                   </Text>
                 </View>
               )}
             </View>
-          </View>
+          ) : (
+            <View style={styles.profileScheduleRow}>
+              <Ionicons name="warning-outline" size={13} color="#D97706" />
+              <Text style={[styles.profileScheduleText, { color: "#D97706" }]}>
+                Sin horario configurado
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* ── Categoría + Botón registrar (bloque unificado) ── */}
@@ -1975,8 +2027,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   profileCardTitle: { fontSize: 14, fontWeight: "600", color: "#2563EB" },
-  profileRow: { flexDirection: "row", alignItems: "center", gap: 14 },
-  avatarWrap: { flexShrink: 0 },
+  profileRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
+  avatarWrap: { flexShrink: 0, position: "relative" },
+  avatarStatusDot: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    width: 13,
+    height: 13,
+    borderRadius: 6.5,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
   avatar: {
     width: 62,
     height: 62,
@@ -1986,25 +2053,38 @@ const styles = StyleSheet.create({
     borderColor: "#DBEAFE",
   },
   avatarFallback: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
+    width: 78,
+    height: 78,
+    borderRadius: 39,
     backgroundColor: "#EFF6FF",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
     borderColor: "#BFDBFE",
   },
-  profileInfo: { flex: 1, gap: 4 },
+  profileInfo: { flex: 1, justifyContent: "center", gap: 6 },
   profileRoleText: { fontSize: 12, color: "#2563EB", fontWeight: "600" },
   profileName: {
-    fontSize: 15,
+    fontSize: 20,
     fontWeight: "800",
     color: "#111827",
     letterSpacing: 0.1,
   },
   profileScheduleRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   profileScheduleText: { fontSize: 12, color: "#6B7280" },
+  lastPunchPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  lastPunchPillEntry: { backgroundColor: "#DCFCE7" },
+  lastPunchPillExit: { backgroundColor: "#EFF6FF" },
+  lastPunchPillNeutral: { backgroundColor: "#F3F4F6" },
+  lastPunchPillText: { fontSize: 11, fontWeight: "700" },
   scheduleCard: {
     backgroundColor: "#EFF6FF",
     borderRadius: 12,
@@ -2033,20 +2113,31 @@ const styles = StyleSheet.create({
   scheduleItems: { gap: 4 },
   scheduleItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   scheduleText: { fontSize: 13, color: "#374151" },
-  scheduleTable: {
-    flexDirection: "row",
-    gap: 16,
-    marginTop: 6,
+  scheduleTable: { flexDirection: "row", gap: 8 },
+  scheduleTableCol: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    gap: 6,
   },
-  scheduleTableCol: { gap: 3 },
-  scheduleTableRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  scheduleTableHeader: { fontSize: 11, fontWeight: "700", color: "#6B7280" },
+  scheduleChipWork: { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" },
+  scheduleChipLunch: { backgroundColor: "#FEF3C7", borderColor: "#FDE68A" },
+  scheduleTableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  scheduleTableHeader: { fontSize: 12, fontWeight: "700", color: "#6B7280" },
   scheduleTableValue: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "700",
     color: "#111827",
-    marginLeft: 13,
+    textAlign: "center",
   },
 
   /* ── Floating label card ── */
@@ -2058,6 +2149,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 22,
     paddingBottom: 18,
+    marginTop: 8,
+    elevation: 0,
+  },
+  profileFloatCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 14,
     marginTop: 8,
     elevation: 0,
   },
