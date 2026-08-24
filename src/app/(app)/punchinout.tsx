@@ -347,6 +347,38 @@ const getCurrentCoordinates = async (): Promise<{
 };
 
 /**
+ * Variante silenciosa de getCurrentCoordinates(), para vistas de solo
+ * lectura (ej. bloque "Ubicación" de la card de Perfil). No pide permiso
+ * (solo lo lee) ni muestra Alert — si algo falla, simplemente no hay
+ * coordenadas y el bloque que las consume no se muestra.
+ */
+const getCurrentCoordinatesSilent = async (): Promise<{
+  latitude: number;
+  longitude: number;
+} | null> => {
+  try {
+    const { status } = await Location.getForegroundPermissionsAsync();
+    if (status !== "granted") return null;
+
+    const location = await Promise.race([
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
+    ]);
+
+    if (!location) return null;
+
+    return {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+    };
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Permisos aprobados/pendientes del día. Nunca lanza: si falla, devuelve []
  * para no romper el render del ponchador (el interceptor global de axios ya se
  * encarga de la sesión expirada).
@@ -403,6 +435,10 @@ export default function PunchInOut() {
   );
   const [breakTagModalVisible, setBreakTagModalVisible] = useState(false);
   const [permissions, setPermissions] = useState<UserDayPermission[]>([]);
+  const [currentLocationInfo, setCurrentLocationInfo] = useState<{
+    address: string;
+    withinArea: boolean;
+  } | null>(null);
 
   const { user, urlColegio, logout } = useSchoolStore();
 
@@ -803,6 +839,64 @@ export default function PunchInOut() {
   useEffect(() => {
     loadTodayPermissions();
   }, [loadTodayPermissions]);
+
+  // Ubicación EN VIVO del dispositivo (card de Perfil) — solo lectura, no
+  // forma parte del flujo de ponchar. Independiente de las coordenadas del
+  // último ponche: el webapp muestra la posición actual evaluada contra la
+  // geocerca, no la de un ponche histórico (que puede no tener coords si se
+  // hizo desde canal Web). Silenciosa: si el permiso de foreground no está
+  // ya otorgado, no se pide (nada de Alert) y el bloque no aparece.
+  // Se re-evalúa con isValidLocation y con cada refresh de `punches` (mismo
+  // trigger que fetchTodayPunches ya usa tras ponchar / pull-to-refresh /
+  // montaje) para no agregar un poll dedicado nuevo.
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolveCurrentLocation = async () => {
+      if (!isValidLocation) {
+        setCurrentLocationInfo(null);
+        return;
+      }
+
+      const coords = await getCurrentCoordinatesSilent();
+      if (cancelled) return;
+      if (!coords) {
+        setCurrentLocationInfo(null);
+        return;
+      }
+
+      try {
+        const [geocoded] = await Location.reverseGeocodeAsync(coords);
+        if (cancelled) return;
+
+        const street = geocoded?.street ?? geocoded?.name ?? "Ubicación desconocida";
+        const city = geocoded?.city ?? geocoded?.subregion ?? geocoded?.region;
+        const address = city ? `${street}, ${city}` : street;
+
+        const target = getTargetGeofenceLocation();
+        const distance = getDistanceInMeters(
+          coords.latitude,
+          coords.longitude,
+          target.targetLatitude,
+          target.targetLongitude,
+        );
+
+        setCurrentLocationInfo({
+          address,
+          withinArea: distance <= target.radius,
+        });
+      } catch {
+        if (!cancelled) setCurrentLocationInfo(null);
+      }
+    };
+
+    resolveCurrentLocation();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isValidLocation, punches]);
 
   const getNextPunchType = (category: Category): "inicio" | "fin" => {
     const types = PUNCH_TYPE_MAP[category];
@@ -1552,7 +1646,7 @@ export default function PunchInOut() {
               >
                 <Ionicons
                   name="time-outline"
-                  size={11}
+                  size={14}
                   color={
                     !lastPunch
                       ? "#6B7280"
@@ -1581,6 +1675,46 @@ export default function PunchInOut() {
               </View>
             </View>
           </View>
+
+          {isValidLocation && currentLocationInfo && (
+            <View
+              style={[
+                styles.locationBlock,
+                currentLocationInfo.withinArea
+                  ? styles.locationBlockWithin
+                  : styles.locationBlockOutside,
+              ]}
+            >
+              <View style={styles.locationHeaderRow}>
+                <Ionicons name="location-outline" size={13} color="#6B7280" />
+                <Text style={styles.locationHeaderText}>Ubicación</Text>
+              </View>
+              <Text style={styles.locationAddressText} numberOfLines={2}>
+                {currentLocationInfo.address}
+              </Text>
+              <View style={styles.locationStatusRow}>
+                <Ionicons
+                  name="location-outline"
+                  size={13}
+                  color={currentLocationInfo.withinArea ? "#16A34A" : "#DC2626"}
+                />
+                <Text
+                  style={[
+                    styles.locationStatusText,
+                    {
+                      color: currentLocationInfo.withinArea
+                        ? "#16A34A"
+                        : "#DC2626",
+                    },
+                  ]}
+                >
+                  {currentLocationInfo.withinArea
+                    ? "Dentro de área"
+                    : "Fuera de área"}
+                </Text>
+              </View>
+            </View>
+          )}
 
           {todaySchedule ? (
             <View style={styles.scheduleTable}>
@@ -2031,7 +2165,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   avatarWrap: { flexShrink: 0, position: "relative" },
   avatarStatusDot: {
@@ -2062,10 +2196,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#BFDBFE",
   },
-  profileInfo: { flex: 1, justifyContent: "center", gap: 6 },
+  profileInfo: { flex: 1, justifyContent: "center", gap: 4 },
   profileRoleText: { fontSize: 12, color: "#2563EB", fontWeight: "600" },
   profileName: {
-    fontSize: 20,
+    fontSize: 25,
     fontWeight: "800",
     color: "#111827",
     letterSpacing: 0.1,
@@ -2076,15 +2210,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     alignSelf: "flex-start",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 20,
   },
   lastPunchPillEntry: { backgroundColor: "#DCFCE7" },
   lastPunchPillExit: { backgroundColor: "#EFF6FF" },
   lastPunchPillNeutral: { backgroundColor: "#F3F4F6" },
-  lastPunchPillText: { fontSize: 11, fontWeight: "700" },
+  lastPunchPillText: { fontSize: 14, fontWeight: "700" },
+  locationBlock: {
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    gap: 4,
+    marginBottom: 8,
+  },
+  locationBlockWithin: { backgroundColor: "#DCFCE7", borderColor: "#BBF7D0" },
+  locationBlockOutside: { backgroundColor: "#FEE2E2", borderColor: "#FECACA" },
+  locationHeaderRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  locationHeaderText: { fontSize: 12, fontWeight: "700", color: "#6B7280" },
+  locationAddressText: { fontSize: 13, color: "#374151" },
+  locationStatusRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  locationStatusText: { fontSize: 12, fontWeight: "700" },
   scheduleCard: {
     backgroundColor: "#EFF6FF",
     borderRadius: 12,
