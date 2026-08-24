@@ -9,6 +9,7 @@ import {
   getRDMinutes,
   isAlmuerzoButtonVisible,
   isAlmuerzoVisible,
+  isBreakVisible,
   isJornadaVisible,
   timeStrToMinutes,
   warnedUnexpectedActions,
@@ -705,6 +706,26 @@ describe("15. isAlmuerzoButtonVisible — Salida", () => {
     expect(
       verAlmuerzoBotonSalida(rd(16, 11), permisoAlmuerzo, conAlmuerzoIniciado),
     ).toBe(false);
+  });
+});
+
+// ─── 16. isBreakVisible — no se puede estar en Break y Almuerzo a la vez ──────
+
+describe("16. isBreakVisible", () => {
+  it("16a. visible sin ningún ponche de almuerzo hoy", () => {
+    expect(isBreakVisible(PUNCHES.ninguno)).toBe(true);
+  });
+
+  it("16b. visible con la jornada iniciada, sin haber ido a almorzar", () => {
+    expect(isBreakVisible(PUNCHES.jornadaIniciada)).toBe(true);
+  });
+
+  it("16c. oculto mientras el almuerzo está activo (InicioAlmuerzo sin cerrar)", () => {
+    expect(isBreakVisible(PUNCHES.almuerzoIniciado)).toBe(false);
+  });
+
+  it("16d. visible de nuevo una vez que el almuerzo ya se cerró", () => {
+    expect(isBreakVisible(PUNCHES.almuerzoCerrado)).toBe(true);
   });
 });
 

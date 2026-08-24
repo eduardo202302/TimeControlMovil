@@ -32,6 +32,7 @@ import {
   getRDMinutes,
   isAlmuerzoButtonVisible,
   isAlmuerzoVisible,
+  isBreakVisible,
   isJornadaVisible,
   timeStrToMinutes,
   toRD,
@@ -706,6 +707,9 @@ export default function PunchInOut() {
     ) {
       setSelectedCategory("Jornada");
     }
+    if (selectedCategory === "Break" && !isBreakVisible(punches)) {
+      setSelectedCategory("Jornada");
+    }
   }, [now, punches, todaySchedule, selectedCategory, permissions]);
 
   // Motivo de break no debe sobrevivir un cambio de categoría — evita que un
@@ -1276,6 +1280,7 @@ export default function PunchInOut() {
         punches,
         permissions,
       );
+    if (cat === "Break") return isBreakVisible(punches);
     if (cat === "Jornada") return true;
     return true;
   });

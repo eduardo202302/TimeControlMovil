@@ -280,6 +280,18 @@ export function isAlmuerzoVisible(
 }
 
 /**
+ * Visibilidad de la pestaña de Break — oculta mientras haya un Almuerzo
+ * activo (InicioAlmuerzo sin FinAlmuerzo), ya que no se puede estar en
+ * ambas actividades a la vez.
+ */
+export function isBreakVisible(punches: PunchEvent[]): boolean {
+  const lastAlmuerzo = [...punches]
+    .reverse()
+    .find((p) => p.type === "InicioAlmuerzo" || p.type === "FinAlmuerzo");
+  return lastAlmuerzo?.type !== "InicioAlmuerzo";
+}
+
+/**
  * Visibilidad del BOTÓN de acción de Almuerzo (Entrada/Salida) — distinta de
  * isAlmuerzoVisible (que solo decide si la PESTAÑA "Almuerzo" aparece en el
  * selector de categorías).
