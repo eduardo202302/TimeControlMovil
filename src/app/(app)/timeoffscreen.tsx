@@ -1,10 +1,6 @@
 import React from "react";
-import { View, Text } from "react-native";
+import SolicitarPermisoForm from "../../components/timeoff/SolicitarPermisoForm";
 
 export default function TimeoffScreen() {
-  return (
-    <View>
-      <Text>Hola</Text>
-    </View>
-  );
+  return <SolicitarPermisoForm />;
 }
