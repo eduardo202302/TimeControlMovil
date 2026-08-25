@@ -17,6 +17,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/tardiness": "Tardanzas",
   "/parentsexcusesscreen": "Excusas",
   "/timeoff": "Permisos",
+  "/timeoffscreen": "Solicitar Permiso",
+  "/mypermissions": "Mis Permisos",
   "/dashboard": "Dashboard",
   "/users": "Usuarios",
   "/students": "Estudiantes",
