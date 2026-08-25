@@ -143,6 +143,12 @@ function formatRDDate(date: Date): string {
   return `${WEEK_DAYS[weekDay]}, ${day} de ${MONTH_NAMES[month]} de ${year}`;
 }
 
+/** "Miércoles 8 de agosto" — reloj compacto, sin año */
+function formatRDDateShort(date: Date): string {
+  const { weekDay, day, month } = toRD(date);
+  return `${WEEK_DAYS[weekDay]} ${day} de ${MONTH_NAMES[month]}`;
+}
+
 // ─── Helpers de negocio ───────────────────────────────────────────────────────
 
 function getTodaySchedule(
@@ -1565,31 +1571,25 @@ export default function PunchInOut() {
         }
       >
         {/* ── Reloj ── */}
-        <View style={styles.floatCard}>
+        <View style={styles.clockFloatCard}>
           <View style={styles.floatLabel}>
             <Ionicons name="time-outline" size={14} color="#2563EB" />
             <Text style={styles.floatLabelText}>Hora Actual</Text>
           </View>
           <View style={styles.clockCard}>
-            <View style={styles.clockTextWrap}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: "100%",
-                }}
-              >
-                <Text style={styles.clockTime}>
-                  {formatRDTime(now).split(" ")[0]}
-                </Text>
-                <Text style={styles.clockAmPm}>
-                  {" "}
-                  {formatRDTime(now).split(" ").slice(1).join(" ")}
-                </Text>
-              </View>
-              <Text style={styles.clockDate}>{formatRDDate(now)}</Text>
+            <View style={styles.clockTimeGroup}>
+              <Text style={styles.clockTime}>
+                {formatRDTimeShort(now).split(" ")[0]}
+              </Text>
+              <Text style={styles.clockAmPm}>
+                {" "}
+                {formatRDTimeShort(now).split(" ").slice(1).join(" ")}
+              </Text>
             </View>
+            <View style={styles.clockDivider} />
+            <Text style={styles.clockDateCompact}>
+              {formatRDDateShort(now)}
+            </Text>
           </View>
         </View>
 
@@ -2101,31 +2101,41 @@ export default function PunchInOut() {
 const styles = StyleSheet.create({
   content: { padding: 16, gap: 18, paddingBottom: 40 },
   /* ── Clock ── */
+  clockFloatCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 12,
+    marginTop: 8,
+    elevation: 0,
+  },
   clockCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#EFF6FF",
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#BFDBFE",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
   },
-  clockTextWrap: {
-    alignItems: "center",
-    justifyContent: "center",
+  clockTimeGroup: {
+    flexDirection: "row",
+    alignItems: "baseline",
+  },
+  clockDivider: {
+    width: 1,
+    height: 22,
+    backgroundColor: "#BFDBFE",
+    marginHorizontal: 16,
   },
   clockTime: {
     color: "#1D4ED8",
-    fontSize: 40,
+    fontSize: 24,
     fontWeight: "800",
     letterSpacing: 0.5,
     textAlign: "center",
-    marginLeft: 25,
   },
   clockAmPm: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
     marginLeft: 4,
     color: "#142157",
@@ -2136,6 +2146,12 @@ const styles = StyleSheet.create({
     marginTop: 1,
     textTransform: "capitalize",
     letterSpacing: 0.2,
+    textAlign: "center",
+  },
+  clockDateCompact: {
+    color: "#3B82F6",
+    fontSize: 12,
+    fontWeight: "600",
     textAlign: "center",
   },
   clockUserRow: {
