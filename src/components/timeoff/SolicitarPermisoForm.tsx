@@ -4,7 +4,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import axios from "axios";
 import * as DocumentPicker from "expo-document-picker";
-import { File as FsFile } from "expo-file-system";
+import * as FileSystemLegacy from "expo-file-system/legacy";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -505,7 +505,10 @@ export default function SolicitarPermisoForm() {
           }
           // En web el picker ya devuelve el base64; en nativo se lee del cache.
           const base64 =
-            asset.base64 ?? (await new FsFile(asset.uri).base64());
+            asset.base64 ??
+            (await FileSystemLegacy.readAsStringAsync(asset.uri, {
+              encoding: FileSystemLegacy.EncodingType.Base64,
+            }));
           const mimeType =
             asset.mimeType || "application/octet-stream";
           const dataUri = `data:${mimeType};base64,${base64}`;
