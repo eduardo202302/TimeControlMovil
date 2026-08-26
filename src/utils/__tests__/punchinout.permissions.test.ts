@@ -6,6 +6,7 @@ import type { UserSchedule } from "../../../types/typeStore/SchoolStoreType";
 import {
   PERMISSION_ACTION,
   getApprovedPermission,
+  getPunctuality,
   getRDMinutes,
   isAlmuerzoButtonVisible,
   isAlmuerzoVisible,
@@ -412,10 +413,10 @@ describe("3. Ausencia en estado Solicitado no bloquea nada", () => {
 describe("4–5. Permiso de Entrada (llegada tardía)", () => {
   const entrada = [permiso("Entrada", "08:00:00", "11:30:00")];
 
-  it("4. dentro de la ventana el botón Entrada queda oculto", () => {
-    expect(verEntrada(rd(8), entrada)).toBe(false);
-    expect(verEntrada(rd(9, 30), entrada)).toBe(false);
-    expect(verEntrada(rd(11, 30), entrada)).toBe(false);
+  it("4. dentro de la ventana el botón Entrada está habilitado", () => {
+    expect(verEntrada(rd(8), entrada)).toBe(true);
+    expect(verEntrada(rd(9, 30), entrada)).toBe(true);
+    expect(verEntrada(rd(11, 30), entrada)).toBe(true);
     // sin el permiso, a esas horas estaría visible
     expect(verEntrada(rd(9, 30), [])).toBe(true);
   });
@@ -783,6 +784,78 @@ describe("getApprovedPermission", () => {
       "Entradas",
     );
     warn.mockRestore();
+  });
+});
+
+// ─── 17. Ponches cubiertos por un permiso ────────────────────────────────────
+// Cuando el backend asocia el ponche a un permiso (permissionId), ya resolvió
+// el estado teniéndolo en cuenta. El cálculo local no tiene el permiso a la
+// vista y marcaría Tardanza/Anticipada, pisando el valor correcto — por eso
+// getPunctuality se salta el cálculo y devuelve null, dejando que la UI caiga
+// en el fallback `punch.status`.
+
+describe("17. getPunctuality con permissionId", () => {
+  /** Réplica del fallback de la UI: puntualidad local > status del backend.
+   * (La cadena completa vive en punchinout.tsx; aquí solo el tramo relevante.) */
+  const displayStatus = (p: PunchEvent) =>
+    getPunctuality(p, [schedule], TOL) ?? p.status ?? "A Tiempo";
+
+  /** El caso real: entrada 11:53 con permiso de llegada tardía aprobado.
+   * Horario 08:00 + 5 min de tolerancia -> localmente sería "Tardanza". */
+  const entradaConPermiso = punch("InicioJornada", {
+    id: 9666,
+    createdDate: "2026-08-19T15:53:31.000Z",
+    permissionId: 698,
+    status: "A Tiempo",
+  });
+
+  it("17a. InicioJornada con permissionId no se recalcula: queda A Tiempo", () => {
+    expect(getPunctuality(entradaConPermiso, [schedule], TOL)).toBeNull();
+    expect(displayStatus(entradaConPermiso)).toBe("A Tiempo");
+  });
+
+  it("17b. el mismo ponche SIN permissionId sí se marca Tardanza", () => {
+    const sinPermiso = { ...entradaConPermiso, permissionId: null };
+    expect(getPunctuality(sinPermiso, [schedule], TOL)).toBe("Tardanza");
+    expect(displayStatus(sinPermiso)).toBe("Tardanza");
+
+    // permissionId ausente por completo se comporta igual que null
+    const { permissionId, ...omitido } = entradaConPermiso;
+    expect(getPunctuality(omitido, [schedule], TOL)).toBe("Tardanza");
+  });
+
+  it("17c. FinJornada con permissionId tampoco se recalcula", () => {
+    // 14:00, muy antes de las 17:00 -> localmente sería "Anticipada"
+    const salida = punch("FinJornada", {
+      createdDate: "2026-08-19T18:00:00.000Z",
+      permissionId: 700,
+      status: "A Tiempo",
+    });
+    expect(getPunctuality(salida, [schedule], TOL)).toBeNull();
+    expect(displayStatus(salida)).toBe("A Tiempo");
+
+    const sinPermiso = { ...salida, permissionId: null };
+    expect(getPunctuality(sinPermiso, [schedule], TOL)).toBe("Anticipada");
+  });
+
+  it("17d. Almuerzo NO cambia: sigue calculándose aunque traiga permissionId", () => {
+    // 12:30, pasada la ventana 12:00 + 5 -> "Tardanza" con o sin permiso
+    const inicio = punch("InicioAlmuerzo", {
+      createdDate: "2026-08-19T16:30:00.000Z",
+      permissionId: 701,
+    });
+    expect(getPunctuality(inicio, [schedule], TOL)).toBe("Tardanza");
+
+    // 13:30, pasada la ventana 13:00 + 5 -> "Tardanza"
+    const fin = punch("FinAlmuerzo", {
+      createdDate: "2026-08-19T17:30:00.000Z",
+      permissionId: 701,
+    });
+    expect(getPunctuality(fin, [schedule], TOL)).toBe("Tardanza");
+  });
+
+  it("17e. sin horario del día devuelve null como siempre", () => {
+    expect(getPunctuality(entradaConPermiso, [], TOL)).toBeNull();
   });
 });
 

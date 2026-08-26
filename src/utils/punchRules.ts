@@ -27,6 +27,7 @@ export interface PunchEvent {
   earlyExit?: boolean;
   overtime?: number | string;
   toleranceMinutes?: number | null;
+  permissionId?: number | null;
   hasOpenDay?: boolean | string;
   openDayDate?: string;
   date?: string;
@@ -92,6 +93,90 @@ export function getRDMinutes(date: Date): number {
 /** Día de la semana en RD */
 export function getRDDayIndex(date: Date): number {
   return toRD(date).weekDay;
+}
+
+export const WEEK_DAYS: Record<number, string> = {
+  0: "Domingo",
+  1: "Lunes",
+  2: "Martes",
+  3: "Miércoles",
+  4: "Jueves",
+  5: "Viernes",
+  6: "Sábado",
+};
+
+export interface ToleranceConfig {
+  workIn: number;
+  workOut: number;
+  lunchIn: number;
+  lunchOut: number;
+}
+
+export type PunctualityStatus = "Tardanza" | "Anticipada" | "A Tiempo";
+
+export function getScheduleForDay(
+  schedules: UserSchedule[],
+  date: Date,
+): UserSchedule | null {
+  const dayName = WEEK_DAYS[getRDDayIndex(date)];
+  return schedules.find((s) => s.weekDay === dayName) ?? null;
+}
+
+/**
+ * Calcula la puntualidad del ponche comparando la hora registrada (en RD)
+ * contra el horario del día correspondiente. Devuelve null cuando no hay
+ * horario aplicable (ej. Break, días sin schedule) para dejar que la UI
+ * use el estado que devuelva el backend.
+ */
+export function getPunctuality(
+  punch: PunchEvent,
+  schedules: UserSchedule[],
+  defaults: ToleranceConfig,
+): PunctualityStatus | null {
+  const punchDate = new Date(punch.createdDate);
+  const schedule = getScheduleForDay(schedules, punchDate);
+  if (!schedule) return null;
+
+  const punchMinutes = getRDMinutes(punchDate);
+
+  switch (punch.type) {
+    case "InicioJornada": {
+      // Ponche cubierto por un permiso: el backend ya resolvió el estado
+      // teniendo el permiso en cuenta — no recalcular localmente.
+      if (punch.permissionId != null) return null;
+      const entryTime = timeStrToMinutes(schedule.workEntryTime);
+      const tolerance = schedule.toleranceWorkTimeIn ?? defaults.workIn;
+      if (punchMinutes > entryTime + tolerance) return "Tardanza";
+      if (punchMinutes < entryTime - tolerance) return "Anticipada";
+      return "A Tiempo";
+    }
+    case "FinJornada": {
+      // Ponche cubierto por un permiso: el backend ya resolvió el estado
+      // teniendo el permiso en cuenta — no recalcular localmente.
+      if (punch.permissionId != null) return null;
+      return punchMinutes <
+        timeStrToMinutes(schedule.workExitTime) -
+          (schedule.toleranceWorkTimeOut ?? defaults.workOut)
+        ? "Anticipada"
+        : "A Tiempo";
+    }
+    case "InicioAlmuerzo":
+      if (!schedule.lunchEntryTime) return null;
+      return punchMinutes >
+        timeStrToMinutes(schedule.lunchEntryTime) +
+          (schedule.toleranceLunchTimeIn ?? defaults.lunchIn)
+        ? "Tardanza"
+        : "A Tiempo";
+    case "FinAlmuerzo":
+      if (!schedule.lunchExitTime) return null;
+      return punchMinutes >
+        timeStrToMinutes(schedule.lunchExitTime) +
+          (schedule.toleranceLunchTimeOut ?? defaults.lunchOut)
+        ? "Tardanza"
+        : "A Tiempo";
+    default:
+      return null;
+  }
 }
 
 export function timeStrToMinutes(timeStr: string): number {
@@ -204,9 +289,9 @@ export function isJornadaVisible(
     if (lastJornada?.type === "InicioJornada") return false;
     // Ya salio hoy -> ocultar
     if (lastJornada?.type === "FinJornada") return false;
-    // Permiso de entrada tardía -> bloquear aunque esté en horario normal
+    // Permiso de entrada tardía aprobado -> habilitar dentro de su ventana
     if (getApprovedPermission(permissions, PERMISSION_ACTION.ENTRADA, now)) {
-      return false;
+      return true;
     }
     if (fueraDeHorario) return true;
     // Sin horario -> ocultar siempre
