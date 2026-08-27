@@ -1506,9 +1506,9 @@ export default function PunchInOut() {
       >
         {/* ── Reloj ── */}
         <View style={styles.clockFloatCard}>
-          <View style={styles.floatLabel}>
-            <Ionicons name="time-outline" size={14} color="#2563EB" />
-            <Text style={styles.floatLabelText}>Hora Actual</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="time-outline" size={18} color="#2563EB" />
+            <Text style={styles.sectionHeaderText}>Hora Actual</Text>
           </View>
           <View style={styles.clockCard}>
             <View style={styles.clockTimeGroup}>
@@ -1529,9 +1529,9 @@ export default function PunchInOut() {
 
         {/* ── Perfil + Horario ── */}
         <View style={styles.profileFloatCard}>
-          <View style={styles.floatLabel}>
-            <Ionicons name="person-circle-outline" size={14} color="#2563EB" />
-            <Text style={styles.floatLabelText}>Perfil - Time Control</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="person-circle-outline" size={18} color="#2563EB" />
+            <Text style={styles.sectionHeaderText}>Perfil - Time Control</Text>
           </View>
 
           <View style={styles.profileRow}>
@@ -1701,13 +1701,13 @@ export default function PunchInOut() {
 
         {/* ── Categoría + Botón registrar (bloque unificado) ── */}
         <View style={styles.floatCard}>
-          <View style={styles.floatLabel}>
+          <View style={styles.sectionHeaderRow}>
             <Ionicons
               name="swap-horizontal-outline"
-              size={14}
+              size={18}
               color="#2563EB"
             />
-            <Text style={styles.floatLabelText}>Reg. Entrada / Salida</Text>
+            <Text style={styles.sectionHeaderText}>Reg. Entrada / Salida</Text>
           </View>
           <View style={styles.categories}>
             {visibleCategories.map((cat) => {
@@ -1822,13 +1822,13 @@ export default function PunchInOut() {
         {/* ── Tolerancias de visibilidad de botones ── */}
         <View style={styles.floatCard}>
           <TouchableOpacity
-            style={styles.historyHeader}
+            style={styles.sectionHeaderToggle}
             onPress={() => setTolerancesExpanded((prev) => !prev)}
             activeOpacity={0.7}
           >
-            <View style={styles.floatLabelInline}>
-              <Ionicons name="hourglass-outline" size={14} color="#2563EB" />
-              <Text style={styles.floatLabelText}>Ver Botones de Acciones</Text>
+            <View style={styles.sectionHeaderToggleLabel}>
+              <Ionicons name="hourglass-outline" size={18} color="#2563EB" />
+              <Text style={styles.sectionHeaderText}>Ver Botones de Acciones</Text>
             </View>
             <View style={styles.historyChevronBtn}>
               <Ionicons
@@ -1871,13 +1871,13 @@ export default function PunchInOut() {
         {/* ── Registros del día ── */}
         <View style={styles.floatCard}>
           <TouchableOpacity
-            style={styles.historyHeader}
+            style={styles.sectionHeaderToggle}
             onPress={() => setHistoryExpanded(!historyExpanded)}
             activeOpacity={0.7}
           >
-            <View style={styles.floatLabelInline}>
-              <Ionicons name="list-outline" size={14} color="#2563EB" />
-              <Text style={styles.floatLabelText}>Historial del Día</Text>
+            <View style={styles.sectionHeaderToggleLabel}>
+              <Ionicons name="list-outline" size={18} color="#2563EB" />
+              <Text style={styles.sectionHeaderText}>Historial del Día</Text>
             </View>
             <View style={styles.historyChevronBtn}>
               <Ionicons
@@ -2084,7 +2084,7 @@ const styles = StyleSheet.create({
   },
   clockDateCompact: {
     color: "#3B82F6",
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: "600",
     textAlign: "center",
   },
@@ -2246,7 +2246,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#E5E7EB",
     paddingHorizontal: 16,
-    paddingTop: 22,
+    paddingTop: 14,
     paddingBottom: 18,
     marginTop: 8,
     elevation: 0,
@@ -2257,43 +2257,28 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#E5E7EB",
     paddingHorizontal: 16,
-    paddingTop: 20,
+    paddingTop: 14,
     paddingBottom: 14,
     marginTop: 8,
     elevation: 0,
   },
-  floatLabel: {
+  sectionHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    position: "absolute",
-    top: -11,
-    left: 14,
-    backgroundColor: APP_BACKGROUND,
-    paddingHorizontal: 7,
+    gap: 8,
+    marginBottom: 14,
   },
-  floatLabelText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#2563EB",
-    letterSpacing: 0.3,
-    textTransform: "none",
-  },
-  floatLabelInline: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: APP_BACKGROUND,
-    paddingHorizontal: 7,
-  },
-  historyHeader: {
+  sectionHeaderText: { fontSize: 15, fontWeight: "700", color: "#111827" },
+  sectionHeaderToggle: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    position: "absolute",
-    top: -11,
-    left: 14,
-    right: 14,
+    marginBottom: 14,
+  },
+  sectionHeaderToggleLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   historyChevronBtn: {
     width: 20,

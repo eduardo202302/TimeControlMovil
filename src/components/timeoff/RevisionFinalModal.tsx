@@ -117,7 +117,7 @@ export default function RevisionFinalModal({
               <Ionicons name="checkmark-circle" size={24} color="#2563EB" />
             </View>
             <View style={styles.headerTextWrap}>
-              <Text style={styles.headerTitle}>Revisión Final</Text>
+              <Text style={styles.headerTitle}>Resumen</Text>
               <Text style={styles.headerSubtitle}>
                 Verifica los datos antes de enviar tu solicitud
               </Text>

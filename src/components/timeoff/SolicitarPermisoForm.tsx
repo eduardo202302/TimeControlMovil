@@ -72,6 +72,14 @@ interface SubmitOutcome {
 /** Nombre de la acción que el backend trata como día completo (00:00–23:59). */
 const AUSENCIA_ACTION_NAME = "ausencia";
 
+/** Alto fijo del textarea de Motivo — debe coincidir con minHeight/maxHeight
+ * de `styles.textarea`, es la base del cálculo del scrollbar visual. */
+const MOTIVO_TEXTAREA_HEIGHT = 120;
+
+/** Separación del track del scrollbar respecto al borde superior/inferior
+ * del textarea — debe coincidir con `styles.motivoScrollTrack` (top/bottom). */
+const MOTIVO_TRACK_INSET = 4;
+
 /** Tope por archivo antes de convertirlo a base64 — el data-URI pesa ~1.34x. */
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 
@@ -252,6 +260,8 @@ export default function SolicitarPermisoForm() {
   const [selectedType, setSelectedType] = useState<PermissionTag | null>(null);
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
+  const [motivoContentHeight, setMotivoContentHeight] = useState(0);
+  const [motivoScrollY, setMotivoScrollY] = useState(0);
   const [fromDate, setFromDate] = useState<Date | null>(null);
   const [toDate, setToDate] = useState<Date | null>(null);
   const [fromTime, setFromTime] = useState<Date | null>(null);
@@ -784,6 +794,23 @@ export default function SolicitarPermisoForm() {
   const selectorSelectedId =
     selectorOpen === "action" ? selectedAction?.id : selectedType?.id;
 
+  // Scrollbar visual del textarea de Motivo — proporcional al contenido real,
+  // solo se calcula cuando hay overflow (ver condición de render más abajo).
+  // El thumb vive DENTRO del track (inset 4 arriba/abajo), así que la escala
+  // y el clamp usan el alto efectivo del track, no el del textarea completo.
+  const motivoTrackHeight = MOTIVO_TEXTAREA_HEIGHT - MOTIVO_TRACK_INSET * 2;
+  const motivoThumbHeight = Math.max(
+    (motivoTrackHeight * motivoTrackHeight) / Math.max(motivoContentHeight, 1),
+    16,
+  );
+  const motivoThumbTop = Math.min(
+    Math.max(
+      motivoScrollY * (motivoTrackHeight / Math.max(motivoContentHeight, 1)),
+      0,
+    ),
+    motivoTrackHeight - motivoThumbHeight,
+  );
+
   return (
     <>
       <ScrollView
@@ -888,16 +915,32 @@ export default function SolicitarPermisoForm() {
           <Text style={[styles.label, styles.labelSpaced]}>
             Motivo <Text style={styles.required}>*</Text>
           </Text>
-          <TextInput
-            style={[styles.input, styles.textarea]}
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Describe el motivo de tu solicitud"
-            placeholderTextColor="#9CA3AF"
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
+          <View style={styles.motivoWrap}>
+            <TextInput
+              style={[styles.input, styles.textarea]}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Describe el motivo de tu solicitud"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              onContentSizeChange={(e) =>
+                setMotivoContentHeight(e.nativeEvent.contentSize.height)
+              }
+              onScroll={(e) => setMotivoScrollY(e.nativeEvent.contentOffset.y)}
+            />
+            {motivoContentHeight > MOTIVO_TEXTAREA_HEIGHT && (
+              <View style={styles.motivoScrollTrack}>
+                <View
+                  style={[
+                    styles.motivoScrollThumb,
+                    { height: motivoThumbHeight, top: motivoThumbTop },
+                  ]}
+                />
+              </View>
+            )}
+          </View>
         </View>
 
         {/* ── 3. Fecha y Hora ── */}
@@ -1310,7 +1353,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#111827",
   },
-  textarea: { minHeight: 96, paddingTop: 12 },
+  textarea: {
+    minHeight: MOTIVO_TEXTAREA_HEIGHT,
+    maxHeight: MOTIVO_TEXTAREA_HEIGHT,
+    paddingTop: 12,
+    paddingRight: 18,
+  },
+  motivoWrap: { position: "relative" },
+  motivoScrollTrack: {
+    position: "absolute",
+    top: 4,
+    bottom: 4,
+    right: 3,
+    width: 3,
+    borderRadius: 2,
+    backgroundColor: "#00000014",
+  },
+  motivoScrollThumb: {
+    position: "absolute",
+    right: 0,
+    width: 3,
+    borderRadius: 2,
+    backgroundColor: "#00000040",
+  },
   select: {
     flexDirection: "row",
     alignItems: "center",
