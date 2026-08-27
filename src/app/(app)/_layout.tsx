@@ -9,6 +9,7 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { APP_BACKGROUND } from "@/constants/colors";
 import DrawerMenu from "../../components/drawer/DrawerMenu";
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -66,7 +67,7 @@ export default function AppLayout() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F9FAFB" },
+  safe: { flex: 1, backgroundColor: APP_BACKGROUND },
   header: {
     flexDirection: "row",
     alignItems: "center",

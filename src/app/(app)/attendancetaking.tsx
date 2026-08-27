@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { APP_BACKGROUND } from "@/constants/colors";
 
 export default function AttendanceTaking() {
   return (
@@ -16,7 +17,7 @@ export default function AttendanceTaking() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F9FAFB" },
+  safe: { flex: 1, backgroundColor: APP_BACKGROUND },
   header: {
     flexDirection: "row",
     alignItems: "center",

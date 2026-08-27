@@ -44,6 +44,7 @@ import {
   type UserDayPermission,
 } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
+import { APP_BACKGROUND } from "@/constants/colors";
 
 type Category = "Jornada" | "Almuerzo" | "Break";
 
@@ -1306,7 +1307,16 @@ export default function PunchInOut() {
         permissions,
       );
     if (cat === "Break") return isBreakVisible(punches);
-    if (cat === "Jornada") return true;
+    if (cat === "Jornada")
+      return isJornadaVisible(
+        now,
+        todaySchedule,
+        getNextPunchType("Jornada") === "inicio",
+        btnVisWorkIn,
+        btnVisWorkOut,
+        punches,
+        permissions,
+      );
     return true;
   });
 
@@ -2259,7 +2269,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -11,
     left: 14,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: APP_BACKGROUND,
     paddingHorizontal: 7,
   },
   floatLabelText: {
@@ -2273,7 +2283,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: APP_BACKGROUND,
     paddingHorizontal: 7,
   },
   historyHeader: {
@@ -2524,7 +2534,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: APP_BACKGROUND,
     borderRadius: 8,
     padding: 10,
     marginTop: 4,
@@ -2599,7 +2609,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: APP_BACKGROUND,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     borderRadius: 12,
@@ -2657,7 +2667,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: APP_BACKGROUND,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     borderRadius: 12,

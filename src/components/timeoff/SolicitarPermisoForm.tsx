@@ -22,6 +22,7 @@ import { useSchoolStore } from "../../../store/useSchoolStore";
 import type { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
 import { normalizePermissionName, toRD } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
+import { APP_BACKGROUND } from "@/constants/colors";
 import RevisionFinalModal, {
   formatDisplayDate,
   formatDisplayTime,
@@ -794,9 +795,6 @@ export default function SolicitarPermisoForm() {
         {/* ── 1. Información ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <View style={styles.stepBadge}>
-              <Text style={styles.stepBadgeText}>1</Text>
-            </View>
             <Ionicons name="people-outline" size={18} color="#2563EB" />
             <Text style={styles.cardTitle}>Información</Text>
           </View>
@@ -871,9 +869,6 @@ export default function SolicitarPermisoForm() {
         {/* ── 2. Detalles ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <View style={styles.stepBadge}>
-              <Text style={styles.stepBadgeText}>2</Text>
-            </View>
             <Ionicons name="document-text-outline" size={18} color="#2563EB" />
             <Text style={styles.cardTitle}>Detalles</Text>
           </View>
@@ -908,9 +903,6 @@ export default function SolicitarPermisoForm() {
         {/* ── 3. Fecha y Hora ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <View style={styles.stepBadge}>
-              <Text style={styles.stepBadgeText}>3</Text>
-            </View>
             <Ionicons name="calendar-outline" size={18} color="#2563EB" />
             <Text style={styles.cardTitle}>Fecha y Hora</Text>
           </View>
@@ -1011,9 +1003,6 @@ export default function SolicitarPermisoForm() {
         {/* ── 4. Adjuntar Archivos ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <View style={styles.stepBadge}>
-              <Text style={styles.stepBadgeText}>4</Text>
-            </View>
             <Ionicons name="attach-outline" size={18} color="#2563EB" />
             <Text style={styles.cardTitle}>Adjuntar Archivos</Text>
           </View>
@@ -1286,7 +1275,7 @@ export default function SolicitarPermisoForm() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F9FAFB" },
+  screen: { flex: 1, backgroundColor: APP_BACKGROUND },
   content: { padding: 16, gap: 16, paddingBottom: 40 },
 
   /* ── Cards ── */
@@ -1305,15 +1294,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 14,
   },
-  stepBadge: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "#EFF6FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepBadgeText: { fontSize: 11, fontWeight: "800", color: "#2563EB" },
   cardTitle: { fontSize: 15, fontWeight: "700", color: "#111827" },
 
   /* ── Campos ── */
@@ -1321,7 +1301,7 @@ const styles = StyleSheet.create({
   labelSpaced: { marginTop: 14 },
   required: { color: "#DC2626" },
   input: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: APP_BACKGROUND,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     borderRadius: 12,
@@ -1335,7 +1315,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: APP_BACKGROUND,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     borderRadius: 12,
@@ -1411,7 +1391,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: APP_BACKGROUND,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     borderRadius: 10,

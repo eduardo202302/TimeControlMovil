@@ -170,25 +170,13 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, menuTree, app, logout } = useSchoolStore();
-  const [userExpanded, setUserExpanded] = useState(false);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
-  const userChevronRotation = useSharedValue(0);
 
   useEffect(() => {
     if (!isVisible) return;
     Storage.getItemAsync("photourl").then(setUserPhoto);
   }, [isVisible]);
-
-  useEffect(() => {
-    userChevronRotation.value = withTiming(userExpanded ? 90 : 0, {
-      duration: 200,
-    });
-  }, [userExpanded, userChevronRotation]);
-
-  const userChevronStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${userChevronRotation.value}deg` }],
-  }));
 
   const handleNavigate = useCallback(
     (path: string) => {
@@ -274,74 +262,45 @@ const confirmLogout = useCallback(async () => {
             />
           ))}
 
-          {/* ── Usuario colapsable ── */}
+          {/* ── Sesión ── */}
           {user && (
             <Animated.View
               style={styles.userSection}
               layout={LinearTransition.duration(200)}
             >
-              <TouchableOpacity
-                style={styles.userHeader}
-                onPress={() => setUserExpanded(!userExpanded)}
-                activeOpacity={0.7}
+              <Modal
+                transparent
+                visible={logoutModalVisible}
+                animationType="fade"
+                onRequestClose={() => setLogoutModalVisible(false)}
               >
-                <Ionicons
-                  name="person-circle-outline"
-                  size={20}
-                  color="#2563EB"
-                />
-                <Text style={styles.sectionTitle}>Sesión</Text>
-                <Animated.View style={userChevronStyle}>
-                  <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
-                </Animated.View>
-              </TouchableOpacity>
-
-              {userExpanded && (
-                <Animated.View
-                  style={styles.userSubmenu}
-                  entering={FadeInDown.duration(220).easing(Easing.out(Easing.quad))}
-                  exiting={FadeOutUp.duration(180).easing(Easing.in(Easing.quad))}
-                  layout={LinearTransition.duration(200)}
-                >
-                  <Modal
-                    transparent
-                    visible={logoutModalVisible}
-                    animationType="fade"
-                    onRequestClose={() => setLogoutModalVisible(false)}
-                  >
-                    <View style={styles.modalOverlay}>
-                      <View style={styles.modalBox}>
-                        <Text style={styles.logoutBtnText}>Cerrar Sesión</Text>
-                        <Text style={styles.modalMessage}>
-                          ¿Estás seguro de que deseas salir de la App?
-                        </Text>
-                        <View style={styles.modalButtons}>
-                          <TouchableOpacity
-                            onPress={() => setLogoutModalVisible(false)}
-                          >
-                            <Text style={styles.modalCancel}>Cancelar</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity onPress={confirmLogout}>
-                            <Text style={styles.modalConfirm}>Salir</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
+                <View style={styles.modalOverlay}>
+                  <View style={styles.modalBox}>
+                    <Text style={styles.logoutBtnText}>Cerrar Sesión</Text>
+                    <Text style={styles.modalMessage}>
+                      ¿Estás seguro de que deseas salir de la App?
+                    </Text>
+                    <View style={styles.modalButtons}>
+                      <TouchableOpacity
+                        onPress={() => setLogoutModalVisible(false)}
+                      >
+                        <Text style={styles.modalCancel}>Cancelar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={confirmLogout}>
+                        <Text style={styles.modalConfirm}>Salir</Text>
+                      </TouchableOpacity>
                     </View>
-                  </Modal>
-                  <TouchableOpacity
-                    style={styles.logoutItem}
-                    onPress={handleLogout}
-                    activeOpacity={0.75}
-                  >
-                    <Ionicons
-                      name="log-out-outline"
-                      size={18}
-                      color="#DC2626"
-                    />
-                    <Text>Cerrar Sesión</Text>
-                  </TouchableOpacity>
-                </Animated.View>
-              )}
+                  </View>
+                </View>
+              </Modal>
+              <TouchableOpacity
+                style={styles.logoutItem}
+                onPress={handleLogout}
+                activeOpacity={0.75}
+              >
+                <Ionicons name="log-out-outline" size={18} color="#DC2626" />
+                <Text style={styles.logoutBtnText}>Cerrar Sesión</Text>
+              </TouchableOpacity>
             </Animated.View>
           )}
         </ScrollView>
@@ -485,18 +444,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#F3F4F6",
     paddingTop: 4,
-  },
-  userHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 10,
-    gap: 10,
-  },
-  userSubmenu: {
-    marginLeft: 8,
-    marginBottom: 4,
   },
   logoutItem: {
     flexDirection: "row",

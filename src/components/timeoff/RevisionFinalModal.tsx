@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { APP_BACKGROUND } from "@/constants/colors";
 
 /** Archivo ya convertido a data-URI base64, listo para el POST. */
 export interface PermissionAttachment {
@@ -328,7 +329,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderLeftWidth: 3,
     borderLeftColor: "#3B82F6",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: APP_BACKGROUND,
     borderTopRightRadius: 10,
     borderBottomRightRadius: 10,
     paddingHorizontal: 12,
@@ -340,7 +341,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: APP_BACKGROUND,
     borderWidth: 1,
     borderColor: "#E5E7EB",
     borderRadius: 10,

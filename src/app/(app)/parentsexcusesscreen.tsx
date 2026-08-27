@@ -21,6 +21,7 @@ import {
 } from "lucide-react-native";
 
 import { getStudents } from "../../api/getStudents";
+import { APP_BACKGROUND } from "@/constants/colors";
 
 export default function ParentsExcusesScreen() {
   const [modalVisible, setModalVisible] = useState(false);
@@ -281,7 +282,7 @@ const styles = StyleSheet.create({
   },
 
   section: {
-    backgroundColor: "#f9fafb",
+    backgroundColor: APP_BACKGROUND,
     padding: 12,
     borderRadius: 10,
     marginBottom: 12,
