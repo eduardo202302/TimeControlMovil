@@ -62,6 +62,21 @@ interface CategoryDefaultIds {
 
 type PickerTarget = "fromDate" | "toDate" | "fromTime" | "toTime" | null;
 
+/** Campos del formulario que pueden mostrar su propio mensaje de error. */
+type FieldKey =
+  | "action"
+  | "type"
+  | "subject"
+  | "description"
+  | "fromDate"
+  | "toDate"
+  | "fromTime"
+  | "toTime"
+  | "attachments";
+
+/** Un mensaje por campo — solo están presentes los campos que fallan. */
+type FieldErrors = Partial<Record<FieldKey, string>>;
+
 interface SubmitOutcome {
   ok: boolean;
   title: string;
@@ -201,6 +216,79 @@ function readCategoryId(raw: unknown): number | undefined {
 }
 
 /**
+ * Normaliza `settings.maxDaysPermissions` — el tope de días por solicitud,
+ * configurado solo a nivel escuela. Mismo problema de forma que
+ * `categoryDefaultIds`: llega como número suelto o envuelto en `{ value: N }`.
+ * Ausente, vacío o no numérico significa SIN LÍMITE, y eso se representa con
+ * null para que el llamador no aplique ningún tope.
+ */
+function readMaxDays(raw: unknown): number | null {
+  if (raw == null) return null;
+  const source =
+    typeof raw === "object" ? (raw as { value?: unknown }).value : raw;
+  if (source == null || source === "") return null;
+  const parsed = Number(source);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+/** Copia desplazada N días — `setDate` ya resuelve fin de mes y año. */
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date.getTime());
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+/** Días de diferencia entre dos fechas, ignorando la hora. */
+function daysBetween(from: Date, to: Date): number {
+  const start = Date.UTC(from.getFullYear(), from.getMonth(), from.getDate());
+  const end = Date.UTC(to.getFullYear(), to.getMonth(), to.getDate());
+  return Math.round((end - start) / (24 * 60 * 60 * 1000));
+}
+
+/** "Ahora" en hora RD como sello comparable. */
+function nowStampRD(): number {
+  const nowRD = toRD(new Date());
+  return calendarStamp(
+    nowRD.year,
+    nowRD.month,
+    nowRD.day,
+    nowRD.hours,
+    nowRD.minutes,
+  );
+}
+
+/** Sello de un día del picker a la hora indicada. */
+function dayStamp(day: Date, hours: number, minutes: number): number {
+  return calendarStamp(
+    day.getFullYear(),
+    day.getMonth(),
+    day.getDate(),
+    hours,
+    minutes,
+  );
+}
+
+/** true si el día ya terminó por completo respecto a la hora RD actual. */
+function hasDayPassed(day: Date): boolean {
+  return dayStamp(day, 23, 59) < nowStampRD();
+}
+
+/** true si esa hora, puesta en ese día, ya pasó. */
+function isPastTimeOnDay(day: Date, time: Date): boolean {
+  return dayStamp(day, time.getHours(), time.getMinutes()) < nowStampRD();
+}
+
+/** true si la fecha elegida es el día de hoy en hora RD. */
+function isTodayRD(day: Date): boolean {
+  const nowRD = toRD(new Date());
+  return (
+    day.getFullYear() === nowRD.year &&
+    day.getMonth() === nowRD.month &&
+    day.getDate() === nowRD.day
+  );
+}
+
+/**
  * Orden alfabético para los dropdowns. `localeCompare` con "es" coloca
  * acentos y ñ donde corresponde, en vez del orden por code point que daría
  * una comparación cruda.
@@ -252,6 +340,8 @@ export default function SolicitarPermisoForm() {
   const [typeCategoryId, setTypeCategoryId] = useState<number | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
+  // Tope de días por solicitud de la escuela. null = sin límite configurado.
+  const [maxDays, setMaxDays] = useState<number | null>(null);
 
   // ── Formulario ────────────────────────────────────────────────────────────
   const [selectedAction, setSelectedAction] = useState<PermissionTag | null>(
@@ -279,6 +369,12 @@ export default function SolicitarPermisoForm() {
   const [reviewVisible, setReviewVisible] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [outcome, setOutcome] = useState<SubmitOutcome | null>(null);
+  // Qué campos ya tienen permiso de mostrar su error. Se llena al intentar
+  // guardar (o al elegir una hora pasada); el mensaje en sí sale de
+  // `fieldErrors`, así que corregir el campo lo apaga sin tocar esto.
+  const [revealedFields, setRevealedFields] = useState<
+    Partial<Record<FieldKey, boolean>>
+  >({});
 
   const isFullDay = isAusenciaTag(selectedAction);
 
@@ -301,6 +397,17 @@ export default function SolicitarPermisoForm() {
       | undefined;
   }, [schoolUser, user, school]);
 
+  // Misma cadena de fallback que categoryDefaultIds, pero normalizando ANTES
+  // del ?? por la misma razón: un `{ value: N }` (o un string vacío) nunca es
+  // nullish y taparía la fuente siguiente aunque no sirva.
+  const seedMaxDays = useMemo<number | null>(() => {
+    return (
+      readMaxDays(schoolUser?.school?.settings?.maxDaysPermissions) ??
+      readMaxDays((user as any)?.school?.settings?.maxDaysPermissions) ??
+      readMaxDays(school?.settings?.maxDaysPermissions)
+    );
+  }, [schoolUser, user, school]);
+
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true);
     setCatalogError(null);
@@ -313,14 +420,21 @@ export default function SolicitarPermisoForm() {
       const headers = { Authorization: `Bearer ${token}` };
 
       let categoryIds: CategoryDefaultIds | undefined = seedCategoryIds;
+      let resolvedMaxDays: number | null = seedMaxDays;
       if (schoolId) {
         try {
           const schoolRes = await axios.get(`${urlColegio}/schools/${schoolId}`, {
             headers,
           });
           if (schoolRes.data.success) {
-            const fresh = schoolRes.data.data?.settings?.categoryDefaultIds;
+            const settings = schoolRes.data.data?.settings;
+            const fresh = settings?.categoryDefaultIds;
             if (fresh) categoryIds = fresh as CategoryDefaultIds;
+            // El tope sí se pisa con lo que venga: que desaparezca de la
+            // configuración significa "sin límite", no "deja el anterior".
+            if (settings) {
+              resolvedMaxDays = readMaxDays(settings.maxDaysPermissions);
+            }
           }
         } catch (error: any) {
           // Si ya hay IDs sembrados del login, un fallo aquí no bloquea el form.
@@ -330,6 +444,7 @@ export default function SolicitarPermisoForm() {
           );
         }
       }
+      setMaxDays(resolvedMaxDays);
 
       // Normalizar ANTES del ?? es lo que hace funcionar el fallback: el objeto
       // crudo `{ label, value }` nunca es nullish, así que un
@@ -377,7 +492,7 @@ export default function SolicitarPermisoForm() {
     } finally {
       setCatalogLoading(false);
     }
-  }, [urlColegio, getToken, schoolId, seedCategoryIds]);
+  }, [urlColegio, getToken, schoolId, seedCategoryIds, seedMaxDays]);
 
   useEffect(() => {
     loadCatalog();
@@ -422,6 +537,14 @@ export default function SolicitarPermisoForm() {
     [currentValueFor],
   );
 
+  const revealFields = useCallback((fields: FieldKey[]) => {
+    setRevealedFields((prev) => {
+      const next = { ...prev };
+      for (const field of fields) next[field] = true;
+      return next;
+    });
+  }, []);
+
   const commitPicked = useCallback(
     (target: Exclude<PickerTarget, null>, date: Date) => {
       switch (target) {
@@ -435,13 +558,19 @@ export default function SolicitarPermisoForm() {
           break;
         case "fromTime":
           setFromTime(date);
+          // Android ignora `minimumDate` en modo hora, así que la hora pasada
+          // hay que atajarla aquí: se acepta el valor elegido pero el campo
+          // queda marcado en rojo en vez de pasar en silencio.
+          if (fromDate && isPastTimeOnDay(fromDate, date)) {
+            revealFields(["fromTime"]);
+          }
           break;
         case "toTime":
           setToTime(date);
           break;
       }
     },
-    [],
+    [fromDate, revealFields],
   );
 
   const handlePickerChange = useCallback(
@@ -462,6 +591,27 @@ export default function SolicitarPermisoForm() {
     if (pickerTarget) commitPicked(pickerTarget, pickerDraft);
     setPickerTarget(null);
   }, [pickerTarget, pickerDraft, commitPicked]);
+
+  // Piso del picker: ninguna fecha del pasado y, si "Desde" es hoy, ninguna
+  // hora de inicio anterior a la actual (iOS lo respeta; Android no, ver
+  // commitPicked).
+  const pickerMinimumDate = useMemo<Date | undefined>(() => {
+    if (pickerTarget === "fromDate" || pickerTarget === "toDate") {
+      return new Date();
+    }
+    if (pickerTarget === "fromTime" && fromDate && isTodayRD(fromDate)) {
+      return new Date();
+    }
+    return undefined;
+  }, [pickerTarget, fromDate]);
+
+  // Techo del picker: "Hasta" no puede pasarse del tope de días de la escuela.
+  const pickerMaximumDate = useMemo<Date | undefined>(() => {
+    if (pickerTarget !== "toDate" || !fromDate || maxDays == null) {
+      return undefined;
+    }
+    return addDays(fromDate, maxDays);
+  }, [pickerTarget, fromDate, maxDays]);
 
   // ── Adjuntos ──────────────────────────────────────────────────────────────
   // Presupuesto del request completo: lo que ya pesan los adjuntos codificados
@@ -572,48 +722,57 @@ export default function SolicitarPermisoForm() {
   }, []);
 
   // ── Validación (espeja las reglas del backend) ────────────────────────────
-  const validationError = useMemo<string | null>(() => {
-    // Va primero: es un bloqueo duro que hay que resolver quitando archivos,
-    // independientemente de qué campos falten por llenar.
-    if (payloadOverLimit) return TOTAL_LIMIT_MESSAGE;
-    if (!selectedAction) return "Selecciona la acción del permiso.";
-    if (!selectedType) return "Selecciona el tipo de permiso.";
-    if (!subject.trim()) return "El asunto es requerido.";
-    if (subject.trim().length > 255)
-      return "El asunto no puede superar los 255 caracteres.";
-    if (!description.trim()) return "El motivo es requerido.";
-    if (!fromDate) return "Selecciona la fecha Desde.";
-    if (!toDate) return "Selecciona la fecha Hasta.";
-    if (toDateKey(toDate) < toDateKey(fromDate))
-      return "La fecha Hasta no puede ser anterior a la fecha Desde.";
+  // Cada regla se evalúa por su cuenta y deja el mensaje en su propio campo:
+  // el usuario ve de una vez todo lo que falta, no solo la primera falla.
+  const fieldErrors = useMemo<FieldErrors>(() => {
+    const errors: FieldErrors = {};
+
+    // Bloqueo duro: se resuelve quitando archivos, no llenando campos.
+    if (payloadOverLimit) errors.attachments = TOTAL_LIMIT_MESSAGE;
+
+    if (!selectedAction) errors.action = "Selecciona la acción del permiso.";
+    if (!selectedType) errors.type = "Selecciona el tipo de permiso.";
+
+    const trimmedSubject = subject.trim();
+    if (!trimmedSubject) errors.subject = "El asunto es requerido.";
+    else if (trimmedSubject.length > 255)
+      errors.subject = "El asunto no puede superar los 255 caracteres.";
+
+    if (!description.trim()) errors.description = "El motivo es requerido.";
+
+    if (!fromDate) errors.fromDate = "Selecciona la fecha Desde.";
+    // Ausencia cubre el día completo, así que el corte de "pasado" para la
+    // fecha es siempre el fin del día; la hora se revisa aparte.
+    else if (hasDayPassed(fromDate))
+      errors.fromDate = "La fecha de inicio no puede estar en el pasado.";
+
+    if (!toDate) errors.toDate = "Selecciona la fecha Hasta.";
+    else if (fromDate && toDateKey(toDate) < toDateKey(fromDate))
+      errors.toDate = "La fecha Hasta no puede ser anterior a la fecha Desde.";
+    else if (
+      fromDate &&
+      maxDays != null &&
+      daysBetween(fromDate, toDate) > maxDays
+    )
+      // Respaldo del `maximumDate` del picker, por si el rango llega de otro
+      // lado. Texto idéntico al del backend para no dar dos versiones.
+      errors.toDate = `El rango excede el máximo permitido de días (${maxDays}).`;
 
     if (!isFullDay) {
-      if (!fromTime) return "Selecciona la hora de Inicio.";
-      if (!toTime) return "Selecciona la hora de Fin.";
-      if (toTimeKey(toTime) <= toTimeKey(fromTime))
-        return "La hora de Fin debe ser posterior a la de Inicio.";
+      if (!fromTime) errors.fromTime = "Selecciona la hora de Inicio.";
+      else if (
+        fromDate &&
+        !errors.fromDate &&
+        isPastTimeOnDay(fromDate, fromTime)
+      )
+        errors.fromTime = "La hora de inicio no puede estar en el pasado.";
+
+      if (!toTime) errors.toTime = "Selecciona la hora de Fin.";
+      else if (fromTime && toTimeKey(toTime) <= toTimeKey(fromTime))
+        errors.toTime = "La hora de Fin debe ser posterior a la de Inicio.";
     }
 
-    const nowRD = toRD(new Date());
-    const nowStamp = calendarStamp(
-      nowRD.year,
-      nowRD.month,
-      nowRD.day,
-      nowRD.hours,
-      nowRD.minutes,
-    );
-    // Ausencia cubre el día completo: basta con que el día no haya terminado.
-    const startStamp = calendarStamp(
-      fromDate.getFullYear(),
-      fromDate.getMonth(),
-      fromDate.getDate(),
-      isFullDay ? 23 : (fromTime?.getHours() ?? 0),
-      isFullDay ? 59 : (fromTime?.getMinutes() ?? 0),
-    );
-    if (startStamp < nowStamp)
-      return "La fecha y hora de inicio no pueden estar en el pasado.";
-
-    return null;
+    return errors;
   }, [
     payloadOverLimit,
     selectedAction,
@@ -625,10 +784,31 @@ export default function SolicitarPermisoForm() {
     fromTime,
     toTime,
     isFullDay,
+    maxDays,
   ]);
 
+  const isFormValid = Object.keys(fieldErrors).length === 0;
+
+  /** Mensaje visible de un campo: existe el error Y ya se reveló. */
+  const errorFor = useCallback(
+    (field: FieldKey): string | undefined =>
+      revealedFields[field] ? fieldErrors[field] : undefined,
+    [revealedFields, fieldErrors],
+  );
+
+  // "Guardar Solicitud" nunca está deshabilitado: si algo falta, en vez de
+  // abrir la revisión se pintan los campos que fallan.
+  const handleSaveRequest = useCallback(() => {
+    const failing = Object.keys(fieldErrors) as FieldKey[];
+    if (failing.length > 0) {
+      revealFields(failing);
+      return;
+    }
+    setReviewVisible(true);
+  }, [fieldErrors, revealFields]);
+
   const review = useMemo<PermissionReview | null>(() => {
-    if (validationError || !selectedAction || !selectedType) return null;
+    if (!isFormValid || !selectedAction || !selectedType) return null;
     if (!fromDate || !toDate) return null;
     return {
       actionName: selectedAction.name,
@@ -643,7 +823,7 @@ export default function SolicitarPermisoForm() {
       attachments,
     };
   }, [
-    validationError,
+    isFormValid,
     selectedAction,
     selectedType,
     fromDate,
@@ -667,6 +847,7 @@ export default function SolicitarPermisoForm() {
     setToTime(null);
     setAttachments([]);
     setAttachmentError(null);
+    setRevealedFields({});
   }, []);
 
   // ── Envío ─────────────────────────────────────────────────────────────────
@@ -788,6 +969,16 @@ export default function SolicitarPermisoForm() {
     resetForm,
   ]);
 
+  const actionError = errorFor("action");
+  const typeError = errorFor("type");
+  const subjectError = errorFor("subject");
+  const descriptionError = errorFor("description");
+  const fromDateError = errorFor("fromDate");
+  const toDateError = errorFor("toDate");
+  const fromTimeError = errorFor("fromTime");
+  const toTimeError = errorFor("toTime");
+  const attachmentsFieldError = errorFor("attachments");
+
   const selectorOptions = selectorOpen === "action" ? actionTags : typeOptions;
   const selectorTitle =
     selectorOpen === "action" ? "Acción" : "Tipo de Permiso";
@@ -845,7 +1036,7 @@ export default function SolicitarPermisoForm() {
                 Acción <Text style={styles.required}>*</Text>
               </Text>
               <TouchableOpacity
-                style={styles.select}
+                style={[styles.select, !!actionError && styles.fieldInvalid]}
                 onPress={() => setSelectorOpen("action")}
                 activeOpacity={0.75}
               >
@@ -860,12 +1051,19 @@ export default function SolicitarPermisoForm() {
                 </Text>
                 <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
               </TouchableOpacity>
+              {!!actionError && (
+                <Text style={styles.fieldError}>{actionError}</Text>
+              )}
 
               <Text style={[styles.label, styles.labelSpaced]}>
                 Tipo Permiso <Text style={styles.required}>*</Text>
               </Text>
               <TouchableOpacity
-                style={[styles.select, !selectedAction && styles.selectDisabled]}
+                style={[
+                  styles.select,
+                  !selectedAction && styles.selectDisabled,
+                  !!typeError && styles.fieldInvalid,
+                ]}
                 onPress={() => selectedAction && setSelectorOpen("type")}
                 disabled={!selectedAction}
                 activeOpacity={0.75}
@@ -884,6 +1082,7 @@ export default function SolicitarPermisoForm() {
                 </Text>
                 <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
               </TouchableOpacity>
+              {!!typeError && <Text style={styles.fieldError}>{typeError}</Text>}
               {selectedAction && typeOptions.length === 0 && (
                 <Text style={styles.helperWarning}>
                   Esta acción no tiene tipos de permiso configurados.
@@ -904,20 +1103,27 @@ export default function SolicitarPermisoForm() {
             Asunto <Text style={styles.required}>*</Text>
           </Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, !!subjectError && styles.fieldInvalid]}
             value={subject}
             onChangeText={setSubject}
             placeholder="Ej. Cita médica"
             placeholderTextColor="#9CA3AF"
             maxLength={255}
           />
+          {!!subjectError && (
+            <Text style={styles.fieldError}>{subjectError}</Text>
+          )}
 
           <Text style={[styles.label, styles.labelSpaced]}>
             Motivo <Text style={styles.required}>*</Text>
           </Text>
           <View style={styles.motivoWrap}>
             <TextInput
-              style={[styles.input, styles.textarea]}
+              style={[
+                styles.input,
+                styles.textarea,
+                !!descriptionError && styles.fieldInvalid,
+              ]}
               value={description}
               onChangeText={setDescription}
               placeholder="Describe el motivo de tu solicitud"
@@ -941,6 +1147,9 @@ export default function SolicitarPermisoForm() {
               </View>
             )}
           </View>
+          {!!descriptionError && (
+            <Text style={styles.fieldError}>{descriptionError}</Text>
+          )}
         </View>
 
         {/* ── 3. Fecha y Hora ── */}
@@ -956,7 +1165,7 @@ export default function SolicitarPermisoForm() {
                 Desde <Text style={styles.required}>*</Text>
               </Text>
               <TouchableOpacity
-                style={styles.select}
+                style={[styles.select, !!fromDateError && styles.fieldInvalid]}
                 onPress={() => openPicker("fromDate")}
                 activeOpacity={0.75}
               >
@@ -970,13 +1179,16 @@ export default function SolicitarPermisoForm() {
                   {fromDate ? formatDisplayDate(toDateKey(fromDate)) : "DD/MM/AAAA"}
                 </Text>
               </TouchableOpacity>
+              {!!fromDateError && (
+                <Text style={styles.fieldError}>{fromDateError}</Text>
+              )}
             </View>
             <View style={styles.rowItem}>
               <Text style={styles.label}>
                 Hasta <Text style={styles.required}>*</Text>
               </Text>
               <TouchableOpacity
-                style={styles.select}
+                style={[styles.select, !!toDateError && styles.fieldInvalid]}
                 onPress={() => openPicker("toDate")}
                 activeOpacity={0.75}
               >
@@ -987,6 +1199,9 @@ export default function SolicitarPermisoForm() {
                   {toDate ? formatDisplayDate(toDateKey(toDate)) : "DD/MM/AAAA"}
                 </Text>
               </TouchableOpacity>
+              {!!toDateError && (
+                <Text style={styles.fieldError}>{toDateError}</Text>
+              )}
             </View>
           </View>
 
@@ -1004,7 +1219,7 @@ export default function SolicitarPermisoForm() {
                   Inicio <Text style={styles.required}>*</Text>
                 </Text>
                 <TouchableOpacity
-                  style={styles.select}
+                  style={[styles.select, !!fromTimeError && styles.fieldInvalid]}
                   onPress={() => openPicker("fromTime")}
                   activeOpacity={0.75}
                 >
@@ -1018,13 +1233,16 @@ export default function SolicitarPermisoForm() {
                     {fromTime ? formatDisplayTime(toTimeKey(fromTime)) : "--:--"}
                   </Text>
                 </TouchableOpacity>
+                {!!fromTimeError && (
+                  <Text style={styles.fieldError}>{fromTimeError}</Text>
+                )}
               </View>
               <View style={styles.rowItem}>
                 <Text style={styles.label}>
                   Fin <Text style={styles.required}>*</Text>
                 </Text>
                 <TouchableOpacity
-                  style={styles.select}
+                  style={[styles.select, !!toTimeError && styles.fieldInvalid]}
                   onPress={() => openPicker("toTime")}
                   activeOpacity={0.75}
                 >
@@ -1038,6 +1256,9 @@ export default function SolicitarPermisoForm() {
                     {toTime ? formatDisplayTime(toTimeKey(toTime)) : "--:--"}
                   </Text>
                 </TouchableOpacity>
+                {!!toTimeError && (
+                  <Text style={styles.fieldError}>{toTimeError}</Text>
+                )}
               </View>
             </View>
           )}
@@ -1119,6 +1340,13 @@ export default function SolicitarPermisoForm() {
             </Text>
           )}
 
+          {/* El aviso de la tanda ya dice lo mismo cuando existe — no se
+              repite el mensaje del tope debajo. La zona de carga en sí queda
+              sombreada por `dropzoneBlocked`. */}
+          {!attachmentError && !!attachmentsFieldError && (
+            <Text style={styles.fieldError}>{attachmentsFieldError}</Text>
+          )}
+
           {attachments.length > 0 && (
             <View style={styles.chipList}>
               {attachments.map((file) => (
@@ -1149,9 +1377,6 @@ export default function SolicitarPermisoForm() {
         </View>
 
         {/* ── Acciones ── */}
-        {!!validationError && (
-          <Text style={styles.validationHint}>{validationError}</Text>
-        )}
         <View style={styles.footerActions}>
           <TouchableOpacity
             style={[styles.btn, styles.btnGhost]}
@@ -1161,13 +1386,8 @@ export default function SolicitarPermisoForm() {
             <Text style={styles.btnGhostText}>Cancelar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[
-              styles.btn,
-              styles.btnPrimary,
-              !!validationError && styles.btnDisabled,
-            ]}
-            onPress={() => setReviewVisible(true)}
-            disabled={!!validationError}
+            style={[styles.btn, styles.btnPrimary]}
+            onPress={handleSaveRequest}
             activeOpacity={0.85}
           >
             <Ionicons name="save-outline" size={17} color="#fff" />
@@ -1241,6 +1461,8 @@ export default function SolicitarPermisoForm() {
                   value={pickerDraft}
                   mode={pickerTarget.endsWith("Date") ? "date" : "time"}
                   display="spinner"
+                  minimumDate={pickerMinimumDate}
+                  maximumDate={pickerMaximumDate}
                   onChange={handlePickerChange}
                 />
               </View>
@@ -1251,6 +1473,8 @@ export default function SolicitarPermisoForm() {
             value={pickerDraft}
             mode={pickerTarget.endsWith("Date") ? "date" : "time"}
             display="default"
+            minimumDate={pickerMinimumDate}
+            maximumDate={pickerMaximumDate}
             onChange={handlePickerChange}
           />
         ))}
@@ -1395,6 +1619,9 @@ const styles = StyleSheet.create({
   rowItem: { flex: 1 },
   helperWarning: { fontSize: 11, color: "#B45309", marginTop: 8 },
   helperError: { color: "#DC2626" },
+  /* Recuadro con error: mismo borde rojo para select, input y textarea. */
+  fieldInvalid: { borderColor: "#DC2626" },
+  fieldError: { fontSize: 12, color: "#DC2626", marginTop: 6 },
   fullDayNote: {
     flexDirection: "row",
     alignItems: "center",
@@ -1467,12 +1694,6 @@ const styles = StyleSheet.create({
   chipSize: { fontSize: 11, color: "#9CA3AF" },
 
   /* ── Acciones ── */
-  validationHint: {
-    fontSize: 12,
-    color: "#B45309",
-    textAlign: "center",
-    marginTop: -4,
-  },
   footerActions: { flexDirection: "row", gap: 10 },
   btn: {
     flex: 1,
@@ -1491,7 +1712,6 @@ const styles = StyleSheet.create({
   btnGhostText: { fontSize: 14, fontWeight: "700", color: "#374151" },
   btnPrimary: { backgroundColor: "#2563EB", flex: 1.5 },
   btnPrimaryText: { fontSize: 14, fontWeight: "700", color: "#fff" },
-  btnDisabled: { opacity: 0.5 },
 
   /* ── Modales ── */
   modalOverlay: {
