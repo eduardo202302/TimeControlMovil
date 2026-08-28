@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
@@ -1499,9 +1499,9 @@ export default function PunchInOut() {
             <View style={styles.ndModalHeaderRow}>
               <View style={styles.ndModalHeaderLeft}>
                 <View style={styles.permissionModalIconWrap}>
-                  <Ionicons
-                    name="document-text-outline"
-                    size={22}
+                  <MaterialCommunityIcons
+                    name="alpha-p"
+                    size={40}
                     color="#2563EB"
                   />
                 </View>
@@ -1606,9 +1606,9 @@ export default function PunchInOut() {
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <View style={styles.permissionBadge}>
-                  <Ionicons
-                    name="document-text-outline"
-                    size={12}
+                  <MaterialCommunityIcons
+                    name="alpha-p"
+                    size={20}
                     color="#2563EB"
                   />
                 </View>
@@ -2087,9 +2087,9 @@ export default function PunchInOut() {
                       )}
                       {punch.permissionId != null && (
                         <View style={styles.permissionBadgeSmall}>
-                          <Ionicons
-                            name="document-text-outline"
-                            size={10}
+                          <MaterialCommunityIcons
+                            name="alpha-p"
+                            size={16}
                             color="#2563EB"
                           />
                         </View>
