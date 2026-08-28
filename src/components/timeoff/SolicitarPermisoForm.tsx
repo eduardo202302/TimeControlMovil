@@ -43,6 +43,7 @@ interface PermissionTag {
   categoryId?: number;
   category?: { id?: number; name?: string } | null;
   gotoTags?: PermissionTag[];
+  description?: string | null;
 }
 
 /**
@@ -364,6 +365,7 @@ export default function SolicitarPermisoForm() {
   const [selectorOpen, setSelectorOpen] = useState<"action" | "type" | null>(
     null,
   );
+  const [expandedTagId, setExpandedTagId] = useState<number | null>(null);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
   const [pickerDraft, setPickerDraft] = useState<Date>(new Date());
   const [reviewVisible, setReviewVisible] = useState(false);
@@ -1406,33 +1408,74 @@ export default function SolicitarPermisoForm() {
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={() => setSelectorOpen(null)}
+          onPress={() => {
+            setSelectorOpen(null);
+            setExpandedTagId(null);
+          }}
         >
           <View style={styles.selectorCard}>
             <Text style={styles.selectorTitle}>{selectorTitle}</Text>
             <ScrollView style={styles.selectorList}>
-              {selectorOptions.map((tag) => (
-                <TouchableOpacity
-                  key={tag.id}
-                  style={styles.selectorOption}
-                  onPress={() => {
-                    if (selectorOpen === "action") {
-                      setSelectedAction(tag);
-                      // El tipo depende de la acción: se reinicia al cambiarla.
-                      setSelectedType(null);
-                    } else {
-                      setSelectedType(tag);
-                    }
-                    setSelectorOpen(null);
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <Text style={styles.selectorOptionText}>{tag.name}</Text>
-                  {selectorSelectedId === tag.id && (
-                    <Ionicons name="checkmark" size={18} color="#2563EB" />
-                  )}
-                </TouchableOpacity>
-              ))}
+              {selectorOptions.map((tag) => {
+                const hasDescription = !!tag.description;
+                const isExpanded = expandedTagId === tag.id;
+                return (
+                  <TouchableOpacity
+                    key={tag.id}
+                    style={styles.selectorOption}
+                    onPress={() => {
+                      if (selectorOpen === "action") {
+                        setSelectedAction(tag);
+                        // El tipo depende de la acción: se reinicia al cambiarla.
+                        setSelectedType(null);
+                      } else {
+                        setSelectedType(tag);
+                      }
+                      setSelectorOpen(null);
+                      setExpandedTagId(null);
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <View style={styles.selectorOptionMain}>
+                      <Text style={styles.selectorOptionText}>{tag.name}</Text>
+                      {hasDescription && !isExpanded && (
+                        <Text
+                          style={styles.selectorOptionDescription}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
+                          {tag.description}
+                        </Text>
+                      )}
+                      {hasDescription && isExpanded && (
+                        <Text style={styles.selectorOptionDescription}>
+                          {tag.description}
+                        </Text>
+                      )}
+                    </View>
+                    {hasDescription && (
+                      <TouchableOpacity
+                        style={styles.selectorOptionChevron}
+                        onPress={() =>
+                          setExpandedTagId(isExpanded ? null : tag.id)
+                        }
+                        activeOpacity={0.6}
+                      >
+                        <Ionicons
+                          name={
+                            isExpanded ? "chevron-up-outline" : "chevron-down-outline"
+                          }
+                          size={18}
+                          color="#6B7280"
+                        />
+                      </TouchableOpacity>
+                    )}
+                    {selectorSelectedId === tag.id && (
+                      <Ionicons name="checkmark" size={18} color="#2563EB" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
               {selectorOptions.length === 0 && (
                 <Text style={styles.selectorEmpty}>
                   No hay opciones disponibles.
@@ -1745,11 +1788,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#F3F4F6",
   },
-  selectorOptionText: {
+  selectorOptionMain: {
     flex: 1,
+  },
+  selectorOptionText: {
     fontSize: 15,
     fontWeight: "600",
     color: "#111827",
+  },
+  selectorOptionDescription: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 2,
+  },
+  selectorOptionChevron: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   selectorEmpty: {
     fontSize: 13,
