@@ -6,6 +6,7 @@ import type { UserSchedule } from "../../../types/typeStore/SchoolStoreType";
 import {
   PERMISSION_ACTION,
   getApprovedPermission,
+  getApprovedPermissionsToday,
   getPunctuality,
   getRDMinutes,
   isAlmuerzoButtonVisible,
@@ -783,6 +784,49 @@ describe("getApprovedPermission", () => {
       "Permiso con actionTag.name inesperado:",
       "Entradas",
     );
+    warn.mockRestore();
+  });
+});
+
+describe("getApprovedPermissionsToday", () => {
+  it("devuelve todos los permisos aprobados, sin filtrar por acción ni hora", () => {
+    const ps = [
+      permiso("Entrada", "08:00:00", "11:30:00"),
+      permiso("Salida", "11:30:00", "15:00:00"),
+      permiso("Almuerzo", "15:00:00", "16:00:00"),
+    ];
+    expect(getApprovedPermissionsToday(ps)).toHaveLength(3);
+  });
+
+  it("descarta los que no están aprobados", () => {
+    const ps = [
+      permiso("Entrada", "08:00:00", "11:30:00", "Solicitado"),
+      permiso("Salida", "11:30:00", "15:00:00", "Rechazado"),
+      permiso("Ausencia", "08:00:00", "18:00:00"),
+    ];
+    const aprobados = getApprovedPermissionsToday(ps);
+    expect(aprobados).toHaveLength(1);
+    expect(aprobados[0].actionTag?.name).toBe("Ausencia");
+  });
+
+  it("normaliza casing y espacios en stateTag", () => {
+    const ps = [permiso("Salida", "11:30:00", "15:00:00", " APROBADO ")];
+    expect(getApprovedPermissionsToday(ps)).toHaveLength(1);
+  });
+
+  it("tolera stateTag nulo y lista vacía sin lanzar", () => {
+    const ps = [
+      { ...permiso("Salida", "11:30:00", "15:00:00"), stateTag: null },
+    ];
+    expect(getApprovedPermissionsToday(ps)).toEqual([]);
+    expect(getApprovedPermissionsToday([])).toEqual([]);
+  });
+
+  it("no avisa por acciones desconocidas: no mira actionTag", () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const ps = [permiso("Entradas", "08:00:00", "11:30:00")];
+    expect(getApprovedPermissionsToday(ps)).toHaveLength(1);
+    expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
   });
 });

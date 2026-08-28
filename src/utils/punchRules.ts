@@ -16,6 +16,8 @@ export interface Tag {
   id: number;
   name: string;
   category?: { id?: number; name?: string } | null;
+  /** Texto genérico del tag (mismo campo que expone /tags/all) */
+  description?: string | null;
 }
 
 export interface PunchEvent {
@@ -228,6 +230,20 @@ export function getApprovedPermissionsByAction(
     }
     return normalized === target;
   });
+}
+
+/**
+ * Todos los permisos aprobados de hoy, sin filtrar por acción ni por hora. La
+ * UI lo usa para saber si mostrar el indicador de permiso del día.
+ */
+export function getApprovedPermissionsToday(
+  permissions: UserDayPermission[],
+): UserDayPermission[] {
+  return permissions.filter(
+    (permission) =>
+      normalizePermissionName(permission.stateTag?.name) ===
+      PERMISSION_STATE_APPROVED,
+  );
 }
 
 /**

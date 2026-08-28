@@ -28,6 +28,7 @@ import type {
   UserSchedule,
 } from "../../../types/typeStore/SchoolStoreType";
 import {
+  getApprovedPermissionsToday,
   getPunctuality,
   getRDDayIndex,
   getRDMinutes,
@@ -366,6 +367,7 @@ export default function PunchInOut() {
   );
   const [breakTagModalVisible, setBreakTagModalVisible] = useState(false);
   const [permissions, setPermissions] = useState<UserDayPermission[]>([]);
+  const [permissionInfoModal, setPermissionInfoModal] = useState(false);
   const [currentLocationInfo, setCurrentLocationInfo] = useState<{
     address: string;
     withinArea: boolean;
@@ -1354,6 +1356,11 @@ export default function PunchInOut() {
     setNextDayExitTime(`${pad(h)}:${pad(m)}`);
   };
 
+  // Permisos aprobados de hoy: mientras exista al menos uno, el indicador de
+  // permiso del perfil se mantiene visible todo el día, se haya usado el
+  // permiso o no.
+  const approvedPermissionsToday = getApprovedPermissionsToday(permissions);
+
   return (
     <View style={{ flex: 1 }}>
       <Modal
@@ -1481,6 +1488,60 @@ export default function PunchInOut() {
           </View>
         </TouchableOpacity>
       </Modal>
+      <Modal
+        visible={permissionInfoModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPermissionInfoModal(false)}
+      >
+        <View style={styles.ndModalOverlay}>
+          <View style={styles.ndModalCard}>
+            <View style={styles.ndModalHeaderRow}>
+              <View style={styles.ndModalHeaderLeft}>
+                <View style={styles.permissionModalIconWrap}>
+                  <Ionicons
+                    name="document-text-outline"
+                    size={22}
+                    color="#2563EB"
+                  />
+                </View>
+                <Text style={styles.ndModalTitle}>Permiso programado</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setPermissionInfoModal(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={22} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.ndModalBody}>
+              {approvedPermissionsToday.map((permission, index) => (
+                <View key={permission.id}>
+                  {index > 0 && <View style={styles.permissionItemDivider} />}
+                  <Text style={styles.permissionItemAction}>
+                    {permission.actionTag?.name ?? "Permiso"}
+                  </Text>
+                  <Text style={styles.permissionItemTime}>
+                    {to12h(permission.fromTime)} – {to12h(permission.toTime)}
+                  </Text>
+                  {!!permission.actionTag?.description?.trim() && (
+                    <Text style={styles.permissionItemText}>
+                      {permission.actionTag.description.trim()}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={styles.ndModalBtn}
+              onPress={() => setPermissionInfoModal(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.ndModalBtnText}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       {showTimePicker && (
         <DateTimePicker
           value={selectedTime}
@@ -1529,9 +1590,30 @@ export default function PunchInOut() {
 
         {/* ── Perfil + Horario ── */}
         <View style={styles.profileFloatCard}>
-          <View style={styles.sectionHeaderRow}>
-            <Ionicons name="person-circle-outline" size={18} color="#2563EB" />
-            <Text style={styles.sectionHeaderText}>Perfil - Time Control</Text>
+          <View style={styles.sectionHeaderToggle}>
+            <View style={styles.sectionHeaderToggleLabel}>
+              <Ionicons
+                name="person-circle-outline"
+                size={18}
+                color="#2563EB"
+              />
+              <Text style={styles.sectionHeaderText}>Perfil - Time Control</Text>
+            </View>
+            {approvedPermissionsToday.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setPermissionInfoModal(true)}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <View style={styles.permissionBadge}>
+                  <Ionicons
+                    name="document-text-outline"
+                    size={12}
+                    color="#2563EB"
+                  />
+                </View>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.profileRow}>
@@ -2002,6 +2084,15 @@ export default function PunchInOut() {
                             </Text>
                           </View>
                         )
+                      )}
+                      {punch.permissionId != null && (
+                        <View style={styles.permissionBadgeSmall}>
+                          <Ionicons
+                            name="document-text-outline"
+                            size={10}
+                            color="#2563EB"
+                          />
+                        </View>
                       )}
                     </View>
                   </View>
@@ -2474,6 +2565,54 @@ const styles = StyleSheet.create({
   },
   badgeOvertimeText: { fontSize: 11, fontWeight: "700", color: "#2563EB" },
   punchTime: { fontSize: 12, fontWeight: "600", color: "#6B7280" },
+  /* Indicador de permiso */
+  permissionBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2563EB",
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  permissionBadgeSmall: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#2563EB",
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  permissionModalIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  permissionItemDivider: {
+    height: 1,
+    backgroundColor: "#E5E7EB",
+    marginBottom: 16,
+  },
+  permissionItemAction: { fontSize: 15, fontWeight: "700", color: "#111827" },
+  permissionItemTime: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#2563EB",
+    marginTop: 2,
+  },
+  permissionItemText: {
+    fontSize: 13,
+    color: "#6B7280",
+    fontStyle: "italic",
+    lineHeight: 20,
+    marginTop: 6,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
