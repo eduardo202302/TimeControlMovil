@@ -9,6 +9,7 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   Platform,
   ScrollView,
@@ -19,8 +20,11 @@ import {
   View,
 } from "react-native";
 import { useSchoolStore } from "../../../store/useSchoolStore";
-import type { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
-import { normalizePermissionName, toRD } from "../../utils/punchRules";
+import type {
+  SchoolUser,
+  UserSchedule,
+} from "../../../types/typeStore/SchoolStoreType";
+import { normalizePermissionName, toRD, WEEK_DAYS } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
 import { APP_BACKGROUND } from "@/constants/colors";
 import RevisionFinalModal, {
@@ -137,6 +141,9 @@ const SKIP_REASON_LABELS: Record<string, string> = {
     "El horario solicitado cae dentro de tu jornada laboral.",
   ausencia_duplicada_dia: "Ya tienes una ausencia registrada ese día.",
 };
+
+/** Nombres de los 7 días tal cual los espera el backend (`weekDays`). */
+const WEEK_DAY_NAMES = Object.values(WEEK_DAYS);
 
 function pad(n: number): string {
   return n.toString().padStart(2, "0");
@@ -335,6 +342,14 @@ export default function SolicitarPermisoForm() {
   const schoolUser: SchoolUser | undefined = user?.user?.schoolUsers?.[0];
   const schoolId =
     schoolUser?.schoolId ?? (user as any)?.school?.id ?? school?.id;
+  const userSchedules: UserSchedule[] =
+    schoolUser?.userSchedules ?? user?.userSchedules ?? [];
+  // Días sin horario configurado: elegirlos siempre terminaría descartado
+  // por el backend, así que se muestran deshabilitados en el selector.
+  const enabledWeekDaysSet = useMemo(
+    () => new Set(userSchedules.map((s) => s.weekDay)),
+    [userSchedules],
+  );
 
   // ── Catálogo (Acción → Tipo Permiso) ──────────────────────────────────────
   const [actionTags, setActionTags] = useState<PermissionTag[]>([]);
@@ -360,12 +375,14 @@ export default function SolicitarPermisoForm() {
   const [attachments, setAttachments] = useState<PermissionAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [loadingFiles, setLoadingFiles] = useState(false);
+  const [selectedWeekDays, setSelectedWeekDays] = useState<string[]>([]);
 
   // ── UI ────────────────────────────────────────────────────────────────────
   const [selectorOpen, setSelectorOpen] = useState<"action" | "type" | null>(
     null,
   );
   const [expandedTagId, setExpandedTagId] = useState<number | null>(null);
+  const [weekDaysModalVisible, setWeekDaysModalVisible] = useState(false);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
   const [pickerDraft, setPickerDraft] = useState<Date>(new Date());
   const [reviewVisible, setReviewVisible] = useState(false);
@@ -798,6 +815,19 @@ export default function SolicitarPermisoForm() {
     [revealedFields, fieldErrors],
   );
 
+  const toggleWeekDay = useCallback((day: string) => {
+    setSelectedWeekDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
+    );
+  }, []);
+
+  const handleWeekDaysInfo = useCallback(() => {
+    Alert.alert(
+      "Días de la semana",
+      "Opcional. Si no seleccionas ningún día, el permiso aplicará a todos los días dentro del rango Desde–Hasta. Solo se muestran habilitados los días que tienes en tu horario.",
+    );
+  }, []);
+
   // "Guardar Solicitud" nunca está deshabilitado: si algo falta, en vez de
   // abrir la revisión se pintan los campos que fallan.
   const handleSaveRequest = useCallback(() => {
@@ -850,6 +880,7 @@ export default function SolicitarPermisoForm() {
     setAttachments([]);
     setAttachmentError(null);
     setRevealedFields({});
+    setSelectedWeekDays([]);
   }, []);
 
   // ── Envío ─────────────────────────────────────────────────────────────────
@@ -932,6 +963,9 @@ export default function SolicitarPermisoForm() {
       if (review.attachments.length > 0) {
         payload.attachments = review.attachments.map((file) => file.dataUri);
       }
+      if (selectedWeekDays.length > 0) {
+        payload.weekDays = selectedWeekDays;
+      }
 
       const response = await axios.post(
         `${urlColegio}/userdaypermissions`,
@@ -967,6 +1001,7 @@ export default function SolicitarPermisoForm() {
     urlColegio,
     selectedType,
     selectedAction,
+    selectedWeekDays,
     buildOutcome,
     resetForm,
   ]);
@@ -1264,6 +1299,39 @@ export default function SolicitarPermisoForm() {
               </View>
             </View>
           )}
+
+          <View style={[styles.labelRow, styles.rowSpaced]}>
+            <Text style={styles.label}>Días de la semana</Text>
+            <TouchableOpacity
+              onPress={handleWeekDaysInfo}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={16}
+                color="#1D4ED8"
+              />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={styles.select}
+            onPress={() => setWeekDaysModalVisible(true)}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="calendar-outline" size={16} color="#2563EB" />
+            <Text
+              style={[
+                styles.selectText,
+                selectedWeekDays.length > 0 && styles.selectTextFilled,
+              ]}
+              numberOfLines={1}
+            >
+              {selectedWeekDays.length > 0
+                ? selectedWeekDays.join(", ")
+                : "Seleccione días (opcional)"}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+          </TouchableOpacity>
         </View>
 
         {/* ── 4. Adjuntar Archivos ── */}
@@ -1486,6 +1554,56 @@ export default function SolicitarPermisoForm() {
         </TouchableOpacity>
       </Modal>
 
+      {/* ── Selector de Días de la semana (multi-selección) ── */}
+      <Modal
+        visible={weekDaysModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setWeekDaysModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setWeekDaysModalVisible(false)}
+        >
+          <View style={styles.selectorCard}>
+            <Text style={styles.selectorTitle}>Días de la semana</Text>
+            <ScrollView style={styles.selectorList}>
+              {WEEK_DAY_NAMES.map((day) => {
+                const enabled = enabledWeekDaysSet.has(day);
+                const checked = selectedWeekDays.includes(day);
+                return (
+                  <TouchableOpacity
+                    key={day}
+                    style={[
+                      styles.selectorOption,
+                      !enabled && styles.selectDisabled,
+                    ]}
+                    onPress={() => toggleWeekDay(day)}
+                    disabled={!enabled}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.selectorOptionText}>{day}</Text>
+                    <Ionicons
+                      name={checked ? "checkbox" : "square-outline"}
+                      size={20}
+                      color={checked ? "#2563EB" : "#9CA3AF"}
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.btn, styles.btnPrimary, styles.selectorDoneButton]}
+              onPress={() => setWeekDaysModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.btnPrimaryText}>Listo</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* ── Picker nativo de fecha/hora ── */}
       {pickerTarget !== null &&
         (Platform.OS === "ios" ? (
@@ -1609,6 +1727,7 @@ const styles = StyleSheet.create({
   /* ── Campos ── */
   label: { fontSize: 12, fontWeight: "600", color: "#374151", marginBottom: 6 },
   labelSpaced: { marginTop: 14 },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   required: { color: "#DC2626" },
   input: {
     backgroundColor: APP_BACKGROUND,
@@ -1811,6 +1930,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     textAlign: "center",
   },
+  selectorDoneButton: { flex: 0, marginTop: 14 },
   pickerCard: {
     width: "100%",
     maxWidth: 400,
