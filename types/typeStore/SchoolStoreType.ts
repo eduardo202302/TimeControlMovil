@@ -46,10 +46,22 @@ export interface Address {
   [key: string]: unknown;
 }
 
+/**
+ * Tag del colegio. `categoryId === 22` son los "tipos de usuario" que
+ * alimentan el selector de register.tsx (ver IkarFlatList).
+ */
+export interface SchoolTag {
+  id: number;
+  name: string;
+  categoryId: number;
+  [key: string]: unknown;
+}
+
 export interface School {
   id: number;
   name: string;
   logo: string;
+  tags?: SchoolTag[];
   email: string | null;
   phone: string;
   settings: SchoolSettings;

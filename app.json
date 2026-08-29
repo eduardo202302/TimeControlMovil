@@ -8,6 +8,7 @@
     "scheme": "timecontrolapp",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "supportsTablet": true,
       "icon": "./assets/expo.icon",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Esta aplicación requiere acceso a tu ubicación para validar que el ponche se realice dentro del área permitida de la institución."

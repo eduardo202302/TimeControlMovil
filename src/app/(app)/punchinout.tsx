@@ -46,6 +46,7 @@ import {
 } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
 import { APP_BACKGROUND } from "@/constants/colors";
+import { MAX_CONTENT_WIDTH, useResponsive } from "@/constants/responsive";
 
 type Category = "Jornada" | "Almuerzo" | "Break";
 
@@ -343,6 +344,7 @@ async function fetchTodayPermissions(
 }
 
 export default function PunchInOut() {
+  const { isTablet } = useResponsive();
   const [now, setNow] = useState(new Date());
   const [selectedCategory, setSelectedCategory] = useState<Category>("Jornada");
   const [punches, setPunches] = useState<PunchEvent[]>([]);
@@ -1551,7 +1553,10 @@ export default function PunchInOut() {
         />
       )}
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          isTablet && styles.contentTablet,
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -1625,7 +1630,7 @@ export default function PunchInOut() {
                     source={{
                       uri: `https://timecontrol.wsmax.net:8600/${phoneImagen}`,
                     }}
-                    style={{ width: 78, height: 78, borderRadius: 39 }}
+                    style={styles.avatarImage}
                     onError={(e) =>
                       console.log("Error imagen:", e.nativeEvent.error)
                     }
@@ -1922,25 +1927,45 @@ export default function PunchInOut() {
           </TouchableOpacity>
           {tolerancesExpanded && (
             <View style={styles.toleranceGrid}>
-              <View style={styles.toleranceCell}>
+              <View
+                style={[
+                  styles.toleranceCell,
+                  isTablet && styles.toleranceCellTablet,
+                ]}
+              >
                 <Text style={styles.toleranceCellLabel}>Entrada Jornada</Text>
                 <Text style={styles.toleranceCellValue}>
                   {btnVisWorkIn} min antes
                 </Text>
               </View>
-              <View style={styles.toleranceCell}>
+              <View
+                style={[
+                  styles.toleranceCell,
+                  isTablet && styles.toleranceCellTablet,
+                ]}
+              >
                 <Text style={styles.toleranceCellLabel}>Entrada Almuerzo</Text>
                 <Text style={styles.toleranceCellValue}>
                   {btnVisLunchIn} min antes
                 </Text>
               </View>
-              <View style={styles.toleranceCell}>
+              <View
+                style={[
+                  styles.toleranceCell,
+                  isTablet && styles.toleranceCellTablet,
+                ]}
+              >
                 <Text style={styles.toleranceCellLabel}>Salida Jornada</Text>
                 <Text style={styles.toleranceCellValue}>
                   {btnVisWorkOut} min antes
                 </Text>
               </View>
-              <View style={styles.toleranceCell}>
+              <View
+                style={[
+                  styles.toleranceCell,
+                  isTablet && styles.toleranceCellTablet,
+                ]}
+              >
                 <Text style={styles.toleranceCellLabel}>Salida Almuerzo</Text>
                 <Text style={styles.toleranceCellValue}>
                   {btnVisLunchOut} min antes
@@ -2123,8 +2148,22 @@ export default function PunchInOut() {
   );
 }
 
+/** Lado del avatar de perfil. Fuente única para el View contenedor y la Image. */
+const AVATAR_SIZE = 78;
+
 const styles = StyleSheet.create({
   content: { padding: 16, gap: 18, paddingBottom: 40 },
+  /**
+   * Centra y limita el contenido en tablet. Sin esto el árbol entero hereda el
+   * ancho del device y los bloques de 2 columnas se estiran (auditoría 4.4).
+   * `width: "100%"` es necesario porque alignSelf: "center" en un
+   * contentContainer haría que el contenido colapse a su ancho intrínseco.
+   */
+  contentTablet: {
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: "center",
+    width: "100%",
+  },
   /* ── Clock ── */
   clockFloatCard: {
     backgroundColor: "#fff",
@@ -2227,10 +2266,15 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#DBEAFE",
   },
+  avatarImage: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
+  },
   avatarFallback: {
-    width: 78,
-    height: 78,
-    borderRadius: 39,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
     backgroundColor: "#EFF6FF",
     alignItems: "center",
     justifyContent: "center",
@@ -2402,6 +2446,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 7,
     paddingHorizontal: 10,
+  },
+  /**
+   * En tablet los 4 items (Entrada/Salida × Jornada/Almuerzo) son homogéneos y
+   * entran en una sola fila: 4 × 23% = 92% + 3 gaps de 8px caben en los 648dp
+   * útiles del contenedor capado a MAX_CONTENT_WIDTH.
+   *
+   * `alignItems: "center"` es el fix real del hallazgo: con la celda ya ancha,
+   * sin centrar, el label quedaba pegado a la izquierda con la caja vacía a la
+   * derecha. Mismo patrón que scheduleTableCol, que por eso sí se veía bien.
+   */
+  toleranceCellTablet: {
+    flexBasis: "23%",
+    alignItems: "center",
   },
   toleranceCellLabel: {
     fontSize: 11,

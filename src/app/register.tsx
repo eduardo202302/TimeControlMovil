@@ -92,7 +92,7 @@ export default function Register() {
           <View style={styles.logo}>
             <Image
               source={{ uri: `${urlColegio}/${logo}` }}
-              style={{ width: 100, height: 100 }}
+              style={styles.logoImage}
             />
             <Text style={styles.logoTitle}>{name}</Text>
           </View>
@@ -376,6 +376,10 @@ const styles = StyleSheet.create({
   logo: {
     alignItems: "center",
     marginBottom: 20,
+  },
+  logoImage: {
+    width: 100,
+    height: 100,
   },
   logoTitle: {
     fontSize: 20,
