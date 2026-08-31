@@ -129,6 +129,7 @@ function createStyles(
     avatarContainer: {
       width: 40,
       height: 40,
+      // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- círculo (mitad de width/height fijos), no un radio de diseño
       borderRadius: 20,
       backgroundColor: "rgba(255,255,255,0.2)",
       alignItems: "center",
@@ -138,6 +139,7 @@ function createStyles(
     avatarImage: {
       width: 40,
       height: 40,
+      // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- círculo (mitad de width/height fijos), no un radio de diseño
       borderRadius: 20,
     },
     appName: {
@@ -156,6 +158,7 @@ function createStyles(
     closeBtn: {
       width: 30,
       height: 30,
+      // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- círculo (mitad de width/height fijos), no un radio de diseño
       borderRadius: 15,
       backgroundColor: "rgba(255,255,255,0.9)",
       alignItems: "center",

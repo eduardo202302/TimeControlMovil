@@ -118,6 +118,7 @@ const styles = StyleSheet.create({
     height: 71,
   },
   background: {
+    // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- círculo (mitad de width/height fijos, 128), no un radio de diseño; archivo fuera del alcance de la migración responsive (no es uno de los 27 auditados)
     borderRadius: 40,
     experimental_backgroundImage: `linear-gradient(180deg, #3C9FFE, #0274DF)`,
     width: 128,

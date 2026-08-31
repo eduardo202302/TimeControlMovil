@@ -285,6 +285,7 @@ function createStyles(
       position: "absolute",
       width: 96,
       height: 96,
+      // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- círculo (mitad de width/height fijos), no un radio de diseño
       borderRadius: 48,
       borderWidth: 2,
       borderColor: "rgba(255,138,0,0.7)",
@@ -292,6 +293,7 @@ function createStyles(
     iconCore: {
       width: 66,
       height: 66,
+      // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- círculo (mitad de width/height fijos), no un radio de diseño
       borderRadius: 33,
       backgroundColor: "#1a2a52",
       borderWidth: 2.5,
@@ -305,6 +307,7 @@ function createStyles(
       right: 2,
       width: 24,
       height: 24,
+      // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- círculo (mitad de width/height fijos), no un radio de diseño
       borderRadius: 12,
       backgroundColor: "#f57c00",
       borderWidth: 2.5,
@@ -335,6 +338,7 @@ function createStyles(
       justifyContent: "center",
       gap: scale(7),
     },
+    // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- círculo (mitad de width/height fijos), no un radio de diseño
     dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#f57c00" },
     statusTxt: {
       color: "#ffb74d",
