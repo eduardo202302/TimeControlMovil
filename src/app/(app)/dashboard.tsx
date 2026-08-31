@@ -1,29 +1,21 @@
-import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
-} from "react-native";
+import React, { useMemo } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { APP_BACKGROUND } from "@/constants/colors";
+import { useResponsive } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 
 export default function Dashboard() {
+  const { scale, verticalScale, font } = useResponsive();
+  const styles = useMemo(
+    () => createStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
+
   const { user } = useSchoolStore();
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.menuBtn} activeOpacity={0.7}>
-          <Ionicons name="menu" size={24} color="#111827" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Dashboard</Text>
-        <View style={{ width: 40 }} />
-      </View>
-
       {/* Contenido */}
       <View style={styles.content}>
         <Text style={styles.welcome}>
@@ -35,32 +27,20 @@ export default function Dashboard() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: APP_BACKGROUND },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#fff",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-  },
-  menuBtn: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 10,
-  },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
-  content: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  welcome: { fontSize: 22, fontWeight: "700", color: "#111827" },
-  role: { fontSize: 15, color: "#6B7280" },
-});
+function createStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: APP_BACKGROUND },
+    content: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: verticalScale(8),
+    },
+    welcome: { fontSize: font(22), fontWeight: "700", color: "#111827" },
+    role: { fontSize: font(15), color: "#6B7280" },
+  });
+}

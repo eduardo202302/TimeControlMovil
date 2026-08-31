@@ -3,12 +3,16 @@ import FormLogin from "@/components/login/FormLogin";
 import { BlurView } from "expo-blur";
 import { useFocusEffect } from "expo-router";
 import * as Storage from "../utils/storage";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useResponsive } from "@/constants/responsive";
 import { useSchoolStore } from "../../store/useSchoolStore";
 
 const Login = () => {
+  const { scale } = useResponsive();
+  const styles = useMemo(() => createStyles(scale), [scale]);
+
   const [showAuth, setShowAuth] = useState(false);
   const [checking, setChecking] = useState(true);
   const { school } = useSchoolStore();
@@ -48,19 +52,21 @@ const Login = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#dfe9ff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  authContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-});
+function createStyles(scale: (size: number) => number) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: "#dfe9ff",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    authContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: scale(24),
+    },
+  });
+}
 
 export default Login;

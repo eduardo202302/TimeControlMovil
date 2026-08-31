@@ -1,12 +1,16 @@
 import FormForgotPassword from "@/components/login/FormForgotPassword";
 import ResetPassword from "@/components/login/Reset-password";
 import VerifyPin from "@/components/login/Verify-pin";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useResponsive } from "@/constants/responsive";
 import { useSchoolStore } from "../../store/useSchoolStore";
 
 const ForgotPassword = () => {
+  const { scale } = useResponsive();
+  const styles = useMemo(() => createStyles(scale), [scale]);
+
   const { school } = useSchoolStore();
   const { name, logo } = school || {};
 
@@ -38,19 +42,21 @@ const ForgotPassword = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#dfe9ff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  authContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-});
+function createStyles(scale: (size: number) => number) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: "#dfe9ff",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    authContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: scale(24),
+    },
+  });
+}
 
 export default ForgotPassword;
