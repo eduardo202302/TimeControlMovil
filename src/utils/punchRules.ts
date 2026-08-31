@@ -33,6 +33,11 @@ export interface PunchEvent {
   hasOpenDay?: boolean | string;
   openDayDate?: string;
   date?: string;
+  /**
+   * Confirmado contra respuestas reales de POST /punches (mismo recurso
+   * "punch" que devuelve GET /punches/opendays): todo punch trae su dueño.
+   */
+  schoolUserId?: number;
 }
 
 /**
@@ -95,6 +100,101 @@ export function getRDMinutes(date: Date): number {
 /** Día de la semana en RD */
 export function getRDDayIndex(date: Date): number {
   return toRD(date).weekDay;
+}
+
+/** Offset fijo de RD (UTC-4, sin horario de verano) al serializar un ponche */
+export const RD_UTC_OFFSET = "-04:00";
+
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const HAS_TZ_RE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+
+/**
+ * Parsea una fecha del backend al instante correcto, según lo que traiga:
+ * - "2026-08-29"               → día de calendario RD. Se ancla al mediodía RD
+ *                                porque `new Date("2026-08-29")` sería medianoche
+ *                                UTC, que en RD ya es el día anterior a las 20:00.
+ * - "2026-08-29T14:51:16.716Z" → instante UTC explícito, se respeta tal cual.
+ * - "2026-08-29T10:51:16"      → sin zona: el backend habla en hora RD.
+ */
+function parseBackendDate(raw: string): Date | null {
+  const s = raw.trim();
+  if (!s) return null;
+  const iso = DATE_ONLY_RE.test(s)
+    ? `${s}T12:00:00${RD_UTC_OFFSET}`
+    : HAS_TZ_RE.test(s)
+      ? s
+      : `${s}${RD_UTC_OFFSET}`;
+  const parsed = new Date(iso);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/** "yyyy-mm-dd" del día en RD — el formato de fecha que espera el backend */
+export function toRDDateString(date: Date): string {
+  const { year, month, day } = toRD(date);
+  const mm = String(month + 1).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  return `${year}-${mm}-${dd}`;
+}
+
+/** El InicioJornada abierto sin cerrar, o null si la lista no trae ninguno */
+export function findOpenDayPunch(punches: PunchEvent[]): PunchEvent | null {
+  return (
+    punches.find(
+      (p) => p.hasOpenDay === true || (p.hasOpenDay as unknown) === "true",
+    ) ?? null
+  );
+}
+
+/**
+ * Fecha real de la jornada abierta que cierra el modal "Jornada Incompleta".
+ *
+ * ÚNICA fuente para sus tres consumos: el texto del modal, la hora sugerida y
+ * la fecha del payload de cierre. Antes cada uno la derivaba por su cuenta y
+ * con parseos distintos (uno normalizaba a RD, otro cortaba el string crudo en
+ * la "T"), y sin punch los tres adivinaban "hoy - 1 día" — el 24-ago eso mandó
+ * domingo 23 para una jornada abierta el sábado 22 y el backend la rechazó con
+ * "La fecha debe coincidir con el día del InicioJornada que se está cerrando".
+ *
+ * Devuelve null cuando no hay punch del cual leerla: la fecha NO se adivina.
+ */
+export function getPendingOpenDayDate(punch: PunchEvent | null): Date | null {
+  const raw = punch?.openDayDate ?? punch?.createdDate ?? punch?.date;
+  return raw ? parseBackendDate(String(raw)) : null;
+}
+
+/**
+ * Aísla el InicioJornada abierto de un usuario dentro de la lista
+ * escuela-completa que devuelve GET /punches/opendays (no filtra por usuario
+ * en el backend). Se usa como respaldo cuando /punches/today no trae el
+ * punch pendiente — típicamente cuando el modal "Jornada Incompleta" lo abre
+ * el RECHAZO del backend ("...ya tiene un inicio de jornada activo"), en vez
+ * del hasOpenDay de /punches/today.
+ *
+ * Cada objeto de /opendays es el punch real de la BD: no trae los campos
+ * sintéticos hasOpenDay/openDayDate que sí expone /punches/today — por eso
+ * findOpenDayPunch (que filtra por hasOpenDay) no sirve aquí. getPendingOpenDayDate
+ * ya cae a createdDate cuando openDayDate no existe, así que no hace falta
+ * ningún parseo nuevo: createdDate de un InicioJornada de /opendays YA ES la
+ * fecha real que hay que enviar de vuelta al cerrar.
+ *
+ * Si el usuario tuviera más de un InicioJornada abierto (no debería pasar —
+ * el backend ya rechaza un segundo InicioJornada mientras el primero sigue
+ * abierto — pero el endpoint es de toda la escuela, no filtrado), se queda
+ * con el más reciente.
+ */
+export function findOpenDayPunchForUser(
+  punches: PunchEvent[],
+  schoolUserId: number,
+): PunchEvent | null {
+  const mine = punches.filter(
+    (p) => p.type === "InicioJornada" && p.schoolUserId === schoolUserId,
+  );
+  if (mine.length === 0) return null;
+  return mine.reduce((latest, p) => {
+    const pTime = getPendingOpenDayDate(p)?.getTime() ?? -Infinity;
+    const latestTime = getPendingOpenDayDate(latest)?.getTime() ?? -Infinity;
+    return pTime > latestTime ? p : latest;
+  });
 }
 
 export const WEEK_DAYS: Record<number, string> = {

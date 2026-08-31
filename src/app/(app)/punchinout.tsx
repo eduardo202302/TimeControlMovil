@@ -6,7 +6,7 @@ import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -28,7 +28,10 @@ import type {
   UserSchedule,
 } from "../../../types/typeStore/SchoolStoreType";
 import {
+  findOpenDayPunch,
+  findOpenDayPunchForUser,
   getApprovedPermissionsToday,
+  getPendingOpenDayDate,
   getPunctuality,
   getRDDayIndex,
   getRDMinutes,
@@ -37,8 +40,10 @@ import {
   isAlmuerzoVisible,
   isBreakVisible,
   isJornadaVisible,
+  RD_UTC_OFFSET,
   timeStrToMinutes,
   toRD,
+  toRDDateString,
   WEEK_DAYS,
   type PunchEvent,
   type Tag,
@@ -340,6 +345,38 @@ async function fetchTodayPermissions(
       error?.response?.data?.message ?? error?.message,
     );
     return [];
+  }
+}
+
+/**
+ * Respaldo para cuando /punches/today no trae el InicioJornada abierto (ver
+ * fetchOpenDayFallback más abajo): GET /punches/opendays devuelve los
+ * InicioJornada sin cerrar de TODA la escuela, sin filtro de usuario en el
+ * backend — se filtra client-side por schoolUserId. Nunca lanza: si falla, se
+ * cae al estado de error del modal en vez de adivinar la fecha.
+ */
+async function fetchOpenDayPunch(
+  baseUrl: string,
+  schoolUserId: number,
+  token: string,
+): Promise<PunchEvent | null> {
+  try {
+    const response = await axios.get(`${baseUrl}/punches/opendays`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    console.log("OPEN DAYS RESPONSE:", {
+      clientTimestamp: new Date().toISOString(),
+      data: response.data,
+    });
+    if (!response.data?.success) return null;
+    const data: PunchEvent[] = response.data.data ?? [];
+    return findOpenDayPunchForUser(data, schoolUserId);
+  } catch (error: any) {
+    console.error(
+      "fetchOpenDayPunch:",
+      error?.response?.data?.message ?? error?.message,
+    );
+    return null;
   }
 }
 
@@ -690,11 +727,16 @@ export default function PunchInOut() {
     setSelectedBreakTagId(null);
   }, [selectedCategory]);
 
-  const fetchTodayPunches = useCallback(async () => {
+  /**
+   * Sincroniza los ponches de hoy y resuelve la jornada abierta pendiente.
+   * Devuelve el punch real del InicioJornada sin cerrar (o null si no lo pudo
+   * determinar) para que quien la llame no tenga que adivinar su fecha.
+   */
+  const fetchTodayPunches = useCallback(async (): Promise<PunchEvent | null> => {
     try {
       setLoadingPunches(true);
       const token = await getToken();
-      if (!urlColegio || !token) return;
+      if (!urlColegio || !token) return null;
       const response = await axios.get(`${urlColegio}/punches/today`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -702,25 +744,24 @@ export default function PunchInOut() {
         clientTimestamp: new Date().toISOString(),
         data: response.data,
       });
-      if (response.data.success) {
-        const data: PunchEvent[] = response.data.data ?? [];
-        setPunches(data);
-        const pending = data.find(
-          (p) => p.hasOpenDay === true || p.hasOpenDay === ("true" as any),
-        );
-        if (pending) {
-          setNextDayExitPunch(pending);
-          setNextDayExitModal(true);
-        } else {
-          setNextDayExitModal(false);
-          setNextDayExitPunch(null);
-        }
+      if (!response.data.success) return null;
+      const data: PunchEvent[] = response.data.data ?? [];
+      setPunches(data);
+      const pending = findOpenDayPunch(data);
+      if (pending) {
+        setNextDayExitPunch(pending);
+        setNextDayExitModal(true);
+      } else {
+        setNextDayExitModal(false);
+        setNextDayExitPunch(null);
       }
+      return pending;
     } catch (error: any) {
       console.error(
         "fetchTodayPunches:",
         error?.response?.data?.message ?? error?.message,
       );
+      return null;
     } finally {
       setLoadingPunches(false);
       setRefreshing(false);
@@ -848,6 +889,16 @@ export default function PunchInOut() {
 
   const isInicio = getNextPunchType(selectedCategory) === "inicio";
 
+  // \u00daNICA fuente de la fecha de la jornada pendiente, le\u00edda del punch real.
+  // La comparten sus tres consumos: el texto del modal, la hora sugerida y la
+  // fecha del payload de cierre. null = no se pudo determinar \u2192 el modal abre
+  // en estado de error y no deja cerrar, en vez de adivinar "hoy - 1 d\u00eda" y
+  // que el backend rechace por fecha que no coincide.
+  const pendingPunchDate = useMemo(
+    () => getPendingOpenDayDate(nextDayExitPunch),
+    [nextDayExitPunch],
+  );
+
   const handleSubmitNextDayExit = async () => {
     if (!nextDayExitTime.trim()) {
       Alert.alert("Error", "Por favor ingresa la hora de salida.");
@@ -858,33 +909,25 @@ export default function PunchInOut() {
       Alert.alert("Error", "Formato inv\u00e1lido. Usa HH:MM (ej: 17:30)");
       return;
     }
+    if (!pendingPunchDate) {
+      Alert.alert(
+        "Error",
+        "No se pudo determinar la jornada pendiente, contacta a soporte.",
+      );
+      return;
+    }
     const token = await getToken();
     if (!urlColegio || !token) return;
     setSubmittingExit(true);
     try {
-      let baseDateStr = "";
-
-      const raw =
-        nextDayExitPunch?.openDayDate ??
-        nextDayExitPunch?.createdDate ??
-        nextDayExitPunch?.date ??
-        "";
-      if (raw) {
-        baseDateStr = String(raw).split("T")[0];
-      } else {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yyyy = yesterday.getFullYear();
-        const mm = String(yesterday.getMonth() + 1).padStart(2, "0");
-        const dd = String(yesterday.getDate()).padStart(2, "0");
-        baseDateStr = `${yyyy}-${mm}-${dd}`;
-      }
-
       const [rawHour, rawMinute] = nextDayExitTime.trim().split(":");
       const hour = pad(Number(rawHour));
       const minute = pad(Number(rawMinute));
 
-      const finalDateTime = `${baseDateStr}T${hour}:${minute}:00-04:00`;
+      // El día sale del punch real, normalizado a RD una sola vez; la hora, del
+      // selector. Nunca de "hoy - 1 día".
+      const baseDateStr = toRDDateString(pendingPunchDate);
+      const finalDateTime = `${baseDateStr}T${hour}:${minute}:00${RD_UTC_OFFSET}`;
 
       const payload = {
         type: "FinJornada" as const,
@@ -966,10 +1009,7 @@ export default function PunchInOut() {
     // primero — el relogin por sesión vieja es el segundo paso, no el primero,
     // cuando ambos casos coinciden.
     const hasPendingOpenDay =
-      nextDayExitModal ||
-      punches.some(
-        (p) => p.hasOpenDay === true || p.hasOpenDay === ("true" as any),
-      );
+      nextDayExitModal || findOpenDayPunch(punches) !== null;
 
     // Antes de la primera Entrada Jornada del día: si la sesión actual lleva
     // más de SESSION_MAX_HOURS_FOR_FIRST_ENTRY horas abierta, forzar relogin
@@ -1260,7 +1300,25 @@ export default function PunchInOut() {
           lowerMsg.includes("inicio de jornada activo") ||
           lowerMsg.includes("cerrar la jornada")
         ) {
-          // Jornada del día anterior sin cerrar → mostrar modal, sin Alert genérico
+          // Jornada anterior sin cerrar → mostrar modal, sin Alert genérico.
+          // El backend rechaza sin devolver el punch original, así que primero
+          // se resuelve contra el servidor cuál es la jornada abierta: su fecha
+          // real es la única que aceptará el cierre. /punches/today solo
+          // refleja los ponches de HOY, así que si no trae el pendiente se cae
+          // a /punches/opendays (toda la escuela, filtrado client-side por
+          // schoolUserId). Sin ninguno de los dos, el modal abre en estado de
+          // error en vez de adivinar "ayer" — caso realmente excepcional.
+          const schoolUserIdForOpenDay = schoolUser?.id ?? user?.id;
+          const pendingOpenDay =
+            (await fetchTodayPunches()) ??
+            (schoolUserIdForOpenDay
+              ? await fetchOpenDayPunch(
+                  urlColegio,
+                  schoolUserIdForOpenDay,
+                  token,
+                )
+              : null);
+          if (pendingOpenDay) setNextDayExitPunch(pendingOpenDay);
           setNextDayExitModal(true);
           return;
         } else if (lowerMsg.includes("cambios en el horario")) {
@@ -1280,13 +1338,23 @@ export default function PunchInOut() {
       const msg: string =
         typeof rawMsg === "string" ? rawMsg : JSON.stringify(rawMsg);
       // Sincronizar igualmente en errores de red/servidor para no dejar la UI trabada
-      await fetchTodayPunches();
+      const pendingFromToday = await fetchTodayPunches();
       const lowerMsg = msg.toLowerCase();
       if (
         lowerMsg.includes("inicio de jornada activo") ||
         lowerMsg.includes("cerrar la jornada")
       ) {
-        // Jornada del día anterior sin cerrar → mostrar modal, sin Alert genérico
+        // Jornada anterior sin cerrar → mostrar modal, sin Alert genérico.
+        // El fetchTodayPunches de arriba ya intentó resolver el punch real;
+        // si no lo encontró, se cae a /punches/opendays antes de abrir el
+        // modal en estado de error.
+        const schoolUserIdForOpenDay = schoolUser?.id ?? user?.id;
+        const pendingOpenDay =
+          pendingFromToday ??
+          (schoolUserIdForOpenDay
+            ? await fetchOpenDayPunch(urlColegio, schoolUserIdForOpenDay, token)
+            : null);
+        if (pendingOpenDay) setNextDayExitPunch(pendingOpenDay);
         setNextDayExitModal(true);
         return;
       }
@@ -1324,29 +1392,17 @@ export default function PunchInOut() {
     return true;
   });
 
-  const pendingDate = nextDayExitPunch
-    ? formatRDDate(
-        new Date(nextDayExitPunch.openDayDate ?? nextDayExitPunch.createdDate),
-      )
-    : "";
+  // Los dos consumos de UI leen la MISMA pendingPunchDate que usa el payload.
+  const pendingDate = pendingPunchDate ? formatRDDate(pendingPunchDate) : "";
 
   // Hora de salida sugerida: horario del USUARIO correspondiente al día que
   // quedó pendiente (no necesariamente el de "hoy" — la jornada abierta pudo
   // ser un día distinto, con otro workExitTime). Se recalcula solo con
   // userSchedules, así que si un admin cambia el horario, la sugerencia se
   // actualiza automáticamente al relogin.
-  // nextDayExitPunch puede venir null: este modal también se abre cuando el
-  // backend RECHAZA un ponche con "cerrar la jornada" (ver handleRegister),
-  // sin devolver el punch original. En ese caso, igual que ya hace
-  // handleSubmitNextDayExit más arriba, se asume que el día pendiente es ayer.
-  const pendingPunchDate = nextDayExitPunch
-    ? new Date(nextDayExitPunch.openDayDate ?? nextDayExitPunch.createdDate)
-    : (() => {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        return yesterday;
-      })();
-  const pendingSchedule = getScheduleForDay(userSchedules, pendingPunchDate);
+  const pendingSchedule = pendingPunchDate
+    ? getScheduleForDay(userSchedules, pendingPunchDate)
+    : null;
   const suggestedExitTime = pendingSchedule?.workExitTime ?? null;
 
   const handleUseSuggestedExitTime = () => {
@@ -1388,60 +1444,75 @@ export default function PunchInOut() {
               </TouchableOpacity>
             </View>
             <View style={styles.ndModalBody}>
-              <Text style={styles.ndModalMsg}>
-                No completaste la salida{" "}
-                {pendingDate ? (
-                  <>
-                    del día{" "}
-                    <Text style={{ fontWeight: "700" }}>{pendingDate}</Text>
-                  </>
-                ) : (
-                  "de la jornada anterior"
-                )}
-                . Esto afecta tu puntuación del mes. Selecciona la hora a la que
-                saliste para cerrar la jornada.
-              </Text>
-
-              <TouchableOpacity
-                style={styles.ndTimeBtn}
-                onPress={() => setShowTimePicker(true)}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="time-outline" size={20} color="#D97706" />
-                <Text
-                  style={[
-                    styles.ndTimeBtnText,
-                    nextDayExitTime && styles.ndTimeBtnTextValue,
-                  ]}
-                >
-                  {nextDayExitTime
-                    ? to12h(nextDayExitTime)
-                    : "Seleccionar hora de salida"}
-                </Text>
-                <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
-              </TouchableOpacity>
-
-              {suggestedExitTime && (
-                <TouchableOpacity
-                  style={styles.ndSuggestionRow}
-                  onPress={handleUseSuggestedExitTime}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="bulb-outline" size={16} color="#2563EB" />
-                  <Text style={styles.ndSuggestionText}>
-                    Hora sugerida según tu horario:{" "}
-                    <Text style={styles.ndSuggestionTextValue}>
-                      {to12h(suggestedExitTime)}
-                    </Text>
+              {pendingPunchDate ? (
+                <>
+                  <Text style={styles.ndModalMsg}>
+                    No completaste la salida del día{" "}
+                    <Text style={{ fontWeight: "700" }}>{pendingDate}</Text>.
+                    Esto afecta tu puntuación del mes. Selecciona la hora a la
+                    que saliste para cerrar la jornada.
                   </Text>
-                  <Text style={styles.ndSuggestionAction}>Usar</Text>
-                </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.ndTimeBtn}
+                    onPress={() => setShowTimePicker(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="time-outline" size={20} color="#D97706" />
+                    <Text
+                      style={[
+                        styles.ndTimeBtnText,
+                        nextDayExitTime && styles.ndTimeBtnTextValue,
+                      ]}
+                    >
+                      {nextDayExitTime
+                        ? to12h(nextDayExitTime)
+                        : "Seleccionar hora de salida"}
+                    </Text>
+                    <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+
+                  {suggestedExitTime && (
+                    <TouchableOpacity
+                      style={styles.ndSuggestionRow}
+                      onPress={handleUseSuggestedExitTime}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="bulb-outline" size={16} color="#2563EB" />
+                      <Text style={styles.ndSuggestionText}>
+                        Hora sugerida según tu horario:{" "}
+                        <Text style={styles.ndSuggestionTextValue}>
+                          {to12h(suggestedExitTime)}
+                        </Text>
+                      </Text>
+                      <Text style={styles.ndSuggestionAction}>Usar</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              ) : (
+                // Sin fecha real no se ofrece cerrar: adivinarla garantiza el
+                // rechazo del backend y deja al usuario reintentando a ciegas.
+                <View style={styles.ndErrorRow}>
+                  <Ionicons
+                    name="alert-circle-outline"
+                    size={20}
+                    color="#B91C1C"
+                  />
+                  <Text style={styles.ndErrorText}>
+                    No se pudo determinar la jornada pendiente, contacta a
+                    soporte.
+                  </Text>
+                </View>
               )}
             </View>
             <TouchableOpacity
-              style={[styles.ndModalBtn, submittingExit && { opacity: 0.7 }]}
+              style={[
+                styles.ndModalBtn,
+                (submittingExit || !pendingPunchDate) &&
+                  styles.ndModalBtnDisabled,
+              ]}
               onPress={handleSubmitNextDayExit}
-              disabled={submittingExit}
+              disabled={submittingExit || !pendingPunchDate}
               activeOpacity={0.85}
             >
               {submittingExit ? (
@@ -2835,7 +2906,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  ndModalBtnDisabled: { opacity: 0.5 },
   ndModalBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
+  ndErrorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#FEF2F2",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  ndErrorText: { flex: 1, fontSize: 13, color: "#B91C1C", lineHeight: 20 },
   /* Break tag selector */
   breakTagWrap: { marginTop: 12 },
   breakTagLabel: {
