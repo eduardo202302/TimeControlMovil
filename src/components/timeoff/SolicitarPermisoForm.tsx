@@ -27,6 +27,7 @@ import type {
 import { normalizePermissionName, toRD, WEEK_DAYS } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
 import { APP_BACKGROUND } from "@/constants/colors";
+import { MAX_CONTENT_WIDTH, useResponsive } from "@/constants/responsive";
 import RevisionFinalModal, {
   formatDisplayDate,
   formatDisplayTime,
@@ -338,6 +339,7 @@ function describeSkipped(skipped: any): string[] {
 }
 
 export default function SolicitarPermisoForm() {
+  const { isTablet } = useResponsive();
   const { user, urlColegio, school } = useSchoolStore();
   const schoolUser: SchoolUser | undefined = user?.user?.schoolUsers?.[0];
   const schoolId =
@@ -1043,7 +1045,10 @@ export default function SolicitarPermisoForm() {
     <>
       <ScrollView
         style={styles.screen}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          isTablet && styles.contentTablet,
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -1705,6 +1710,22 @@ export default function SolicitarPermisoForm() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: APP_BACKGROUND },
   content: { padding: 16, gap: 16, paddingBottom: 40 },
+  /**
+   * Centra y limita el contenido en tablet, igual que punchinout.tsx. Sin esto
+   * las cards heredan el ancho completo del device y la fila Desde/Hasta
+   * (row + rowItem flex:1) estira cada campo a ~500dp para mostrar una fecha.
+   *
+   * `width: "100%"` es necesario porque `alignSelf: "center"` en un
+   * contentContainer haría que el contenido colapse a su ancho intrínseco.
+   *
+   * Los modales quedan fuera de este cap a propósito: `Modal` renderiza en su
+   * propio árbol y ya trae su tope explícito (maxWidth: 400).
+   */
+  contentTablet: {
+    maxWidth: MAX_CONTENT_WIDTH,
+    alignSelf: "center",
+    width: "100%",
+  },
 
   /* ── Cards ── */
   card: {
