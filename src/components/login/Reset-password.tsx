@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   Image,
@@ -14,6 +14,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { resetPassword } from "../../../api/Login/loginAuthentication";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { NewPasswordType } from "../../../types/typesLogin/ForgotPasswordType";
+import {
+  RADIUS_MD,
+  RADIUS_XL,
+  RADIUS_3XL,
+  useResponsive,
+} from "@/constants/responsive";
 
 export default function ResetPassword({
   name,
@@ -22,6 +28,12 @@ export default function ResetPassword({
   name?: string;
   image?: string;
 }) {
+  const { scale, verticalScale, font } = useResponsive();
+  const styles = useMemo(
+    () => createStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
+
   const [mensaje, setMensaje] = useState<any>(null);
   const [showPassword, setShowPassword] = useState(false);
   const { urlColegio } = useSchoolStore();
@@ -79,7 +91,7 @@ export default function ResetPassword({
           {urlColegio && image ? (
             <Image
               source={{ uri: `${urlColegio}/${image}` }}
-              style={{ width: 100, height: 100 }}
+              style={styles.logoImage}
             />
           ) : null}
 
@@ -212,129 +224,113 @@ export default function ResetPassword({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#dfe9ff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  companies: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  logoCompanies: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#3c5fa6",
-    marginBottom: 16,
-  },
-  logoTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#3c5fa6",
-    marginTop: 10,
-  },
-  card: {
-    backgroundColor: "white",
-    borderRadius: 16,
-    padding: 40,
-  },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#3c5fa6",
-    marginBottom: 18,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    color: "#555",
-    marginBottom: 20,
-  },
-  logo: {
-    alignItems: "center",
-    marginBottom: 27,
-  },
-  phone: {
-    width: "90%",
-    maxWidth: 360,
-    padding: 25,
-    borderRadius: 32,
-    backgroundColor: "#eef4ff",
-  },
-  authContainer: {
-    width: "100%",
-    maxWidth: 350,
-    padding: 24,
-    backgroundColor: "white",
-    borderRadius: 20,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "600",
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  subtitle: {
-    textAlign: "center",
-    color: "#555",
-    marginBottom: 20,
-  },
-  inputGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-  },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    width: "80%",
-    paddingVertical: 10,
-  },
-  button: {
-    backgroundColor: "#2d5fd3",
-    padding: 14,
-    borderRadius: 10,
-  },
-  buttonText: {
-    color: "white",
-    textAlign: "center",
-    fontWeight: "600",
-  },
-  errorText: {
-    color: "red",
-    textAlign: "center",
-    marginBottom: 10,
-  },
+function createStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: "#dfe9ff",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    companies: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    logoCompanies: {
+      fontSize: font(20),
+      fontWeight: "600",
+      color: "#3c5fa6",
+      marginBottom: verticalScale(16),
+    },
+    logoTitle: {
+      fontSize: font(20),
+      fontWeight: "600",
+      color: "#3c5fa6",
+      marginTop: verticalScale(10),
+    },
+    card: {
+      backgroundColor: "white",
+      borderRadius: RADIUS_XL,
+      padding: scale(40),
+    },
+    cardTitle: {
+      fontSize: font(17),
+      fontWeight: "600",
+      color: "#3c5fa6",
+      marginBottom: verticalScale(18),
+    },
+    logo: {
+      alignItems: "center",
+      marginBottom: verticalScale(27),
+    },
+    /** Tamaño fijo: iconografía de logo, no contenido — mismo criterio que avatarContainer en DrawerMenu.tsx. */
+    logoImage: { width: 100, height: 100 },
+    /** Ancho ideal de formulario, no un cap de emergencia — no tokenizar. */
+    phone: {
+      width: "90%",
+      maxWidth: 360,
+      padding: scale(25),
+      borderRadius: RADIUS_3XL,
+      backgroundColor: "#eef4ff",
+    },
+    inputGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: verticalScale(15),
+      borderWidth: 1,
+      borderColor: "#ddd",
+      borderRadius: RADIUS_MD,
+      paddingHorizontal: scale(12),
+    },
+    inputIcon: {
+      marginRight: scale(8),
+    },
+    input: {
+      width: "80%",
+      paddingVertical: verticalScale(10),
+    },
+    button: {
+      backgroundColor: "#2d5fd3",
+      padding: scale(14),
+      borderRadius: RADIUS_MD,
+    },
+    buttonText: {
+      color: "white",
+      textAlign: "center",
+      fontWeight: "600",
+    },
+    errorText: {
+      color: "red",
+      textAlign: "center",
+      marginBottom: verticalScale(10),
+    },
 
-  back: {
-    marginTop: 15,
-    textAlign: "center",
-    color: "#2d5fd3",
-  },
-  msg: { marginTop: 10, padding: 8, borderRadius: 6, alignItems: "center" },
-  msgError: {
-    backgroundColor: "#fff8f0",
-    borderWidth: 1,
-    borderColor: "#ffcc80",
-  },
-  msgSuccess: {
-    backgroundColor: "#f0faf5",
-    borderWidth: 1,
-    borderColor: "#a8dfc4",
-  },
-  msgText: { fontSize: 12 },
-  footerNote: {
-    textAlign: "center",
-    fontSize: 11,
-    color: "#9ab0c8",
-    marginTop: 14,
-    lineHeight: 18,
-  },
-});
+    back: {
+      marginTop: verticalScale(15),
+      textAlign: "center",
+      color: "#2d5fd3",
+    },
+    msg: {
+      marginTop: verticalScale(10),
+      padding: scale(8),
+      borderRadius: scale(6),
+      alignItems: "center",
+    },
+    msgError: {
+      backgroundColor: "#fff8f0",
+      borderWidth: 1,
+      borderColor: "#ffcc80",
+    },
+    msgSuccess: {
+      backgroundColor: "#f0faf5",
+      borderWidth: 1,
+      borderColor: "#a8dfc4",
+    },
+    msgText: { fontSize: font(12) },
+  });
+}

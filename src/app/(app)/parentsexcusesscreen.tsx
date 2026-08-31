@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Modal,
   ScrollView,
@@ -22,8 +22,20 @@ import {
 
 import { getStudents } from "../../api/getStudents";
 import { APP_BACKGROUND } from "@/constants/colors";
+import {
+  RADIUS_LG,
+  RADIUS_MD,
+  RADIUS_SM,
+  useResponsive,
+} from "@/constants/responsive";
 
 export default function ParentsExcusesScreen() {
+  const { scale, verticalScale, font } = useResponsive();
+  const styles = useMemo(
+    () => createStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
+
   const [modalVisible, setModalVisible] = useState(false);
   const [estudiante, setEstudiante] = useState("");
   const [estudiantes, setEstudiantes] = useState<any[]>([]);
@@ -123,7 +135,7 @@ export default function ParentsExcusesScreen() {
 
               <TextInput
                 placeholder="Describe el motivo de la ausencia o tardanza"
-                style={[styles.input, { height: 80 }]}
+                style={[styles.input, styles.textarea]}
                 multiline
               />
             </View>
@@ -139,25 +151,25 @@ export default function ParentsExcusesScreen() {
               <Text style={styles.subLabel}>Fecha</Text>
 
               <View style={styles.dateInput}>
-                <TextInput placeholder="dd/mm/aaaa" style={{ flex: 1 }} />
+                <TextInput placeholder="dd/mm/aaaa" style={styles.dateInputField} />
                 <Calendar size={18} />
               </View>
 
               <View style={styles.timeRow}>
-                <View style={{ flex: 1 }}>
+                <View style={styles.timeCol}>
                   <Text style={styles.subLabel}>Hora desde</Text>
 
                   <View style={styles.dateInput}>
-                    <TextInput placeholder="--:--" style={{ flex: 1 }} />
+                    <TextInput placeholder="--:--" style={styles.dateInputField} />
                     <Clock size={18} />
                   </View>
                 </View>
 
-                <View style={{ flex: 1 }}>
+                <View style={styles.timeCol}>
                   <Text style={styles.subLabel}>Hora hasta</Text>
 
                   <View style={styles.dateInput}>
-                    <TextInput placeholder="--:--" style={{ flex: 1 }} />
+                    <TextInput placeholder="--:--" style={styles.dateInputField} />
                     <Clock size={18} />
                   </View>
                 </View>
@@ -202,183 +214,205 @@ export default function ParentsExcusesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 15,
-    backgroundColor: "#f3f4f6",
-  },
+function createStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      padding: scale(15),
+      backgroundColor: "#f3f4f6",
+    },
 
-  stats: {
-    flexDirection: "row",
-    marginBottom: 15,
-  },
+    stats: {
+      flexDirection: "row",
+      marginBottom: verticalScale(15),
+    },
 
-  card: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 10,
-    alignItems: "center",
-    marginHorizontal: 3,
-  },
+    card: {
+      flex: 1,
+      padding: scale(10),
+      borderRadius: RADIUS_MD,
+      alignItems: "center",
+      marginHorizontal: scale(3),
+    },
 
-  number: {
-    fontWeight: "bold",
-    fontSize: 18,
-  },
+    number: {
+      fontWeight: "bold",
+      fontSize: font(18),
+    },
 
-  cardText: {
-    fontSize: 12,
-  },
+    cardText: {
+      fontSize: font(12),
+    },
 
-  button: {
-    backgroundColor: "#2563eb",
-    padding: 14,
-    borderRadius: 12,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-  },
+    button: {
+      backgroundColor: "#2563eb",
+      padding: scale(14),
+      borderRadius: RADIUS_LG,
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: scale(10),
+    },
 
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
+    buttonText: {
+      color: "#fff",
+      fontWeight: "600",
+    },
 
-  empty: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+    empty: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
 
-  emptyTitle: {
-    fontWeight: "600",
-    fontSize: 16,
-  },
+    emptyTitle: {
+      fontWeight: "600",
+      fontSize: font(16),
+    },
 
-  emptyText: {
-    fontSize: 13,
-    color: "#6b7280",
-  },
+    emptyText: {
+      fontSize: font(13),
+      color: "#6b7280",
+    },
 
-  overlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.3)",
-  },
+    overlay: {
+      flex: 1,
+      justifyContent: "flex-end",
+      // Necesario para que `maxWidth` en `sheet` centre en tablet en vez de
+      // pegarse a la izquierda (mismo patrón que modalOverlay en DrawerMenu.tsx).
+      alignItems: "center",
+      backgroundColor: "rgba(0,0,0,0.3)",
+    },
 
-  sheet: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
-  },
+    sheet: {
+      backgroundColor: "#fff",
+      padding: scale(20),
+      // Único riesgo estructural real de este archivo (auditoría FASE A): sin
+      // tope, el bottom sheet se estira a pantalla completa en tablet. Mismo
+      // valor/criterio que modalBox en DrawerMenu.tsx.
+      width: "100%",
+      maxWidth: 400,
+      // 25 no coincide con ningún RADIUS_* (entre LG=12 y 2XL=20 y 3XL=32) —
+      // huérfano, scale() directo.
+      borderTopLeftRadius: scale(25),
+      borderTopRightRadius: scale(25),
+    },
 
-  title: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 15,
-  },
+    title: {
+      fontSize: font(18),
+      fontWeight: "600",
+      marginBottom: verticalScale(15),
+    },
 
-  section: {
-    backgroundColor: APP_BACKGROUND,
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 12,
-  },
+    section: {
+      backgroundColor: APP_BACKGROUND,
+      padding: scale(12),
+      borderRadius: RADIUS_MD,
+      marginBottom: verticalScale(12),
+    },
 
-  labelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 6,
-  },
+    labelRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(6),
+      marginBottom: verticalScale(6),
+    },
 
-  label: {
-    fontWeight: "600",
-  },
+    label: {
+      fontWeight: "600",
+    },
 
-  subLabel: {
-    fontSize: 12,
-    marginTop: 6,
-    marginBottom: 4,
-  },
+    subLabel: {
+      fontSize: font(12),
+      marginTop: verticalScale(6),
+      marginBottom: verticalScale(4),
+    },
 
-  input: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
+    input: {
+      backgroundColor: "#fff",
+      borderRadius: RADIUS_SM,
+      padding: scale(10),
+      borderWidth: 1,
+      borderColor: "#ddd",
+    },
 
-  dateInput: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    justifyContent: "space-between",
-  },
+    textarea: { height: verticalScale(80) },
 
-  timeRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 10,
-  },
+    dateInput: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: "#fff",
+      borderRadius: RADIUS_SM,
+      padding: scale(10),
+      borderWidth: 1,
+      borderColor: "#ddd",
+      justifyContent: "space-between",
+    },
 
-  pickerContainer: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
+    dateInputField: { flex: 1 },
 
-  fileInput: {
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
+    timeRow: {
+      flexDirection: "row",
+      gap: scale(10),
+      marginTop: verticalScale(10),
+    },
 
-  helpText: {
-    fontSize: 11,
-    color: "#6b7280",
-    marginTop: 4,
-  },
+    timeCol: { flex: 1 },
 
-  buttons: {
-    flexDirection: "row",
-    marginTop: 15,
-    gap: 10,
-  },
+    pickerContainer: {
+      backgroundColor: "#fff",
+      borderRadius: RADIUS_SM,
+      borderWidth: 1,
+      borderColor: "#ddd",
+    },
 
-  send: {
-    flex: 1,
-    backgroundColor: "#2563eb",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
+    fileInput: {
+      backgroundColor: "#fff",
+      padding: scale(12),
+      borderRadius: RADIUS_SM,
+      borderWidth: 1,
+      borderColor: "#ddd",
+    },
 
-  cancel: {
-    flex: 1,
-    backgroundColor: "#e5e7eb",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
+    helpText: {
+      fontSize: font(11),
+      color: "#6b7280",
+      marginTop: verticalScale(4),
+    },
 
-  sendText: {
-    color: "#fff",
-    fontWeight: "600",
-  },
+    buttons: {
+      flexDirection: "row",
+      marginTop: verticalScale(15),
+      gap: scale(10),
+    },
 
-  cancelText: {
-    fontWeight: "600",
-  },
-});
+    send: {
+      flex: 1,
+      backgroundColor: "#2563eb",
+      padding: scale(12),
+      borderRadius: RADIUS_SM,
+      alignItems: "center",
+    },
+
+    cancel: {
+      flex: 1,
+      backgroundColor: "#e5e7eb",
+      padding: scale(12),
+      borderRadius: RADIUS_SM,
+      alignItems: "center",
+    },
+
+    sendText: {
+      color: "#fff",
+      fontWeight: "600",
+    },
+
+    cancelText: {
+      fontWeight: "600",
+    },
+  });
+}

@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Modal,
@@ -10,6 +10,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import {
+  RADIUS_2XL,
+  RADIUS_LG,
+  RADIUS_MD,
+  RADIUS_SM,
+  useResponsive,
+} from "@/constants/responsive";
 
 const LIMIT_OPTIONS = [20, 25, 50];
 
@@ -42,6 +49,12 @@ const IkarFlatList = ({
   required,
   data,
 }: SelectFieldProps) => {
+  const { scale, verticalScale, font } = useResponsive();
+  const styles = useMemo(
+    () => createStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
+
   const [opciones, setOpciones] = useState<any[]>([]);
   const [visible, setVisible] = useState(false);
   const [search, setSearch] = useState("");
@@ -313,140 +326,166 @@ const IkarFlatList = ({
   );
 };
 
-const styles = StyleSheet.create({
-  wrapper: { marginBottom: 20, marginTop: 10 },
-  label: {
-    position: "absolute",
-    top: -9,
-    left: 12,
-    backgroundColor: "white",
-    paddingHorizontal: 4,
-    fontSize: 12,
-    color: "#333333cd",
-    zIndex: 1,
-    fontWeight: "600",
-  },
-  container: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1.5,
-    borderColor: "#99999953",
-    borderRadius: 10,
-    backgroundColor: "white",
-    height: 52,
-    paddingHorizontal: 12,
-  },
-  placeholder: { fontSize: 14 },
-  selectedText: { fontSize: 14, color: "#090e15", fontWeight: "500" },
-  error: { color: "#EF4444", fontSize: 11, marginTop: 4, marginLeft: 16 },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(10, 30, 60, 0.6)",
-    justifyContent: "center",
-    padding: 24,
-  },
-  modal: {
-    borderRadius: 20,
-    padding: 16,
-    height: "70%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-    paddingHorizontal: 4,
-  },
-  modalTitulo: {
-    fontSize: 18,
-    fontWeight: "bold",
-    letterSpacing: 0.5,
-  },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "rgba(255,255,255,0.4)",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    height: 42,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    marginBottom: 12,
-  },
-  searchInput: { flex: 1, fontSize: 13, color: "#010408", marginLeft: 6 },
-  opcion: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 13,
-    paddingHorizontal: 12,
-    borderColor: "rgba(255,255,255,0.2)",
-    borderWidth: 0.5,
-    borderRadius: 10,
-    marginBottom: 6,
-    backgroundColor: "rgba(103, 162, 213, 0.1)",
-  },
-  opcionActiva: {
-    backgroundColor: "white",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    borderColor: "white",
-  },
-  opcionText: { fontSize: 15, fontWeight: "400" },
-  opcionTextActiva: { color: "#1A73E8", fontWeight: "700" },
-  pagination: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    marginTop: 12,
-    gap: 4,
-  },
-  btn: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "white",
-  },
-  btnActivo: { backgroundColor: "#1A73E8", borderColor: "#1A73E8" },
-  btnDisabled: { opacity: 0.4 },
-  btnText: { fontSize: 14, color: "#374151" },
-  btnTextActivo: { color: "white", fontWeight: "bold" },
-  info: { fontSize: 13, color: "#6B7280", marginLeft: 4 },
-  limitRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-    gap: 6,
-  },
-  limitBtn: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "white",
-  },
-  limitOverlay: { flex: 1, justifyContent: "flex-end", padding: 24 },
-  limitModal: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  limitOpcion: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8 },
-  limitOpcionActiva: { backgroundColor: "#EFF6FF" },
-});
+function createStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    wrapper: { marginBottom: verticalScale(20), marginTop: verticalScale(10) },
+    label: {
+      position: "absolute",
+      top: -9,
+      left: 12,
+      backgroundColor: "white",
+      paddingHorizontal: scale(4),
+      fontSize: font(12),
+      color: "#333333cd",
+      zIndex: 1,
+      fontWeight: "600",
+    },
+    container: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      borderWidth: 1.5,
+      borderColor: "#99999953",
+      borderRadius: RADIUS_MD,
+      backgroundColor: "white",
+      height: verticalScale(52),
+      paddingHorizontal: scale(12),
+    },
+    placeholder: { fontSize: font(14) },
+    selectedText: { fontSize: font(14), color: "#090e15", fontWeight: "500" },
+    error: {
+      color: "#EF4444",
+      fontSize: font(11),
+      marginTop: verticalScale(4),
+      marginLeft: scale(16),
+    },
+    overlay: {
+      flex: 1,
+      backgroundColor: "rgba(10, 30, 60, 0.6)",
+      justifyContent: "center",
+      // Necesario para que `maxWidth` en `modal` centre en tablet en vez de
+      // pegarse a la izquierda (mismo patrón que modalOverlay en DrawerMenu.tsx).
+      alignItems: "center",
+      padding: scale(24),
+    },
+    modal: {
+      // Único riesgo estructural real de este archivo (auditoría FASE A): sin
+      // tope, el modal del selector se estira a pantalla completa en tablet.
+      // Mismo valor/criterio que modalBox en DrawerMenu.tsx y los 3 modales
+      // de SolicitarPermisoForm.tsx.
+      width: "100%",
+      maxWidth: 400,
+      borderRadius: RADIUS_2XL,
+      padding: scale(16),
+      height: "70%",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.3,
+      shadowRadius: 16,
+      elevation: 4,
+    },
+    modalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: verticalScale(12),
+      paddingHorizontal: scale(4),
+    },
+    modalTitulo: {
+      fontSize: font(18),
+      fontWeight: "bold",
+      letterSpacing: 0.5,
+    },
+    searchContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1.5,
+      borderColor: "rgba(255,255,255,0.4)",
+      borderRadius: RADIUS_MD,
+      paddingHorizontal: scale(10),
+      height: verticalScale(42),
+      backgroundColor: "rgba(255,255,255,0.15)",
+      marginBottom: verticalScale(12),
+    },
+    searchInput: { flex: 1, fontSize: font(13), color: "#010408", marginLeft: scale(6) },
+    opcion: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: verticalScale(13),
+      paddingHorizontal: scale(12),
+      borderColor: "rgba(255,255,255,0.2)",
+      borderWidth: 0.5,
+      borderRadius: RADIUS_MD,
+      marginBottom: verticalScale(6),
+      backgroundColor: "rgba(103, 162, 213, 0.1)",
+    },
+    opcionActiva: {
+      backgroundColor: "white",
+      borderRadius: RADIUS_MD,
+      paddingHorizontal: scale(12),
+      borderColor: "white",
+    },
+    opcionText: { fontSize: font(15), fontWeight: "400" },
+    opcionTextActiva: { color: "#1A73E8", fontWeight: "700" },
+    pagination: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      marginTop: verticalScale(12),
+      gap: scale(4),
+    },
+    btn: {
+      borderWidth: 1,
+      borderColor: "#D1D5DB",
+      // 6 no coincide con ningún RADIUS_* — huérfano, scale() directo.
+      borderRadius: scale(6),
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(6),
+      backgroundColor: "white",
+    },
+    btnActivo: { backgroundColor: "#1A73E8", borderColor: "#1A73E8" },
+    btnDisabled: { opacity: 0.4 },
+    btnText: { fontSize: font(14), color: "#374151" },
+    btnTextActivo: { color: "white", fontWeight: "bold" },
+    info: { fontSize: font(13), color: "#6B7280", marginLeft: scale(4) },
+    limitRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: verticalScale(8),
+      gap: scale(6),
+    },
+    limitBtn: {
+      borderWidth: 1,
+      borderColor: "#D1D5DB",
+      // 6 no coincide con ningún RADIUS_* — huérfano, scale() directo.
+      borderRadius: scale(6),
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(6),
+      backgroundColor: "white",
+    },
+    limitOverlay: { flex: 1, justifyContent: "flex-end", padding: scale(24) },
+    limitModal: {
+      backgroundColor: "white",
+      borderRadius: RADIUS_LG,
+      padding: scale(8),
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    limitOpcion: {
+      paddingVertical: verticalScale(10),
+      paddingHorizontal: scale(16),
+      borderRadius: RADIUS_SM,
+    },
+    limitOpcionActiva: { backgroundColor: "#EFF6FF" },
+  });
+}
 
 export default IkarFlatList;

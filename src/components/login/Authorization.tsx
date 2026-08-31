@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
@@ -12,8 +12,19 @@ import {
 } from "react-native";
 import { authorization } from "../../../api/authorization";
 import { ClaveRegistroType } from "../../../types/typesAuthorization/claveRegistroType";
+import {
+  MAX_CONTENT_WIDTH,
+  RADIUS_SM,
+  useResponsive,
+} from "@/constants/responsive";
 
 const Authorization = ({ onClose }: { onClose: () => void }) => {
+  const { isTablet, scale, verticalScale, font } = useResponsive();
+  const styles = useMemo(
+    () => createStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
+
   const [mensaje, setMensaje] = useState<{
     texto: string;
     tipo: "error" | "success";
@@ -115,7 +126,7 @@ const Authorization = ({ onClose }: { onClose: () => void }) => {
   if (!showCard) return null;
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isTablet && styles.contentTablet]}>
       <View style={styles.stripe} />
       <View style={styles.cardHead}>
         <View style={styles.rippleWrap}>
@@ -144,7 +155,7 @@ const Authorization = ({ onClose }: { onClose: () => void }) => {
             name="information-circle-outline"
             size={16}
             color="#f57c00"
-            style={{ marginTop: 2 }}
+            style={styles.infoIcon}
           />
           <Text style={styles.infoText}>
             Solicita tu{" "}
@@ -228,163 +239,189 @@ const Authorization = ({ onClose }: { onClose: () => void }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  card: {
-    width: "100%",
-    borderRadius: 14,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  stripe: { height: 10, backgroundColor: "#f57c00" },
-  cardHead: {
-    backgroundColor: "#0f1e42",
-    paddingBottom: 22,
-    alignItems: "center",
-  },
-  rippleWrap: {
-    width: 96,
-    height: 96,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 22,
-    marginBottom: 14,
-  },
-  ripple: {
-    position: "absolute",
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 2,
-    borderColor: "rgba(255,138,0,0.7)",
-  },
-  iconCore: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-    backgroundColor: "#1a2a52",
-    borderWidth: 2.5,
-    borderColor: "#f57c00",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  errBadge: {
-    position: "absolute",
-    top: 2,
-    right: 2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#f57c00",
-    borderWidth: 2.5,
-    borderColor: "#0f1e42",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cardTitle: {
-    color: "#fff",
-    fontSize: 17,
-    fontWeight: "700",
-    letterSpacing: 0.3,
-    marginBottom: 4,
-  },
-  cardSub: {
-    color: "#ffb74d",
-    fontSize: 12,
-    fontWeight: "500",
-    letterSpacing: 0.8,
-  },
-  statusBar: {
-    backgroundColor: "#1c0f00",
-    borderTopWidth: 1,
-    borderTopColor: "#4a2800",
-    paddingVertical: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-  },
-  dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#f57c00" },
-  statusTxt: {
-    color: "#ffb74d",
-    fontSize: 11,
-    fontWeight: "600",
-    letterSpacing: 1,
-  },
-  errorText: {
-    color: "#EF4444",
-    fontSize: 11,
-    marginTop: 4,
-    marginLeft: 4,
-    marginBottom: 4,
-  },
-  cardBody: { backgroundColor: "#fff", padding: 20 },
-  infoBox: {
-    backgroundColor: "#fff8f0",
-    borderWidth: 1,
-    borderColor: "#ffcc80",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 18,
-    flexDirection: "row",
-    gap: 10,
-  },
-  infoText: { fontSize: 13, color: "#5a2d00", lineHeight: 20, flex: 1 },
-  inputLabel: {
-    fontSize: 12,
-    color: "#5a7a9a",
-    marginBottom: 5,
-    fontWeight: "500",
-  },
-  inputWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1.5,
-    borderColor: "#ccd6e0",
-    borderRadius: 7,
-    paddingHorizontal: 12,
-    height: 48,
-  },
-  input: { flex: 1, fontSize: 14, color: "#111", letterSpacing: 1 },
-  inputIcon: { marginRight: 8 },
-  sendBtn: {
-    backgroundColor: "#1B3A6B",
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 14,
-    flexDirection: "row",
-    gap: 8,
-  },
-  sendBtnText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "700",
-    letterSpacing: 0.4,
-  },
-  msg: { marginTop: 10, padding: 8, borderRadius: 6, alignItems: "center" },
-  msgError: {
-    backgroundColor: "#fff8f0",
-    borderWidth: 1,
-    borderColor: "#ffcc80",
-  },
-  msgSuccess: {
-    backgroundColor: "#f0faf5",
-    borderWidth: 1,
-    borderColor: "#a8dfc4",
-  },
-  msgText: { fontSize: 12 },
-  footerNote: {
-    textAlign: "center",
-    fontSize: 11,
-    color: "#9ab0c8",
-    marginTop: 14,
-    lineHeight: 18,
-  },
-});
+function createStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    card: {
+      width: "100%",
+      // 14 no coincide con ningún RADIUS_* — huérfano, scale() directo.
+      borderRadius: scale(14),
+      overflow: "hidden",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 12 },
+      shadowOpacity: 0.35,
+      shadowRadius: 20,
+      elevation: 10,
+    },
+    contentTablet: {
+      maxWidth: MAX_CONTENT_WIDTH,
+      alignSelf: "center",
+      width: "100%",
+    },
+    stripe: { height: verticalScale(10), backgroundColor: "#f57c00" },
+    cardHead: {
+      backgroundColor: "#0f1e42",
+      paddingBottom: verticalScale(22),
+      alignItems: "center",
+    },
+    /**
+     * Clúster puramente iconográfico/decorativo (aros de ripple + ícono
+     * central + badge) — tamaños fijos a propósito, mismo criterio que
+     * avatarContainer en DrawerMenu.tsx. Solo el margen externo (espaciado
+     * de página, no parte de la geometría del clúster) se tokeniza.
+     */
+    rippleWrap: {
+      width: 96,
+      height: 96,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: verticalScale(22),
+      marginBottom: verticalScale(14),
+    },
+    ripple: {
+      position: "absolute",
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      borderWidth: 2,
+      borderColor: "rgba(255,138,0,0.7)",
+    },
+    iconCore: {
+      width: 66,
+      height: 66,
+      borderRadius: 33,
+      backgroundColor: "#1a2a52",
+      borderWidth: 2.5,
+      borderColor: "#f57c00",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    errBadge: {
+      position: "absolute",
+      top: 2,
+      right: 2,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: "#f57c00",
+      borderWidth: 2.5,
+      borderColor: "#0f1e42",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    cardTitle: {
+      color: "#fff",
+      fontSize: font(17),
+      fontWeight: "700",
+      letterSpacing: 0.3,
+      marginBottom: verticalScale(4),
+    },
+    cardSub: {
+      color: "#ffb74d",
+      fontSize: font(12),
+      fontWeight: "500",
+      letterSpacing: 0.8,
+    },
+    statusBar: {
+      backgroundColor: "#1c0f00",
+      borderTopWidth: 1,
+      borderTopColor: "#4a2800",
+      paddingVertical: verticalScale(8),
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: scale(7),
+    },
+    dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#f57c00" },
+    statusTxt: {
+      color: "#ffb74d",
+      fontSize: font(11),
+      fontWeight: "600",
+      letterSpacing: 1,
+    },
+    errorText: {
+      color: "#EF4444",
+      fontSize: font(11),
+      marginTop: verticalScale(4),
+      marginLeft: scale(4),
+      marginBottom: verticalScale(4),
+    },
+    cardBody: { backgroundColor: "#fff", padding: scale(20) },
+    infoBox: {
+      backgroundColor: "#fff8f0",
+      borderWidth: 1,
+      borderColor: "#ffcc80",
+      borderRadius: RADIUS_SM,
+      padding: scale(12),
+      marginBottom: verticalScale(18),
+      flexDirection: "row",
+      gap: scale(10),
+    },
+    infoIcon: { marginTop: verticalScale(2) },
+    infoText: { fontSize: font(13), color: "#5a2d00", lineHeight: 20, flex: 1 },
+    inputLabel: {
+      fontSize: font(12),
+      color: "#5a7a9a",
+      marginBottom: verticalScale(5),
+      fontWeight: "500",
+    },
+    inputWrap: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1.5,
+      borderColor: "#ccd6e0",
+      // 7 no coincide con ningún RADIUS_* — huérfano, scale() directo.
+      borderRadius: scale(7),
+      paddingHorizontal: scale(12),
+      height: verticalScale(48),
+    },
+    input: { flex: 1, fontSize: font(14), color: "#111", letterSpacing: 1 },
+    inputIcon: { marginRight: scale(8) },
+    sendBtn: {
+      backgroundColor: "#1B3A6B",
+      borderRadius: RADIUS_SM,
+      paddingVertical: verticalScale(14),
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: verticalScale(14),
+      flexDirection: "row",
+      gap: scale(8),
+    },
+    sendBtnText: {
+      color: "#fff",
+      fontSize: font(15),
+      fontWeight: "700",
+      letterSpacing: 0.4,
+    },
+    msg: {
+      marginTop: verticalScale(10),
+      padding: scale(8),
+      // 6 no coincide con ningún RADIUS_* — huérfano, scale() directo.
+      borderRadius: scale(6),
+      alignItems: "center",
+    },
+    msgError: {
+      backgroundColor: "#fff8f0",
+      borderWidth: 1,
+      borderColor: "#ffcc80",
+    },
+    msgSuccess: {
+      backgroundColor: "#f0faf5",
+      borderWidth: 1,
+      borderColor: "#a8dfc4",
+    },
+    msgText: { fontSize: font(12) },
+    footerNote: {
+      textAlign: "center",
+      fontSize: font(11),
+      color: "#9ab0c8",
+      marginTop: verticalScale(14),
+      lineHeight: 18,
+    },
+  });
+}
 
 export default Authorization;

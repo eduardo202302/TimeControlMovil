@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   Image,
@@ -16,6 +16,13 @@ import { getRoleById } from "../../../api/Roles/getRoles";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { LoginType } from "../../../types/typesLogin/LoginType";
 import * as Storage from "../../utils/storage";
+import {
+  RADIUS_MD,
+  RADIUS_SM,
+  RADIUS_XL,
+  RADIUS_3XL,
+  useResponsive,
+} from "@/constants/responsive";
 
 interface FormLoginProps {
   name?: string;
@@ -32,6 +39,12 @@ function decodeJWT(token: string): Record<string, any> {
 }
 
 export default function FormLogin({ name, image }: FormLoginProps) {
+  const { scale, verticalScale, font } = useResponsive();
+  const styles = useMemo(
+    () => createStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
+
   const [mensaje, setMensaje] = useState<{
     texto: string;
     tipo: "error" | "success";
@@ -153,7 +166,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         <View>
           <Image
             source={require("../../../assets/images/logos/logoMini.png")}
-            style={{ width: 100, height: 100 }}
+            style={styles.logoImage}
           />
         </View>
         <View>
@@ -164,7 +177,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         {urlColegio && name ? (
           <Image
             source={{ uri: `${urlColegio}/${image}` }}
-            style={{ width: 100, height: 100 }}
+            style={styles.logoImage}
           />
         ) : null}
         <Text style={styles.logoTitle}>{name}</Text>
@@ -294,91 +307,107 @@ export default function FormLogin({ name, image }: FormLoginProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#dfe9ff",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  companies: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  phone: {
-    width: "90%",
-    maxWidth: 360,
-    padding: 25,
-    borderRadius: 32,
-    backgroundColor: "#eef4ff",
-  },
-  errorText: {
-    color: "#EF4444",
-    fontSize: 11,
-    marginTop: 4,
-    marginLeft: 4,
-    marginBottom: 4,
-  },
-  logo: { alignItems: "center", marginBottom: 27 },
-  logoTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#3c5fa6",
-    marginTop: 6,
-  },
-  card: { backgroundColor: "white", borderRadius: 16, padding: 20 },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 14,
-  },
-  inputGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 12,
-  },
-  inputIcon: { marginRight: 8 },
-  input: { flex: 1, paddingVertical: 10, fontSize: 14 },
-  options: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 4,
-  },
-  rememberMe: { flexDirection: "row", alignItems: "center", gap: 6 },
-  rememberText: { fontSize: 13, color: "#555" },
-  forgot: { fontSize: 13, color: "#4c6fbf" },
-  button: {
-    backgroundColor: "#2d5fd3",
-    padding: 13,
-    borderRadius: 10,
-    marginTop: 18,
-  },
-  buttonText: {
-    color: "white",
-    textAlign: "center",
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  register: { flexDirection: "row", justifyContent: "center", marginTop: 14 },
-  registerText: { fontSize: 13, color: "#666" },
-  registerLink: { fontSize: 13, color: "#4c6fbf", fontWeight: "500" },
-  msg: { marginTop: 10, padding: 8, borderRadius: 6, alignItems: "center" },
-  msgError: {
-    backgroundColor: "#fff8f0",
-    borderWidth: 1,
-    borderColor: "#ffcc80",
-  },
-  msgSuccess: {
-    backgroundColor: "#f0faf5",
-    borderWidth: 1,
-    borderColor: "#a8dfc4",
-  },
-  msgText: { fontSize: 12 },
-});
+function createStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    companies: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    /** Ancho ideal de formulario, no un cap de emergencia — no tokenizar. */
+    phone: {
+      width: "90%",
+      maxWidth: 360,
+      padding: scale(25),
+      borderRadius: RADIUS_3XL,
+      backgroundColor: "#eef4ff",
+    },
+    errorText: {
+      color: "#EF4444",
+      fontSize: font(11),
+      marginTop: verticalScale(4),
+      marginLeft: scale(4),
+      marginBottom: verticalScale(4),
+    },
+    logo: { alignItems: "center", marginBottom: verticalScale(27) },
+    /** Tamaño fijo: iconografía de logo, no contenido — mismo criterio que avatarContainer en DrawerMenu.tsx. */
+    logoImage: { width: 100, height: 100 },
+    logoTitle: {
+      fontSize: font(20),
+      fontWeight: "600",
+      color: "#3c5fa6",
+      marginTop: verticalScale(6),
+    },
+    card: {
+      backgroundColor: "white",
+      borderRadius: RADIUS_XL,
+      padding: scale(20),
+    },
+    cardTitle: {
+      fontSize: font(17),
+      fontWeight: "600",
+      color: "#333",
+      marginBottom: verticalScale(14),
+    },
+    inputGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: "#ddd",
+      borderRadius: RADIUS_SM,
+      paddingHorizontal: scale(10),
+      marginBottom: verticalScale(12),
+    },
+    inputIcon: { marginRight: scale(8) },
+    input: { flex: 1, paddingVertical: verticalScale(10), fontSize: font(14) },
+    options: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginTop: verticalScale(4),
+    },
+    rememberMe: { flexDirection: "row", alignItems: "center", gap: scale(6) },
+    rememberText: { fontSize: font(13), color: "#555" },
+    forgot: { fontSize: font(13), color: "#4c6fbf" },
+    button: {
+      backgroundColor: "#2d5fd3",
+      padding: scale(13),
+      borderRadius: RADIUS_MD,
+      marginTop: verticalScale(18),
+    },
+    buttonText: {
+      color: "white",
+      textAlign: "center",
+      fontSize: font(15),
+      fontWeight: "500",
+    },
+    register: {
+      flexDirection: "row",
+      justifyContent: "center",
+      marginTop: verticalScale(14),
+    },
+    registerText: { fontSize: font(13), color: "#666" },
+    registerLink: { fontSize: font(13), color: "#4c6fbf", fontWeight: "500" },
+    msg: {
+      marginTop: verticalScale(10),
+      padding: scale(8),
+      borderRadius: scale(6),
+      alignItems: "center",
+    },
+    msgError: {
+      backgroundColor: "#fff8f0",
+      borderWidth: 1,
+      borderColor: "#ffcc80",
+    },
+    msgSuccess: {
+      backgroundColor: "#f0faf5",
+      borderWidth: 1,
+      borderColor: "#a8dfc4",
+    },
+    msgText: { fontSize: font(12) },
+  });
+}

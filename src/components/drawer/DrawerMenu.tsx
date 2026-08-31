@@ -1,10 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { usePathname, useRouter } from "expo-router";
 import * as Storage from "../../utils/storage";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Dimensions,
   Image,
   Modal,
   ScrollView,
@@ -29,11 +28,13 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { MenuTree } from "../../../utils/resolveRoute";
+import {
+  RADIUS_MD,
+  RADIUS_SM,
+  useResponsive,
+} from "@/constants/responsive";
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-
-const { width } = Dimensions.get("window");
-const DRAWER_WIDTH = Math.min(width * 0.78, 320);
 
 const ICON_MAP: Record<string, keyof typeof Ionicons.glyphMap> = {
   dashboard: "grid-outline",
@@ -71,13 +72,220 @@ function getIcon(iconName: string): keyof typeof Ionicons.glyphMap {
   return ICON_MAP[iconName?.toLowerCase()] ?? "ellipse-outline";
 }
 
+/**
+ * Estilos tokenizados con scale/verticalScale/font de useResponsive(). Vive
+ * fuera del componente (función pura) para que tanto DrawerMenu como
+ * MenuSection consuman la misma instancia memoizada — evita recalcular por
+ * cada sección del menú.
+ */
+function createStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    overlay: {
+      ...StyleSheet.absoluteFill,
+      zIndex: 999,
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: "rgba(0,0,0,0.45)",
+    },
+    drawer: {
+      // `width` se aplica inline (ver drawerWidth) — depende de
+      // useWindowDimensions() y no puede vivir en un StyleSheet memoizado
+      // solo por scale/verticalScale/font.
+      position: "absolute",
+      top: 0,
+      left: 0,
+      height: "100%",
+      zIndex: 1,
+      backgroundColor: "#FFFFFF",
+      elevation: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: -2, height: 0 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: scale(16),
+      paddingVertical: verticalScale(18),
+      backgroundColor: "#2563EB",
+    },
+    headerLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+    },
+    /**
+     * Tamaño fijo a propósito: es iconografía (avatar de cabecera), no
+     * contenido que necesite más espacio en pantalla grande — mismo
+     * criterio que AVATAR_SIZE en punchinout.tsx.
+     */
+    avatarContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: "rgba(255,255,255,0.2)",
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+    },
+    avatarImage: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+    },
+    appName: {
+      // `maxWidth` se aplica inline (ver appNameMaxWidth) — depende de
+      // drawerWidth.
+      color: "#FFFFFF",
+      fontSize: font(16),
+      fontWeight: "700",
+    },
+    appSubtitle: {
+      color: "rgba(255,255,255,0.8)",
+      fontSize: font(12),
+      marginTop: verticalScale(1),
+    },
+    /** Tamaño fijo, mismo criterio que avatarContainer/avatarImage. */
+    closeBtn: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: "rgba(255,255,255,0.9)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    scroll: { flex: 1 },
+    section: {
+      marginBottom: verticalScale(2),
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(12),
+      borderRadius: RADIUS_MD,
+      gap: scale(10),
+      backgroundColor: "#F3F4F6",
+    },
+    sectionTitle: {
+      flex: 1,
+      fontSize: font(15),
+      fontWeight: "600",
+      color: "#374151",
+    },
+    sectionTitleActive: {
+      color: "#2563EB",
+    },
+    submenu: {
+      marginLeft: scale(8),
+      marginBottom: verticalScale(4),
+    },
+    childItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+      paddingLeft: scale(28),
+      paddingRight: scale(12),
+      paddingVertical: verticalScale(11),
+      borderRadius: RADIUS_SM,
+      marginBottom: verticalScale(2),
+      borderLeftWidth: 2,
+      borderLeftColor: "transparent",
+    },
+    activeChildItem: {
+      backgroundColor: "#EFF6FF",
+      borderLeftColor: "#2563EB",
+    },
+    childText: {
+      fontSize: font(14),
+      color: "#6B7280",
+    },
+    activeChildText: {
+      color: "#2563EB",
+      fontWeight: "700",
+    },
+    userSection: {
+      marginTop: verticalScale(8),
+      borderTopWidth: 1,
+      borderTopColor: "#F3F4F6",
+      paddingTop: verticalScale(4),
+    },
+    logoutItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+      paddingLeft: scale(38),
+      paddingRight: scale(12),
+      paddingVertical: verticalScale(11),
+      borderRadius: RADIUS_SM,
+      marginBottom: verticalScale(2),
+      borderLeftWidth: 2,
+      borderLeftColor: "#FECACA",
+      backgroundColor: "#FEF2F2",
+    },
+    logoutBtnText: {
+      fontSize: font(12),
+      fontWeight: "700",
+      color: "#DC2626",
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    modalBox: {
+      backgroundColor: "#fff",
+      borderRadius: RADIUS_SM,
+      padding: scale(24),
+      width: "80%",
+      // Único riesgo estructural real de este archivo (auditoría FASE A):
+      // sin tope, en un tablet grande el diálogo de confirmar logout podía
+      // llegar a 800-1000dp. Mismo valor/criterio que los modales de
+      // SolicitarPermisoForm.tsx y punchinout.tsx.
+      maxWidth: 400,
+      elevation: 5,
+    },
+    modalMessage: {
+      fontSize: font(14),
+      color: "#444",
+      marginBottom: verticalScale(24),
+    },
+    modalButtons: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      gap: scale(20),
+    },
+    modalCancel: {
+      color: "#6B7280",
+      fontWeight: "600",
+      fontSize: font(14),
+    },
+    modalConfirm: {
+      color: "#DC2626",
+      fontWeight: "600",
+      fontSize: font(14),
+    },
+  });
+}
+
+type DrawerStyles = ReturnType<typeof createStyles>;
+
 interface SectionProps {
   section: MenuTree;
   onNavigate: (path: string) => void;
   pathname: string;
+  styles: DrawerStyles;
 }
 
-function MenuSection({ section, onNavigate, pathname }: SectionProps) {
+function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
   const [expanded, setExpanded] = useState(false);
   const sectionIcon = getIcon(section.parent.icon);
   const hasChildren = section.children.length > 0;
@@ -172,6 +380,26 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
   const { user, menuTree, app, logout } = useSchoolStore();
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
+  const { width, isTablet, scale, verticalScale, font } = useResponsive();
+
+  const styles = useMemo(
+    () => createStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
+
+  /**
+   * En teléfono, 78% del ancho tapa a 320dp igual que antes. En tablet el
+   * tope sube a 380dp: con 320 fijo, un tablet de 1280dp landscape dejaba el
+   * drawer en solo 25% del ancho, angosto para el criterio de Material
+   * Design (256-320dp fue pensado para teléfono). No depende de
+   * SlideInLeft/SlideOutLeft: Reanimated mide el View real al animar, no usa
+   * este valor como parámetro.
+   */
+  const drawerWidth = useMemo(() => {
+    const cap = isTablet ? 380 : 320;
+    return Math.min(width * 0.78, cap);
+  }, [width, isTablet]);
+  const appNameMaxWidth = useMemo(() => drawerWidth - 110, [drawerWidth]);
 
   useEffect(() => {
     if (!isVisible) return;
@@ -214,7 +442,7 @@ const confirmLogout = useCallback(async () => {
       <Animated.View
         entering={SlideInLeft.duration(280).easing(Easing.out(Easing.cubic))}
         exiting={SlideOutLeft.duration(220).easing(Easing.in(Easing.cubic))}
-        style={styles.drawer}
+        style={[styles.drawer, { width: drawerWidth }]}
       >
         <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
@@ -234,7 +462,10 @@ const confirmLogout = useCallback(async () => {
               )}
             </View>
             <View>
-              <Text style={styles.appName} numberOfLines={1}>
+              <Text
+                style={[styles.appName, { maxWidth: appNameMaxWidth }]}
+                numberOfLines={1}
+              >
                 {user?.user?.fullName ?? "Usuario"}
               </Text>
               <Text style={styles.appSubtitle} numberOfLines={1}>
@@ -251,7 +482,10 @@ const confirmLogout = useCallback(async () => {
         <ScrollView
           style={styles.scroll}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingVertical: 8, paddingHorizontal: 8 }}
+          contentContainerStyle={{
+            paddingVertical: verticalScale(8),
+            paddingHorizontal: scale(8),
+          }}
         >
           {(menuTree as MenuTree[]).map((section) => (
             <MenuSection
@@ -259,6 +493,7 @@ const confirmLogout = useCallback(async () => {
               section={section}
               onNavigate={handleNavigate}
               pathname={pathname}
+              styles={styles}
             />
           ))}
 
@@ -309,222 +544,3 @@ const confirmLogout = useCallback(async () => {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    zIndex: 999,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: "rgba(0,0,0,0.45)",
-  },
-  drawer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    height: "100%",
-    width: DRAWER_WIDTH,
-    zIndex: 1,
-    backgroundColor: "#FFFFFF",
-    elevation: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: -2, height: 0 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-    backgroundColor: "#2563EB",
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  avatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  avatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  appName: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-    maxWidth: DRAWER_WIDTH - 110,
-  },
-  appSubtitle: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 12,
-    marginTop: 1,
-  },
-  closeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  scroll: { flex: 1 },
-  section: {
-    marginBottom: 2,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 10,
-    gap: 10,
-    backgroundColor: "#F3F4F6",
-  },
-  sectionTitle: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#374151",
-  },
-  sectionTitleActive: {
-    color: "#2563EB",
-  },
-  submenu: {
-    marginLeft: 8,
-    marginBottom: 4,
-  },
-  childItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingLeft: 28,
-    paddingRight: 12,
-    paddingVertical: 11,
-    borderRadius: 8,
-    marginBottom: 2,
-    borderLeftWidth: 2,
-    borderLeftColor: "transparent",
-  },
-  activeChildItem: {
-    backgroundColor: "#EFF6FF",
-    borderLeftColor: "#2563EB",
-  },
-  childText: {
-    fontSize: 14,
-    color: "#6B7280",
-  },
-  activeChildText: {
-    color: "#2563EB",
-    fontWeight: "700",
-  },
-  footer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
-    backgroundColor: "#FAFAFA",
-  },
-  userSection: {
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
-    paddingTop: 4,
-  },
-  logoutItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingLeft: 38,
-    paddingRight: 12,
-    paddingVertical: 11,
-    borderRadius: 8,
-    marginBottom: 2,
-    borderLeftWidth: 2,
-    borderLeftColor: "#FECACA",
-    backgroundColor: "#FEF2F2",
-  },
-  avatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#DBEAFE",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#2563EB",
-  },
-  footerInfo: { flex: 1 },
-  footerName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  footerRole: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 1,
-  },
-  logoutBtnText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#DC2626",
-  },
-
-  modalOverlay: {
-  flex: 1,
-  backgroundColor: 'rgba(0,0,0,0.5)',
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-modalBox: {
-  backgroundColor: '#fff',
-  borderRadius: 8,
-  padding: 24,
-  width: '80%',
-  elevation: 5,
-},
-modalTitle: {
-  fontSize: 18,
-  fontWeight: '600',
-  marginBottom: 12,
-  color: '#111',
-},
-modalMessage: {
-  fontSize: 14,
-  color: '#444',
-  marginBottom: 24,
-},
-modalButtons: {
-  flexDirection: 'row',
-  justifyContent: 'flex-end',
-  gap: 20,
-},
-modalCancel: {
-  color: '#6B7280',
-  fontWeight: '600',
-  fontSize: 14,
-},
-modalConfirm: {
-  color: '#DC2626',
-  fontWeight: '600',
-  fontSize: 14,
-},
-});

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,8 +7,14 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Clock, AlertTriangle, Lightbulb } from "lucide-react-native";
+import { RADIUS_LG, RADIUS_MD, RADIUS_SM, useResponsive } from "@/constants/responsive";
 
 export default function Tardanza() {
+  const { scale, verticalScale, font } = useResponsive();
+  const styles = useMemo(
+    () => createStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
 
   const [tardanzas, setTardanzas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +66,7 @@ export default function Tardanza() {
 
       {/* LOADING */}
       {loading && (
-        <ActivityIndicator size="large" style={{ marginTop: 50 }} />
+        <ActivityIndicator size="large" style={styles.loadingIndicator} />
       )}
 
       {/* CONTENIDO */}
@@ -69,7 +75,7 @@ export default function Tardanza() {
           {/* ALERTA */}
           <View style={styles.alertBox}>
             <AlertTriangle size={20} color="#b45309" />
-            <View style={{ marginLeft: 10 }}>
+            <View style={styles.alertTextWrap}>
               <Text style={styles.alertTitle}>Atención</Text>
               <Text style={styles.alertText}>
                 Has acumulado {total} tardanzas.
@@ -105,7 +111,7 @@ export default function Tardanza() {
                   <Clock size={18} color="#ca8a04" />
                 </View>
 
-                <View style={{ flex: 1 }}>
+                <View style={styles.itemInfo}>
                   <Text style={styles.materia}>{item.materia}</Text>
                   <Text style={styles.fecha}>{item.fecha}</Text>
                 </View>
@@ -129,7 +135,7 @@ export default function Tardanza() {
 
       {/* CONSEJOS (SIEMPRE VISIBLES) */}
       <View style={styles.tipsBox}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <View style={styles.tipsHeader}>
           <Lightbulb size={18} color="#1d4ed8" />
           <Text style={styles.tipsTitle}> Consejos para mejorar</Text>
         </View>
@@ -143,157 +149,181 @@ export default function Tardanza() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: "#f3f4f6",
+      padding: scale(15),
+    },
 
-  container: {
-    flex: 1,
-    backgroundColor: "#f3f4f6",
-    padding: 15,
-  },
+    emptyBox: {
+      marginTop: verticalScale(50),
+      alignItems: "center",
+    },
 
-  emptyBox: {
-    marginTop: 50,
-    alignItems: "center",
-  },
+    emptyText: {
+      color: "gray",
+    },
 
-  emptyText: {
-    color: "gray",
-  },
+    loadingIndicator: { marginTop: verticalScale(50) },
 
-  alertBox: {
-    flexDirection: "row",
-    backgroundColor: "#fef3c7",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#facc15",
-  },
+    alertBox: {
+      flexDirection: "row",
+      backgroundColor: "#fef3c7",
+      padding: scale(12),
+      borderRadius: RADIUS_LG,
+      marginBottom: verticalScale(15),
+      borderWidth: 1,
+      borderColor: "#facc15",
+    },
 
-  alertTitle: {
-    fontWeight: "bold",
-    color: "#92400e",
-  },
+    alertTextWrap: { marginLeft: scale(10) },
 
-  alertText: {
-    fontSize: 12,
-    color: "#92400e",
-  },
+    alertTitle: {
+      fontWeight: "bold",
+      color: "#92400e",
+    },
 
-  statsContainer: {
-    flexDirection: "row",
-    marginBottom: 20,
-  },
+    // 12 no coincide con ningún token — huérfano, font() directo.
+    alertText: {
+      fontSize: font(12),
+      color: "#92400e",
+    },
 
-  cardLeft: {
-    flex: 1,
-    backgroundColor: "#d97706",
-    padding: 15,
-    borderRadius: 12,
-    marginRight: 5,
-    alignItems: "center",
-  },
+    statsContainer: {
+      flexDirection: "row",
+      marginBottom: verticalScale(20),
+    },
 
-  cardRight: {
-    flex: 1,
-    backgroundColor: "#ea580c",
-    padding: 15,
-    borderRadius: 12,
-    marginLeft: 5,
-    alignItems: "center",
-  },
+    cardLeft: {
+      flex: 1,
+      backgroundColor: "#d97706",
+      padding: scale(15),
+      borderRadius: RADIUS_LG,
+      marginRight: scale(5),
+      alignItems: "center",
+    },
 
-  cardNumber: {
-    fontSize: 24,
-    color: "white",
-    fontWeight: "bold",
-  },
+    cardRight: {
+      flex: 1,
+      backgroundColor: "#ea580c",
+      padding: scale(15),
+      borderRadius: RADIUS_LG,
+      marginLeft: scale(5),
+      alignItems: "center",
+    },
 
-  cardText: {
-    color: "white",
-    fontSize: 12,
-  },
+    // 24 está fuera del rango documentado de la escala (FONT_XS=11 a
+    // FONT_XXL=25) — huérfano, font() directo, no se le asigna token.
+    cardNumber: {
+      fontSize: font(24),
+      color: "white",
+      fontWeight: "bold",
+    },
 
-  sectionTitle: {
-    fontWeight: "bold",
-    fontSize: 16,
-    marginBottom: 10,
-  },
+    // 12 no coincide con ningún token — huérfano, font() directo.
+    cardText: {
+      color: "white",
+      fontSize: font(12),
+    },
 
-  itemBox: {
-    backgroundColor: "#fef9c3",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#fde047",
-  },
+    // 16 no coincide con ningún token — huérfano, font() directo.
+    sectionTitle: {
+      fontWeight: "bold",
+      fontSize: font(16),
+      marginBottom: verticalScale(10),
+    },
 
-  itemHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
+    itemBox: {
+      backgroundColor: "#fef9c3",
+      borderRadius: RADIUS_LG,
+      padding: scale(12),
+      marginBottom: verticalScale(12),
+      borderWidth: 1,
+      borderColor: "#fde047",
+    },
 
-  iconBox: {
-    backgroundColor: "#fde68a",
-    padding: 8,
-    borderRadius: 8,
-    marginRight: 10,
-  },
+    itemHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: verticalScale(10),
+    },
 
-  materia: {
-    fontWeight: "bold",
-  },
+    iconBox: {
+      backgroundColor: "#fde68a",
+      padding: scale(8),
+      borderRadius: RADIUS_SM,
+      marginRight: scale(10),
+    },
 
-  fecha: {
-    fontSize: 12,
-    color: "gray",
-  },
+    itemInfo: { flex: 1 },
 
-  badge: {
-    alignItems: "flex-end",
-  },
+    materia: {
+      fontWeight: "bold",
+    },
 
-  badgeText: {
-    backgroundColor: "#fde047",
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    fontSize: 12,
-    fontWeight: "bold",
-  },
+    // 12 no coincide con ningún token — huérfano, font() directo.
+    fecha: {
+      fontSize: font(12),
+      color: "gray",
+    },
 
-  hora: {
-    fontSize: 10,
-    color: "gray",
-  },
+    badge: {
+      alignItems: "flex-end",
+    },
 
-  motivoBox: {
-    backgroundColor: "#e5e7eb",
-    padding: 8,
-    borderRadius: 8,
-  },
+    // 12 no coincide con ningún token — huérfano, font() directo.
+    badgeText: {
+      backgroundColor: "#fde047",
+      paddingHorizontal: scale(8),
+      borderRadius: RADIUS_MD,
+      fontSize: font(12),
+      fontWeight: "bold",
+    },
 
-  motivoText: {
-    fontSize: 12,
-  },
+    // 10 está fuera del rango documentado de la escala (FONT_XS=11 a
+    // FONT_XXL=25) — huérfano, font() directo, no se le asigna token.
+    hora: {
+      fontSize: font(10),
+      color: "gray",
+    },
 
-  tipsBox: {
-    marginTop: 20,
-    backgroundColor: "#dbeafe",
-    padding: 12,
-    borderRadius: 12,
-  },
+    motivoBox: {
+      backgroundColor: "#e5e7eb",
+      padding: scale(8),
+      borderRadius: RADIUS_SM,
+    },
 
-  tipsTitle: {
-    fontWeight: "bold",
-    color: "#1d4ed8",
-  },
+    // 12 no coincide con ningún token — huérfano, font() directo.
+    motivoText: {
+      fontSize: font(12),
+    },
 
-  tip: {
-    fontSize: 12,
-    marginTop: 3,
-    color: "#1e3a8a",
-  },
+    tipsBox: {
+      marginTop: verticalScale(20),
+      backgroundColor: "#dbeafe",
+      padding: scale(12),
+      borderRadius: RADIUS_LG,
+    },
 
-});
+    tipsHeader: { flexDirection: "row", alignItems: "center" },
+
+    tipsTitle: {
+      fontWeight: "bold",
+      color: "#1d4ed8",
+    },
+
+    // 12 no coincide con ningún token — huérfano, font() directo.
+    tip: {
+      fontSize: font(12),
+      marginTop: verticalScale(3),
+      color: "#1e3a8a",
+    },
+
+  });
+}

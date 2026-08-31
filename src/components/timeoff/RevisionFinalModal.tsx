@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -10,6 +10,12 @@ import {
   View,
 } from "react-native";
 import { APP_BACKGROUND } from "@/constants/colors";
+import {
+  RADIUS_LG,
+  RADIUS_MD,
+  RADIUS_2XL,
+  useResponsive,
+} from "@/constants/responsive";
 
 /** Archivo ya convertido a data-URI base64, listo para el POST. */
 export interface PermissionAttachment {
@@ -98,6 +104,12 @@ export default function RevisionFinalModal({
   onEdit,
   onConfirm,
 }: RevisionFinalModalProps) {
+  const { scale, verticalScale, font } = useResponsive();
+  const styles = useMemo(
+    () => createStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
+
   if (!review) return null;
 
   const isSingleDay = review.fromDate === review.toDate;
@@ -254,126 +266,141 @@ export default function RevisionFinalModal({
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  card: {
-    width: "100%",
-    maxWidth: 440,
-    maxHeight: "88%",
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 20,
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
-  },
-  headerIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: "#EFF6FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTextWrap: { flex: 1 },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: "#111827" },
-  headerSubtitle: { fontSize: 12, color: "#6B7280", marginTop: 2 },
-  scroll: { flexGrow: 0 },
-  scrollContent: { paddingTop: 16, paddingBottom: 4 },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#2563EB",
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-    marginBottom: 10,
-  },
-  twoCols: { flexDirection: "row", gap: 12 },
-  col: { flex: 1, gap: 3 },
-  fieldLabel: { fontSize: 11, color: "#9CA3AF", fontWeight: "600" },
-  fieldValue: { fontSize: 14, color: "#111827", fontWeight: "600" },
-  divider: {
-    height: 1,
-    backgroundColor: "#F3F4F6",
-    marginVertical: 16,
-  },
-  fullDayNote: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#EFF6FF",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    marginTop: 10,
-  },
-  fullDayNoteText: { flex: 1, fontSize: 12, color: "#1D4ED8" },
-  subject: { fontSize: 15, fontWeight: "700", color: "#111827" },
-  descriptionBlock: {
-    marginTop: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: "#3B82F6",
-    backgroundColor: APP_BACKGROUND,
-    borderTopRightRadius: 10,
-    borderBottomRightRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  descriptionText: { fontSize: 13, color: "#4B5563", lineHeight: 20 },
-  chipList: { gap: 8 },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: APP_BACKGROUND,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  chipName: { flex: 1, fontSize: 13, color: "#374151", fontWeight: "500" },
-  chipSize: { fontSize: 11, color: "#9CA3AF" },
-  actions: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 16,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
-  },
-  btn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 7,
-    borderRadius: 12,
-    paddingVertical: 14,
-  },
-  btnGhost: {
-    backgroundColor: "#F3F4F6",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  btnGhostText: { fontSize: 14, fontWeight: "700", color: "#374151" },
-  btnPrimary: { backgroundColor: "#2563EB", flex: 1.4 },
-  btnPrimaryText: { fontSize: 14, fontWeight: "700", color: "#fff" },
-  btnDisabled: { opacity: 0.6 },
-});
+function createStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: scale(20),
+    },
+    card: {
+      width: "100%",
+      // maxWidth ya existente — se deja literal, no se tokeniza.
+      maxWidth: 440,
+      maxHeight: "88%",
+      backgroundColor: "#fff",
+      borderRadius: RADIUS_2XL,
+      padding: scale(20),
+      elevation: 10,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(12),
+      paddingBottom: verticalScale(14),
+      borderBottomWidth: 1,
+      borderBottomColor: "#F3F4F6",
+    },
+    /** Ícono de cabecera: tamaño fijo, mismo criterio que avatarContainer en DrawerMenu.tsx. */
+    headerIconWrap: {
+      width: 42,
+      height: 42,
+      borderRadius: RADIUS_LG,
+      backgroundColor: "#EFF6FF",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerTextWrap: { flex: 1 },
+    headerTitle: { fontSize: font(18), fontWeight: "700", color: "#111827" },
+    headerSubtitle: {
+      fontSize: font(12),
+      color: "#6B7280",
+      marginTop: verticalScale(2),
+    },
+    scroll: { flexGrow: 0 },
+    scrollContent: {
+      paddingTop: verticalScale(16),
+      paddingBottom: verticalScale(4),
+    },
+    sectionTitle: {
+      fontSize: font(11),
+      fontWeight: "700",
+      color: "#2563EB",
+      letterSpacing: 0.4,
+      textTransform: "uppercase",
+      marginBottom: verticalScale(10),
+    },
+    twoCols: { flexDirection: "row", gap: scale(12) },
+    col: { flex: 1, gap: verticalScale(3) },
+    fieldLabel: { fontSize: font(11), color: "#9CA3AF", fontWeight: "600" },
+    fieldValue: { fontSize: font(14), color: "#111827", fontWeight: "600" },
+    divider: {
+      height: 1,
+      backgroundColor: "#F3F4F6",
+      marginVertical: verticalScale(16),
+    },
+    fullDayNote: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(6),
+      backgroundColor: "#EFF6FF",
+      borderRadius: RADIUS_MD,
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(9),
+      marginTop: verticalScale(10),
+    },
+    fullDayNoteText: { flex: 1, fontSize: font(12), color: "#1D4ED8" },
+    subject: { fontSize: font(15), fontWeight: "700", color: "#111827" },
+    descriptionBlock: {
+      marginTop: verticalScale(8),
+      borderLeftWidth: 3,
+      borderLeftColor: "#3B82F6",
+      backgroundColor: APP_BACKGROUND,
+      borderTopRightRadius: RADIUS_MD,
+      borderBottomRightRadius: RADIUS_MD,
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(10),
+    },
+    descriptionText: { fontSize: font(13), color: "#4B5563", lineHeight: 20 },
+    chipList: { gap: verticalScale(8) },
+    chip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(8),
+      backgroundColor: APP_BACKGROUND,
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      borderRadius: RADIUS_MD,
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(10),
+    },
+    chipName: { flex: 1, fontSize: font(13), color: "#374151", fontWeight: "500" },
+    chipSize: { fontSize: font(11), color: "#9CA3AF" },
+    actions: {
+      flexDirection: "row",
+      gap: scale(10),
+      marginTop: verticalScale(16),
+      paddingTop: verticalScale(14),
+      borderTopWidth: 1,
+      borderTopColor: "#F3F4F6",
+    },
+    btn: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: scale(7),
+      borderRadius: RADIUS_LG,
+      paddingVertical: verticalScale(14),
+    },
+    btnGhost: {
+      backgroundColor: "#F3F4F6",
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+    },
+    btnGhostText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
+    btnPrimary: { backgroundColor: "#2563EB", flex: 1.4 },
+    btnPrimaryText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
+    btnDisabled: { opacity: 0.6 },
+  });
+}

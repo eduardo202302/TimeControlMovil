@@ -2,7 +2,7 @@ import IkarFlatList from "@/components/login/IkarFlatList";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Storage from "../utils/storage";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   Image,
@@ -19,8 +19,20 @@ import { registerUser } from "../../api/Login/loginAuthentication";
 import { useSchoolStore } from "../../store/useSchoolStore";
 import { RegisterType } from "../../types/typesLogin/RegisterType";
 import { formatCedula, formatPhone } from "../../utils/metodos";
+import {
+  RADIUS_MD,
+  RADIUS_SM,
+  RADIUS_3XL,
+  useResponsive,
+} from "@/constants/responsive";
 
 export default function Register() {
+  const { scale, verticalScale, font } = useResponsive();
+  const styles = useMemo(
+    () => createStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
+
   const { school, urlColegio } = useSchoolStore();
   const { name, logo } = school || {};
   const [showPassword, setShowPassword] = useState(false);
@@ -100,12 +112,12 @@ export default function Register() {
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Registro de Usuario</Text>
             {mensaje && (
-              <View style={{ marginBottom: 10 }}>
+              <View style={styles.mensajeWrap}>
                 <Text
-                  style={{
-                    color: mensaje.tipo === "error" ? "red" : "green",
-                    textAlign: "center",
-                  }}
+                  style={[
+                    styles.mensajeText,
+                    { color: mensaje.tipo === "error" ? "red" : "green" },
+                  ]}
                 >
                   {mensaje.texto}
                 </Text>
@@ -131,7 +143,7 @@ export default function Register() {
                     required={true}
                   />
                   {fieldState.error && (
-                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                    <Text style={styles.controllerError}>
                       {fieldState.error.message}
                     </Text>
                   )}
@@ -145,13 +157,14 @@ export default function Register() {
               render={({ field, fieldState }) => (
                 <>
                   <InputField
+                    styles={styles}
                     icon="person-outline"
                     placeholder="Nombre Completo"
                     value={field.value}
                     onChangeText={field.onChange}
                   />
                   {fieldState.error && (
-                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                    <Text style={styles.controllerError}>
                       {fieldState.error.message}
                     </Text>
                   )}
@@ -165,13 +178,14 @@ export default function Register() {
               render={({ field, fieldState }) => (
                 <>
                   <InputField
+                    styles={styles}
                     icon="people-outline"
                     placeholder="Usuario"
                     value={field.value}
                     onChangeText={field.onChange}
                   />
                   {fieldState.error && (
-                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                    <Text style={styles.controllerError}>
                       {fieldState.error.message}
                     </Text>
                   )}
@@ -185,6 +199,7 @@ export default function Register() {
               render={({ field, fieldState }) => (
                 <>
                   <InputField
+                    styles={styles}
                     icon="mail-outline"
                     placeholder="Email"
                     value={field.value}
@@ -192,7 +207,7 @@ export default function Register() {
                     keyboardType="email-address"
                   />
                   {fieldState.error && (
-                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                    <Text style={styles.controllerError}>
                       {fieldState.error.message}
                     </Text>
                   )}
@@ -206,6 +221,7 @@ export default function Register() {
               render={({ field, fieldState }) => (
                 <>
                   <InputField
+                    styles={styles}
                     icon="call-outline"
                     placeholder="Teléfono"
                     value={field.value}
@@ -215,7 +231,7 @@ export default function Register() {
                     keyboardType="phone-pad"
                   />
                   {fieldState.error && (
-                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                    <Text style={styles.controllerError}>
                       {fieldState.error.message}
                     </Text>
                   )}
@@ -229,6 +245,7 @@ export default function Register() {
               render={({ field, fieldState }) => (
                 <>
                   <InputField
+                    styles={styles}
                     icon="lock-closed-outline"
                     placeholder="Clave"
                     value={field.value}
@@ -249,7 +266,7 @@ export default function Register() {
                     }
                   />
                   {fieldState.error && (
-                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                    <Text style={styles.controllerError}>
                       {fieldState.error.message}
                     </Text>
                   )}
@@ -263,6 +280,7 @@ export default function Register() {
               render={({ field, fieldState }) => (
                 <>
                   <InputField
+                    styles={styles}
                     icon="card-outline"
                     placeholder="Cédula"
                     value={field.value}
@@ -273,7 +291,7 @@ export default function Register() {
                     required={false}
                   />
                   {fieldState.error && (
-                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                    <Text style={styles.controllerError}>
                       {fieldState.error.message}
                     </Text>
                   )}
@@ -301,7 +319,10 @@ export default function Register() {
   );
 }
 
+type RegisterStyles = ReturnType<typeof createStyles>;
+
 type InputFieldProps = {
+  styles: RegisterStyles;
   icon: string;
   placeholder: string;
   value: string;
@@ -313,6 +334,7 @@ type InputFieldProps = {
 };
 
 function InputField({
+  styles,
   icon,
   placeholder,
   value,
@@ -353,120 +375,121 @@ function InputField({
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: {
-    flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-    backgroundColor: "#dfe9ff",
-  },
-  companies: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  phone: {
-    width: "100%",
-    maxWidth: 360,
-    padding: 25,
-    borderRadius: 32,
-    backgroundColor: "#eef4ff",
-  },
-  logo: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  logoImage: {
-    width: 100,
-    height: 100,
-  },
-  logoTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#3c5fa6",
-    marginTop: 6,
-  },
-  card: {
-    borderRadius: 33,
-    padding: 20,
-    backgroundColor: "white",
-  },
-  cardTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 14,
-  },
-  labelGroup: {
-    marginBottom: 10,
-  },
-  label: {
-    fontSize: 13,
-    color: "#555",
-    marginBottom: 4,
-    fontWeight: "500",
-  },
-  required: {
-    color: "#e24b4a",
-  },
-  inputGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    backgroundColor: "#f9fbff",
-  },
-  inputFocused: {
-    borderColor: "#4c6fbf",
-    borderWidth: 1.5,
-  },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: "#333",
-  },
-  button: {
-    backgroundColor: "#2d5fd3",
-    padding: 13,
-    borderRadius: 10,
-    marginTop: 16,
-  },
-  buttonText: {
-    color: "white",
-    textAlign: "center",
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  buttonOutline: {
-    padding: 13,
-    borderRadius: 10,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: "#e24b4a",
-  },
-  buttonOutlineText: {
-    color: "#e24b4a",
-    textAlign: "center",
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  msg: { marginTop: 10, padding: 8, borderRadius: 6, alignItems: "center" },
-  msgError: {
-    backgroundColor: "#fff8f0",
-    borderWidth: 1,
-    borderColor: "#ffcc80",
-  },
-  msgSuccess: {
-    backgroundColor: "#f0faf5",
-    borderWidth: 1,
-    borderColor: "#a8dfc4",
-  },
-  msgText: { fontSize: 12 },
-});
+function createStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    scroll: {
+      flexGrow: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: scale(20),
+      backgroundColor: "#dfe9ff",
+    },
+    companies: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    /** Ancho ideal de formulario, no un cap de emergencia — no tokenizar. */
+    phone: {
+      width: "100%",
+      maxWidth: 360,
+      padding: scale(25),
+      borderRadius: RADIUS_3XL,
+      backgroundColor: "#eef4ff",
+    },
+    logo: {
+      alignItems: "center",
+      marginBottom: verticalScale(20),
+    },
+    /** Tamaño fijo: iconografía de logo, no contenido — mismo criterio que avatarContainer en DrawerMenu.tsx. */
+    logoImage: {
+      width: 100,
+      height: 100,
+    },
+    logoTitle: {
+      fontSize: font(20),
+      fontWeight: "600",
+      color: "#3c5fa6",
+      marginTop: verticalScale(6),
+    },
+    card: {
+      // 33 no coincide con ningún RADIUS_* (el más cercano es RADIUS_3XL=32) —
+      // huérfano, se deja en scale() directo tal como está.
+      borderRadius: scale(33),
+      padding: scale(20),
+      backgroundColor: "white",
+    },
+    cardTitle: {
+      fontSize: font(17),
+      fontWeight: "600",
+      color: "#333",
+      marginBottom: verticalScale(14),
+    },
+    mensajeWrap: { marginBottom: verticalScale(10) },
+    mensajeText: { textAlign: "center" },
+    controllerError: { color: "#e24b4a", marginTop: verticalScale(4) },
+    labelGroup: {
+      marginBottom: verticalScale(10),
+    },
+    label: {
+      fontSize: font(13),
+      color: "#555",
+      marginBottom: verticalScale(4),
+      fontWeight: "500",
+    },
+    required: {
+      color: "#e24b4a",
+    },
+    inputGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: "#ddd",
+      borderRadius: RADIUS_SM,
+      paddingHorizontal: scale(10),
+      backgroundColor: "#f9fbff",
+    },
+    inputFocused: {
+      borderColor: "#4c6fbf",
+      borderWidth: 1.5,
+    },
+    inputIcon: {
+      marginRight: scale(8),
+    },
+    input: {
+      flex: 1,
+      paddingVertical: verticalScale(10),
+      fontSize: font(14),
+      color: "#333",
+    },
+    button: {
+      backgroundColor: "#2d5fd3",
+      padding: scale(13),
+      borderRadius: RADIUS_MD,
+      marginTop: verticalScale(16),
+    },
+    buttonText: {
+      color: "white",
+      textAlign: "center",
+      fontSize: font(15),
+      fontWeight: "500",
+    },
+    buttonOutline: {
+      padding: scale(13),
+      borderRadius: RADIUS_MD,
+      marginTop: verticalScale(10),
+      borderWidth: 1,
+      borderColor: "#e24b4a",
+    },
+    buttonOutlineText: {
+      color: "#e24b4a",
+      textAlign: "center",
+      fontSize: font(15),
+      fontWeight: "500",
+    },
+  });
+}
