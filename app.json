@@ -17,9 +17,10 @@
     "android": {
       "package": "com.timecontrol.movil",
       "permissions": [
-        "CAMERA",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.RECORD_AUDIO"
       ],
       "icon": "./assets/images/logos/logo_adaptive.png",
       "adaptiveIcon": {
@@ -65,7 +66,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "b8ca7a8a-5e7f-4651-bc4d-86fb78e6c908"
+        "projectId": "ea57f376-647a-4164-a977-94d685b3ac4e"
       }
     },
     "runtimeVersion": {
@@ -73,6 +74,7 @@
     },
     "updates": {
       "url": "https://u.expo.dev/b8ca7a8a-5e7f-4651-bc4d-86fb78e6c908"
-    }
+    },
+    "owner": "anthonyjr0511"
   }
 }
