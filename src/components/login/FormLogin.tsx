@@ -220,6 +220,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
                 <TextInput
                   style={styles.input}
                   placeholder="Usuario / Email / Teléfono"
+                  placeholderTextColor="#9aa4b4"
                   value={field.value}
                   onChangeText={field.onChange}
                   autoCapitalize="none"
@@ -248,6 +249,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
                 <TextInput
                   style={styles.input}
                   placeholder="Contraseña"
+                  placeholderTextColor="#9aa4b4"
                   secureTextEntry={!showPassword}
                   value={field.value}
                   onChangeText={field.onChange}
@@ -363,7 +365,12 @@ function createStyles(
       marginBottom: verticalScale(12),
     },
     inputIcon: { marginRight: scale(8) },
-    input: { flex: 1, paddingVertical: verticalScale(10), fontSize: font(14) },
+    input: {
+      flex: 1,
+      paddingVertical: verticalScale(10),
+      fontSize: font(14),
+      color: "#111",
+    },
     options: {
       flexDirection: "row",
       justifyContent: "space-between",

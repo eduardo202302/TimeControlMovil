@@ -115,6 +115,7 @@ export default function FormForgotPassword({
                 <TextInput
                   style={styles.input}
                   placeholder="Usuario / Email / Teléfono"
+                  placeholderTextColor="#9aa4b4"
                   value={field.value}
                   onChangeText={field.onChange}
                   autoCapitalize="none"
@@ -227,6 +228,7 @@ function createStyles(
     input: {
       width: "90%",
       fontSize: font(14),
+      color: "#111",
     },
     button: {
       backgroundColor: "#2d5fd3",

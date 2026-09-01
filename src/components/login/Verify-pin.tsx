@@ -120,6 +120,7 @@ const VerifyPin = ({ name, image, onNext }: FormLoginProps) => {
                   <TextInput
                     style={styles.input}
                     placeholder="Código PIN"
+                    placeholderTextColor="#9aa4b4"
                     value={field.value}
                     onChangeText={field.onChange}
                     keyboardType="number-pad"
@@ -232,6 +233,7 @@ function createStyles(
       letterSpacing: 4,
       textAlign: "center",
       fontSize: font(18),
+      color: "#111",
     },
     button: {
       backgroundColor: "#2d5fd3",

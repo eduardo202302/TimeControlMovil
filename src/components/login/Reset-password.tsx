@@ -141,6 +141,7 @@ export default function ResetPassword({
                   <TextInput
                     style={styles.input}
                     placeholder="Nueva contraseña"
+                    placeholderTextColor="#9aa4b4"
                     secureTextEntry={!showPassword}
                     value={field.value}
                     onChangeText={field.onChange}
@@ -184,6 +185,7 @@ export default function ResetPassword({
                   <TextInput
                     style={styles.input}
                     placeholder="Confirmar contraseña"
+                    placeholderTextColor="#9aa4b4"
                     secureTextEntry={!showPassword}
                     value={field.value}
                     onChangeText={field.onChange}
@@ -293,6 +295,7 @@ function createStyles(
     input: {
       width: "80%",
       paddingVertical: verticalScale(10),
+      color: "#111",
     },
     button: {
       backgroundColor: "#2d5fd3",
