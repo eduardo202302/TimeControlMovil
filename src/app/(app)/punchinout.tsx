@@ -1,3 +1,5 @@
+import { APP_BACKGROUND } from "@/constants/colors";
+import { MAX_CONTENT_WIDTH, useResponsive } from "@/constants/responsive";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker, {
   type DateTimePickerEvent,
@@ -34,24 +36,20 @@ import {
   getPendingOpenDayDate,
   getPunctuality,
   getRDDayIndex,
-  getRDMinutes,
   getScheduleForDay,
   isAlmuerzoButtonVisible,
   isAlmuerzoVisible,
   isBreakVisible,
   isJornadaVisible,
   RD_UTC_OFFSET,
-  timeStrToMinutes,
   toRD,
   toRDDateString,
   WEEK_DAYS,
   type PunchEvent,
   type Tag,
-  type UserDayPermission,
+  type UserDayPermission
 } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
-import { APP_BACKGROUND } from "@/constants/colors";
-import { MAX_CONTENT_WIDTH, useResponsive } from "@/constants/responsive";
 
 type Category = "Jornada" | "Almuerzo" | "Break";
 
@@ -732,41 +730,42 @@ export default function PunchInOut() {
    * Devuelve el punch real del InicioJornada sin cerrar (o null si no lo pudo
    * determinar) para que quien la llame no tenga que adivinar su fecha.
    */
-  const fetchTodayPunches = useCallback(async (): Promise<PunchEvent | null> => {
-    try {
-      setLoadingPunches(true);
-      const token = await getToken();
-      if (!urlColegio || !token) return null;
-      const response = await axios.get(`${urlColegio}/punches/today`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      console.log("TODAY PUNCHES RESPONSE:", {
-        clientTimestamp: new Date().toISOString(),
-        data: response.data,
-      });
-      if (!response.data.success) return null;
-      const data: PunchEvent[] = response.data.data ?? [];
-      setPunches(data);
-      const pending = findOpenDayPunch(data);
-      if (pending) {
-        setNextDayExitPunch(pending);
-        setNextDayExitModal(true);
-      } else {
-        setNextDayExitModal(false);
-        setNextDayExitPunch(null);
+  const fetchTodayPunches =
+    useCallback(async (): Promise<PunchEvent | null> => {
+      try {
+        setLoadingPunches(true);
+        const token = await getToken();
+        if (!urlColegio || !token) return null;
+        const response = await axios.get(`${urlColegio}/punches/today`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        console.log("TODAY PUNCHES RESPONSE:", {
+          clientTimestamp: new Date().toISOString(),
+          data: response.data,
+        });
+        if (!response.data.success) return null;
+        const data: PunchEvent[] = response.data.data ?? [];
+        setPunches(data);
+        const pending = findOpenDayPunch(data);
+        if (pending) {
+          setNextDayExitPunch(pending);
+          setNextDayExitModal(true);
+        } else {
+          setNextDayExitModal(false);
+          setNextDayExitPunch(null);
+        }
+        return pending;
+      } catch (error: any) {
+        console.error(
+          "fetchTodayPunches:",
+          error?.response?.data?.message ?? error?.message,
+        );
+        return null;
+      } finally {
+        setLoadingPunches(false);
+        setRefreshing(false);
       }
-      return pending;
-    } catch (error: any) {
-      console.error(
-        "fetchTodayPunches:",
-        error?.response?.data?.message ?? error?.message,
-      );
-      return null;
-    } finally {
-      setLoadingPunches(false);
-      setRefreshing(false);
-    }
-  }, [urlColegio, getToken]);
+    }, [urlColegio, getToken]);
 
   useEffect(() => {
     fetchTodayPunches();
@@ -845,7 +844,8 @@ export default function PunchInOut() {
         const [geocoded] = await Location.reverseGeocodeAsync(coords);
         if (cancelled) return;
 
-        const street = geocoded?.street ?? geocoded?.name ?? "Ubicación desconocida";
+        const street =
+          geocoded?.street ?? geocoded?.name ?? "Ubicación desconocida";
         const city = geocoded?.city ?? geocoded?.subregion ?? geocoded?.region;
         const address = city ? `${street}, ${city}` : street;
 
@@ -1673,7 +1673,9 @@ export default function PunchInOut() {
                 size={18}
                 color="#2563EB"
               />
-              <Text style={styles.sectionHeaderText}>Perfil - Time Control</Text>
+              <Text style={styles.sectionHeaderText}>
+                Perfil - Time Control
+              </Text>
             </View>
             {approvedPermissionsToday.length > 0 && (
               <TouchableOpacity
@@ -1986,7 +1988,9 @@ export default function PunchInOut() {
           >
             <View style={styles.sectionHeaderToggleLabel}>
               <Ionicons name="hourglass-outline" size={18} color="#2563EB" />
-              <Text style={styles.sectionHeaderText}>Ver Botones de Acciones</Text>
+              <Text style={styles.sectionHeaderText}>
+                Ver Botones de Acciones
+              </Text>
             </View>
             <View style={styles.historyChevronBtn}>
               <Ionicons
@@ -2080,123 +2084,127 @@ export default function PunchInOut() {
               ) : (
                 [...punches]
                   .reverse()
-                  .slice(0, historyShowAll ? undefined : HISTORY_COLLAPSED_LIMIT)
+                  .slice(
+                    0,
+                    historyShowAll ? undefined : HISTORY_COLLAPSED_LIMIT,
+                  )
                   .map((punch) => {
-              const hasOvertime = parseFloat(String(punch.overtime ?? 0)) > 0;
-              // Solo FinJornada puede generar horas extras
-              const isJornadaOvertime =
-                punch.type === "FinJornada" && hasOvertime;
-              // Puntualidad calculada localmente (corrige estados erróneos del backend)
-              const punctuality = getPunctuality(punch, userSchedules, {
-                workIn: tolWorkIn,
-                workOut: tolWorkOut,
-                lunchIn: tolLunchIn,
-                lunchOut: tolLunchOut,
-              });
-              // Prioridad: horas extras > error de imagen > puntualidad local >
-              // flags del backend (lateEntry/earlyExit) > status del backend
-              const displayStatus = isJornadaOvertime
-                ? "Horas extras"
-                : punch.status === "Error de Imagen"
-                  ? "Error de Imagen"
-                  : punctuality !== null
-                    ? punctuality
-                    : punch.lateEntry
-                      ? "Tardanza"
-                      : punch.earlyExit
-                        ? "Anticipada"
-                        : punch.type === "FinBreak"
-                          ? "A Tiempo"
-                          : punch.status || "A Tiempo";
-              const isLateBadge =
-                displayStatus === "Tardanza" ||
-                displayStatus === "Error de Imagen";
-              const isEarlyBadge = displayStatus === "Anticipada";
+                    const hasOvertime =
+                      parseFloat(String(punch.overtime ?? 0)) > 0;
+                    // Solo FinJornada puede generar horas extras
+                    const isJornadaOvertime =
+                      punch.type === "FinJornada" && hasOvertime;
+                    // Puntualidad calculada localmente (corrige estados erróneos del backend)
+                    const punctuality = getPunctuality(punch, userSchedules, {
+                      workIn: tolWorkIn,
+                      workOut: tolWorkOut,
+                      lunchIn: tolLunchIn,
+                      lunchOut: tolLunchOut,
+                    });
+                    // Prioridad: horas extras > error de imagen > puntualidad local >
+                    // flags del backend (lateEntry/earlyExit) > status del backend
+                    const displayStatus = isJornadaOvertime
+                      ? "Horas extras"
+                      : punch.status === "Error de Imagen"
+                        ? "Error de Imagen"
+                        : punctuality !== null
+                          ? punctuality
+                          : punch.lateEntry
+                            ? "Tardanza"
+                            : punch.earlyExit
+                              ? "Anticipada"
+                              : punch.type === "FinBreak"
+                                ? "A Tiempo"
+                                : punch.status || "A Tiempo";
+                    const isLateBadge =
+                      displayStatus === "Tardanza" ||
+                      displayStatus === "Error de Imagen";
+                    const isEarlyBadge = displayStatus === "Anticipada";
 
-              return (
-                <View key={punch.id} style={styles.punchRow}>
-                  <View
-                    style={[
-                      styles.punchIcon,
-                      isLateBadge
-                        ? styles.punchIconError
-                        : isEarlyBadge
-                          ? styles.punchIconEarly
-                          : punch.type.startsWith("Inicio")
-                            ? styles.punchIconEntry
-                            : isJornadaOvertime
-                              ? styles.punchIconOvertime
-                              : styles.punchIconExitOnTime,
-                    ]}
-                  >
-                    <Ionicons
-                      name={CATEGORY_ICONS[getPunchCategory(punch.type)]}
-                      size={16}
-                      color={
-                        isLateBadge
-                          ? "#DC2626"
-                          : isEarlyBadge
-                            ? "#D97706"
-                            : punch.type.startsWith("Inicio")
-                              ? "#16A34A"
-                              : isJornadaOvertime
-                                ? "#2563EB"
-                                : "#16A34A"
-                      }
-                    />
-                  </View>
-                  <View style={styles.punchInfo}>
-                    <Text style={styles.punchType}>
-                      {getPunchTypeLabel(punch.type)}
-                    </Text>
-                    <View style={styles.punchBadgeRow}>
-                      {isJornadaOvertime ? (
-                        /* Solo FinJornada con overtime → "Horas extras" */
-                        <View style={styles.badgeOvertime}>
-                          <Text style={styles.badgeOvertimeText}>
-                            Horas extras
-                          </Text>
-                        </View>
-                      ) : (
-                        /* Resto → status normal (almuerzo/break fuera de horario = Tardanza) */
-                        displayStatus && (
-                          <View
-                            style={[
-                              styles.punchBadge,
-                              isLateBadge
-                                ? styles.badgeLate
-                                : isEarlyBadge
-                                  ? styles.badgeEarly
-                                  : styles.badgeOnTime,
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.punchBadgeText,
-                                { color: getStatusColor(displayStatus) },
-                              ]}
-                            >
-                              {displayStatus}
-                            </Text>
-                          </View>
-                        )
-                      )}
-                      {punch.permissionId != null && (
-                        <View style={styles.permissionBadgeSmall}>
-                          <MaterialCommunityIcons
-                            name="alpha-p"
+                    return (
+                      <View key={punch.id} style={styles.punchRow}>
+                        <View
+                          style={[
+                            styles.punchIcon,
+                            isLateBadge
+                              ? styles.punchIconError
+                              : isEarlyBadge
+                                ? styles.punchIconEarly
+                                : punch.type.startsWith("Inicio")
+                                  ? styles.punchIconEntry
+                                  : isJornadaOvertime
+                                    ? styles.punchIconOvertime
+                                    : styles.punchIconExitOnTime,
+                          ]}
+                        >
+                          <Ionicons
+                            name={CATEGORY_ICONS[getPunchCategory(punch.type)]}
                             size={16}
-                            color="#2563EB"
+                            color={
+                              isLateBadge
+                                ? "#DC2626"
+                                : isEarlyBadge
+                                  ? "#D97706"
+                                  : punch.type.startsWith("Inicio")
+                                    ? "#16A34A"
+                                    : isJornadaOvertime
+                                      ? "#2563EB"
+                                      : "#16A34A"
+                            }
                           />
                         </View>
-                      )}
-                    </View>
-                  </View>
-                  <Text style={styles.punchTime}>
-                    {formatRDTimeShort(new Date(punch.createdDate))}
-                  </Text>
-                </View>
-              );
+                        <View style={styles.punchInfo}>
+                          <Text style={styles.punchType}>
+                            {getPunchTypeLabel(punch.type)}
+                          </Text>
+                          <View style={styles.punchBadgeRow}>
+                            {isJornadaOvertime ? (
+                              /* Solo FinJornada con overtime → "Horas extras" */
+                              <View style={styles.badgeOvertime}>
+                                <Text style={styles.badgeOvertimeText}>
+                                  Horas extras
+                                </Text>
+                              </View>
+                            ) : (
+                              /* Resto → status normal (almuerzo/break fuera de horario = Tardanza) */
+                              displayStatus && (
+                                <View
+                                  style={[
+                                    styles.punchBadge,
+                                    isLateBadge
+                                      ? styles.badgeLate
+                                      : isEarlyBadge
+                                        ? styles.badgeEarly
+                                        : styles.badgeOnTime,
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.punchBadgeText,
+                                      { color: getStatusColor(displayStatus) },
+                                    ]}
+                                  >
+                                    {displayStatus}
+                                  </Text>
+                                </View>
+                              )
+                            )}
+                            {punch.permissionId != null && (
+                              <View style={styles.permissionBadgeSmall}>
+                                <MaterialCommunityIcons
+                                  name="alpha-p"
+                                  size={16}
+                                  color="#2563EB"
+                                />
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                        <Text style={styles.punchTime}>
+                          {formatRDTimeShort(new Date(punch.createdDate))}
+                        </Text>
+                      </View>
+                    );
                   })
               )}
               {punches.length > HISTORY_COLLAPSED_LIMIT && (
