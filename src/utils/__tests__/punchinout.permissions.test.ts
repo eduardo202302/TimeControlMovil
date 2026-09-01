@@ -901,6 +901,46 @@ describe("17. getPunctuality con permissionId", () => {
   it("17e. sin horario del día devuelve null como siempre", () => {
     expect(getPunctuality(entradaConPermiso, [], TOL)).toBeNull();
   });
+
+  /** Réplica LITERAL de la cadena completa de punchinout.tsx (~líneas
+   * 2106-2118), no la versión simplificada de arriba. El bug real estaba
+   * aquí: con permissionId válido, punctuality da null y la cadena caía en
+   * lateEntry/earlyExit (que ignoran el permiso) antes de llegar a status. */
+  const displayStatusReal = (
+    punch: PunchEvent,
+    isJornadaOvertime: boolean,
+  ): string => {
+    const punctuality = getPunctuality(punch, [schedule], TOL);
+    return isJornadaOvertime
+      ? "Horas extras"
+      : punch.status === "Error de Imagen"
+        ? "Error de Imagen"
+        : punctuality !== null
+          ? punctuality
+          : punch.permissionId != null
+            ? punch.status || "A Tiempo"
+            : punch.lateEntry
+              ? "Tardanza"
+              : punch.earlyExit
+                ? "Anticipada"
+                : punch.type === "FinBreak"
+                  ? "A Tiempo"
+                  : punch.status || "A Tiempo";
+  };
+
+  it("17f. cadena completa: permissionId + lateEntry:true + status A Tiempo -> A Tiempo, no Tardanza", () => {
+    const conPermisoYFlagSucio = punch("InicioJornada", {
+      createdDate: "2026-08-19T15:53:31.000Z", // 11:53 RD, tardaría si se recalculara
+      permissionId: 698,
+      status: "A Tiempo",
+      lateEntry: true, // flag "sucio" del backend que el permiso debe ignorar
+    });
+    expect(displayStatusReal(conPermisoYFlagSucio, false)).toBe("A Tiempo");
+
+    // sin permissionId, el mismo lateEntry:true SÍ debe producir Tardanza
+    const sinPermiso = { ...conPermisoYFlagSucio, permissionId: null };
+    expect(displayStatusReal(sinPermiso, false)).toBe("Tardanza");
+  });
 });
 
 // ─── Sanidad de los helpers de tiempo usados por los fixtures ────────────────

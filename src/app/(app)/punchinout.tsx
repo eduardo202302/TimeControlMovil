@@ -2102,20 +2102,23 @@ export default function PunchInOut() {
                       lunchOut: tolLunchOut,
                     });
                     // Prioridad: horas extras > error de imagen > puntualidad local >
-                    // flags del backend (lateEntry/earlyExit) > status del backend
+                    // permiso (ignora flags lateEntry/earlyExit) > flags del backend >
+                    // status del backend
                     const displayStatus = isJornadaOvertime
                       ? "Horas extras"
                       : punch.status === "Error de Imagen"
                         ? "Error de Imagen"
                         : punctuality !== null
                           ? punctuality
-                          : punch.lateEntry
-                            ? "Tardanza"
-                            : punch.earlyExit
-                              ? "Anticipada"
-                              : punch.type === "FinBreak"
-                                ? "A Tiempo"
-                                : punch.status || "A Tiempo";
+                          : punch.permissionId != null
+                            ? punch.status || "A Tiempo"
+                            : punch.lateEntry
+                              ? "Tardanza"
+                              : punch.earlyExit
+                                ? "Anticipada"
+                                : punch.type === "FinBreak"
+                                  ? "A Tiempo"
+                                  : punch.status || "A Tiempo";
                     const isLateBadge =
                       displayStatus === "Tardanza" ||
                       displayStatus === "Error de Imagen";
