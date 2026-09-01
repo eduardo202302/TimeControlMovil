@@ -1733,20 +1733,28 @@ export default function PunchInOut() {
                   styles.lastPunchPill,
                   !lastPunch
                     ? styles.lastPunchPillNeutral
-                    : lastPunch.type.startsWith("Inicio")
-                      ? styles.lastPunchPillEntry
-                      : styles.lastPunchPillExit,
+                    : lastPunch.status === "Error de Imagen"
+                      ? styles.lastPunchPillError
+                      : lastPunch.type.startsWith("Inicio")
+                        ? styles.lastPunchPillEntry
+                        : styles.lastPunchPillExit,
                 ]}
               >
                 <Ionicons
-                  name="time-outline"
+                  name={
+                    lastPunch?.status === "Error de Imagen"
+                      ? "alert-circle-outline"
+                      : "time-outline"
+                  }
                   size={14}
                   color={
                     !lastPunch
                       ? "#6B7280"
-                      : lastPunch.type.startsWith("Inicio")
-                        ? "#16A34A"
-                        : "#2563EB"
+                      : lastPunch.status === "Error de Imagen"
+                        ? "#DC2626"
+                        : lastPunch.type.startsWith("Inicio")
+                          ? "#16A34A"
+                          : "#2563EB"
                   }
                 />
                 <Text
@@ -1755,9 +1763,11 @@ export default function PunchInOut() {
                     {
                       color: !lastPunch
                         ? "#6B7280"
-                        : lastPunch.type.startsWith("Inicio")
-                          ? "#16A34A"
-                          : "#2563EB",
+                        : lastPunch.status === "Error de Imagen"
+                          ? "#DC2626"
+                          : lastPunch.type.startsWith("Inicio")
+                            ? "#16A34A"
+                            : "#2563EB",
                     },
                   ]}
                   numberOfLines={1}
@@ -2385,6 +2395,7 @@ const styles = StyleSheet.create({
   lastPunchPillEntry: { backgroundColor: "#DCFCE7" },
   lastPunchPillExit: { backgroundColor: "#EFF6FF" },
   lastPunchPillNeutral: { backgroundColor: "#F3F4F6" },
+  lastPunchPillError: { backgroundColor: "#FEE2E2" },
   lastPunchPillText: { fontSize: 14, fontWeight: "700" },
   locationBlock: {
     borderRadius: 12,
