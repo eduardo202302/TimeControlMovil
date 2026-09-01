@@ -1,5 +1,7 @@
 import { Stack, router } from "expo-router";
 import { useEffect, useRef } from "react";
+import { AppState, Alert } from "react-native";
+import * as Updates from "expo-updates";
 import { useSchoolStore } from "../../store/useSchoolStore";
 import * as Storage from "../utils/storage";
 
@@ -60,6 +62,45 @@ export default function RootLayout() {
     });
 
     return () => unsubscribe();
+  }, []);
+
+  // ── Detectar actualizaciones OTA (EAS Update) ─────────────────────────────────
+  useEffect(() => {
+    if (!Updates.isEnabled) return; // Expo Go / dev client no soportan updates
+
+    let alertShown = false;
+
+    const checkForUpdate = async () => {
+      if (alertShown) return;
+      try {
+        const result = await Updates.checkForUpdateAsync();
+        if (!result.isAvailable) return;
+
+        await Updates.fetchUpdateAsync();
+        alertShown = true;
+
+        Alert.alert(
+          "Actualización disponible",
+          "Hay una nueva versión de la app. Debes reiniciarla para aplicar los cambios.",
+          [{ text: "Reiniciar ahora", onPress: () => Updates.reloadAsync() }],
+          { cancelable: false },
+        );
+      } catch {
+        // Silencioso — errores de red no deben interrumpir el uso de la app
+      }
+    };
+
+    checkForUpdate();
+    const updatePoller = setInterval(checkForUpdate, 10_000); // cada 10 seg — igual que el poller de horario
+
+    const appStateListener = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") checkForUpdate();
+    });
+
+    return () => {
+      clearInterval(updatePoller);
+      appStateListener.remove();
+    };
   }, []);
 
   return (
