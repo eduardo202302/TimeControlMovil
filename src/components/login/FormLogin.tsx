@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -185,17 +186,45 @@ export default function FormLogin({ name, image }: FormLoginProps) {
     [remember, urlColegio, setMenuResolution],
   );
 
-  const handleSelectCompany = (schoolUser: SchoolUser) => {
-    setCompanySelectorVisible(false);
-    if (pendingLogin) {
-      completeLogin(
+  const handleSelectCompany = async (schoolUser: SchoolUser) => {
+    if (!pendingLogin) return;
+
+    // El token de /login es ambiguo (sin schoolId) — los endpoints protegidos
+    // por schoolStrategy lo rechazan. Hay que re-scopearlo a la compañía
+    // elegida vía chooseschool antes de completar el login. Mismo patrón de
+    // llamada que el poller de horario en punchinout.tsx:637-642.
+    try {
+      const baseUrl =
+        urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
+      const rawAxios = axios.create();
+      const res = await rawAxios.post(
+        `${baseUrl}/authentication/chooseschool`,
+        { schoolId: schoolUser.schoolId },
+        { headers: { Authorization: `Bearer ${pendingLogin.token}` } },
+      );
+
+      const scopedToken = res.data?.data?.token;
+      if (!res.data?.success || !scopedToken) {
+        throw new Error("chooseschool no devolvió un token válido");
+      }
+
+      useSchoolStore.getState().setToken(scopedToken);
+      setCompanySelectorVisible(false);
+      await completeLogin(
         schoolUser,
         pendingLogin.loginData,
-        pendingLogin.token,
+        scopedToken,
         pendingLogin.menuItems,
         pendingLogin.usuario,
         pendingLogin.password,
       );
+    } catch (error) {
+      console.error("Error en chooseschool:", error);
+      setMensaje({
+        texto:
+          "No se pudo seleccionar la compañía. Intenta de nuevo.",
+        tipo: "error",
+      });
     }
   };
 

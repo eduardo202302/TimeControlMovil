@@ -414,6 +414,8 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, menuTree, app, logout, school, urlColegio } = useSchoolStore();
+  const schoolUser = user?.user?.schoolUsers?.[0];
+  const activeSchool = schoolUser?.school ?? school;
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const { width, isTablet, scale, verticalScale, font } = useResponsive();
@@ -485,9 +487,9 @@ const confirmLogout = useCallback(async () => {
         <View style={styles.header}>
           <View style={styles.companyRow}>
             <View style={styles.companyLeft}>
-              {school?.logo ? (
+              {activeSchool?.logo ? (
                 <Image
-                  source={{ uri: `${urlColegio}/${school.logo}` }}
+                  source={{ uri: `${urlColegio}/${activeSchool.logo}` }}
                   style={styles.companyLogo}
                   resizeMode="contain"
                 />
@@ -500,7 +502,7 @@ const confirmLogout = useCallback(async () => {
                 style={[styles.companyName, { maxWidth: appNameMaxWidth }]}
                 numberOfLines={1}
               >
-                {school?.name ?? ""}
+                {activeSchool?.name ?? ""}
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
