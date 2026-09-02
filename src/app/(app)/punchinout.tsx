@@ -379,7 +379,7 @@ async function fetchOpenDayPunch(
 }
 
 export default function PunchInOut() {
-  const { isTablet } = useResponsive();
+  const { isTablet, font } = useResponsive();
   const [now, setNow] = useState(new Date());
   const [selectedCategory, setSelectedCategory] = useState<Category>("Jornada");
   const [punches, setPunches] = useState<PunchEvent[]>([]);
@@ -1649,16 +1649,16 @@ export default function PunchInOut() {
           </View>
           <View style={styles.clockCard}>
             <View style={styles.clockTimeGroup}>
-              <Text style={styles.clockTime}>
+              <Text style={[styles.clockTime, { fontSize: font(24) }]}>
                 {formatRDTimeShort(now).split(" ")[0]}
               </Text>
-              <Text style={styles.clockAmPm}>
+              <Text style={[styles.clockAmPm, { fontSize: font(13) }]}>
                 {" "}
                 {formatRDTimeShort(now).split(" ").slice(1).join(" ")}
               </Text>
             </View>
             <View style={styles.clockDivider} />
-            <Text style={styles.clockDateCompact}>
+            <Text style={[styles.clockDateCompact, { fontSize: font(16) }]}>
               {formatRDDateShort(now)}
             </Text>
           </View>

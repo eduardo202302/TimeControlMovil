@@ -109,17 +109,50 @@ function createStyles(
       shadowRadius: 12,
     },
     header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: scale(16),
-      paddingVertical: verticalScale(18),
+      flexDirection: "column",
       backgroundColor: "#2563EB",
     },
     headerLeft: {
       flexDirection: "row",
       alignItems: "center",
       gap: scale(10),
+      paddingHorizontal: scale(16),
+      paddingTop: verticalScale(14),
+      paddingBottom: verticalScale(16),
+    },
+    companyRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: "#1D4ED8",
+      paddingHorizontal: scale(16),
+      paddingTop: verticalScale(14),
+      paddingBottom: verticalScale(12),
+    },
+    companyLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(8),
+      flexShrink: 1,
+    },
+    companyLogo: {
+      width: 32,
+      height: 32,
+      borderRadius: scale(6),
+      backgroundColor: "#FFFFFF",
+    },
+    companyLogoFallback: {
+      width: 32,
+      height: 32,
+      borderRadius: scale(6),
+      backgroundColor: "rgba(255,255,255,0.2)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    companyName: {
+      color: "#FFFFFF",
+      fontSize: font(13),
+      fontWeight: "700",
     },
     /**
      * Tamaño fijo a propósito: es iconografía (avatar de cabecera), no
@@ -380,7 +413,7 @@ interface DrawerMenuProps {
 export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, menuTree, app, logout } = useSchoolStore();
+  const { user, menuTree, app, logout, school, urlColegio } = useSchoolStore();
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const { width, isTablet, scale, verticalScale, font } = useResponsive();
@@ -450,6 +483,30 @@ const confirmLogout = useCallback(async () => {
         <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.header}>
+          <View style={styles.companyRow}>
+            <View style={styles.companyLeft}>
+              {school?.logo ? (
+                <Image
+                  source={{ uri: `${urlColegio}/${school.logo}` }}
+                  style={styles.companyLogo}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={styles.companyLogoFallback}>
+                  <Ionicons name="business-outline" size={18} color="#fff" />
+                </View>
+              )}
+              <Text
+                style={[styles.companyName, { maxWidth: appNameMaxWidth }]}
+                numberOfLines={1}
+              >
+                {school?.name ?? ""}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <Ionicons name="close" size={20} color="#374151" />
+            </TouchableOpacity>
+          </View>
           <View style={styles.headerLeft}>
             <View style={styles.avatarContainer}>
               {userPhoto ? (
@@ -476,9 +533,6 @@ const confirmLogout = useCallback(async () => {
               </Text>
             </View>
           </View>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <Ionicons name="close" size={20} color="#374151" />
-          </TouchableOpacity>
         </View>
 
         {/* Menu */}
