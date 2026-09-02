@@ -3,6 +3,12 @@ import * as Updates from "expo-updates";
 import { useEffect, useRef } from "react";
 import { Alert, AppState } from "react-native";
 import { useSchoolStore } from "../../store/useSchoolStore";
+import { refreshSchoolData } from "../../api/authorization";
+import {
+  clearSession,
+  isTokenExpired,
+  setupAxiosInterceptors,
+} from "../utils/session";
 import * as Storage from "../utils/storage";
 
 export default function RootLayout() {
@@ -11,6 +17,13 @@ export default function RootLayout() {
 
   // Guardar si ya hicimos la carga inicial — para distinguirla del logout
   const initialLoadDone = useRef(false);
+
+  // Registrar el interceptor global de axios (manejo central de 401) una sola vez
+  const interceptorsSet = useRef(false);
+  if (!interceptorsSet.current) {
+    setupAxiosInterceptors();
+    interceptorsSet.current = true;
+  }
 
   // ── Carga inicial: hidratar store desde SecureStore ──────────────────────────
   useEffect(() => {
@@ -22,11 +35,27 @@ export default function RootLayout() {
       const userRaw = await Storage.getItemAsync("user");
       const menuItemsRaw = await Storage.getItemAsync("menuItems");
 
-      if (schoolDataRaw) setSchool(JSON.parse(schoolDataRaw));
+      // Actualizar dataSchool con la información más reciente de la escuela
+      const refreshedSchool = await refreshSchoolData();
+
+      if (refreshedSchool) {
+        setSchool(refreshedSchool);
+      } else if (schoolDataRaw) {
+        setSchool(JSON.parse(schoolDataRaw));
+      }
       if (urlColegio) setUrlColegio(urlColegio);
       if (token) setToken(token);
 
-      if (isAuthorized === "true" && userRaw && menuItemsRaw) {
+      // Validar vigencia del token restaurado: si expiró, no entrar con un
+      // token muerto. Se limpia y se va al login para re-loguear.
+      if (isAuthorized === "true" && token && isTokenExpired(token)) {
+        await clearSession();
+        initialLoadDone.current = true;
+        router.replace("/login");
+        return;
+      }
+
+      if (isAuthorized === "true" && userRaw && menuItemsRaw && token) {
         const user = JSON.parse(userRaw);
         console.log("User from storage:", user);
         const menuItems = JSON.parse(menuItemsRaw);

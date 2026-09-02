@@ -24,6 +24,7 @@ export interface SchoolSettings {
   toleranceRadius?: number;
   radioPermitido?: number;
   cedula?: boolean;
+  cedulaRequerida?: boolean;
   [key: string]: unknown;
 }
 

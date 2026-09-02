@@ -234,35 +234,36 @@ export default function Register() {
                 </>
               )}
             />
-            <Controller
-              name="cedula"
-              control={control}
-              rules={{
-                required: school?.settings.cedula
-                  ? "La cédula es requerida"
-                  : false,
-              }}
-              render={({ field, fieldState }) => (
-                <>
-                  <InputField
-                    icon="card-outline"
-                    placeholder="Cédula"
-                    value={field.value}
-                    onChangeText={(text) => {
-                      field.onChange(formatCedula(text));
-                    }}
-                    keyboardType="numeric"
-                    required={school?.settings.cedula}
-                  />
-                  {fieldState.error && (
-                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
-                      {fieldState.error.message}
-                    </Text>
-                  )}
-                </>
-              )}
-            />
-
+            {school?.settings.cedula && (
+              <Controller
+                name="cedula"
+                control={control}
+                rules={{
+                  required: school?.settings.cedulaRequerida
+                    ? "La cédula es requerida"
+                    : false,
+                }}
+                render={({ field, fieldState }) => (
+                  <>
+                    <InputField
+                      icon="card-outline"
+                      placeholder="Cédula"
+                      value={field.value}
+                      onChangeText={(text) => {
+                        field.onChange(formatCedula(text));
+                      }}
+                      keyboardType="numeric"
+                      required={school?.settings.cedulaRequerida}
+                    />
+                    {fieldState.error && (
+                      <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                        {fieldState.error.message}
+                      </Text>
+                    )}
+                  </>
+                )}
+              />
+            )}
             <TouchableOpacity
               style={styles.button}
               onPress={handleSubmit(onSubmit)}
