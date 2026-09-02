@@ -767,17 +767,18 @@ export default function SolicitarPermisoForm() {
     else if (hasDayPassed(fromDate))
       errors.fromDate = "La fecha de inicio no puede estar en el pasado.";
 
-    if (!toDate) errors.toDate = "Selecciona la fecha Hasta.";
-    else if (fromDate && toDateKey(toDate) < toDateKey(fromDate))
-      errors.toDate = "La fecha Hasta no puede ser anterior a la fecha Desde.";
-    else if (
-      fromDate &&
-      maxDays != null &&
-      daysBetween(fromDate, toDate) > maxDays
-    )
-      // Respaldo del `maximumDate` del picker, por si el rango llega de otro
-      // lado. Texto idéntico al del backend para no dar dos versiones.
-      errors.toDate = `El rango excede el máximo permitido de días (${maxDays}).`;
+    if (toDate) {
+      if (fromDate && toDateKey(toDate) < toDateKey(fromDate))
+        errors.toDate = "La fecha Hasta no puede ser anterior a la fecha Desde.";
+      else if (
+        fromDate &&
+        maxDays != null &&
+        daysBetween(fromDate, toDate) > maxDays
+      )
+        // Respaldo del `maximumDate` del picker, por si el rango llega de otro
+        // lado. Texto idéntico al del backend para no dar dos versiones.
+        errors.toDate = `El rango excede el máximo permitido de días (${maxDays}).`;
+    }
 
     if (!isFullDay) {
       if (!fromTime) errors.fromTime = "Selecciona la hora de Inicio.";
@@ -843,12 +844,13 @@ export default function SolicitarPermisoForm() {
 
   const review = useMemo<PermissionReview | null>(() => {
     if (!isFormValid || !selectedAction || !selectedType) return null;
-    if (!fromDate || !toDate) return null;
+    if (!fromDate) return null;
+    const effectiveToDate = toDate ?? fromDate;
     return {
       actionName: selectedAction.name,
       typeName: selectedType.name,
       fromDate: toDateKey(fromDate),
-      toDate: toDateKey(toDate),
+      toDate: toDateKey(effectiveToDate),
       fromTime: isFullDay || !fromTime ? "" : toTimeKey(fromTime),
       toTime: isFullDay || !toTime ? "" : toTimeKey(toTime),
       isFullDay,
@@ -1227,7 +1229,7 @@ export default function SolicitarPermisoForm() {
             </View>
             <View style={styles.rowItem}>
               <Text style={styles.label}>
-                Hasta <Text style={styles.required}>*</Text>
+                Hasta
               </Text>
               <TouchableOpacity
                 style={[styles.select, !!toDateError && styles.fieldInvalid]}
