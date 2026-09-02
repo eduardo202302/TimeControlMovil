@@ -14,9 +14,7 @@ export async function getMenuItems(
   try {
     const response = await axios.get<MenuResponse>(`${urlColegio}/menu/all`, {
       headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (response.data.success) {
+    });    if (response.data.success) {
       return Array.isArray(response.data.data) ? response.data.data : [];
     }
 

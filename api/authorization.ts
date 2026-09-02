@@ -21,13 +21,10 @@ const authorization = async (data: ClaveRegistroType) => {
 
     if (!peticion) throw new Error("Error en la solicitud de autorización.");
 
-    const { success, data: responseData, message } = peticion.data;
+    const { success, data: responseData } = peticion.data;
 
     if (success) {
-      await Storage.setItemAsync(
-        "dataSchool",
-        JSON.stringify(responseData),
-      );
+      await Storage.setItemAsync("dataSchool", JSON.stringify(responseData));
       await Storage.setItemAsync("claveRegistro", claveRegistro);
       await Storage.setItemAsync("urlColegio", response.url);
       await Storage.setItemAsync("isAuthorized", "true");

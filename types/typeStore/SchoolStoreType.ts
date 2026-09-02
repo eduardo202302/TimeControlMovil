@@ -23,6 +23,7 @@ export interface SchoolSettings {
   schoolLongitude?: number;
   toleranceRadius?: number;
   radioPermitido?: number;
+  cedula?: boolean;
   [key: string]: unknown;
 }
 

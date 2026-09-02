@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   Image,
@@ -12,13 +12,13 @@ import {
 } from "react-native";
 import { loginAuthentication } from "../../../api/Login/loginAuthentication";
 import { getMenuItems } from "../../../api/menu/getMenuItems";
-import { getRoleById } from "../../../api/Roles/getRoles";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { LoginType } from "../../../types/typesLogin/LoginType";
+import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
 import * as Storage from "../../utils/storage";
+import CompanySelector from "./CompanySelector";
 import {
   RADIUS_MD,
-  RADIUS_SM,
   RADIUS_XL,
   RADIUS_3XL,
   useResponsive,
@@ -29,19 +29,14 @@ interface FormLoginProps {
   image?: string;
 }
 
-function decodeJWT(token: string): Record<string, any> {
-  try {
-    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    return JSON.parse(atob(base64));
-  } catch {
-    return {};
-  }
-}
-
 export default function FormLogin({ name, image }: FormLoginProps) {
   const { scale, verticalScale, font } = useResponsive();
   const styles = useMemo(
     () => createStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
+  const inputStyles = useMemo(
+    () => createLocalStyles(scale, verticalScale, font),
     [scale, verticalScale, font],
   );
 
@@ -53,7 +48,16 @@ export default function FormLogin({ name, image }: FormLoginProps) {
   const [remember, setRemember] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { urlColegio, setMenuResolution, setRole } = useSchoolStore();
+  const [companySelectorVisible, setCompanySelectorVisible] = useState(false);
+  const [pendingLogin, setPendingLogin] = useState<{
+    token: string;
+    loginData: any;
+    menuItems: any[];
+    usuario: string;
+    password: string;
+  } | null>(null);
+
+  const { urlColegio, setMenuResolution } = useSchoolStore();
 
   const { handleSubmit, control, setValue } = useForm<LoginType>({
     defaultValues: { usuario: "", password: "" },
@@ -73,6 +77,134 @@ export default function FormLogin({ name, image }: FormLoginProps) {
     cargarCredenciales();
   }, []);
 
+  const completeLogin = useCallback(
+    async (
+      schoolUser: SchoolUser | null,
+      loginData: any,
+      token: string,
+      menuItems: any[],
+      usuario: string,
+      password: string,
+    ) => {
+      const currentUrl =
+        urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
+
+      const schoolUsers = loginData?.user?.schoolUsers ?? [];
+      const selected =
+        schoolUser ??
+        schoolUsers[0] ??
+        (loginData.userSchedules ? { school: loginData.school ?? {} } : null);
+
+      const roleId = selected?.roleId ?? loginData?.roleId;
+      const role = selected?.role ?? loginData?.role ?? {
+        id: roleId,
+        name: selected?.role?.name ?? loginData?.roleName ?? "",
+        permissions: {},
+        menu: selected?.role?.menu ?? [],
+        defaultMenu: selected?.role?.defaultMenu ?? null,
+      };
+      const schedules = selected?.userSchedules ?? loginData?.userSchedules ?? [];
+
+      // Persistir credenciales de "Recordarme"
+      if (remember) {
+        await Storage.setItemAsync("usuario", usuario ?? "");
+        await Storage.setItemAsync("password", password ?? "");
+        await Storage.setItemAsync("recordarme", "true");
+      } else {
+        await Storage.deleteItemAsync("usuario");
+        await Storage.deleteItemAsync("password");
+        await Storage.deleteItemAsync("recordarme");
+      }
+
+      // Armar user completo con el rol de la compañía seleccionada.
+      // Reordenar schoolUsers para que la compañía elegida quede en [0],
+      // así el resto de la app (horarios, settings, foto, permisos, geocerca)
+      // que lee schoolUsers[0] usa la compañía correcta.
+      const selectedId = selected?.id ?? selected?.schoolId;
+      const reorderedSchoolUsers = (
+        loginData?.user?.schoolUsers ?? []
+      )
+        .slice()
+        .sort((a: SchoolUser, b: SchoolUser) => {
+          const aSelected = a?.id === selectedId || a?.schoolId === selectedId;
+          const bSelected = b?.id === selectedId || b?.schoolId === selectedId;
+          return (bSelected ? 1 : 0) - (aSelected ? 1 : 0);
+        });
+
+      const fullUser = {
+        ...loginData,
+        user: {
+          ...loginData?.user,
+          schoolUsers: reorderedSchoolUsers,
+        },
+        roleId,
+        role: {
+          id: roleId,
+          name: role?.name ?? "",
+          permissions: {},
+          menu: role?.menu ?? [],
+          defaultMenu: role?.defaultMenu ?? null,
+        },
+        school: selected?.school ?? useSchoolStore.getState().school ?? {},
+        userSchedules: schedules,
+      };
+
+      // Resolver app + ruta + árbol de menú
+      setMenuResolution(fullUser as any, menuItems);
+
+      // Persistir en SecureStore
+      await Storage.setItemAsync("isAuthorized", "true");
+      await Storage.setItemAsync("token", token);
+      await Storage.setItemAsync("urlColegio", currentUrl);
+      await Storage.setItemAsync("user", JSON.stringify(fullUser));
+      await Storage.setItemAsync("menuItems", JSON.stringify(menuItems));
+
+      // Guardar la foto del usuario correspondiente a la compañía seleccionada
+      const selectedPhoto = (selected as any)?.photourl;
+      const selectedS3Photo = (selected as any)?.s3Photo;
+      if (selectedPhoto) {
+        await Storage.setItemAsync("photourl", selectedPhoto);
+      } else {
+        await Storage.deleteItemAsync("photourl");
+      }
+      if (selectedS3Photo) {
+        await Storage.setItemAsync("s3Photo", selectedS3Photo);
+      } else {
+        await Storage.deleteItemAsync("s3Photo");
+      }
+
+      setMensaje({
+        texto: "Autenticación exitosa. Redirigiendo...",
+        tipo: "success",
+      });
+
+      router.replace(
+        (useSchoolStore.getState().role?.defaultMenu?.path ?? "/login") as never,
+      );
+    },
+    [remember, urlColegio, setMenuResolution],
+  );
+
+  const handleSelectCompany = (schoolUser: SchoolUser) => {
+    setCompanySelectorVisible(false);
+    if (pendingLogin) {
+      completeLogin(
+        schoolUser,
+        pendingLogin.loginData,
+        pendingLogin.token,
+        pendingLogin.menuItems,
+        pendingLogin.usuario,
+        pendingLogin.password,
+      );
+    }
+  };
+
+  const handleCancelCompany = () => {
+    setCompanySelectorVisible(false);
+    setPendingLogin(null);
+    setLoading(false);
+  };
+
   const onSubmit = async (data: LoginType) => {
     setLoading(true);
     setMensaje(null);
@@ -82,65 +214,34 @@ export default function FormLogin({ name, image }: FormLoginProps) {
 
       if (response.success) {
         const { token } = response.data;
-        const schedules =
-          response.data.user?.schoolUsers?.[0]?.userSchedules ??
-          response.data.userSchedules ??
-          [];
-
+        const schoolUsers = response.data.user?.schoolUsers ?? [];
         const currentUrl =
           urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
 
-        const jwtPayload = decodeJWT(token);
-
-        // Llamar getMenuItems y getRoleById en paralelo
-        const [menuItems, role] = await Promise.all([
+        const [menuItems] = await Promise.all([
           getMenuItems(currentUrl, token),
-          getRoleById(currentUrl, token, jwtPayload.roleId), // Guardar el rol en el store
         ]);
-        if (role) {
-          setRole(role);
-        }
 
-        // Armar user completo con menu real del rol
-        const fullUser = {
-          ...response.data,
-          roleId: jwtPayload.roleId,
-          role: {
-            id: jwtPayload.roleId,
-            name: jwtPayload.roleName,
-            permissions: {},
-            menu: role?.menu ?? [],
-            defaultMenu: role?.defaultMenu ?? null,
-          },
-          school: useSchoolStore.getState().school ?? {},
-          userSchedules: schedules,
-        };
-
-        // Resolver app + ruta + árbol de menú
-        setMenuResolution(fullUser as any, menuItems);
-
-        // Persistir en SecureStore
-        await Storage.setItemAsync("isAuthorized", "true");
-        await Storage.setItemAsync("token", token);
-        await Storage.setItemAsync("urlColegio", currentUrl);
-        await Storage.setItemAsync("user", JSON.stringify(fullUser));
-        await Storage.setItemAsync("menuItems", JSON.stringify(menuItems));
-
-        setMensaje({
-          texto: "Autenticación exitosa. Redirigiendo...",
-          tipo: "success",
-        });
-
-        router.replace((useSchoolStore.getState().role?.defaultMenu?.path ?? "/login") as never);
-
-        if (remember) {
-          await Storage.setItemAsync("usuario", data.usuario);
-          await Storage.setItemAsync("password", data.password);
-          await Storage.setItemAsync("recordarme", "true");
+        if (schoolUsers.length > 1) {
+          // Usuario pertenece a varias compañías → mostrar selector
+          setPendingLogin({
+            token,
+            loginData: response.data,
+            menuItems,
+            usuario: data.usuario,
+            password: data.password,
+          });
+          setCompanySelectorVisible(true);
         } else {
-          await Storage.deleteItemAsync("usuario");
-          await Storage.deleteItemAsync("password");
-          await Storage.deleteItemAsync("recordarme");
+          // Una sola compañía → entrar normal (pasar datos directo, sin depender del estado)
+          await completeLogin(
+            schoolUsers[0] ?? null,
+            response.data,
+            token,
+            menuItems,
+            data.usuario,
+            data.password,
+          );
         }
       } else {
         setMensaje({
@@ -210,22 +311,13 @@ export default function FormLogin({ name, image }: FormLoginProps) {
           rules={{ required: "El usuario es requerido" }}
           render={({ field, fieldState }) => (
             <>
-              <View style={styles.inputGroup}>
-                <Ionicons
-                  name="person-outline"
-                  size={18}
-                  color="#9aa4b4"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Usuario / Email / Teléfono"
-                  placeholderTextColor="#9aa4b4"
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  autoCapitalize="none"
-                />
-              </View>
+              <InputField
+                styles={inputStyles}
+                icon="person-outline"
+                placeholder="Usuario / Email / Teléfono"
+                value={field.value}
+                onChangeText={field.onChange}
+              />
               {fieldState.error && (
                 <Text style={styles.errorText}>{fieldState.error.message}</Text>
               )}
@@ -239,31 +331,25 @@ export default function FormLogin({ name, image }: FormLoginProps) {
           rules={{ required: "La clave es requerida" }}
           render={({ field, fieldState }) => (
             <>
-              <View style={styles.inputGroup}>
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={18}
-                  color="#9aa4b4"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Contraseña"
-                  placeholderTextColor="#9aa4b4"
-                  secureTextEntry={!showPassword}
-                  value={field.value}
-                  onChangeText={field.onChange}
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                >
-                  <Ionicons
-                    name={showPassword ? "eye-off-outline" : "eye-outline"}
-                    size={18}
-                    color="#999"
-                  />
-                </TouchableOpacity>
-              </View>
+              <InputField
+                styles={inputStyles}
+                icon="lock-closed-outline"
+                placeholder="Contraseña"
+                value={field.value}
+                onChangeText={field.onChange}
+                secureTextEntry={!showPassword}
+                rightIcon={
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    <Ionicons
+                      name={showPassword ? "eye-off-outline" : "eye-outline"}
+                      size={18}
+                      color="#999"
+                    />
+                  </TouchableOpacity>
+                }
+              />
               {fieldState.error && (
                 <Text style={styles.errorText}>{fieldState.error.message}</Text>
               )}
@@ -305,8 +391,121 @@ export default function FormLogin({ name, image }: FormLoginProps) {
           </TouchableOpacity>
         </View>
       </View>
+
+      <CompanySelector
+        visible={companySelectorVisible}
+        companies={pendingLogin?.loginData?.user?.schoolUsers ?? []}
+        onSelect={handleSelectCompany}
+        onCancel={handleCancelCompany}
+      />
     </View>
   );
+}
+
+type InputFieldProps = {
+  styles: any;
+  icon: string;
+  placeholder: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  secureTextEntry?: boolean;
+  keyboardType?: any;
+  rightIcon?: React.ReactNode;
+  required?: boolean;
+};
+
+function InputField({
+  styles,
+  icon,
+  placeholder,
+  value,
+  onChangeText,
+  secureTextEntry,
+  keyboardType,
+  rightIcon,
+  required = true,
+}: InputFieldProps) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={styles.labelGroup}>
+      <Text style={styles.label}>
+        {placeholder} {required && <Text style={styles.required}>*</Text>}
+      </Text>
+      <View style={[styles.inputGroup, focused && styles.inputFocused]}>
+        <Ionicons
+          name={icon as any}
+          size={18}
+          color="#9aa4b4"
+          style={styles.inputIcon}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder={placeholder}
+          placeholderTextColor="#bbb"
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={secureTextEntry}
+          keyboardType={keyboardType}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          autoCapitalize="none"
+        />
+        {value ? (
+          <TouchableOpacity onPress={() => onChangeText("")} style={styles.clearButton}>
+            <Ionicons name="close-circle" size={18} color="#999" />
+          </TouchableOpacity>
+        ) : null}
+        {rightIcon}
+      </View>
+    </View>
+  );
+}
+
+function createLocalStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    labelGroup: {
+      marginBottom: verticalScale(10),
+    },
+    label: {
+      fontSize: font(13),
+      color: "#555",
+      marginBottom: verticalScale(4),
+      fontWeight: "500",
+    },
+    required: {
+      color: "#e24b4a",
+    },
+    inputGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: "#ddd",
+      // 8 coincide con RADIUS_SM — usar constante importada
+      borderRadius: scale(8),
+      paddingHorizontal: scale(10),
+      backgroundColor: "#f9fbff",
+    },
+    inputFocused: {
+      borderColor: "#4c6fbf",
+      borderWidth: 1.5,
+    },
+    inputIcon: {
+      marginRight: scale(8),
+    },
+    clearButton: {
+      marginLeft: scale(6),
+    },
+    input: {
+      flex: 1,
+      paddingVertical: verticalScale(10),
+      fontSize: font(14),
+      color: "#333",
+    },
+  });
 }
 
 function createStyles(
@@ -320,7 +519,6 @@ function createStyles(
       justifyContent: "space-between",
       alignItems: "center",
     },
-    /** Ancho ideal de formulario, no un cap de emergencia — no tokenizar. */
     phone: {
       width: "90%",
       maxWidth: 360,
@@ -336,7 +534,6 @@ function createStyles(
       marginBottom: verticalScale(4),
     },
     logo: { alignItems: "center", marginBottom: verticalScale(27) },
-    /** Tamaño fijo: iconografía de logo, no contenido — mismo criterio que avatarContainer en DrawerMenu.tsx. */
     logoImage: { width: 100, height: 100 },
     logoTitle: {
       fontSize: font(20),
@@ -354,22 +551,6 @@ function createStyles(
       fontWeight: "600",
       color: "#333",
       marginBottom: verticalScale(14),
-    },
-    inputGroup: {
-      flexDirection: "row",
-      alignItems: "center",
-      borderWidth: 1,
-      borderColor: "#ddd",
-      borderRadius: RADIUS_SM,
-      paddingHorizontal: scale(10),
-      marginBottom: verticalScale(12),
-    },
-    inputIcon: { marginRight: scale(8) },
-    input: {
-      flex: 1,
-      paddingVertical: verticalScale(10),
-      fontSize: font(14),
-      color: "#111",
     },
     options: {
       flexDirection: "row",

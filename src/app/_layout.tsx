@@ -1,7 +1,7 @@
 import { Stack, router } from "expo-router";
-import { useEffect, useRef } from "react";
-import { AppState, Alert } from "react-native";
 import * as Updates from "expo-updates";
+import { useEffect, useRef } from "react";
+import { Alert, AppState } from "react-native";
 import { useSchoolStore } from "../../store/useSchoolStore";
 import * as Storage from "../utils/storage";
 
@@ -28,14 +28,16 @@ export default function RootLayout() {
 
       if (isAuthorized === "true" && userRaw && menuItemsRaw) {
         const user = JSON.parse(userRaw);
+        console.log("User from storage:", user);
         const menuItems = JSON.parse(menuItemsRaw);
         setMenuResolution(user, menuItems);
         initialLoadDone.current = true;
         const { role } = useSchoolStore.getState();
+        console.log("Role from store:", role);
         router.replace((role?.defaultMenu?.path ?? "/login") as never);
         return;
       }
-
+      console.log("No valid authorization found. Redirecting to login.");
       initialLoadDone.current = true;
       router.replace("/login");
     };
@@ -93,9 +95,12 @@ export default function RootLayout() {
     checkForUpdate();
     const updatePoller = setInterval(checkForUpdate, 10_000); // cada 10 seg — igual que el poller de horario
 
-    const appStateListener = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") checkForUpdate();
-    });
+    const appStateListener = AppState.addEventListener(
+      "change",
+      (nextState) => {
+        if (nextState === "active") checkForUpdate();
+      },
+    );
 
     return () => {
       clearInterval(updatePoller);

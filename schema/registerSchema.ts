@@ -15,6 +15,5 @@ export const registerSchema = z.object({
     .string()
     .trim()
     .min(5, "La contraseña debe tener al menos 5 caracteres"),
-  userType: z.number().min(1, "El tipo de usuario es requerido"),
   cedula: z.string().trim().min(1, "La cédula es requerida"),
 });

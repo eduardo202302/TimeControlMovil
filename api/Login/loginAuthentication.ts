@@ -68,7 +68,6 @@ const registerUser = async (data: RegisterType) => {
       password: data.password,
       cedula: data.cedula || null,
     },
-    tagIds: [data.userType],
     token: dataSchool?.token,
   };
 

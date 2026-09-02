@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { SchoolStore } from "../types/typeStore/SchoolStoreType";
-import { MenuItem, RoleItem } from "../types/typesMenu/MenuTypes";
+import { MenuItem } from "../types/typesMenu/MenuTypes";
 import { resolveRoute } from "../utils/resolveRoute";
 
 export const useSchoolStore = create<SchoolStore>((set) => ({
