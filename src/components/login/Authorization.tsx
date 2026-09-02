@@ -4,6 +4,8 @@ import { Controller, useForm } from "react-hook-form";
 import {
   ActivityIndicator,
   Animated,
+  KeyboardAvoidingView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -126,116 +128,131 @@ const Authorization = ({ onClose }: { onClose: () => void }) => {
   if (!showCard) return null;
 
   return (
-    <View style={[styles.card, isTablet && styles.contentTablet]}>
-      <View style={styles.stripe} />
-      <View style={styles.cardHead}>
-        <View style={styles.rippleWrap}>
-          <Animated.View style={[styles.ripple, getRippleStyle(ripple1)]} />
-          <Animated.View style={[styles.ripple, getRippleStyle(ripple2)]} />
-          <Animated.View style={[styles.ripple, getRippleStyle(ripple3)]} />
-          <View style={styles.iconCore}>
-            <Ionicons name="document-text-outline" size={32} color="#ff9800" />
-          </View>
-          <View style={styles.errBadge}>
-            <Ionicons name="close" size={12} color="#fff" />
-          </View>
-        </View>
-        <Text style={styles.cardTitle}>Dispositivo no registrado</Text>
-        <Text style={styles.cardSub}>ACCESO DENEGADO</Text>
-      </View>
-
-      <View style={styles.statusBar}>
-        <Animated.View style={[styles.dot, { opacity: blink }]} />
-        <Text style={styles.statusTxt}>DISPOSITIVO NO AUTORIZADO</Text>
-      </View>
-
-      <View style={styles.cardBody}>
-        <View style={styles.infoBox}>
-          <Ionicons
-            name="information-circle-outline"
-            size={16}
-            color="#f57c00"
-            style={styles.infoIcon}
-          />
-          <Text style={styles.infoText}>
-            Solicita tu{" "}
-            <Text style={{ fontWeight: "bold" }}>Clave de Registro</Text> al
-            administrador del sistema de tu empresa, para habilitar este
-            dispositivo.
-          </Text>
-        </View>
-
-        <Text style={styles.inputLabel}>Clave de Registro</Text>
-        <Controller
-          name="claveRegistro"
-          control={control}
-          rules={{ required: "La clave es requerida" }}
-          render={({ field, fieldState }) => (
-            <>
-              <View style={styles.inputWrap}>
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={16}
-                  color="#9ab0c8"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Ingrese tu Clave"
-                  placeholderTextColor="#9ab0c8"
-                  onChangeText={field.onChange}
-                  value={field.value}
-                />
+    <KeyboardAvoidingView
+      behavior="padding"
+      keyboardVerticalOffset={0}
+      style={{ flex: 1, width: "100%" }}
+    >
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={[styles.card, isTablet && styles.contentTablet]}>
+          <View style={styles.stripe} />
+          <View style={styles.cardHead}>
+            <View style={styles.rippleWrap}>
+              <Animated.View style={[styles.ripple, getRippleStyle(ripple1)]} />
+              <Animated.View style={[styles.ripple, getRippleStyle(ripple2)]} />
+              <Animated.View style={[styles.ripple, getRippleStyle(ripple3)]} />
+              <View style={styles.iconCore}>
+                <Ionicons name="document-text-outline" size={32} color="#ff9800" />
               </View>
-              {fieldState.error && (
-                <Text style={styles.errorText}>{fieldState.error.message}</Text>
+              <View style={styles.errBadge}>
+                <Ionicons name="close" size={12} color="#fff" />
+              </View>
+            </View>
+            <Text style={styles.cardTitle}>Dispositivo no registrado</Text>
+            <Text style={styles.cardSub}>ACCESO DENEGADO</Text>
+          </View>
+
+          <View style={styles.statusBar}>
+            <Animated.View style={[styles.dot, { opacity: blink }]} />
+            <Text style={styles.statusTxt}>DISPOSITIVO NO AUTORIZADO</Text>
+          </View>
+
+          <View style={styles.cardBody}>
+            <View style={styles.infoBox}>
+              <Ionicons
+                name="information-circle-outline"
+                size={16}
+                color="#f57c00"
+                style={styles.infoIcon}
+              />
+              <Text style={styles.infoText}>
+                Solicita tu{" "}
+                <Text style={{ fontWeight: "bold" }}>Clave de Registro</Text> al
+                administrador del sistema de tu empresa, para habilitar este
+                dispositivo.
+              </Text>
+            </View>
+
+            <Text style={styles.inputLabel}>Clave de Registro</Text>
+            <Controller
+              name="claveRegistro"
+              control={control}
+              rules={{ required: "La clave es requerida" }}
+              render={({ field, fieldState }) => (
+                <>
+                  <View style={styles.inputWrap}>
+                    <Ionicons
+                      name="lock-closed-outline"
+                      size={16}
+                      color="#9ab0c8"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Ingrese tu Clave"
+                      placeholderTextColor="#9ab0c8"
+                      onChangeText={field.onChange}
+                      value={field.value}
+                    />
+                  </View>
+                  {fieldState.error && (
+                    <Text style={styles.errorText}>{fieldState.error.message}</Text>
+                  )}
+                </>
               )}
-            </>
-          )}
-        />
+            />
 
-        <TouchableOpacity
-          style={[styles.sendBtn, loading && { backgroundColor: "#0a6644" }]}
-          onPress={handleSubmit(onSubmit)}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
-          {loading ? (
-            <>
-              <ActivityIndicator size="small" color="#fff" />
-              <Text style={styles.sendBtnText}>Verificando...</Text>
-            </>
-          ) : (
-            <>
-              <Ionicons name="send-outline" size={16} color="#fff" />
-              <Text style={styles.sendBtnText}>Enviar clave</Text>
-            </>
-          )}
-        </TouchableOpacity>
-
-        {mensaje && (
-          <View
-            style={[
-              styles.msg,
-              mensaje.tipo === "error" ? styles.msgError : styles.msgSuccess,
-            ]}
-          >
-            <Text
-              style={[
-                styles.msgText,
-                { color: mensaje.tipo === "error" ? "#b54a00" : "#0a6644" },
-              ]}
+            <TouchableOpacity
+              style={[styles.sendBtn, loading && { backgroundColor: "#0a6644" }]}
+              onPress={handleSubmit(onSubmit)}
+              disabled={loading}
+              activeOpacity={0.85}
             >
-              {mensaje.texto}
+              {loading ? (
+                <>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={styles.sendBtnText}>Verificando...</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="send-outline" size={16} color="#fff" />
+                  <Text style={styles.sendBtnText}>Enviar clave</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {mensaje && (
+              <View
+                style={[
+                  styles.msg,
+                  mensaje.tipo === "error" ? styles.msgError : styles.msgSuccess,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.msgText,
+                    { color: mensaje.tipo === "error" ? "#b54a00" : "#0a6644" },
+                  ]}
+                >
+                  {mensaje.texto}
+                </Text>
+              </View>
+            )}
+
+            <Text style={styles.footerNote}>
+              ¿No tiene su clave? Contacte a su{"\n"}administrador de sistemas.
             </Text>
           </View>
-        )}
-
-        <Text style={styles.footerNote}>
-          ¿No tiene su clave? Contacte a su{"\n"}administrador de sistemas.
-        </Text>
-      </View>
-    </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 

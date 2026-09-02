@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  KeyboardAvoidingView,
   Modal,
   ScrollView,
   StyleSheet,
@@ -95,119 +96,125 @@ export default function ParentsExcusesScreen() {
 
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.overlay}>
-          <ScrollView style={styles.sheet}>
-            <Text style={styles.title}>Nueva Excusa</Text>
+          <KeyboardAvoidingView
+            behavior="padding"
+            keyboardVerticalOffset={0}
+            style={{ flex: 1 }}
+          >
+            <ScrollView style={styles.sheet} keyboardShouldPersistTaps="handled">
+              <Text style={styles.title}>Nueva Excusa</Text>
 
-            {/* ESTUDIANTE */}
+              {/* ESTUDIANTE */}
 
-            <View style={styles.section}>
-              <View style={styles.labelRow}>
-                <User size={18} color="#2563eb" />
-                <Text style={styles.label}>Estudiante</Text>
+              <View style={styles.section}>
+                <View style={styles.labelRow}>
+                  <User size={18} color="#2563eb" />
+                  <Text style={styles.label}>Estudiante</Text>
+                </View>
+
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={estudiante}
+                    onValueChange={(itemValue) => setEstudiante(itemValue)}
+                  >
+                    {estudiantes.length === 0 ? (
+                      <Picker.Item
+                        label="No hay estudiantes disponibles"
+                        value=""
+                      />
+                    ) : (
+                      estudiantes.map((e) => (
+                        <Picker.Item key={e.id} label={e.name} value={e.id} />
+                      ))
+                    )}
+                  </Picker>
+                </View>
               </View>
 
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={estudiante}
-                  onValueChange={(itemValue) => setEstudiante(itemValue)}
+              {/* MOTIVO */}
+
+              <View style={styles.section}>
+                <View style={styles.labelRow}>
+                  <MessageSquare size={18} color="#2563eb" />
+                  <Text style={styles.label}>Motivo de la excusa</Text>
+                </View>
+
+                <TextInput
+                  placeholder="Describe el motivo de la ausencia o tardanza"
+                  style={[styles.input, styles.textarea]}
+                  multiline
+                />
+              </View>
+
+              {/* PERIODO */}
+
+              <View style={styles.section}>
+                <View style={styles.labelRow}>
+                  <Calendar size={18} color="#2563eb" />
+                  <Text style={styles.label}>Período de ausencia</Text>
+                </View>
+
+                <Text style={styles.subLabel}>Fecha</Text>
+
+                <View style={styles.dateInput}>
+                  <TextInput placeholder="dd/mm/aaaa" style={styles.dateInputField} />
+                  <Calendar size={18} />
+                </View>
+
+                <View style={styles.timeRow}>
+                  <View style={styles.timeCol}>
+                    <Text style={styles.subLabel}>Hora desde</Text>
+
+                    <View style={styles.dateInput}>
+                      <TextInput placeholder="--:--" style={styles.dateInputField} />
+                      <Clock size={18} />
+                    </View>
+                  </View>
+
+                  <View style={styles.timeCol}>
+                    <Text style={styles.subLabel}>Hora hasta</Text>
+
+                    <View style={styles.dateInput}>
+                      <TextInput placeholder="--:--" style={styles.dateInputField} />
+                      <Clock size={18} />
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* DOCUMENTO */}
+
+              <View style={styles.section}>
+                <View style={styles.labelRow}>
+                  <Paperclip size={18} color="#2563eb" />
+                  <Text style={styles.label}>Documento de respaldo</Text>
+                </View>
+
+                <TouchableOpacity style={styles.fileInput}>
+                  <Text>Seleccionar archivo</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.helpText}>
+                  Adjunta un certificado médico u otro documento si aplica
+                </Text>
+              </View>
+
+              {/* BOTONES */}
+
+              <View style={styles.buttons}>
+                <TouchableOpacity style={styles.send}>
+                  <Text style={styles.sendText}>Enviar</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.cancel}
+                  onPress={() => setModalVisible(false)}
                 >
-                  {estudiantes.length === 0 ? (
-                    <Picker.Item
-                      label="No hay estudiantes disponibles"
-                      value=""
-                    />
-                  ) : (
-                    estudiantes.map((e) => (
-                      <Picker.Item key={e.id} label={e.name} value={e.id} />
-                    ))
-                  )}
-                </Picker>
+                  <Text style={styles.cancelText}>Cancelar</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-
-            {/* MOTIVO */}
-
-            <View style={styles.section}>
-              <View style={styles.labelRow}>
-                <MessageSquare size={18} color="#2563eb" />
-                <Text style={styles.label}>Motivo de la excusa</Text>
-              </View>
-
-              <TextInput
-                placeholder="Describe el motivo de la ausencia o tardanza"
-                style={[styles.input, styles.textarea]}
-                multiline
-              />
-            </View>
-
-            {/* PERIODO */}
-
-            <View style={styles.section}>
-              <View style={styles.labelRow}>
-                <Calendar size={18} color="#2563eb" />
-                <Text style={styles.label}>Período de ausencia</Text>
-              </View>
-
-              <Text style={styles.subLabel}>Fecha</Text>
-
-              <View style={styles.dateInput}>
-                <TextInput placeholder="dd/mm/aaaa" style={styles.dateInputField} />
-                <Calendar size={18} />
-              </View>
-
-              <View style={styles.timeRow}>
-                <View style={styles.timeCol}>
-                  <Text style={styles.subLabel}>Hora desde</Text>
-
-                  <View style={styles.dateInput}>
-                    <TextInput placeholder="--:--" style={styles.dateInputField} />
-                    <Clock size={18} />
-                  </View>
-                </View>
-
-                <View style={styles.timeCol}>
-                  <Text style={styles.subLabel}>Hora hasta</Text>
-
-                  <View style={styles.dateInput}>
-                    <TextInput placeholder="--:--" style={styles.dateInputField} />
-                    <Clock size={18} />
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            {/* DOCUMENTO */}
-
-            <View style={styles.section}>
-              <View style={styles.labelRow}>
-                <Paperclip size={18} color="#2563eb" />
-                <Text style={styles.label}>Documento de respaldo</Text>
-              </View>
-
-              <TouchableOpacity style={styles.fileInput}>
-                <Text>Seleccionar archivo</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.helpText}>
-                Adjunta un certificado médico u otro documento si aplica
-              </Text>
-            </View>
-
-            {/* BOTONES */}
-
-            <View style={styles.buttons}>
-              <TouchableOpacity style={styles.send}>
-                <Text style={styles.sendText}>Enviar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.cancel}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.cancelText}>Cancelar</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
     </View>
