@@ -185,15 +185,16 @@ function getStatusColor(status: string): string {
   if (status === "Tardanza") return "#DC2626";
   if (status === "Anticipada") return "#D97706";
   if (status === "Error de Imagen") return "#DC2626";
+  if (status === "Fuera de área") return "#DC2626";
   return "#16A34A";
 }
 
 /**
  * Estado a mostrar para un punch, con la misma cadena de prioridad en
  * todos los lugares que lo necesitan (historial del día, pill del último
- * ponche): horas extras > error de imagen > puntualidad local (corrige
- * estados erróneos del backend) > permiso (ignora flags lateEntry/earlyExit)
- * > flags del backend > status del backend.
+ * ponche): horas extras > error de imagen / fuera de área > puntualidad
+ * local (corrige estados erróneos del backend) > permiso (ignora flags
+ * lateEntry/earlyExit) > flags del backend > status del backend.
  */
 function getDisplayStatus(
   punch: PunchEvent,
@@ -208,15 +209,17 @@ function getDisplayStatus(
     ? "Horas extras"
     : punch.status === "Error de Imagen"
       ? "Error de Imagen"
-      : punctuality !== null
-        ? punctuality
-        : punch.permissionId != null
-          ? punch.status || "A Tiempo"
-          : punch.lateEntry
-            ? "Tardanza"
-            : punch.earlyExit
-              ? "Anticipada"
-              : punch.status || "A Tiempo";
+      : punch.status === "Fuera de área"
+        ? "Fuera de área"
+        : punctuality !== null
+          ? punctuality
+          : punch.permissionId != null
+            ? punch.status || "A Tiempo"
+            : punch.lateEntry
+              ? "Tardanza"
+              : punch.earlyExit
+                ? "Anticipada"
+                : punch.status || "A Tiempo";
 }
 
 function getStatusLabel(status: string): string {
@@ -233,6 +236,7 @@ function isJornadaActiva(punches: PunchEvent[]): boolean {
       (p) =>
         (p.type === "InicioJornada" || p.type === "FinJornada") &&
         p.status !== "Error de Imagen" &&
+        p.status !== "Fuera de área" &&
         !p.hasOpenDay &&
         p.hasOpenDay !== ("true" as any),
     );
@@ -916,7 +920,8 @@ export default function PunchInOut() {
       .find(
         (p) =>
           (p.type === types.inicio || p.type === types.fin) &&
-          p.status !== "Error de Imagen",
+          p.status !== "Error de Imagen" &&
+          p.status !== "Fuera de área",
       );
     if (!last) return "inicio";
     return last.type === types.inicio ? "fin" : "inicio";
@@ -1098,8 +1103,10 @@ export default function PunchInOut() {
     });
 
     // ── 1) Validación de UBICACIÓN + GEOCERCA (si la institución la exige) ───
-    // Pre-validación antes del POST: si el usuario está fuera del radio permitido
-    // se aborta inmediatamente, sin ejecutar la captura de foto ni el axios.post.
+    // Solo bloquea si faltan coordenadas (propias o de referencia) — error de
+    // configuración. Estar fuera del radio permitido YA NO aborta el ponche:
+    // se envía igual con las coordenadas reales y el backend decide, marcando
+    // el punch con status "Fuera de área" cuando corresponde.
     let coords: { latitude: number; longitude: number } | null = null;
     if (locationRequired) {
       coords = await getCurrentCoordinates();
@@ -1140,23 +1147,9 @@ export default function PunchInOut() {
           dentroDeGeocerca,
         });
 
-        if (!dentroDeGeocerca) {
-          console.warn(
-            "BLOQUEO GEOCERCA: Usuario fuera del radio permitido — se aborta el ponche",
-            {
-              source: targetGeo.source,
-              distanceMeters: Math.round(distanceMeters),
-              maxRadius: targetGeo.radius,
-            },
-          );
-          Alert.alert(
-            "Ubicación No Válida",
-            targetGeo.source === "USER_CUSTOM_LOCATION"
-              ? "Te encuentras fuera del área permitida para registrar tu asistencia. Acércate a la ubicación asignada."
-              : "Te encuentras fuera del área permitida para registrar tu asistencia. Acércate a la institución.",
-          );
-          return;
-        }
+        // Fuera de geocerca: ya NO se bloquea del lado cliente — el ponche se
+        // envía igual (con las coordenadas reales) y el backend decide,
+        // devolviendo status "Fuera de área" en la respuesta si corresponde.
       } else {
         // isValidLocation es una exigencia explícita — sin coordenadas de
         // referencia (ni usuario ni sede) no se puede validar, así que se
@@ -1278,35 +1271,25 @@ export default function PunchInOut() {
         data: response.data,
       });
 
+      // El backend valida la geocerca del lado servidor y, si el ponche cae
+      // fuera del área permitida, lo registra igual con status "Fuera de
+      // área" (success sigue en true) — se sincroniza y se avisa, sin tratarlo
+      // como error.
+      if (response.data?.status === "Fuera de área") {
+        await fetchTodayPunches();
+        Alert.alert(
+          "Ponche Registrado",
+          "Tu ponche quedó registrado como 'Fuera de área' porque no estabas dentro del rango permitido.",
+        );
+        return;
+      }
+
       if (response.data.success) {
         if (type === "InicioBreak") setSelectedBreakTagId(null);
         await fetchTodayPunches();
       } else {
         const msg: string = response.data.message ?? "Intenta de nuevo.";
         const lowerMsg = msg.toLowerCase();
-
-        // Post-validación: si el backend rechaza por ubicación fuera de área,
-        // no se actualiza el historial y se lanza la alerta correspondiente.
-        const outOfAreaRejected =
-          isValidLocation &&
-          (response.data.isOutOfArea === true ||
-            response.data.status === "OUT_OF_AREA" ||
-            lowerMsg.includes("fuera de área") ||
-            lowerMsg.includes("fuera del área") ||
-            lowerMsg.includes("fuera del area") ||
-            lowerMsg.includes("out of area"));
-
-        if (outOfAreaRejected) {
-          console.warn(
-            "BLOQUEO POST-VALIDACIÓN: El backend rechazó el ponche por ubicación fuera de área",
-            { message: msg, response: response.data },
-          );
-          Alert.alert(
-            "Ubicación No Válida",
-            "Te encuentras fuera del área permitida para registrar tu asistencia. Acércate a la institución.",
-          );
-          return;
-        }
 
         // El backend pudo registrar el intento con "Error de Imagen"; sincronizar
         // para que el botón de entrada vuelva a quedar visible y habilitado.
@@ -1768,7 +1751,8 @@ export default function PunchInOut() {
                   styles.lastPunchPill,
                   !lastPunch
                     ? styles.lastPunchPillNeutral
-                    : lastPunchDisplayStatus === "Error de Imagen"
+                    : lastPunchDisplayStatus === "Error de Imagen" ||
+                        lastPunchDisplayStatus === "Fuera de área"
                       ? styles.lastPunchPillError
                       : lastPunchDisplayStatus === "Tardanza"
                         ? styles.lastPunchPillLate
@@ -1781,7 +1765,8 @@ export default function PunchInOut() {
               >
                 <Ionicons
                   name={
-                    lastPunchDisplayStatus === "Error de Imagen"
+                    lastPunchDisplayStatus === "Error de Imagen" ||
+                    lastPunchDisplayStatus === "Fuera de área"
                       ? "alert-circle-outline"
                       : "time-outline"
                   }
@@ -1789,7 +1774,8 @@ export default function PunchInOut() {
                   color={
                     !lastPunch
                       ? "#6B7280"
-                      : lastPunchDisplayStatus === "Error de Imagen"
+                      : lastPunchDisplayStatus === "Error de Imagen" ||
+                          lastPunchDisplayStatus === "Fuera de área"
                         ? "#DC2626"
                         : lastPunchDisplayStatus === "Tardanza"
                           ? "#DC2626"
@@ -1806,7 +1792,8 @@ export default function PunchInOut() {
                     {
                       color: !lastPunch
                         ? "#6B7280"
-                        : lastPunchDisplayStatus === "Error de Imagen"
+                        : lastPunchDisplayStatus === "Error de Imagen" ||
+                            lastPunchDisplayStatus === "Fuera de área"
                           ? "#DC2626"
                           : lastPunchDisplayStatus === "Tardanza"
                             ? "#DC2626"
@@ -2159,7 +2146,8 @@ export default function PunchInOut() {
                     const isJornadaOvertime = displayStatus === "Horas extras";
                     const isLateBadge =
                       displayStatus === "Tardanza" ||
-                      displayStatus === "Error de Imagen";
+                      displayStatus === "Error de Imagen" ||
+                      displayStatus === "Fuera de área";
                     const isEarlyBadge = displayStatus === "Anticipada";
 
                     return (
