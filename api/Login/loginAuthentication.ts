@@ -62,7 +62,7 @@ const registerUser = async (data: RegisterType) => {
   const payload = {
     user: {
       fullName: data.fullName,
-      nickName: data.nickName,
+      nickName: data.nickName || null,
       email: data.email,
       phone: data.phone,
       password: data.password,

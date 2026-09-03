@@ -1,3 +1,9 @@
+﻿import {
+  RADIUS_3XL,
+  RADIUS_MD,
+  RADIUS_XL,
+  useResponsive,
+} from "@/constants/responsive";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { router } from "expo-router";
@@ -18,12 +24,6 @@ import { LoginType } from "../../../types/typesLogin/LoginType";
 import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
 import * as Storage from "../../utils/storage";
 import CompanySelector from "./CompanySelector";
-import {
-  RADIUS_MD,
-  RADIUS_XL,
-  RADIUS_3XL,
-  useResponsive,
-} from "@/constants/responsive";
 
 interface FormLoginProps {
   name?: string;
@@ -97,14 +97,16 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         (loginData.userSchedules ? { school: loginData.school ?? {} } : null);
 
       const roleId = selected?.roleId ?? loginData?.roleId;
-      const role = selected?.role ?? loginData?.role ?? {
-        id: roleId,
-        name: selected?.role?.name ?? loginData?.roleName ?? "",
-        permissions: {},
-        menu: selected?.role?.menu ?? [],
-        defaultMenu: selected?.role?.defaultMenu ?? null,
-      };
-      const schedules = selected?.userSchedules ?? loginData?.userSchedules ?? [];
+      const role = selected?.role ??
+        loginData?.role ?? {
+          id: roleId,
+          name: selected?.role?.name ?? loginData?.roleName ?? "",
+          permissions: {},
+          menu: selected?.role?.menu ?? [],
+          defaultMenu: selected?.role?.defaultMenu ?? null,
+        };
+      const schedules =
+        selected?.userSchedules ?? loginData?.userSchedules ?? [];
 
       // Persistir credenciales de "Recordarme"
       if (remember) {
@@ -117,14 +119,12 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         await Storage.deleteItemAsync("recordarme");
       }
 
-      // Armar user completo con el rol de la compañía seleccionada.
-      // Reordenar schoolUsers para que la compañía elegida quede en [0],
-      // así el resto de la app (horarios, settings, foto, permisos, geocerca)
-      // que lee schoolUsers[0] usa la compañía correcta.
+      // Armar user completo con el rol de la compaÃ±Ã­a seleccionada.
+      // Reordenar schoolUsers para que la compaÃ±Ã­a elegida quede en [0],
+      // asÃ­ el resto de la app (horarios, settings, foto, permisos, geocerca)
+      // que lee schoolUsers[0] usa la compaÃ±Ã­a correcta.
       const selectedId = selected?.id ?? selected?.schoolId;
-      const reorderedSchoolUsers = (
-        loginData?.user?.schoolUsers ?? []
-      )
+      const reorderedSchoolUsers = (loginData?.user?.schoolUsers ?? [])
         .slice()
         .sort((a: SchoolUser, b: SchoolUser) => {
           const aSelected = a?.id === selectedId || a?.schoolId === selectedId;
@@ -150,7 +150,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         userSchedules: schedules,
       };
 
-      // Resolver app + ruta + árbol de menú
+      // Resolver app + ruta + Ã¡rbol de menÃº
       setMenuResolution(fullUser as any, menuItems);
 
       // Persistir en SecureStore
@@ -160,7 +160,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       await Storage.setItemAsync("user", JSON.stringify(fullUser));
       await Storage.setItemAsync("menuItems", JSON.stringify(menuItems));
 
-      // Guardar la foto del usuario correspondiente a la compañía seleccionada
+      // Guardar la foto del usuario correspondiente a la compaÃ±Ã­a seleccionada
       const selectedPhoto = (selected as any)?.photourl;
       const selectedS3Photo = (selected as any)?.s3Photo;
       if (selectedPhoto) {
@@ -175,12 +175,13 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       }
 
       setMensaje({
-        texto: "Autenticación exitosa. Redirigiendo...",
+        texto: "AutenticaciÃ³n exitosa. Redirigiendo...",
         tipo: "success",
       });
 
       router.replace(
-        (useSchoolStore.getState().role?.defaultMenu?.path ?? "/login") as never,
+        (useSchoolStore.getState().role?.defaultMenu?.path ??
+          "/login") as never,
       );
     },
     [remember, urlColegio, setMenuResolution],
@@ -189,13 +190,12 @@ export default function FormLogin({ name, image }: FormLoginProps) {
   const handleSelectCompany = async (schoolUser: SchoolUser) => {
     if (!pendingLogin) return;
 
-    // El token de /login es ambiguo (sin schoolId) — los endpoints protegidos
-    // por schoolStrategy lo rechazan. Hay que re-scopearlo a la compañía
-    // elegida vía chooseschool antes de completar el login. Mismo patrón de
+    // El token de /login es ambiguo (sin schoolId) â€” los endpoints protegidos
+    // por schoolStrategy lo rechazan. Hay que re-scopearlo a la compaÃ±Ã­a
+    // elegida vÃ­a chooseschool antes de completar el login. Mismo patrÃ³n de
     // llamada que el poller de horario en punchinout.tsx:637-642.
     try {
-      const baseUrl =
-        urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
+      const baseUrl = urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
       const rawAxios = axios.create();
       const res = await rawAxios.post(
         `${baseUrl}/authentication/chooseschool`,
@@ -205,7 +205,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
 
       const scopedToken = res.data?.data?.token;
       if (!res.data?.success || !scopedToken) {
-        throw new Error("chooseschool no devolvió un token válido");
+        throw new Error("chooseschool no devolviÃ³ un token vÃ¡lido");
       }
 
       useSchoolStore.getState().setToken(scopedToken);
@@ -221,8 +221,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
     } catch (error) {
       console.error("Error en chooseschool:", error);
       setMensaje({
-        texto:
-          "No se pudo seleccionar la compañía. Intenta de nuevo.",
+        texto: "No se pudo seleccionar la compaÃ±Ã­a. Intenta de nuevo.",
         tipo: "error",
       });
     }
@@ -252,7 +251,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         ]);
 
         if (schoolUsers.length > 1) {
-          // Usuario pertenece a varias compañías → mostrar selector
+          // Usuario pertenece a varias compaÃ±Ã­as â†’ mostrar selector
           setPendingLogin({
             token,
             loginData: response.data,
@@ -262,7 +261,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
           });
           setCompanySelectorVisible(true);
         } else {
-          // Una sola compañía → entrar normal (pasar datos directo, sin depender del estado)
+          // Una sola compaÃ±Ã­a â†’ entrar normal (pasar datos directo, sin depender del estado)
           await completeLogin(
             schoolUsers[0] ?? null,
             response.data,
@@ -275,14 +274,14 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       } else {
         setMensaje({
           texto:
-            "Error en la autenticación. Por favor, verifica tus credenciales.",
+            "Error en la autenticaciÃ³n. Por favor, verifica tus credenciales.",
           tipo: "error",
         });
       }
     } catch (error) {
       console.error("Error en login:", error);
       setMensaje({
-        texto: "Ocurrió un error. Intenta de nuevo.",
+        texto: "OcurriÃ³ un error. Intenta de nuevo.",
         tipo: "error",
       });
     } finally {
@@ -343,7 +342,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
               <InputField
                 styles={inputStyles}
                 icon="person-outline"
-                placeholder="Usuario / Email / Teléfono"
+                placeholder="Usuario / Email / Telefono"
                 value={field.value}
                 onChangeText={field.onChange}
               />
@@ -480,8 +479,12 @@ function InputField({
           autoCapitalize="none"
         />
         {value ? (
-          <TouchableOpacity onPress={() => onChangeText("")} style={styles.clearButton}>
-            <Ionicons name="close-circle" size={18} color="#999" />
+          <TouchableOpacity
+            onPress={() => onChangeText("")}
+            style={styles.clearButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close-circle" size={12} color="#999" />
           </TouchableOpacity>
         ) : null}
         {rightIcon}
@@ -513,7 +516,7 @@ function createLocalStyles(
       alignItems: "center",
       borderWidth: 1,
       borderColor: "#ddd",
-      // 8 coincide con RADIUS_SM — usar constante importada
+      // 8 coincide con RADIUS_SM â€” usar constante importada
       borderRadius: scale(8),
       paddingHorizontal: scale(10),
       backgroundColor: "#f9fbff",
@@ -526,7 +529,7 @@ function createLocalStyles(
       marginRight: scale(8),
     },
     clearButton: {
-      marginLeft: scale(6),
+      marginLeft: scale(2),
     },
     input: {
       flex: 1,
@@ -550,7 +553,7 @@ function createStyles(
     },
     phone: {
       width: "90%",
-      maxWidth: 360,
+      maxWidth: 480,
       padding: scale(25),
       borderRadius: RADIUS_3XL,
       backgroundColor: "#eef4ff",
@@ -573,7 +576,8 @@ function createStyles(
     card: {
       backgroundColor: "white",
       borderRadius: RADIUS_XL,
-      padding: scale(20),
+      padding: scale(18),
+      marginHorizontal: -scale(12),
     },
     cardTitle: {
       fontSize: font(17),

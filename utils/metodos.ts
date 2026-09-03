@@ -27,6 +27,6 @@ export const formatPhone = (value: string) => {
 export const formatCedula = (value: string) => {
   const cleaned = value.replace(/\D/g, "").slice(0, 11);
   if (cleaned.length <= 3) return cleaned;
-  if (cleaned.length <= 9) return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
-  return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 9)}-${cleaned.slice(9)}`;
+  if (cleaned.length <= 10) return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+  return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 10)}-${cleaned.slice(10)}`;
 };

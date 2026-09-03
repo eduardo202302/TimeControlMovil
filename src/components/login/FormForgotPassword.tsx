@@ -1,3 +1,9 @@
+﻿import {
+  RADIUS_3XL,
+  RADIUS_MD,
+  RADIUS_XL,
+  useResponsive,
+} from "@/constants/responsive";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
@@ -13,13 +19,6 @@ import {
 import { validateUser } from "../../../api/Login/loginAuthentication";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { ValidateUser } from "../../../types/typesLogin/ForgotPasswordType";
-import {
-  RADIUS_MD,
-  RADIUS_SM,
-  RADIUS_XL,
-  RADIUS_3XL,
-  useResponsive,
-} from "@/constants/responsive";
 
 interface FormLoginProps {
   name?: string;
@@ -35,6 +34,10 @@ export default function FormForgotPassword({
   const { scale, verticalScale, font } = useResponsive();
   const styles = useMemo(
     () => createStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
+  const inputStyles = useMemo(
+    () => createLocalStyles(scale, verticalScale, font),
     [scale, verticalScale, font],
   );
 
@@ -66,7 +69,13 @@ export default function FormForgotPassword({
     <View style={styles.phone}>
       <View style={styles.companies}>
         <View>
-          <Text style={styles.logoCompanies}>FaceClass</Text>
+          <Image
+            source={require("../../../assets/images/logos/logoMini.png")}
+            style={styles.logoImage}
+          />
+        </View>
+        <View>
+          <Text style={styles.logoTitle}>FaceClass</Text>
         </View>
       </View>
       <View style={styles.logo}>
@@ -105,22 +114,13 @@ export default function FormForgotPassword({
           rules={{ required: "El usuario es requerido" }}
           render={({ field, fieldState }) => (
             <>
-              <View style={styles.inputGroup}>
-                <Ionicons
-                  name="person-outline"
-                  size={18}
-                  color="#9aa4b4"
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Usuario / Email / Teléfono"
-                  placeholderTextColor="#9aa4b4"
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  autoCapitalize="none"
-                />
-              </View>
+              <InputField
+                styles={inputStyles}
+                icon="person-outline"
+                placeholder="Usuario"
+                value={field.value}
+                onChangeText={field.onChange}
+              />
               {fieldState.error && (
                 <Text style={styles.errorText}>{fieldState.error.message}</Text>
               )}
@@ -152,6 +152,115 @@ export default function FormForgotPassword({
   );
 }
 
+type InputFieldProps = {
+  styles: any;
+  icon: string;
+  placeholder: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  secureTextEntry?: boolean;
+  keyboardType?: any;
+  rightIcon?: React.ReactNode;
+  required?: boolean;
+};
+
+function InputField({
+  styles,
+  icon,
+  placeholder,
+  value,
+  onChangeText,
+  secureTextEntry,
+  keyboardType,
+  rightIcon,
+  required = true,
+}: InputFieldProps) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={styles.labelGroup}>
+      <Text style={styles.label}>
+        {placeholder} {required && <Text style={styles.required}>*</Text>}
+      </Text>
+      <View style={[styles.inputGroup, focused && styles.inputFocused]}>
+        <Ionicons
+          name={icon as any}
+          size={18}
+          color="#9aa4b4"
+          style={styles.inputIcon}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder={placeholder}
+          placeholderTextColor="#bbb"
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={secureTextEntry}
+          keyboardType={keyboardType}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          autoCapitalize="none"
+        />
+        {value ? (
+          <TouchableOpacity
+            onPress={() => onChangeText("")}
+            style={styles.clearButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close-circle" size={12} color="#999" />
+          </TouchableOpacity>
+        ) : null}
+        {rightIcon}
+      </View>
+    </View>
+  );
+}
+
+function createLocalStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    labelGroup: {
+      marginBottom: verticalScale(10),
+    },
+    label: {
+      fontSize: font(13),
+      color: "#555",
+      marginBottom: verticalScale(4),
+      fontWeight: "500",
+    },
+    required: {
+      color: "#e24b4a",
+    },
+    inputGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: "#ddd",
+      borderRadius: scale(8),
+      paddingHorizontal: scale(10),
+      backgroundColor: "#f9fbff",
+    },
+    inputFocused: {
+      borderColor: "#4c6fbf",
+      borderWidth: 1.5,
+    },
+    inputIcon: {
+      marginRight: scale(8),
+    },
+    clearButton: {
+      marginLeft: scale(2),
+    },
+    input: {
+      flex: 1,
+      paddingVertical: verticalScale(10),
+      fontSize: font(14),
+      color: "#333",
+    },
+  });
+}
+
 function createStyles(
   scale: (size: number) => number,
   verticalScale: (size: number) => number,
@@ -163,10 +272,9 @@ function createStyles(
       justifyContent: "space-between",
       alignItems: "center",
     },
-    /** Ancho ideal de formulario, no un cap de emergencia — no tokenizar. */
     phone: {
       width: "90%",
-      maxWidth: 360,
+      maxWidth: 480,
       padding: scale(25),
       borderRadius: RADIUS_3XL,
       backgroundColor: "#eef4ff",
@@ -178,17 +286,13 @@ function createStyles(
       marginLeft: scale(4),
       marginBottom: verticalScale(4),
     },
-    logo: {
-      alignItems: "center",
-      marginBottom: verticalScale(27),
-    },
-    /** Tamaño fijo: iconografía de logo, no contenido — mismo criterio que avatarContainer en DrawerMenu.tsx. */
+    logo: { alignItems: "center", marginBottom: verticalScale(27) },
     logoImage: { width: 100, height: 100 },
     logoTitle: {
       fontSize: font(20),
       fontWeight: "600",
       color: "#3c5fa6",
-      marginTop: verticalScale(10),
+      marginTop: verticalScale(6),
     },
     logoCompanies: {
       fontSize: font(20),
@@ -199,36 +303,19 @@ function createStyles(
     card: {
       backgroundColor: "white",
       borderRadius: RADIUS_XL,
-      padding: scale(40),
+      padding: scale(18),
+      marginHorizontal: -scale(12),
     },
     formTitle: {
-      fontSize: font(20),
+      fontSize: font(17),
       fontWeight: "600",
-      color: "#3c5fa6",
+      color: "#333",
       marginBottom: verticalScale(8),
     },
     formSubtitle: {
-      fontSize: font(20),
-      color: "#3c5fa6",
-      marginBottom: verticalScale(20),
-    },
-    inputGroup: {
-      flexDirection: "row",
-      alignItems: "center",
-      borderWidth: 1,
-      borderColor: "#ddd",
-      borderRadius: RADIUS_SM,
-      paddingHorizontal: scale(5),
-
-      marginBottom: verticalScale(12),
-    },
-    inputIcon: {
-      marginRight: scale(8),
-    },
-    input: {
-      width: "90%",
       fontSize: font(14),
-      color: "#111",
+      color: "#666",
+      marginBottom: verticalScale(14),
     },
     button: {
       backgroundColor: "#2d5fd3",
@@ -247,15 +334,8 @@ function createStyles(
       justifyContent: "center",
       marginTop: verticalScale(14),
     },
-    registerText: {
-      fontSize: font(13),
-      color: "#666",
-    },
-    registerLink: {
-      fontSize: font(13),
-      color: "#4c6fbf",
-      fontWeight: "500",
-    },
+    registerText: { fontSize: font(13), color: "#666" },
+    registerLink: { fontSize: font(13), color: "#4c6fbf", fontWeight: "500" },
     msg: {
       marginTop: verticalScale(10),
       padding: scale(8),

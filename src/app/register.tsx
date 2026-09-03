@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -14,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { registerUser } from "../../api/Login/loginAuthentication";
+import { registerSchema } from "../../schema/registerSchema";
 import { useSchoolStore } from "../../store/useSchoolStore";
 import { RegisterType } from "../../types/typesLogin/RegisterType";
 import { formatCedula, formatPhone } from "../../utils/metodos";
@@ -53,6 +55,7 @@ export default function Register() {
 
   const { handleSubmit, control } = useForm<RegisterType>({
     defaultValues: valuesDefault,
+    resolver: zodResolver(registerSchema),
   });
 
   const onSubmit = async (data: RegisterType) => {
@@ -145,7 +148,7 @@ export default function Register() {
                   <InputField
                     icon="people-outline"
                     placeholder="Usuario"
-                    value={field.value}
+                    value={field.value || ""}
                     onChangeText={field.onChange}
                   />
                   {fieldState.error && (
@@ -220,7 +223,7 @@ export default function Register() {
                           name={
                             showPassword ? "eye-off-outline" : "eye-outline"
                           }
-                          size={18}
+                          size={15}
                           color="#999"
                         />
                       </TouchableOpacity>
@@ -334,8 +337,9 @@ function InputField({
           <TouchableOpacity
             onPress={() => onChangeText("")}
             style={styles.clearButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="close-circle" size={18} color="#999" />
+            <Ionicons name="close-circle" size={12} color="#999" />
           </TouchableOpacity>
         ) : null}
         {rightIcon}
@@ -359,7 +363,7 @@ const styles = StyleSheet.create({
   },
   phone: {
     width: "100%",
-    maxWidth: 360,
+    maxWidth: 480,
     padding: 25,
     borderRadius: 32,
     backgroundColor: "#eef4ff",
@@ -376,7 +380,8 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 33,
-    padding: 20,
+    padding: 18,
+    marginHorizontal: -12,
     backgroundColor: "white",
   },
   cardTitle: {
@@ -414,7 +419,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   clearButton: {
-    marginLeft: 6,
+    marginLeft: 2,
   },
   input: {
     flex: 1,

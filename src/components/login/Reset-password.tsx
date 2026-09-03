@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+﻿import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -33,6 +33,10 @@ export default function ResetPassword({
     () => createStyles(scale, verticalScale, font),
     [scale, verticalScale, font],
   );
+  const inputStyles = useMemo(
+    () => createLocalStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
 
   const [mensaje, setMensaje] = useState<any>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -50,7 +54,7 @@ export default function ResetPassword({
   const onSubmit = async (data: NewPasswordType) => {
     if (data.password !== data.confirmPassword) {
       setMensaje({
-        texto: "Las contraseñas no coinciden",
+        texto: "Las contraseÃ±as no coinciden",
         tipo: "error",
       });
       return;
@@ -62,14 +66,14 @@ export default function ResetPassword({
 
     if (!response.success) {
       setMensaje({
-        texto: response.message || "Error al restablecer la contraseña",
+        texto: response.message || "Error al restablecer la contraseÃ±a",
         tipo: "error",
       });
       return;
     }
 
     setMensaje({
-      texto: "Contraseña actualizada correctamente",
+      texto: "ContraseÃ±a actualizada correctamente",
       tipo: "success",
     });
 
@@ -83,7 +87,11 @@ export default function ResetPassword({
       <View style={styles.phone}>
         {/* Header empresa */}
         <View style={styles.companies}>
-          <Text style={styles.logoCompanies}>FaceClass</Text>
+          <Image
+            source={require("../../../assets/images/logos/logoMini.png")}
+            style={styles.logoImage}
+          />
+          <Text style={styles.logoTitle}>FaceClass</Text>
         </View>
 
         {/* Logo colegio */}
@@ -121,43 +129,36 @@ export default function ResetPassword({
 
         {/* Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Nueva Contraseña</Text>
+          <Text style={styles.cardTitle}>Nueva ContraseÃ±a</Text>
 
           {/* Password */}
           <Controller
             name="password"
             control={control}
-            rules={{ required: "La contraseña es requerida" }}
+            rules={{ required: "La contraseÃ±a es requerida" }}
             render={({ field, fieldState }) => (
               <>
-                <View style={styles.inputGroup}>
-                  <Ionicons
-                    name="lock-closed-outline"
-                    size={18}
-                    color="#9aa4b4"
-                    style={styles.inputIcon}
-                  />
-
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Nueva contraseña"
-                    placeholderTextColor="#9aa4b4"
-                    secureTextEntry={!showPassword}
-                    value={field.value}
-                    onChangeText={field.onChange}
-                  />
-
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                  >
-                    <Ionicons
-                      name={showPassword ? "eye-off-outline" : "eye-outline"}
-                      size={18}
-                      color="#999"
-                    />
-                  </TouchableOpacity>
-                </View>
-
+                <InputField
+                  styles={inputStyles}
+                  icon="lock-closed-outline"
+                  placeholder="Nueva contraseÃ±a"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  secureTextEntry={!showPassword}
+                  rightIcon={
+                    <TouchableOpacity
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Ionicons
+                        name={
+                          showPassword ? "eye-off-outline" : "eye-outline"
+                        }
+                        size={18}
+                        color="#999"
+                      />
+                    </TouchableOpacity>
+                  }
+                />
                 {fieldState.error && (
                   <Text style={styles.errorText}>
                     {fieldState.error.message}
@@ -171,36 +172,30 @@ export default function ResetPassword({
           <Controller
             name="confirmPassword"
             control={control}
-            rules={{ required: "Confirma la contraseña" }}
+            rules={{ required: "Confirma la contraseÃ±a" }}
             render={({ field, fieldState }) => (
               <>
-                <View style={styles.inputGroup}>
-                  <Ionicons
-                    name="lock-closed-outline"
-                    size={18}
-                    color="#9aa4b4"
-                    style={styles.inputIcon}
-                  />
-
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Confirmar contraseña"
-                    placeholderTextColor="#9aa4b4"
-                    secureTextEntry={!showPassword}
-                    value={field.value}
-                    onChangeText={field.onChange}
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                  >
-                    <Ionicons
-                      name={showPassword ? "eye-off-outline" : "eye-outline"}
-                      size={18}
-                      color="#999"
-                    />
-                  </TouchableOpacity>
-                </View>
-
+                <InputField
+                  styles={inputStyles}
+                  icon="lock-closed-outline"
+                  placeholder="Confirmar contraseÃ±a"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  secureTextEntry={!showPassword}
+                  rightIcon={
+                    <TouchableOpacity
+                      onPress={() => setShowPassword(!showPassword)}
+                    >
+                      <Ionicons
+                        name={
+                          showPassword ? "eye-off-outline" : "eye-outline"
+                        }
+                        size={18}
+                        color="#999"
+                      />
+                    </TouchableOpacity>
+                  }
+                />
                 {fieldState.error && (
                   <Text style={styles.errorText}>
                     {fieldState.error.message}
@@ -214,7 +209,7 @@ export default function ResetPassword({
             style={styles.button}
             onPress={handleSubmit(onSubmit)}
           >
-            <Text style={styles.buttonText}>Cambiar contraseña</Text>
+            <Text style={styles.buttonText}>Cambiar contraseÃ±a</Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => router.replace("/login")}>
@@ -224,6 +219,115 @@ export default function ResetPassword({
       </View>
     </SafeAreaView>
   );
+}
+
+type InputFieldProps = {
+  styles: any;
+  icon: string;
+  placeholder: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  secureTextEntry?: boolean;
+  keyboardType?: any;
+  rightIcon?: React.ReactNode;
+  required?: boolean;
+};
+
+function InputField({
+  styles,
+  icon,
+  placeholder,
+  value,
+  onChangeText,
+  secureTextEntry,
+  keyboardType,
+  rightIcon,
+  required = true,
+}: InputFieldProps) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={styles.labelGroup}>
+      <Text style={styles.label}>
+        {placeholder} {required && <Text style={styles.required}>*</Text>}
+      </Text>
+      <View style={[styles.inputGroup, focused && styles.inputFocused]}>
+        <Ionicons
+          name={icon as any}
+          size={18}
+          color="#9aa4b4"
+          style={styles.inputIcon}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder={placeholder}
+          placeholderTextColor="#bbb"
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={secureTextEntry}
+          keyboardType={keyboardType}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          autoCapitalize="none"
+        />
+        {value ? (
+          <TouchableOpacity
+            onPress={() => onChangeText("")}
+            style={styles.clearButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close-circle" size={12} color="#999" />
+          </TouchableOpacity>
+        ) : null}
+        {rightIcon}
+      </View>
+    </View>
+  );
+}
+
+function createLocalStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    labelGroup: {
+      marginBottom: verticalScale(10),
+    },
+    label: {
+      fontSize: font(13),
+      color: "#555",
+      marginBottom: verticalScale(4),
+      fontWeight: "500",
+    },
+    required: {
+      color: "#e24b4a",
+    },
+    inputGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: "#ddd",
+      borderRadius: scale(8),
+      paddingHorizontal: scale(10),
+      backgroundColor: "#f9fbff",
+    },
+    inputFocused: {
+      borderColor: "#4c6fbf",
+      borderWidth: 1.5,
+    },
+    inputIcon: {
+      marginRight: scale(8),
+    },
+    clearButton: {
+      marginLeft: scale(2),
+    },
+    input: {
+      flex: 1,
+      paddingVertical: verticalScale(10),
+      fontSize: font(14),
+      color: "#333",
+    },
+  });
 }
 
 function createStyles(
@@ -243,76 +347,50 @@ function createStyles(
       justifyContent: "space-between",
       alignItems: "center",
     },
-    logoCompanies: {
-      fontSize: font(20),
-      fontWeight: "600",
-      color: "#3c5fa6",
-      marginBottom: verticalScale(16),
-    },
     logoTitle: {
       fontSize: font(20),
       fontWeight: "600",
       color: "#3c5fa6",
-      marginTop: verticalScale(10),
+      marginTop: verticalScale(6),
     },
     card: {
       backgroundColor: "white",
       borderRadius: RADIUS_XL,
-      padding: scale(40),
+      padding: scale(18),
+      marginHorizontal: -scale(12),
     },
     cardTitle: {
       fontSize: font(17),
       fontWeight: "600",
-      color: "#3c5fa6",
+      color: "#333",
       marginBottom: verticalScale(18),
     },
-    logo: {
-      alignItems: "center",
-      marginBottom: verticalScale(27),
-    },
-    /** Tamaño fijo: iconografía de logo, no contenido — mismo criterio que avatarContainer en DrawerMenu.tsx. */
+    logo: { alignItems: "center", marginBottom: verticalScale(27) },
     logoImage: { width: 100, height: 100 },
-    /** Ancho ideal de formulario, no un cap de emergencia — no tokenizar. */
     phone: {
       width: "90%",
-      maxWidth: 360,
+      maxWidth: 480,
       padding: scale(25),
       borderRadius: RADIUS_3XL,
       backgroundColor: "#eef4ff",
     },
-    inputGroup: {
-      flexDirection: "row",
-      alignItems: "center",
-      marginBottom: verticalScale(15),
-      borderWidth: 1,
-      borderColor: "#ddd",
-      borderRadius: RADIUS_MD,
-      paddingHorizontal: scale(12),
-    },
-    inputIcon: {
-      marginRight: scale(8),
-    },
-    input: {
-      width: "80%",
-      paddingVertical: verticalScale(10),
-      color: "#111",
-    },
     button: {
       backgroundColor: "#2d5fd3",
-      padding: scale(14),
+      padding: scale(13),
       borderRadius: RADIUS_MD,
+      marginTop: verticalScale(18),
     },
     buttonText: {
       color: "white",
       textAlign: "center",
-      fontWeight: "600",
+      fontSize: font(15),
+      fontWeight: "500",
     },
     errorText: {
       color: "red",
       textAlign: "center",
       marginBottom: verticalScale(10),
     },
-
     back: {
       marginTop: verticalScale(15),
       textAlign: "center",
@@ -337,3 +415,4 @@ function createStyles(
     msgText: { fontSize: font(12) },
   });
 }
+

@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+﻿import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -24,13 +24,17 @@ import {
 interface FormLoginProps {
   name?: string;
   image?: string;
-  onNext: () => void; // función para avanzar al siguiente paso
+  onNext: () => void; // funciÃ³n para avanzar al siguiente paso
 }
 
 const VerifyPin = ({ name, image, onNext }: FormLoginProps) => {
   const { scale, verticalScale, font } = useResponsive();
   const styles = useMemo(
     () => createStyles(scale, verticalScale, font),
+    [scale, verticalScale, font],
+  );
+  const inputStyles = useMemo(
+    () => createLocalStyles(scale, verticalScale, font),
     [scale, verticalScale, font],
   );
 
@@ -50,12 +54,12 @@ const VerifyPin = ({ name, image, onNext }: FormLoginProps) => {
 
   const onSubmit = async (data: ValidaPin) => {
     const respoaense = await validatePin(data);
-    console.log("Respuesta de validación PIN:", respoaense);
+    console.log("Respuesta de validaciÃ³n PIN:", respoaense);
     if (!respoaense.success) {
       setMensaje({ texto: respoaense.message, tipo: "error" });
       return;
     }
-    onNext(); // avanzar al siguiente paso después de enviar el formulario
+    onNext(); // avanzar al siguiente paso despuÃ©s de enviar el formulario
   };
 
   return (
@@ -63,7 +67,11 @@ const VerifyPin = ({ name, image, onNext }: FormLoginProps) => {
       <View style={styles.phone}>
         {/* Header empresa */}
         <View style={styles.companies}>
-          <Text style={styles.logoCompanies}>FaceClass</Text>
+          <Image
+            source={require("../../../assets/images/logos/logoMini.png")}
+            style={styles.logoImage}
+          />
+          <Text style={styles.logoTitle}>FaceClass</Text>
         </View>
 
         {/* Logo colegio */}
@@ -99,7 +107,7 @@ const VerifyPin = ({ name, image, onNext }: FormLoginProps) => {
 
         {/* Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Cambiar Contraseña</Text>
+          <Text style={styles.cardTitle}>Cambiar ContraseÃ±a</Text>
 
           <Text style={styles.pinLabel}>Ingresar PIN:</Text>
 
@@ -109,24 +117,14 @@ const VerifyPin = ({ name, image, onNext }: FormLoginProps) => {
             rules={{ required: "El pin es requerido" }}
             render={({ field, fieldState }) => (
               <>
-                <View style={styles.inputGroup}>
-                  <Ionicons
-                    name="key-outline"
-                    size={12}
-                    color="#9aa4b4"
-                    style={styles.inputIcon}
-                  />
-
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Código PIN"
-                    placeholderTextColor="#9aa4b4"
-                    value={field.value}
-                    onChangeText={field.onChange}
-                    keyboardType="number-pad"
-                    maxLength={6}
-                  />
-                </View>
+                <InputField
+                  styles={inputStyles}
+                  icon="key-outline"
+                  placeholder="CÃ³digo PIN"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  keyboardType="number-pad"
+                />
 
                 {fieldState.error && (
                   <Text style={styles.errorText}>
@@ -137,7 +135,7 @@ const VerifyPin = ({ name, image, onNext }: FormLoginProps) => {
             )}
           />
 
-          {/* Botón */}
+          {/* BotÃ³n */}
           <TouchableOpacity
             style={styles.button}
             onPress={handleSubmit(onSubmit)}
@@ -156,6 +154,115 @@ const VerifyPin = ({ name, image, onNext }: FormLoginProps) => {
 };
 export default VerifyPin;
 
+type InputFieldProps = {
+  styles: any;
+  icon: string;
+  placeholder: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  secureTextEntry?: boolean;
+  keyboardType?: any;
+  rightIcon?: React.ReactNode;
+  required?: boolean;
+};
+
+function InputField({
+  styles,
+  icon,
+  placeholder,
+  value,
+  onChangeText,
+  secureTextEntry,
+  keyboardType,
+  rightIcon,
+  required = true,
+}: InputFieldProps) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <View style={styles.labelGroup}>
+      <Text style={styles.label}>
+        {placeholder} {required && <Text style={styles.required}>*</Text>}
+      </Text>
+      <View style={[styles.inputGroup, focused && styles.inputFocused]}>
+        <Ionicons
+          name={icon as any}
+          size={18}
+          color="#9aa4b4"
+          style={styles.inputIcon}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder={placeholder}
+          placeholderTextColor="#bbb"
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={secureTextEntry}
+          keyboardType={keyboardType}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          autoCapitalize="none"
+        />
+        {value ? (
+          <TouchableOpacity
+            onPress={() => onChangeText("")}
+            style={styles.clearButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="close-circle" size={12} color="#999" />
+          </TouchableOpacity>
+        ) : null}
+        {rightIcon}
+      </View>
+    </View>
+  );
+}
+
+function createLocalStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    labelGroup: {
+      marginBottom: verticalScale(10),
+    },
+    label: {
+      fontSize: font(13),
+      color: "#555",
+      marginBottom: verticalScale(4),
+      fontWeight: "500",
+    },
+    required: {
+      color: "#e24b4a",
+    },
+    inputGroup: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: "#ddd",
+      borderRadius: scale(8),
+      paddingHorizontal: scale(10),
+      backgroundColor: "#f9fbff",
+    },
+    inputFocused: {
+      borderColor: "#4c6fbf",
+      borderWidth: 1.5,
+    },
+    inputIcon: {
+      marginRight: scale(8),
+    },
+    clearButton: {
+      marginLeft: scale(2),
+    },
+    input: {
+      flex: 1,
+      paddingVertical: verticalScale(10),
+      fontSize: font(14),
+      color: "#333",
+    },
+  });
+}
+
 function createStyles(
   scale: (size: number) => number,
   verticalScale: (size: number) => number,
@@ -173,84 +280,55 @@ function createStyles(
       justifyContent: "space-between",
       alignItems: "center",
     },
-    logoCompanies: {
-      fontSize: font(20),
-      fontWeight: "600",
-      color: "#3c5fa6",
-      marginBottom: verticalScale(16),
-    },
     logoTitle: {
       fontSize: font(20),
       fontWeight: "600",
       color: "#3c5fa6",
-      marginTop: verticalScale(10),
+      marginTop: verticalScale(6),
     },
     card: {
       backgroundColor: "white",
       borderRadius: RADIUS_XL,
-      padding: scale(50),
+      padding: scale(18),
+      marginHorizontal: -scale(12),
     },
     cardTitle: {
       fontSize: font(17),
       fontWeight: "600",
-      color: "#3c5fa6",
+      color: "#333",
       marginBottom: verticalScale(14),
     },
     pinLabel: {
-      fontSize: font(18),
-      color: "#3c5fa6",
-      marginBottom: verticalScale(20),
+      fontSize: font(14),
+      color: "#666",
+      marginBottom: verticalScale(14),
     },
-    logo: {
-      alignItems: "center",
-      marginBottom: verticalScale(27),
-    },
-    /** Tamaño fijo: iconografía de logo, no contenido — mismo criterio que avatarContainer en DrawerMenu.tsx. */
+    logo: { alignItems: "center", marginBottom: verticalScale(27) },
     logoImage: { width: 100, height: 100 },
-    /** Ancho ideal de formulario, no un cap de emergencia — no tokenizar. */
     phone: {
       width: "90%",
-      maxWidth: 360,
+      maxWidth: 480,
       padding: scale(25),
       borderRadius: RADIUS_3XL,
       backgroundColor: "#eef4ff",
     },
-    inputGroup: {
-      flexDirection: "row",
-      alignItems: "center",
-      borderWidth: 1,
-      borderColor: "#ddd",
-      borderRadius: RADIUS_MD,
-      paddingHorizontal: scale(12),
-      marginBottom: verticalScale(15),
-    },
-    inputIcon: {
-      marginRight: scale(8),
-    },
-    input: {
-      width: "86%",
-      paddingVertical: verticalScale(10),
-      letterSpacing: 4,
-      textAlign: "center",
-      fontSize: font(18),
-      color: "#111",
-    },
     button: {
       backgroundColor: "#2d5fd3",
-      padding: scale(14),
+      padding: scale(13),
       borderRadius: RADIUS_MD,
+      marginTop: verticalScale(18),
     },
     buttonText: {
       color: "white",
       textAlign: "center",
-      fontWeight: "600",
+      fontSize: font(15),
+      fontWeight: "500",
     },
     errorText: {
       color: "red",
       textAlign: "center",
       marginBottom: verticalScale(10),
     },
-
     back: {
       marginTop: verticalScale(15),
       textAlign: "center",
@@ -275,3 +353,4 @@ function createStyles(
     msgText: { fontSize: font(12) },
   });
 }
+
