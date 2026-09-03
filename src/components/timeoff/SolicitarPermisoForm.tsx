@@ -1810,7 +1810,7 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 13,
+    paddingVertical: 10,
   },
   selectDisabled: { opacity: 0.55 },
   selectText: { flex: 1, fontSize: 14, color: "#9CA3AF" },
