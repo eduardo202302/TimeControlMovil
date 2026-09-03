@@ -6,7 +6,6 @@ import { Controller, useForm } from "react-hook-form";
 import {
   Image,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -80,10 +79,14 @@ export default function Register() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior="padding"
+      keyboardVerticalOffset={0}
       style={{ flex: 1, backgroundColor: "#dfe9ff" }}
     >
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.phone}>
           <View style={styles.companies}>
             <View>

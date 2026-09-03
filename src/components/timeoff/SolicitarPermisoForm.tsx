@@ -1276,6 +1276,14 @@ export default function SolicitarPermisoForm() {
                   >
                     {fromTime ? formatDisplayTime(toTimeKey(fromTime)) : "--:--"}
                   </Text>
+                  {!!fromTime && (
+                    <TouchableOpacity
+                      onPress={() => setFromTime(null)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="close-circle" size={16} color="#9AA4B4" />
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
                 {!!fromTimeError && (
                   <Text style={styles.fieldError}>{fromTimeError}</Text>
@@ -1299,6 +1307,14 @@ export default function SolicitarPermisoForm() {
                   >
                     {toTime ? formatDisplayTime(toTimeKey(toTime)) : "--:--"}
                   </Text>
+                  {!!toTime && (
+                    <TouchableOpacity
+                      onPress={() => setToTime(null)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="close-circle" size={16} color="#9AA4B4" />
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
                 {!!toTimeError && (
                   <Text style={styles.fieldError}>{toTimeError}</Text>
@@ -1794,7 +1810,7 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
     borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 13,
+    paddingVertical: 10,
   },
   selectDisabled: { opacity: 0.55 },
   selectText: { flex: 1, fontSize: 14, color: "#9CA3AF" },

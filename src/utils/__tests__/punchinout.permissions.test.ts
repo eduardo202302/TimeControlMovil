@@ -923,9 +923,7 @@ describe("17. getPunctuality con permissionId", () => {
               ? "Tardanza"
               : punch.earlyExit
                 ? "Anticipada"
-                : punch.type === "FinBreak"
-                  ? "A Tiempo"
-                  : punch.status || "A Tiempo";
+                : punch.status || "A Tiempo";
   };
 
   it("17f. cadena completa: permissionId + lateEntry:true + status A Tiempo -> A Tiempo, no Tardanza", () => {
@@ -940,6 +938,33 @@ describe("17. getPunctuality con permissionId", () => {
     // sin permissionId, el mismo lateEntry:true SÍ debe producir Tardanza
     const sinPermiso = { ...conPermisoYFlagSucio, permissionId: null };
     expect(displayStatusReal(sinPermiso, false)).toBe("Tardanza");
+  });
+
+  it("17g. FinBreak respeta el status real del backend, no lo pisa con A Tiempo", () => {
+    // getPunctuality no calcula nada para Break (default: null en el switch),
+    // así que la cadena debe caer directo en punch.status del backend.
+    const finBreakTarde = punch("FinBreak", { status: "Tardanza" });
+    expect(getPunctuality(finBreakTarde, [schedule], TOL)).toBeNull();
+    expect(displayStatusReal(finBreakTarde, false)).toBe("Tardanza");
+
+    // y si el backend manda A Tiempo, se respeta igual
+    const finBreakOk = punch("FinBreak", { status: "A Tiempo" });
+    expect(displayStatusReal(finBreakOk, false)).toBe("A Tiempo");
+  });
+
+  it("17h. lastPunch con lateEntry:true da Tardanza, no A Tiempo (bug del pill de último ponche)", () => {
+    // InicioBreak: getPunctuality no lo calcula (default null en el switch) y
+    // el status del backend viene "A Tiempo" — el pill de último ponche
+    // (antes de extraer getDisplayStatus) solo miraba status==="Error de
+    // Imagen" y type.startsWith("Inicio"), así que esto rendería verde
+    // ignorando por completo el flag lateEntry. La cadena completa debe
+    // preferir el flag y devolver "Tardanza".
+    const ultimoPonche = punch("InicioBreak", {
+      status: "A Tiempo",
+      lateEntry: true,
+    });
+    expect(getPunctuality(ultimoPonche, [schedule], TOL)).toBeNull();
+    expect(displayStatusReal(ultimoPonche, false)).toBe("Tardanza");
   });
 });
 

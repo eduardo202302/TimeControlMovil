@@ -4,7 +4,13 @@ import { BlurView } from "expo-blur";
 import { useFocusEffect } from "expo-router";
 import * as Storage from "../utils/storage";
 import React, { useCallback, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useResponsive } from "@/constants/responsive";
 import { useSchoolStore } from "../../store/useSchoolStore";
@@ -39,7 +45,18 @@ const Login = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <FormLogin name={name} image={logo} />
+      <KeyboardAvoidingView
+        behavior="padding"
+        keyboardVerticalOffset={0}
+        style={{ flex: 1, width: "100%" }}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <FormLogin name={name} image={logo} />
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {showAuth && (
         <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill}>
@@ -57,8 +74,12 @@ function createStyles(scale: (size: number) => number) {
     container: {
       flex: 1,
       backgroundColor: "#dfe9ff",
+    },
+    scrollContent: {
+      flexGrow: 1,
       justifyContent: "center",
       alignItems: "center",
+      padding: scale(24),
     },
     authContainer: {
       flex: 1,

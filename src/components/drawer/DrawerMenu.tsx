@@ -31,6 +31,8 @@ import { MenuTree } from "../../../utils/resolveRoute";
 import {
   RADIUS_MD,
   RADIUS_SM,
+  RADIUS_2XL,
+  RADIUS_PILL,
   useResponsive,
 } from "@/constants/responsive";
 
@@ -110,7 +112,9 @@ function createStyles(
     },
     header: {
       flexDirection: "column",
-      backgroundColor: "#2563EB",
+      backgroundColor: "#1D4ED8",
+      borderBottomLeftRadius: RADIUS_2XL,
+      borderBottomRightRadius: RADIUS_2XL,
     },
     headerLeft: {
       flexDirection: "row",
@@ -124,10 +128,11 @@ function createStyles(
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      backgroundColor: "#1D4ED8",
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(12),
+      borderBottomWidth: 1,
+      borderBottomColor: "rgba(255,255,255,0.18)",
     },
     companyLeft: {
       flexDirection: "row",
@@ -159,6 +164,7 @@ function createStyles(
      * contenido que necesite más espacio en pantalla grande — mismo
      * criterio que AVATAR_SIZE en punchinout.tsx.
      */
+    avatarWrapper: { position: "relative" },
     avatarContainer: {
       width: 40,
       height: 40,
@@ -175,6 +181,19 @@ function createStyles(
       // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- círculo (mitad de width/height fijos), no un radio de diseño
       borderRadius: 20,
     },
+    /** Tamaño fijo, mismo criterio que avatarContainer/avatarImage. */
+    statusDot: {
+      position: "absolute",
+      bottom: 0,
+      right: 0,
+      width: 12,
+      height: 12,
+      // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- círculo (mitad de width/height fijos), no un radio de diseño
+      borderRadius: 6,
+      backgroundColor: "#22C55E",
+      borderWidth: 2,
+      borderColor: "#1D4ED8",
+    },
     appName: {
       // `maxWidth` se aplica inline (ver appNameMaxWidth) — depende de
       // drawerWidth.
@@ -186,6 +205,19 @@ function createStyles(
       color: "rgba(255,255,255,0.8)",
       fontSize: font(12),
       marginTop: verticalScale(1),
+    },
+    roleBadge: {
+      alignSelf: "flex-start",
+      marginTop: verticalScale(4),
+      backgroundColor: "rgba(255,255,255,0.18)",
+      borderRadius: RADIUS_PILL,
+      paddingHorizontal: scale(8),
+      paddingVertical: verticalScale(2),
+    },
+    roleBadgeText: {
+      color: "#FFFFFF",
+      fontSize: font(11),
+      fontWeight: "600",
     },
     /** Tamaño fijo, mismo criterio que avatarContainer/avatarImage. */
     closeBtn: {
@@ -510,18 +542,21 @@ const confirmLogout = useCallback(async () => {
             </TouchableOpacity>
           </View>
           <View style={styles.headerLeft}>
-            <View style={styles.avatarContainer}>
-              {userPhoto ? (
-                <Image
-                  source={{
-                    uri: `https://timecontrol.wsmax.net:8600/${userPhoto}`,
-                  }}
-                  style={styles.avatarImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <Ionicons name="person" size={22} color="#fff" />
-              )}
+            <View style={styles.avatarWrapper}>
+              <View style={styles.avatarContainer}>
+                {userPhoto ? (
+                  <Image
+                    source={{
+                      uri: `https://timecontrol.wsmax.net:8600/${userPhoto}`,
+                    }}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Ionicons name="person" size={22} color="#fff" />
+                )}
+              </View>
+              <View style={styles.statusDot} />
             </View>
             <View>
               <Text
@@ -530,9 +565,11 @@ const confirmLogout = useCallback(async () => {
               >
                 {user?.user?.fullName ?? "Usuario"}
               </Text>
-              <Text style={styles.appSubtitle} numberOfLines={1}>
-                {user?.role?.name ?? ""}
-              </Text>
+              <View style={styles.roleBadge}>
+                <Text style={styles.roleBadgeText} numberOfLines={1}>
+                  {user?.role?.name ?? ""}
+                </Text>
+              </View>
             </View>
           </View>
         </View>

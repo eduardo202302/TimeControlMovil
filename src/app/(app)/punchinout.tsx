@@ -47,6 +47,7 @@ import {
   WEEK_DAYS,
   type PunchEvent,
   type Tag,
+  type ToleranceConfig,
   type UserDayPermission
 } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
@@ -187,10 +188,35 @@ function getStatusColor(status: string): string {
   return "#16A34A";
 }
 
-function getStatusIcon(status: string): keyof typeof Ionicons.glyphMap {
-  if (status === "Tardanza") return "warning-outline";
-  if (status === "Anticipada") return "time-outline";
-  return "checkmark-circle-outline";
+/**
+ * Estado a mostrar para un punch, con la misma cadena de prioridad en
+ * todos los lugares que lo necesitan (historial del día, pill del último
+ * ponche): horas extras > error de imagen > puntualidad local (corrige
+ * estados erróneos del backend) > permiso (ignora flags lateEntry/earlyExit)
+ * > flags del backend > status del backend.
+ */
+function getDisplayStatus(
+  punch: PunchEvent,
+  userSchedules: UserSchedule[],
+  tolerances: ToleranceConfig,
+): string {
+  const hasOvertime = parseFloat(String(punch.overtime ?? 0)) > 0;
+  // Solo FinJornada puede generar horas extras
+  const isJornadaOvertime = punch.type === "FinJornada" && hasOvertime;
+  const punctuality = getPunctuality(punch, userSchedules, tolerances);
+  return isJornadaOvertime
+    ? "Horas extras"
+    : punch.status === "Error de Imagen"
+      ? "Error de Imagen"
+      : punctuality !== null
+        ? punctuality
+        : punch.permissionId != null
+          ? punch.status || "A Tiempo"
+          : punch.lateEntry
+            ? "Tardanza"
+            : punch.earlyExit
+              ? "Anticipada"
+              : punch.status || "A Tiempo";
 }
 
 function getStatusLabel(status: string): string {
@@ -453,6 +479,15 @@ export default function PunchInOut() {
     schoolUserSettings?.toleranceLunchTimeOut ??
     schoolSettings?.toleranceLunchTimeOut ??
     5;
+
+  const lastPunchDisplayStatus = lastPunch
+    ? getDisplayStatus(lastPunch, userSchedules, {
+        workIn: tolWorkIn,
+        workOut: tolWorkOut,
+        lunchIn: tolLunchIn,
+        lunchOut: tolLunchOut,
+      })
+    : null;
 
   // "Ver Botón" — minutos antes del horario en que el botón de acción se
   // hace VISIBLE (distinto de tolWorkIn/etc., que solo decide la etiqueta
@@ -1649,16 +1684,16 @@ export default function PunchInOut() {
           </View>
           <View style={styles.clockCard}>
             <View style={styles.clockTimeGroup}>
-              <Text style={[styles.clockTime, { fontSize: font(24) }]}>
+              <Text style={[styles.clockTime, { fontSize: font(isTablet ? 24 : 20) }]}>
                 {formatRDTimeShort(now).split(" ")[0]}
               </Text>
-              <Text style={[styles.clockAmPm, { fontSize: font(13) }]}>
+              <Text style={[styles.clockAmPm, { fontSize: font(isTablet ? 13 : 11) }]}>
                 {" "}
                 {formatRDTimeShort(now).split(" ").slice(1).join(" ")}
               </Text>
             </View>
             <View style={styles.clockDivider} />
-            <Text style={[styles.clockDateCompact, { fontSize: font(16) }]}>
+            <Text style={[styles.clockDateCompact, { fontSize: font(isTablet ? 16 : 14) }]}>
               {formatRDDateShort(now)}
             </Text>
           </View>
@@ -1733,16 +1768,20 @@ export default function PunchInOut() {
                   styles.lastPunchPill,
                   !lastPunch
                     ? styles.lastPunchPillNeutral
-                    : lastPunch.status === "Error de Imagen"
+                    : lastPunchDisplayStatus === "Error de Imagen"
                       ? styles.lastPunchPillError
-                      : lastPunch.type.startsWith("Inicio")
-                        ? styles.lastPunchPillEntry
-                        : styles.lastPunchPillExit,
+                      : lastPunchDisplayStatus === "Tardanza"
+                        ? styles.lastPunchPillLate
+                        : lastPunchDisplayStatus === "Anticipada"
+                          ? styles.lastPunchPillEarly
+                          : lastPunch.type.startsWith("Inicio")
+                            ? styles.lastPunchPillEntry
+                            : styles.lastPunchPillExit,
                 ]}
               >
                 <Ionicons
                   name={
-                    lastPunch?.status === "Error de Imagen"
+                    lastPunchDisplayStatus === "Error de Imagen"
                       ? "alert-circle-outline"
                       : "time-outline"
                   }
@@ -1750,11 +1789,15 @@ export default function PunchInOut() {
                   color={
                     !lastPunch
                       ? "#6B7280"
-                      : lastPunch.status === "Error de Imagen"
+                      : lastPunchDisplayStatus === "Error de Imagen"
                         ? "#DC2626"
-                        : lastPunch.type.startsWith("Inicio")
-                          ? "#16A34A"
-                          : "#2563EB"
+                        : lastPunchDisplayStatus === "Tardanza"
+                          ? "#DC2626"
+                          : lastPunchDisplayStatus === "Anticipada"
+                            ? "#D97706"
+                            : lastPunch.type.startsWith("Inicio")
+                              ? "#16A34A"
+                              : "#2563EB"
                   }
                 />
                 <Text
@@ -1763,11 +1806,15 @@ export default function PunchInOut() {
                     {
                       color: !lastPunch
                         ? "#6B7280"
-                        : lastPunch.status === "Error de Imagen"
+                        : lastPunchDisplayStatus === "Error de Imagen"
                           ? "#DC2626"
-                          : lastPunch.type.startsWith("Inicio")
-                            ? "#16A34A"
-                            : "#2563EB",
+                          : lastPunchDisplayStatus === "Tardanza"
+                            ? "#DC2626"
+                            : lastPunchDisplayStatus === "Anticipada"
+                              ? "#D97706"
+                              : lastPunch.type.startsWith("Inicio")
+                                ? "#16A34A"
+                                : "#2563EB",
                     },
                   ]}
                   numberOfLines={1}
@@ -2099,36 +2146,17 @@ export default function PunchInOut() {
                     historyShowAll ? undefined : HISTORY_COLLAPSED_LIMIT,
                   )
                   .map((punch) => {
-                    const hasOvertime =
-                      parseFloat(String(punch.overtime ?? 0)) > 0;
-                    // Solo FinJornada puede generar horas extras
-                    const isJornadaOvertime =
-                      punch.type === "FinJornada" && hasOvertime;
-                    // Puntualidad calculada localmente (corrige estados erróneos del backend)
-                    const punctuality = getPunctuality(punch, userSchedules, {
-                      workIn: tolWorkIn,
-                      workOut: tolWorkOut,
-                      lunchIn: tolLunchIn,
-                      lunchOut: tolLunchOut,
-                    });
-                    // Prioridad: horas extras > error de imagen > puntualidad local >
-                    // permiso (ignora flags lateEntry/earlyExit) > flags del backend >
-                    // status del backend
-                    const displayStatus = isJornadaOvertime
-                      ? "Horas extras"
-                      : punch.status === "Error de Imagen"
-                        ? "Error de Imagen"
-                        : punctuality !== null
-                          ? punctuality
-                          : punch.permissionId != null
-                            ? punch.status || "A Tiempo"
-                            : punch.lateEntry
-                              ? "Tardanza"
-                              : punch.earlyExit
-                                ? "Anticipada"
-                                : punch.type === "FinBreak"
-                                  ? "A Tiempo"
-                                  : punch.status || "A Tiempo";
+                    const displayStatus = getDisplayStatus(
+                      punch,
+                      userSchedules,
+                      {
+                        workIn: tolWorkIn,
+                        workOut: tolWorkOut,
+                        lunchIn: tolLunchIn,
+                        lunchOut: tolLunchOut,
+                      },
+                    );
+                    const isJornadaOvertime = displayStatus === "Horas extras";
                     const isLateBadge =
                       displayStatus === "Tardanza" ||
                       displayStatus === "Error de Imagen";
@@ -2208,6 +2236,16 @@ export default function PunchInOut() {
                                   name="alpha-p"
                                   size={16}
                                   color="#2563EB"
+                                />
+                              </View>
+                            )}
+                            {(punch.hasOpenDay === true ||
+                              (punch.hasOpenDay as unknown) === "true") && (
+                              <View style={styles.openDayBadgeSmall}>
+                                <Ionicons
+                                  name="lock-open-outline"
+                                  size={16}
+                                  color="#7C3AED"
                                 />
                               </View>
                             )}
@@ -2390,12 +2428,14 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 999,
   },
   lastPunchPillEntry: { backgroundColor: "#DCFCE7" },
   lastPunchPillExit: { backgroundColor: "#EFF6FF" },
   lastPunchPillNeutral: { backgroundColor: "#F3F4F6" },
   lastPunchPillError: { backgroundColor: "#FEE2E2" },
+  lastPunchPillLate: { backgroundColor: "#FEE2E2" },
+  lastPunchPillEarly: { backgroundColor: "#FEF3C7" },
   lastPunchPillText: { fontSize: 14, fontWeight: "700" },
   locationBlock: {
     borderRadius: 12,
@@ -2700,13 +2740,6 @@ const styles = StyleSheet.create({
   badgeLate: { backgroundColor: "#FEE2E2" },
   badgeEarly: { backgroundColor: "#FEF3C7" },
   punchBadgeText: { fontSize: 11, fontWeight: "700" },
-  badgeLateEntry: {
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 20,
-  },
-  badgeLateEntryText: { fontSize: 11, fontWeight: "700", color: "#D97706" },
   badgeOvertime: {
     backgroundColor: "#EFF6FF",
     paddingHorizontal: 8,
@@ -2733,6 +2766,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#2563EB",
     backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  /* Indicador de jornada pendiente de cerrar (hasOpenDay) */
+  openDayBadgeSmall: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#7C3AED",
+    backgroundColor: "#F5F3FF",
     alignItems: "center",
     justifyContent: "center",
   },

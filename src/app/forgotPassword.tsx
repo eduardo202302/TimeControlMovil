@@ -1,9 +1,20 @@
 import FormForgotPassword from "@/components/login/FormForgotPassword";
 import ResetPassword from "@/components/login/Reset-password";
 import VerifyPin from "@/components/login/Verify-pin";
+<<<<<<< HEAD
 import { useResponsive } from "@/constants/responsive";
 import { useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
+=======
+import React, { useMemo, useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+>>>>>>> 22ff8357bc2dd7d73413638bb606add01a0d0507
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSchoolStore } from "../../store/useSchoolStore";
 
@@ -19,25 +30,34 @@ const ForgotPassword = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.authContainer}>
-        {step === 1 && (
-          <FormForgotPassword
-            name={name}
-            image={logo}
-            onNext={() => setStep(2)} // cuando termine el primer formulario
-          />
-        )}
+      <KeyboardAvoidingView
+        behavior="padding"
+        keyboardVerticalOffset={0}
+        style={{ flex: 1, width: "100%" }}
+      >
+        <ScrollView
+          contentContainerStyle={styles.authContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          {step === 1 && (
+            <FormForgotPassword
+              name={name}
+              image={logo}
+              onNext={() => setStep(2)} // cuando termine el primer formulario
+            />
+          )}
 
-        {step === 2 && (
-          <VerifyPin
-            name={name}
-            image={logo}
-            onNext={() => setStep(3)} // cuando se verifique el PIN
-          />
-        )}
+          {step === 2 && (
+            <VerifyPin
+              name={name}
+              image={logo}
+              onNext={() => setStep(3)} // cuando se verifique el PIN
+            />
+          )}
 
-        {step === 3 && <ResetPassword name={name} image={logo} />}
-      </View>
+          {step === 3 && <ResetPassword name={name} image={logo} />}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -48,11 +68,9 @@ function createStyles(scale: (size: number) => number) {
       flex: 1,
       width: "100%",
       backgroundColor: "#dfe9ff",
-      justifyContent: "center",
-      alignItems: "center",
     },
     authContainer: {
-      flex: 1,
+      flexGrow: 1,
       justifyContent: "center",
       alignItems: "center",
       padding: scale(19),
