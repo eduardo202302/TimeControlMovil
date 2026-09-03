@@ -1684,16 +1684,16 @@ export default function PunchInOut() {
           </View>
           <View style={styles.clockCard}>
             <View style={styles.clockTimeGroup}>
-              <Text style={[styles.clockTime, { fontSize: font(24) }]}>
+              <Text style={[styles.clockTime, { fontSize: font(isTablet ? 24 : 20) }]}>
                 {formatRDTimeShort(now).split(" ")[0]}
               </Text>
-              <Text style={[styles.clockAmPm, { fontSize: font(13) }]}>
+              <Text style={[styles.clockAmPm, { fontSize: font(isTablet ? 13 : 11) }]}>
                 {" "}
                 {formatRDTimeShort(now).split(" ").slice(1).join(" ")}
               </Text>
             </View>
             <View style={styles.clockDivider} />
-            <Text style={[styles.clockDateCompact, { fontSize: font(16) }]}>
+            <Text style={[styles.clockDateCompact, { fontSize: font(isTablet ? 16 : 14) }]}>
               {formatRDDateShort(now)}
             </Text>
           </View>
