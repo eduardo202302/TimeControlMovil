@@ -1,20 +1,13 @@
 import FormForgotPassword from "@/components/login/FormForgotPassword";
 import ResetPassword from "@/components/login/Reset-password";
 import VerifyPin from "@/components/login/Verify-pin";
-<<<<<<< HEAD
 import { useResponsive } from "@/constants/responsive";
 import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
-=======
-import React, { useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
-  StyleSheet,
-  View,
+  StyleSheet
 } from "react-native";
->>>>>>> 22ff8357bc2dd7d73413638bb606add01a0d0507
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSchoolStore } from "../../store/useSchoolStore";
 
