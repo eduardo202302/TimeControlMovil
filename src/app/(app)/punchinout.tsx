@@ -187,12 +187,6 @@ function getStatusColor(status: string): string {
   return "#16A34A";
 }
 
-function getStatusIcon(status: string): keyof typeof Ionicons.glyphMap {
-  if (status === "Tardanza") return "warning-outline";
-  if (status === "Anticipada") return "time-outline";
-  return "checkmark-circle-outline";
-}
-
 function getStatusLabel(status: string): string {
   if (status === "Tardanza") return "Tardanza";
   if (status === "Anticipada") return "Salida anticipada";
@@ -2126,9 +2120,7 @@ export default function PunchInOut() {
                               ? "Tardanza"
                               : punch.earlyExit
                                 ? "Anticipada"
-                                : punch.type === "FinBreak"
-                                  ? "A Tiempo"
-                                  : punch.status || "A Tiempo";
+                                : punch.status || "A Tiempo";
                     const isLateBadge =
                       displayStatus === "Tardanza" ||
                       displayStatus === "Error de Imagen";
@@ -2208,6 +2200,16 @@ export default function PunchInOut() {
                                   name="alpha-p"
                                   size={16}
                                   color="#2563EB"
+                                />
+                              </View>
+                            )}
+                            {(punch.hasOpenDay === true ||
+                              (punch.hasOpenDay as unknown) === "true") && (
+                              <View style={styles.openDayBadgeSmall}>
+                                <Ionicons
+                                  name="lock-open-outline"
+                                  size={16}
+                                  color="#7C3AED"
                                 />
                               </View>
                             )}
@@ -2700,13 +2702,6 @@ const styles = StyleSheet.create({
   badgeLate: { backgroundColor: "#FEE2E2" },
   badgeEarly: { backgroundColor: "#FEF3C7" },
   punchBadgeText: { fontSize: 11, fontWeight: "700" },
-  badgeLateEntry: {
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 20,
-  },
-  badgeLateEntryText: { fontSize: 11, fontWeight: "700", color: "#D97706" },
   badgeOvertime: {
     backgroundColor: "#EFF6FF",
     paddingHorizontal: 8,
@@ -2733,6 +2728,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#2563EB",
     backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  /* Indicador de jornada pendiente de cerrar (hasOpenDay) */
+  openDayBadgeSmall: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#7C3AED",
+    backgroundColor: "#F5F3FF",
     alignItems: "center",
     justifyContent: "center",
   },
