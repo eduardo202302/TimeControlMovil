@@ -951,6 +951,21 @@ describe("17. getPunctuality con permissionId", () => {
     const finBreakOk = punch("FinBreak", { status: "A Tiempo" });
     expect(displayStatusReal(finBreakOk, false)).toBe("A Tiempo");
   });
+
+  it("17h. lastPunch con lateEntry:true da Tardanza, no A Tiempo (bug del pill de último ponche)", () => {
+    // InicioBreak: getPunctuality no lo calcula (default null en el switch) y
+    // el status del backend viene "A Tiempo" — el pill de último ponche
+    // (antes de extraer getDisplayStatus) solo miraba status==="Error de
+    // Imagen" y type.startsWith("Inicio"), así que esto rendería verde
+    // ignorando por completo el flag lateEntry. La cadena completa debe
+    // preferir el flag y devolver "Tardanza".
+    const ultimoPonche = punch("InicioBreak", {
+      status: "A Tiempo",
+      lateEntry: true,
+    });
+    expect(getPunctuality(ultimoPonche, [schedule], TOL)).toBeNull();
+    expect(displayStatusReal(ultimoPonche, false)).toBe("Tardanza");
+  });
 });
 
 // ─── Sanidad de los helpers de tiempo usados por los fixtures ────────────────
