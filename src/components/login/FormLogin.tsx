@@ -20,6 +20,7 @@ import {
 import { loginAuthentication } from "../../../api/Login/loginAuthentication";
 import { getMenuItems } from "../../../api/menu/getMenuItems";
 import { useSchoolStore } from "../../../store/useSchoolStore";
+import { resolveMobilePath } from "../../constants/mobileRoutes";
 import { LoginType } from "../../../types/typesLogin/LoginType";
 import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
 import * as Storage from "../../utils/storage";
@@ -180,8 +181,9 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       });
 
       router.replace(
-        (useSchoolStore.getState().role?.defaultMenu?.path ??
-          "/login") as never,
+        resolveMobilePath(
+          useSchoolStore.getState().role?.defaultMenu?.path,
+        ) as never,
       );
     },
     [remember, urlColegio, setMenuResolution],
