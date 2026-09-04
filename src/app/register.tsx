@@ -209,12 +209,12 @@ export default function Register() {
             <Controller
               name="password"
               control={control}
-              rules={{ required: "La clave es requerida" }}
+              rules={{ required: "La contraseña es requerida" }}
               render={({ field, fieldState }) => (
                 <>
                   <InputField
                     icon="lock-closed-outline"
-                    placeholder="Clave"
+                    placeholder="Contraseña"
                     value={field.value}
                     onChangeText={field.onChange}
                     secureTextEntry={!showPassword}
