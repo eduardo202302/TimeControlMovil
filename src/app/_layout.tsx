@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { Alert, AppState } from "react-native";
 import { useSchoolStore } from "../../store/useSchoolStore";
 import { refreshSchoolData } from "../../api/authorization";
+import { resolveMobilePath } from "../constants/mobileRoutes";
 import {
   clearSession,
   isTokenExpired,
@@ -63,7 +64,7 @@ export default function RootLayout() {
         initialLoadDone.current = true;
         const { role } = useSchoolStore.getState();
         console.log("Role from store:", role);
-        router.replace((role?.defaultMenu?.path ?? "/login") as never);
+        router.replace(resolveMobilePath(role?.defaultMenu?.path) as never);
         return;
       }
       console.log("No valid authorization found. Redirecting to login.");

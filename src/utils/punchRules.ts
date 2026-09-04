@@ -382,13 +382,15 @@ export function isJornadaVisible(
   }
 
   const current = getRDMinutes(now);
-  // Los intentos rechazados por imagen no cuentan como jornada iniciada
+  // Los intentos rechazados por imagen, o fuera del área permitida, no
+  // cuentan como jornada iniciada
   const lastJornada = [...punches]
     .reverse()
     .find(
       (p) =>
         (p.type === "InicioJornada" || p.type === "FinJornada") &&
         p.status !== "Error de Imagen" &&
+        p.status !== "Fuera de área" &&
         !p.hasOpenDay &&
         p.hasOpenDay !== ("true" as any),
     );

@@ -902,9 +902,9 @@ describe("17. getPunctuality con permissionId", () => {
     expect(getPunctuality(entradaConPermiso, [], TOL)).toBeNull();
   });
 
-  /** Réplica LITERAL de la cadena completa de punchinout.tsx (~líneas
-   * 2106-2118), no la versión simplificada de arriba. El bug real estaba
-   * aquí: con permissionId válido, punctuality da null y la cadena caía en
+  /** Réplica LITERAL de la cadena completa de punchinout.tsx (getDisplayStatus),
+   * no la versión simplificada de arriba. El bug real estaba aquí: con
+   * permissionId válido, punctuality da null y la cadena caía en
    * lateEntry/earlyExit (que ignoran el permiso) antes de llegar a status. */
   const displayStatusReal = (
     punch: PunchEvent,
@@ -915,15 +915,17 @@ describe("17. getPunctuality con permissionId", () => {
       ? "Horas extras"
       : punch.status === "Error de Imagen"
         ? "Error de Imagen"
-        : punctuality !== null
-          ? punctuality
-          : punch.permissionId != null
-            ? punch.status || "A Tiempo"
-            : punch.lateEntry
-              ? "Tardanza"
-              : punch.earlyExit
-                ? "Anticipada"
-                : punch.status || "A Tiempo";
+        : punch.status === "Fuera de área"
+          ? "Fuera de área"
+          : punctuality !== null
+            ? punctuality
+            : punch.permissionId != null
+              ? punch.status || "A Tiempo"
+              : punch.lateEntry
+                ? "Tardanza"
+                : punch.earlyExit
+                  ? "Anticipada"
+                  : punch.status || "A Tiempo";
   };
 
   it("17f. cadena completa: permissionId + lateEntry:true + status A Tiempo -> A Tiempo, no Tardanza", () => {
@@ -965,6 +967,54 @@ describe("17. getPunctuality con permissionId", () => {
     });
     expect(getPunctuality(ultimoPonche, [schedule], TOL)).toBeNull();
     expect(displayStatusReal(ultimoPonche, false)).toBe("Tardanza");
+  });
+
+  it("17i. status 'Fuera de área' le gana a puntualidad local y a lateEntry/earlyExit", () => {
+    // InicioJornada a las 11:53 RD, muy tarde vs 08:00 + tolerancia -> la
+    // puntualidad local daría "Tardanza" si se calculara. El backend ya
+    // resolvió "Fuera de área" (geocerca del lado servidor) y eso debe
+    // prevalecer, con la misma prioridad que "Error de Imagen".
+    const fueraDeArea = punch("InicioJornada", {
+      createdDate: "2026-08-19T15:53:31.000Z",
+      status: "Fuera de área",
+    });
+    expect(getPunctuality(fueraDeArea, [schedule], TOL)).toBe("Tardanza");
+    expect(displayStatusReal(fueraDeArea, false)).toBe("Fuera de área");
+
+    // también le gana al flag earlyExit en un tipo que getPunctuality no
+    // calcula (Break), para confirmar que no depende de la puntualidad
+    const fueraDeAreaBreak = punch("FinBreak", {
+      status: "Fuera de área",
+      earlyExit: true,
+    });
+    expect(getPunctuality(fueraDeAreaBreak, [schedule], TOL)).toBeNull();
+    expect(displayStatusReal(fueraDeAreaBreak, false)).toBe("Fuera de área");
+  });
+});
+
+// ─── 18. isJornadaVisible — un InicioJornada "Fuera de área" no cuenta ────────
+// El backend puede registrar el ponche igual (ya no se bloquea del lado
+// cliente) pero marcado "Fuera de área" — igual que pasa hoy con "Error de
+// Imagen", ese intento no debe contar como jornada activa: la persona tiene
+// que poder reintentar la Entrada.
+
+describe("18. isJornadaVisible — 'Fuera de área' no cuenta como jornada iniciada", () => {
+  it("18a. Entrada sigue visible tras un InicioJornada marcado 'Fuera de área'", () => {
+    const fueraDeArea: PunchEvent[] = [
+      punch("InicioJornada", { status: "Fuera de área" }),
+    ];
+    expect(verEntrada(rd(9), [], fueraDeArea)).toBe(true);
+
+    // control: con status normal, ese mismo InicioJornada SÍ cuenta como
+    // jornada activa y oculta la Entrada
+    expect(verEntrada(rd(9), [], PUNCHES.jornadaIniciada)).toBe(false);
+  });
+
+  it("18b. mismo criterio ya aplicado hoy a 'Error de Imagen'", () => {
+    const errorImagen: PunchEvent[] = [
+      punch("InicioJornada", { status: "Error de Imagen" }),
+    ];
+    expect(verEntrada(rd(9), [], errorImagen)).toBe(true);
   });
 });
 

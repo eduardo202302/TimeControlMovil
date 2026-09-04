@@ -127,20 +127,28 @@ const JSON_STRING_OVERHEAD_BYTES = 3;
 /** El backend descarta cualquier adjunto de 100 chars o menos. */
 const MIN_DATA_URI_LENGTH = 100;
 
-/** Códigos que devuelve el backend en `skipped` traducidos a español simple. */
+/**
+ * Códigos que devuelve el backend en `skipped`, con el texto EXACTO de
+ * `skippedReasonMessages` en handlers.js. Solo se usa como fallback si la
+ * respuesta no trae `reasonMessage` — ver `describeSkipped`.
+ */
 const SKIP_REASON_LABELS: Record<string, string> = {
-  weekday_invalido: "El día no forma parte de tu horario laboral.",
-  feriado_no_laborable: "Es un feriado no laborable.",
-  sin_horario_usuario: "No tienes horario configurado para ese día.",
-  horario_invalido_usuario: "Tu horario de ese día no es válido.",
-  fecha_hora_inicio_pasada: "La fecha y hora de inicio ya pasaron.",
-  solape_horario: "Se solapa con otro permiso ya registrado.",
-  entrada_duplicada_dia: "Ya tienes un permiso de entrada ese día.",
-  salida_duplicada_dia: "Ya tienes un permiso de salida ese día.",
-  almuerzo_duplicado_dia: "Ya tienes un permiso de almuerzo ese día.",
+  weekday_invalido: "La fecha no corresponde a un día válido.",
+  feriado_no_laborable: "La fecha corresponde a un feriado no laborable.",
+  sin_horario_usuario: "El usuario no tiene horario configurado para ese día.",
+  horario_invalido_usuario: "El horario del usuario es inválido para ese día.",
+  fecha_hora_inicio_pasada: "La fecha y hora de inicio deben ser mayor a la actual.",
+  solape_horario:
+    "Ya existe un permiso registrado que coincide con el horario solicitado.",
+  entrada_duplicada_dia: "Ya existe un permiso de entrada para ese día.",
+  salida_duplicada_dia: "Ya existe un permiso de salida para ese día.",
+  almuerzo_duplicado_dia: "Ya existe un permiso de almuerzo para ese día.",
+  entrada_ya_registrada_dia: "Ya existe una entrada registrada para ese día.",
+  salida_ya_registrada_dia: "Ya existe una salida registrada para ese día.",
+  almuerzo_ya_registrado_dia: "Ya existe un almuerzo registrado para ese día.",
   fuera_horario_dentro_jornada:
-    "El horario solicitado cae dentro de tu jornada laboral.",
-  ausencia_duplicada_dia: "Ya tienes una ausencia registrada ese día.",
+    "El rango solicitado está dentro de la jornada laboral.",
+  ausencia_duplicada_dia: "Ya existe un permiso de ausencia para ese día.",
 };
 
 /** Nombres de los 7 días tal cual los espera el backend (`weekDays`). */
@@ -317,20 +325,22 @@ function describeSkipped(skipped: any): string[] {
 
   const byReason = Array.isArray(skipped.byReason) ? skipped.byReason : [];
   for (const entry of byReason) {
-    const code = String(entry?.reason ?? entry?.code ?? "");
+    const code = String(entry?.reasonCode ?? entry?.reason ?? entry?.code ?? "");
     const count = Number(entry?.count ?? entry?.total ?? 0);
-    const label = SKIP_REASON_LABELS[code] ?? code.replace(/_/g, " ");
+    const label =
+      entry?.reasonMessage ?? SKIP_REASON_LABELS[code] ?? code.replace(/_/g, " ");
     lines.push(count > 0 ? `${count} día(s) — ${label}` : label);
   }
 
   // Algunas respuestas traen solo `items`; se agrupa por fecha en ese caso.
   if (lines.length === 0 && Array.isArray(skipped.items)) {
     for (const item of skipped.items) {
-      const code = String(item?.reason ?? item?.code ?? "");
-      const rawDate = String(item?.date ?? item?.permissionDate ?? "").split(
-        "T",
-      )[0];
-      const label = SKIP_REASON_LABELS[code] ?? code.replace(/_/g, " ");
+      const code = String(item?.reasonCode ?? item?.reason ?? item?.code ?? "");
+      const rawDate = String(
+        item?.permissionDate ?? item?.date ?? "",
+      ).split("T")[0];
+      const label =
+        item?.reasonMessage ?? SKIP_REASON_LABELS[code] ?? code.replace(/_/g, " ");
       lines.push(rawDate ? `${formatDisplayDate(rawDate)} — ${label}` : label);
     }
   }
@@ -902,10 +912,16 @@ export default function SolicitarPermisoForm() {
       return {
         ok: false,
         title: "No se pudo enviar",
+        // Si hay `details`, el mensaje plano del backend repetiría los mismos
+        // días como texto con saltos de línea — se prefiere un genérico corto.
+        // Sin `details` (p. ej. el rollback de hasSingleDate) sí es una sola
+        // oración y no hay nada que duplicar.
         message:
-          payload?.message ??
-          data?.message ??
-          "No se creó ningún permiso. Revisa el detalle.",
+          details.length > 0
+            ? "No se creó ningún permiso para el rango solicitado."
+            : (payload?.message ??
+              data?.message ??
+              "No se creó ningún permiso. Revisa el detalle."),
         details,
       };
     }
