@@ -18,9 +18,11 @@ export const registerSchema = z.object({
   cedula: z
     .string()
     .trim()
-    .min(1, "La cédula es requerida")
+    .optional()
+    .or(z.literal(""))
     .refine((val) => {
+      if (!val) return true;
       const digits = val.replace(/\D/g, "");
-      return digits.length === 19;
+      return digits.length === 11;
     }, "La cédula debe contener exactamente 11 números"),
 });

@@ -145,7 +145,6 @@ export default function Register() {
             <Controller
               name="nickName"
               control={control}
-              rules={{ required: "El nombre de usuario es requerido" }}
               render={({ field, fieldState }) => (
                 <>
                   <InputField
@@ -153,6 +152,7 @@ export default function Register() {
                     placeholder="Usuario"
                     value={field.value || ""}
                     onChangeText={field.onChange}
+                    required={false}
                   />
                   {fieldState.error && (
                     <Text style={{ color: "#e24b4a", marginTop: 4 }}>
@@ -254,7 +254,7 @@ export default function Register() {
                     <InputField
                       icon="card-outline"
                       placeholder="Cédula"
-                      value={field.value}
+                      value={field.value || ""}
                       onChangeText={(text) => {
                         field.onChange(formatCedula(text));
                       }}
