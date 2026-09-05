@@ -14,6 +14,7 @@ export const VALID_MOBILE_PATHS: Set<string> = new Set([
   "/mypermissions",
   "/parentsexcusesscreen",
   "/timeoff",
+  "/adminpunchinout",
 ]);
 
 export const DEFAULT_MOBILE_PATH = "/punchinout";

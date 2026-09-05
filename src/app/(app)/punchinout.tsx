@@ -32,6 +32,8 @@ import type {
 import {
   findOpenDayPunch,
   findOpenDayPunchForUser,
+  getBreakTagCategoryId,
+  tagsOfCategory,
   getApprovedPermissionsToday,
   getPendingOpenDayDate,
   getPunctuality,
@@ -65,8 +67,6 @@ interface PunchPayload {
   nextDayExit?: boolean;
   tagId?: number;
 }
-
-const BREAK_TAG_CATEGORY_NAME = "Tipos de Break";
 
 const MONTH_NAMES: Record<number, string> = {
   0: "enero",
@@ -466,6 +466,23 @@ export default function PunchInOut() {
     schoolUserSettings?.isValidLocation ?? schoolSettings?.isValidLocation,
   );
 
+  /**
+   * Categoría de los "Motivos del break", de la config de la escuela
+   * (settings.categoryDefaultIds.catBreakTypeId) — la misma fuente que usa el
+   * backend para su propio listado de break tags.
+   *
+   * Se lee SOLO de schoolSettings, no de schoolUserSettings: categoryDefaultIds
+   * es configuración de la sede, no tiene contraparte por usuario.
+   *
+   * Antes se filtraba por el nombre "Tipos de Break", que es apenas el `label`
+   * con el que se siembra esa entrada: coincidía por casualidad y se rompía
+   * apenas una escuela renombrara su categoría.
+   */
+  const breakTagCategoryId = useMemo(
+    () => getBreakTagCategoryId(schoolSettings),
+    [schoolSettings],
+  );
+
   // Tolerancias de tiempo: usuario → sede → default UX (1 min jornada, 5 min almuerzo)
   const tolWorkIn =
     schoolUserSettings?.toleranceWorkTimeIn ??
@@ -821,11 +838,7 @@ export default function PunchInOut() {
       });
       if (response.data.success) {
         const allTags: Tag[] = response.data.data ?? [];
-        setBreakTags(
-          allTags.filter(
-            (tag) => tag.category?.name === BREAK_TAG_CATEGORY_NAME,
-          ),
-        );
+        setBreakTags(tagsOfCategory(allTags, breakTagCategoryId));
       }
     } catch (error: any) {
       console.error(
@@ -833,7 +846,10 @@ export default function PunchInOut() {
         error?.response?.data?.message ?? error?.message,
       );
     }
-  }, [urlColegio, getToken]);
+    // `breakTagCategoryId` en las deps a propósito: schoolSettings se refresca
+    // por poller, así que si los tags se piden antes de que llegue la config,
+    // el efecto vuelve a correr cuando la categoría queda resuelta.
+  }, [urlColegio, getToken, breakTagCategoryId]);
 
   useEffect(() => {
     fetchBreakTags();

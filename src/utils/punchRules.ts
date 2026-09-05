@@ -286,6 +286,61 @@ export function timeStrToMinutes(timeStr: string): number {
   return h * 60 + m;
 }
 
+// ─── Tags y categorías de la escuela ─────────────────────────────────────────
+
+/**
+ * Normaliza un id de `school.settings.categoryDefaultIds`. El backend lo
+ * guarda como `{ label, value }` (Schools/handlers.js:1562-1567), pero se
+ * aceptan también el número suelto y el string por si alguna escuela quedó con
+ * la forma vieja — la comparación contra `tag.categoryId`, que es un número
+ * plano, no debe depender de eso.
+ */
+export function readCategoryDefaultId(raw: unknown): number | undefined {
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  if (raw && typeof raw === "object" && "value" in raw) {
+    return readCategoryDefaultId((raw as { value: unknown }).value);
+  }
+  return undefined;
+}
+
+/**
+ * Categoría de los "Motivos del break", leída de la configuración de la
+ * escuela: `settings.categoryDefaultIds.catBreakTypeId.value`.
+ *
+ * Es la MISMA fuente que usa el backend para su propio listado de break tags
+ * (Tags/handlers.js:183), y es por escuela — por eso no se hardcodea.
+ *
+ * El nombre "Tipos de Break" que se usaba antes es solo el `label` con el que
+ * se siembra esa entrada (Schools/handlers.js:1002-1004): coincidía por
+ * casualidad y se rompe apenas una escuela renombra su categoría.
+ *
+ * Sin fallback a `catPermTypeId` a propósito: los tipos de permiso son otra
+ * categoría distinta y mezclarlas ofrecería motivos que no son de break.
+ * Si no está configurada, el picker queda vacío — igual que el backend, que
+ * responde "La categoria no está configurada" (Tags/handlers.js:185-189).
+ */
+export function getBreakTagCategoryId(settings: unknown): number | undefined {
+  if (!settings || typeof settings !== "object") return undefined;
+  const defaults = (settings as Record<string, any>).categoryDefaultIds;
+  if (!defaults || typeof defaults !== "object") return undefined;
+  return readCategoryDefaultId(defaults.catBreakTypeId);
+}
+
+/** Los tags de una categoría — el picker de "Motivo del break". */
+export function tagsOfCategory(
+  tags: Tag[],
+  categoryId: number | null | undefined,
+): Tag[] {
+  if (categoryId == null) return [];
+  return (tags ?? []).filter(
+    (tag) => (tag.category?.id ?? (tag as any).categoryId) === categoryId,
+  );
+}
+
 // ─── Permisos del día ─────────────────────────────────────────────────────────
 
 export function normalizePermissionName(value: string | null | undefined): string {
