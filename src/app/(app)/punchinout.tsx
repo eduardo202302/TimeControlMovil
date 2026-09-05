@@ -39,6 +39,7 @@ import {
   getPunctuality,
   getRDDayIndex,
   getScheduleForDay,
+  getStatusColor,
   isAlmuerzoButtonVisible,
   isAlmuerzoVisible,
   isBreakVisible,
@@ -179,14 +180,6 @@ function getPunchCategory(type: string): Category {
   if (type.includes("Jornada")) return "Jornada";
   if (type.includes("Almuerzo")) return "Almuerzo";
   return "Break";
-}
-
-function getStatusColor(status: string): string {
-  if (status === "Tardanza") return "#DC2626";
-  if (status === "Anticipada") return "#D97706";
-  if (status === "Error de Imagen") return "#DC2626";
-  if (status === "Fuera de área") return "#DC2626";
-  return "#16A34A";
 }
 
 /**

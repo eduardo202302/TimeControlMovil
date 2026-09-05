@@ -286,6 +286,27 @@ export function timeStrToMinutes(timeStr: string): number {
   return h * 60 + m;
 }
 
+// ─── Presentación ─────────────────────────────────────────────────────────────
+
+/**
+ * Color del estado de un ponche. Compartida por el ponchador normal
+ * (punchinout.tsx) y el Ponche ADM (adminpunchinout.tsx) para que el mismo
+ * estado no se pinte distinto en cada pantalla.
+ *
+ * Rojo para lo que salió mal (tardanza, imagen rechazada, fuera del área),
+ * ámbar para lo que se salió del horario esperado sin ser un error
+ * (anticipada, fuera de horario), verde para todo lo demás — incluido el
+ * status vacío, que es el caso de un ponche sin evaluar.
+ */
+export function getStatusColor(status: string | null | undefined): string {
+  if (status === "Tardanza") return "#DC2626";
+  if (status === "Anticipada") return "#D97706";
+  if (status === "Fuera de Horario") return "#D97706";
+  if (status === "Error de Imagen") return "#DC2626";
+  if (status === "Fuera de área") return "#DC2626";
+  return "#16A34A";
+}
+
 // ─── Tags y categorías de la escuela ─────────────────────────────────────────
 
 /**

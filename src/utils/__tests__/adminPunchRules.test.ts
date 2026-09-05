@@ -5,19 +5,23 @@ import {
   buildEmployeeSearchParams,
   buildEmployeeSearchQueryString,
   EMPLOYEE_SEARCH_FIELDS,
-  clampPickedTimeToNow,
+  daysElapsedRD,
   extractTableRows,
   formatEmployeeContact,
+  getAdminPunchDay,
+  getHistoryEvents,
   getNextAdminAction,
+  getOpenWorkdayDate,
+  getSuggestedPunchTime,
   isAdminBreakEnabled,
-  isFutureCreatedDate,
   normalizeAdminPanel,
   toEmployeeOption,
   toOpenWorkdayRows,
   type AdminOpenDayPunch,
   type AdminPunchPanel,
 } from "../adminPunchRules";
-import type { PunchEvent, Tag } from "../punchRules";
+import type { UserSchedule } from "../../../types/typeStore/SchoolStoreType";
+import { toRDDateString, type PunchEvent, type Tag } from "../punchRules";
 
 const TARGET_ID = 501;
 
@@ -101,7 +105,7 @@ describe("buildAdminPunchPayload", () => {
   });
 });
 
-// ── createdDate y guard de hora futura ────────────────────────────────────────
+// ── createdDate ────────────────────────────────────────
 
 describe("buildAdminCreatedDate (TZ del runner = UTC)", () => {
   test("el día sale de `day` y la hora del `picked`, ambos en RD", () => {
@@ -125,45 +129,6 @@ describe("buildAdminCreatedDate (TZ del runner = UTC)", () => {
     expect(buildAdminCreatedDate(nightRD, nightRD)).toBe(
       "2026-09-04T21:00:00-04:00",
     );
-  });
-});
-
-describe("guard de hora futura (el backend no la valida hoy)", () => {
-  const now = new Date("2026-09-04T18:00:00.000Z"); // 14:00 RD
-
-  test("un minuto en el futuro se bloquea", () => {
-    expect(isFutureCreatedDate("2026-09-04T14:01:00-04:00", now)).toBe(true);
-  });
-
-  test("la hora exacta actual NO se bloquea", () => {
-    expect(isFutureCreatedDate("2026-09-04T14:00:00-04:00", now)).toBe(false);
-  });
-
-  test("el pasado nunca se bloquea", () => {
-    expect(isFutureCreatedDate("2026-09-04T07:59:00-04:00", now)).toBe(false);
-  });
-
-  test("acepta un Date además del string ya construido", () => {
-    expect(isFutureCreatedDate(new Date("2026-09-04T18:00:01.000Z"), now)).toBe(
-      true,
-    );
-    expect(isFutureCreatedDate(new Date("2026-09-04T17:59:59.000Z"), now)).toBe(
-      false,
-    );
-  });
-
-  test("una fecha inválida no se considera futura (no bloquea por parseo)", () => {
-    expect(isFutureCreatedDate("no-es-una-fecha", now)).toBe(false);
-  });
-
-  test("clampPickedTimeToNow recorta la selección futura a ahora", () => {
-    const future = new Date("2026-09-04T23:00:00.000Z");
-    expect(clampPickedTimeToNow(future, now)).toBe(now);
-  });
-
-  test("clampPickedTimeToNow deja pasar una selección pasada", () => {
-    const past = new Date("2026-09-04T12:00:00.000Z");
-    expect(clampPickedTimeToNow(past, now)).toBe(past);
   });
 });
 
@@ -323,6 +288,276 @@ describe("isAdminBreakEnabled", () => {
   });
 });
 
+describe("Historial del Día con una jornada abierta de un día anterior", () => {
+  const ayer = punch({
+    id: 90,
+    type: "InicioJornada",
+    createdDate: "2026-09-02T12:00:00.000Z", // 08:00 RD del 2-sep
+  });
+  const ayerBreak = punch({
+    id: 91,
+    type: "InicioBreak",
+    createdDate: "2026-09-02T14:00:00.000Z",
+  });
+  const hoy = punch({ id: 1, type: "InicioJornada" });
+
+  test("sin jornada abierta, el historial son los ponches de hoy", () => {
+    expect(
+      getHistoryEvents(panel({ punchesToday: [hoy] })).map((p) => p.id),
+    ).toEqual([1]);
+  });
+
+  test("con jornada abierta, el historial son los eventos de ESE día", () => {
+    // openDayEvents es la lista completa del día, no un subconjunto: mostrar
+    // punchesToday acá dejaría el historial vacío.
+    const withOpen = panel({
+      openDayEvents: [ayer, ayerBreak],
+      punchesToday: [],
+    });
+    expect(getHistoryEvents(withOpen).map((p) => p.id)).toEqual([90, 91]);
+  });
+
+  test("openDayEvents gana aunque haya ponches de hoy", () => {
+    const both = panel({ openDayEvents: [ayer], punchesToday: [hoy] });
+    expect(getHistoryEvents(both).map((p) => p.id)).toEqual([90]);
+  });
+
+  test("un panel nulo no rompe el render", () => {
+    expect(getHistoryEvents(null)).toEqual([]);
+  });
+
+  test("la fecha del título sale del InicioJornada abierto", () => {
+    const withOpen = panel({ openDayEvents: [ayerBreak, ayer] });
+    const date = getOpenWorkdayDate(withOpen);
+    expect(toRDDateString(date!)).toBe("2026-09-02");
+  });
+
+  test("sin InicioJornada explícito cae al primer evento del día", () => {
+    const withOpen = panel({ openDayEvents: [ayerBreak] });
+    expect(toRDDateString(getOpenWorkdayDate(withOpen)!)).toBe("2026-09-02");
+  });
+
+  test("sin jornada abierta no hay fecha que mostrar", () => {
+    expect(getOpenWorkdayDate(panel({ punchesToday: [hoy] }))).toBeNull();
+    expect(getOpenWorkdayDate(null)).toBeNull();
+  });
+
+  test("los N días del título salen del mismo daysElapsedRD que diasTrans", () => {
+    const date = getOpenWorkdayDate(panel({ openDayEvents: [ayer] }))!;
+    // 2-sep → 4-sep = 2 días.
+    expect(daysElapsedRD(date, new Date("2026-09-04T20:00:00.000Z"))).toBe(2);
+  });
+});
+
+describe("getAdminPunchDay — el día que lleva el createdDate", () => {
+  // Hoy: 2026-09-04 16:00 RD. Jornada abierta el 2026-09-02.
+  const TODAY = new Date("2026-09-04T20:00:00.000Z");
+  const abierta = punch({
+    id: 90,
+    type: "InicioJornada",
+    createdDate: "2026-09-02T12:00:00.000Z", // 08:00 RD del 2-sep
+  });
+
+  const conJornadaAbierta = panel({ openDayEvents: [abierta] });
+  const finJornada = getNextAdminAction(conJornadaAbierta, "Jornada");
+  const inicioJornada = getNextAdminAction(panel({}), "Jornada");
+
+  test("cerrar una jornada abierta usa la fecha de ESA jornada, no hoy", () => {
+    // Sin esto el backend rechaza con "La fecha debe coincidir con el día del
+    // InicioJornada que se está cerrando".
+    expect(finJornada.type).toBe("FinJornada");
+    const day = getAdminPunchDay(conJornadaAbierta, finJornada, TODAY);
+    expect(toRDDateString(day)).toBe("2026-09-02");
+  });
+
+  test("el createdDate completo sale con esa fecha y la hora elegida", () => {
+    const day = getAdminPunchDay(conJornadaAbierta, finJornada, TODAY);
+    const picked = new Date("2026-09-04T21:00:00.000Z"); // 17:00 RD
+    expect(buildAdminCreatedDate(day, picked)).toBe(
+      "2026-09-02T17:00:00-04:00",
+    );
+  });
+
+  test("FinJornada del MISMO día sigue usando hoy", () => {
+    const hoyMismo = panel({
+      punchesToday: [punch({ id: 1, type: "InicioJornada" })],
+    });
+    const action = getNextAdminAction(hoyMismo, "Jornada");
+    expect(action.type).toBe("FinJornada");
+    expect(toRDDateString(getAdminPunchDay(hoyMismo, action, TODAY))).toBe(
+      "2026-09-04",
+    );
+  });
+
+  test("InicioJornada usa hoy aunque haya una jornada abierta", () => {
+    expect(inicioJornada.type).toBe("InicioJornada");
+    expect(
+      toRDDateString(getAdminPunchDay(conJornadaAbierta, inicioJornada, TODAY)),
+    ).toBe("2026-09-04");
+  });
+
+  test("Break usa hoy aunque haya una jornada abierta", () => {
+    const breakAction = getNextAdminAction(conJornadaAbierta, "Break");
+    expect(breakAction.type).toBe("InicioBreak");
+    expect(
+      toRDDateString(getAdminPunchDay(conJornadaAbierta, breakAction, TODAY)),
+    ).toBe("2026-09-04");
+  });
+
+  test("sin panel, o sin fecha legible, cae a hoy en vez de adivinar", () => {
+    expect(toRDDateString(getAdminPunchDay(null, finJornada, TODAY))).toBe(
+      "2026-09-04",
+    );
+    const sinFecha = panel({
+      openDayEvents: [punch({ id: 9, type: "InicioJornada", createdDate: "" })],
+    });
+    expect(toRDDateString(getAdminPunchDay(sinFecha, finJornada, TODAY))).toBe(
+      "2026-09-04",
+    );
+  });
+});
+
+describe("getSuggestedPunchTime — hora inicial del picker", () => {
+  // 2026-09-04 es VIERNES. 20:00Z = 16:00 RD.
+  const NOW = new Date("2026-09-04T20:00:00.000Z");
+
+  const schedule = (over: Partial<UserSchedule> = {}): UserSchedule => ({
+    id: 1,
+    weekDay: "Viernes",
+    workEntryTime: "08:00:00",
+    workExitTime: "17:00:00",
+    lunchEntryTime: "12:00:00",
+    lunchExitTime: "13:00:00",
+    ...over,
+  });
+
+  const withSchedule = (s: UserSchedule[]) => panel({ userSchedules: s });
+  const salida = getNextAdminAction(panel({}), "Jornada"); // sin ponches → Entrada
+  const finJornada = getNextAdminAction(
+    panel({ punchesToday: [punch({ type: "InicioJornada" })] }),
+    "Jornada",
+  );
+
+  test("Jornada→Salida arranca en el workExitTime del día", () => {
+    // Salida programada 15:00 RD, ya pasada respecto de NOW (16:00 RD).
+    const suggested = getSuggestedPunchTime(
+      withSchedule([schedule({ workExitTime: "15:00:00" })]),
+      finJornada,
+      NOW,
+    );
+    expect(suggested.toISOString()).toBe("2026-09-04T19:00:00.000Z"); // 15:00 RD
+  });
+
+  test("una salida programada que aún no llegó se sugiere igual", () => {
+    // 17:00 RD > 16:00 RD (NOW): la sugerencia NO se recorta. Queda en el
+    // futuro a propósito — sugerir y validar son cosas distintas.
+    const suggested = getSuggestedPunchTime(
+      withSchedule([schedule()]),
+      finJornada,
+      NOW,
+    );
+    expect(suggested.toISOString()).toBe("2026-09-04T21:00:00.000Z"); // 17:00 RD
+  });
+
+  test("una jornada abierta usa el horario de SU día, no el de hoy", () => {
+    // Jornada abierta el MARTES 2026-09-01 (sale 17:00); hoy es VIERNES
+    // 2026-09-04 (sale 15:00). La sugerencia tiene que ser la del martes.
+    const abierta = punch({
+      id: 90,
+      type: "InicioJornada",
+      createdDate: "2026-09-01T12:00:00.000Z", // 08:00 RD del martes 1-sep
+    });
+    const conJornadaAbierta = panel({
+      openDayEvents: [abierta],
+      userSchedules: [
+        schedule({ weekDay: "Martes", workExitTime: "17:00:00" }),
+        schedule({ weekDay: "Viernes", workExitTime: "15:00:00" }),
+      ],
+    });
+    const action = getNextAdminAction(conJornadaAbierta, "Jornada");
+    expect(action.type).toBe("FinJornada");
+
+    const suggested = getSuggestedPunchTime(conJornadaAbierta, action, NOW);
+    // 17:00 RD del martes 1-sep, no las 15:00 del viernes.
+    expect(suggested.toISOString()).toBe("2026-09-01T21:00:00.000Z");
+
+    // Y el createdDate queda coherente: día del martes, hora del martes.
+    const day = getAdminPunchDay(conJornadaAbierta, action, NOW);
+    expect(buildAdminCreatedDate(day, suggested)).toBe(
+      "2026-09-01T17:00:00-04:00",
+    );
+  });
+
+  test("sin horario para el día de la jornada abierta cae a la hora actual", () => {
+    const abierta = punch({
+      id: 90,
+      type: "InicioJornada",
+      createdDate: "2026-09-01T12:00:00.000Z", // martes
+    });
+    const soloViernes = panel({
+      openDayEvents: [abierta],
+      userSchedules: [schedule({ weekDay: "Viernes" })],
+    });
+    const action = getNextAdminAction(soloViernes, "Jornada");
+    expect(getSuggestedPunchTime(soloViernes, action, NOW)).toBe(NOW);
+  });
+
+  test("sin horario para HOY cae a la hora actual", () => {
+    // Horario de lunes, hoy es viernes.
+    const otroDia = withSchedule([schedule({ weekDay: "Lunes" })]);
+    expect(getSuggestedPunchTime(otroDia, finJornada, NOW)).toBe(NOW);
+  });
+
+  test("sin userSchedules cae a la hora actual", () => {
+    expect(getSuggestedPunchTime(panel({}), finJornada, NOW)).toBe(NOW);
+    expect(getSuggestedPunchTime(null, finJornada, NOW)).toBe(NOW);
+  });
+
+  test("workExitTime ilegible cae a la hora actual, no a una fecha inválida", () => {
+    const roto = withSchedule([schedule({ workExitTime: "no-es-hora" })]);
+    expect(getSuggestedPunchTime(roto, finJornada, NOW)).toBe(NOW);
+  });
+
+  test("Jornada→ENTRADA no se toca: sigue en la hora actual", () => {
+    expect(salida.type).toBe("InicioJornada");
+    expect(
+      getSuggestedPunchTime(
+        withSchedule([schedule({ workExitTime: "15:00:00" })]),
+        salida,
+        NOW,
+      ),
+    ).toBe(NOW);
+  });
+
+  test("Break no se toca: sigue en la hora actual", () => {
+    for (const category of ["Break"] as const) {
+      const breakAction = getNextAdminAction(
+        panel({ punchesToday: [punch({ type: "InicioJornada" })] }),
+        category,
+      );
+      expect(
+        getSuggestedPunchTime(
+          withSchedule([schedule({ workExitTime: "15:00:00" })]),
+          breakAction,
+          NOW,
+        ),
+      ).toBe(NOW);
+    }
+  });
+
+  test("la hora sugerida sobrevive el round-trip a createdDate", () => {
+    const suggested = getSuggestedPunchTime(
+      withSchedule([schedule({ workExitTime: "15:30:00" })]),
+      finJornada,
+      NOW,
+    );
+    expect(buildAdminCreatedDate(NOW, suggested)).toBe(
+      "2026-09-04T15:30:00-04:00",
+    );
+  });
+
+});
+
 // ── Normalización de listados ─────────────────────────────────────────────────
 
 describe("toOpenWorkdayRows", () => {
@@ -350,8 +585,11 @@ describe("toOpenWorkdayRows", () => {
     },
   };
 
+  // 3-sep 12:00Z = 08:00 RD del 3-sep (createdDate de `row`).
+  const NOW_SAME_DAY = new Date("2026-09-03T20:00:00.000Z"); // 16:00 RD del 3
+
   test("mapea nombre, rol y contadores del webapp", () => {
-    const [mapped] = toOpenWorkdayRows([row]);
+    const [mapped] = toOpenWorkdayRows([row], NOW_SAME_DAY);
     expect(mapped).toMatchObject({
       punchId: 9511,
       schoolUserId: TARGET_ID,
@@ -364,22 +602,104 @@ describe("toOpenWorkdayRows", () => {
       tagName: "Personal",
       permissionType: "Salud",
       permissionState: "Aprobado",
+      diasTrans: 0,
     });
   });
 
   test("contadores ausentes cuentan como 0, no NaN", () => {
-    const [mapped] = toOpenWorkdayRows([
-      { ...row, schoolUser: { ...row.schoolUser!, adminPunchCount: null } },
-    ]);
+    const [mapped] = toOpenWorkdayRows(
+      [{ ...row, schoolUser: { ...row.schoolUser!, adminPunchCount: null } }],
+      NOW_SAME_DAY,
+    );
     expect(mapped.entradas).toBe(0);
     expect(mapped.salidas).toBe(0);
   });
 
-  test("s3Photo tiene precedencia sobre photourl", () => {
-    const [mapped] = toOpenWorkdayRows([
-      { ...row, schoolUser: { ...row.schoolUser!, s3Photo: "https://s3/a.jpg" } },
-    ]);
+  test("photourl tiene precedencia sobre s3Photo", () => {
+    // Mismo orden que punchinout.tsx, que arma el avatar solo con photourl.
+    const [mapped] = toOpenWorkdayRows(
+      [{ ...row, schoolUser: { ...row.schoolUser!, s3Photo: "https://s3/a.jpg" } }],
+      NOW_SAME_DAY,
+    );
+    expect(mapped.photourl).toBe("uploads/a.jpg");
+  });
+
+  test("s3Photo se usa cuando NO hay photourl — sigue siendo un fallback válido", () => {
+    const [mapped] = toOpenWorkdayRows(
+      [
+        {
+          ...row,
+          schoolUser: {
+            ...row.schoolUser!,
+            photourl: null,
+            s3Photo: "https://s3/a.jpg",
+          },
+        },
+      ],
+      NOW_SAME_DAY,
+    );
     expect(mapped.photourl).toBe("https://s3/a.jpg");
+  });
+
+  test("sin ninguna de las dos, null", () => {
+    const [mapped] = toOpenWorkdayRows(
+      [{ ...row, schoolUser: { ...row.schoolUser!, photourl: null } }],
+      NOW_SAME_DAY,
+    );
+    expect(mapped.photourl).toBeNull();
+  });
+
+  test("Días Trans. = 0 el mismo día en que quedó abierta", () => {
+    expect(toOpenWorkdayRows([row], NOW_SAME_DAY)[0].diasTrans).toBe(0);
+  });
+
+  test("Días Trans. = 1 al día siguiente", () => {
+    const nextDay = new Date("2026-09-04T20:00:00.000Z"); // 16:00 RD del 4
+    expect(toOpenWorkdayRows([row], nextDay)[0].diasTrans).toBe(1);
+  });
+
+  test("Días Trans. cuenta varios días", () => {
+    const sixDaysLater = new Date("2026-09-09T20:00:00.000Z"); // 16:00 RD del 9
+    expect(toOpenWorkdayRows([row], sixDaysLater)[0].diasTrans).toBe(6);
+  });
+
+  test("BORDE medianoche: cuenta días de calendario, no bloques de 24h", () => {
+    // Abre 23:30 RD del 3-sep (03:30Z del 4), se mira 00:30 RD del 4-sep
+    // (04:30Z): solo pasó 1 hora, pero ya cruzó la medianoche → 1 día.
+    const nocturno = {
+      ...row,
+      createdDate: "2026-09-04T03:30:00.000Z",
+    };
+    const justAfterMidnight = new Date("2026-09-04T04:30:00.000Z");
+    expect(toOpenWorkdayRows([nocturno], justAfterMidnight)[0].diasTrans).toBe(
+      1,
+    );
+  });
+
+  test("BORDE medianoche: 23h dentro del MISMO día RD siguen siendo 0", () => {
+    // Abre 00:30 RD del 3-sep, se mira 23:30 RD del 3-sep: casi 24h, mismo día.
+    const madrugada = { ...row, createdDate: "2026-09-03T04:30:00.000Z" };
+    const sameDayNight = new Date("2026-09-04T03:30:00.000Z");
+    expect(toOpenWorkdayRows([madrugada], sameDayNight)[0].diasTrans).toBe(0);
+  });
+
+  test("una fecha futura da 0, nunca un negativo", () => {
+    const past = new Date("2026-09-01T20:00:00.000Z");
+    expect(toOpenWorkdayRows([row], past)[0].diasTrans).toBe(0);
+  });
+
+  test("daysElapsedRD no depende de la hora del día", () => {
+    // Mismo par de días de calendario, horas muy distintas → mismo resultado.
+    const from = new Date("2026-09-03T12:00:00.000Z"); // 08:00 RD del 3
+    expect(daysElapsedRD(from, new Date("2026-09-05T12:00:00.000Z"))).toBe(2);
+    expect(daysElapsedRD(from, new Date("2026-09-05T23:00:00.000Z"))).toBe(2);
+    expect(daysElapsedRD(from, new Date("2026-09-06T02:00:00.000Z"))).toBe(2);
+  });
+
+  test("cruza fin de mes sin romperse", () => {
+    const from = new Date("2026-08-30T16:00:00.000Z"); // 12:00 RD del 30-ago
+    const to = new Date("2026-09-02T16:00:00.000Z"); // 12:00 RD del 2-sep
+    expect(daysElapsedRD(from, to)).toBe(3);
   });
 
   test("una fila sin schoolUser identificable se descarta", () => {

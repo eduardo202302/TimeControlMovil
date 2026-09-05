@@ -32,16 +32,18 @@ import {
 } from "react-native";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import {
-  clampPickedTimeToNow,
   createAdminPunch,
+  daysElapsedRD,
   fetchEmployeePunchPanel,
   fetchOpenWorkdaysAdmin,
   formatEmployeeContact,
-  FUTURE_TIME_MESSAGE,
+  getAdminPunchDay,
+  getHistoryEvents,
   getNextAdminAction,
+  getOpenWorkdayDate,
+  getSuggestedPunchTime,
   identifyEmployeeByPhoto,
   isAdminBreakEnabled,
-  isFutureCreatedDate,
   searchEmployees,
   buildAdminCreatedDate,
   type AdminCategory,
@@ -52,10 +54,10 @@ import {
 import {
   getBreakTagCategoryId,
   getScheduleForDay,
+  getStatusColor,
   tagsOfCategory,
   toRD,
   WEEK_DAYS,
-  type PunchEvent,
   type Tag,
 } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
@@ -106,11 +108,60 @@ const CATEGORY_ICONS: Record<AdminCategory, keyof typeof Ionicons.glyphMap> = {
   Break: "cafe-outline",
 };
 
+/**
+ * Las 3 métricas de cada fila de "No finalizaron Jornada". Se declaran como
+ * datos y no como tres bloques de JSX repetidos para que el ícono, el label y
+ * el color no puedan quedar desalineados entre columnas.
+ *
+ * `key` apunta a un campo numérico de OpenWorkdayRow — el tipo obliga a que
+ * exista, así que renombrarlo en las rules rompe acá en compilación.
+ */
+const METRICS: {
+  key: "entradas" | "salidas" | "diasTrans";
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  circleStyle: "metricIconEntry" | "metricIconExit" | "metricIconDays";
+}[] = [
+  {
+    key: "entradas",
+    label: "Entradas",
+    icon: "enter-outline",
+    color: "#16A34A",
+    circleStyle: "metricIconEntry",
+  },
+  {
+    key: "salidas",
+    label: "Salidas",
+    icon: "exit-outline",
+    color: "#DC2626",
+    circleStyle: "metricIconExit",
+  },
+  {
+    key: "diasTrans",
+    label: "Días Trans.",
+    icon: "calendar-outline",
+    color: "#7C3AED",
+    circleStyle: "metricIconDays",
+  },
+];
+
+/**
+ * Nombres legibles de cada tipo de ponche. Las variantes Adicional/FH/Extra
+ * existen en el backend (UserPunchEvents/handlers.js) y sin entrada acá el
+ * fallback mostraría el identificador crudo, p. ej. "FinJornadaAdicional".
+ */
 const PUNCH_TYPE_LABELS: Record<string, string> = {
   InicioJornada: "Entrada Jornada",
-  FinJornada: "Salida Jornada",
+  FinJornada: "Fin Jornada",
+  InicioJornadaAdicional: "Inicio Jornada Adicional",
+  FinJornadaAdicional: "Fin Jornada Adicional",
+  InicioJornadaFH: "Inicio Jornada FH",
+  FinJornadaFH: "Fin Jornada FH",
+  InicioJornadaExtra: "Inicio Jornada Extra",
+  FinJornadaExtra: "Fin Jornada Extra",
   InicioAlmuerzo: "Entrada Almuerzo",
-  FinAlmuerzo: "Salida Almuerzo",
+  FinAlmuerzo: "Fin Almuerzo",
   InicioBreak: "Inicio Break",
   FinBreak: "Fin Break",
 };
@@ -134,6 +185,12 @@ function formatRDTimeShort(date: Date): string {
   const { hours, minutes } = toRD(date);
   const h12 = hours % 12 === 0 ? 12 : hours % 12;
   return `${pad(h12)}:${pad(minutes)} ${hours < 12 ? "a. m." : "p. m."}`;
+}
+
+/** "08/06/2026" — formato del título del historial, calcado del webapp. */
+function formatRDDateNumeric(date: Date): string {
+  const { year, month, day } = toRD(date);
+  return `${pad(day)}/${pad(month + 1)}/${year}`;
 }
 
 /** "miércoles, 3 de septiembre" */
@@ -459,14 +516,9 @@ export default function AdminPunchInOutScreen() {
         if (event.type !== "set" || !date) return;
       }
       if (!date) return;
-      // Salvaguarda client-side: el backend NO valida hora futura hoy, así que
-      // la selección se recorta a "ahora" en vez de aceptarla.
-      const now = new Date();
-      if (date.getTime() > now.getTime()) {
-        Alert.alert("Hora inválida", FUTURE_TIME_MESSAGE);
-        setPickedTime(clampPickedTimeToNow(date, now));
-        return;
-      }
+      // Cualquier hora es válida, incluida una futura: el backend no lo valida
+      // y el webapp tampoco lo restringe. Mismo comportamiento que la
+      // plataforma de referencia.
       setPickedTime(date);
     },
     [],
@@ -482,10 +534,44 @@ export default function AdminPunchInOutScreen() {
     () => getScheduleForDay(panel?.userSchedules ?? [], today),
     [panel, today],
   );
-  const punchesToday: PunchEvent[] = panel?.punchesToday ?? [];
+  /**
+   * Historial: con una jornada abierta de un día anterior son SUS eventos
+   * (openDayEvents), no los de hoy — si no, el historial queda vacío justo
+   * cuando hace falta ver qué pasó ese día.
+   */
+  const historyEvents = useMemo(() => getHistoryEvents(panel), [panel]);
+  const openWorkdayDate = useMemo(() => getOpenWorkdayDate(panel), [panel]);
+
+  /** "Historial del día viernes, 4 de septiembre - 2 días" cuando hay jornada abierta. */
+  const historyTitle = useMemo(() => {
+    if (!openWorkdayDate) return "Historial del Día";
+    const days = daysElapsedRD(openWorkdayDate, new Date());
+    return `Historial del día ${formatRDDateNumeric(openWorkdayDate)} - ${days} ${
+      days === 1 ? "día" : "días"
+    }`;
+  }, [openWorkdayDate]);
+
+  /**
+   * Hora inicial del picker. Va en un efecto y no en selectEmployee porque el
+   * horario del empleado llega DESPUÉS: al elegirlo todavía no hay panel, así
+   * que la sugerencia solo se puede calcular cuando el fetch responde. Se
+   * recalcula también al cambiar de pestaña, que es cuando cambia la acción.
+   */
+  useEffect(() => {
+    setPickedTime(getSuggestedPunchTime(panel, nextAction, new Date()));
+  }, [panel, nextAction]);
+  /**
+   * El día del ponche NO siempre es hoy: cerrar una jornada abierta de un día
+   * anterior tiene que llevar la fecha de esa jornada, o el backend lo rechaza
+   * por fecha que no coincide.
+   */
   const createdDate = useMemo(
-    () => buildAdminCreatedDate(today, pickedTime),
-    [today, pickedTime],
+    () =>
+      buildAdminCreatedDate(
+        getAdminPunchDay(panel, nextAction, today),
+        pickedTime,
+      ),
+    [panel, nextAction, today, pickedTime],
   );
   const selectedTagName =
     breakTags.find((t) => t.id === selectedTagId)?.name ?? null;
@@ -501,12 +587,8 @@ export default function AdminPunchInOutScreen() {
       Alert.alert("Motivo requerido", "Selecciona el motivo del break.");
       return;
     }
-    if (isFutureCreatedDate(createdDate, new Date())) {
-      Alert.alert("Hora inválida", FUTURE_TIME_MESSAGE);
-      return;
-    }
     setConfirmVisible(true);
-  }, [nextAction, breakTags.length, selectedTagId, createdDate]);
+  }, [nextAction, breakTags.length, selectedTagId]);
 
   const handleConfirmRegister = useCallback(async () => {
     if (!employee) return;
@@ -515,15 +597,6 @@ export default function AdminPunchInOutScreen() {
       Alert.alert("Error", "No hay conexión activa.");
       return;
     }
-    // Se revalida contra el reloj del momento del envío: el modal pudo quedar
-    // abierto y una hora que era pasada al abrirlo sigue siéndolo, pero una
-    // hora "ahora" no debe colarse al futuro por el camino inverso.
-    if (isFutureCreatedDate(createdDate, new Date())) {
-      setConfirmVisible(false);
-      Alert.alert("Hora inválida", FUTURE_TIME_MESSAGE);
-      return;
-    }
-
     setSubmitting(true);
     try {
       const result = await createAdminPunch({
@@ -569,8 +642,8 @@ export default function AdminPunchInOutScreen() {
 
   // ── Render ──
   const visibleHistory = historyShowAll
-    ? [...punchesToday].reverse()
-    : [...punchesToday].reverse().slice(0, HISTORY_COLLAPSED_LIMIT);
+    ? [...historyEvents].reverse()
+    : [...historyEvents].reverse().slice(0, HISTORY_COLLAPSED_LIMIT);
 
   return (
     <View style={styles.root}>
@@ -827,7 +900,12 @@ export default function AdminPunchInOutScreen() {
                     >
                       <View style={styles.sectionHeaderRow}>
                         <Ionicons name="list-outline" size={18} color="#2563EB" />
-                        <Text style={styles.sectionHeaderText}>Historial del Día</Text>
+                        <Text
+                          style={styles.sectionHeaderText}
+                          numberOfLines={2}
+                        >
+                          {historyTitle}
+                        </Text>
                       </View>
                       <Ionicons
                         name={historyExpanded ? "chevron-up" : "chevron-down"}
@@ -843,20 +921,27 @@ export default function AdminPunchInOutScreen() {
                             color="#2563EB"
                             style={styles.inlineLoader}
                           />
-                        ) : punchesToday.length === 0 ? (
+                        ) : historyEvents.length === 0 ? (
                           <View style={styles.emptyBlock}>
                             <Ionicons name="time-outline" size={30} color="#D1D5DB" />
-                            <Text style={styles.emptyText}>Sin registros hoy</Text>
+                            <Text style={styles.emptyText}>Sin registros</Text>
                           </View>
                         ) : (
-                          visibleHistory.map((punch) => (
+                          visibleHistory.map((punch) => {
+                            // El color lo decide el ESTADO del ponche, no si es
+                            // entrada o salida: una salida a tiempo y una
+                            // tardanza no pueden verse igual. El ícono sigue
+                            // saliendo del tipo.
+                            const statusColor = getStatusColor(punch.status);
+                            return (
                             <View key={punch.id} style={styles.punchRow}>
                               <View
                                 style={[
                                   styles.punchIcon,
-                                  punch.type.startsWith("Inicio")
-                                    ? styles.punchIconEntry
-                                    : styles.punchIconExit,
+                                  // Mismo color del ícono al ~13% de opacidad:
+                                  // el círculo acompaña al estado sin necesidad
+                                  // de un mapa de tintes paralelo que mantener.
+                                  { backgroundColor: `${statusColor}22` },
                                 ]}
                               >
                                 <Ionicons
@@ -868,11 +953,7 @@ export default function AdminPunchInOutScreen() {
                                         : "briefcase-outline"
                                   }
                                   size={16}
-                                  color={
-                                    punch.type.startsWith("Inicio")
-                                      ? "#16A34A"
-                                      : "#2563EB"
-                                  }
+                                  color={statusColor}
                                 />
                               </View>
                               <View style={styles.punchInfo}>
@@ -889,9 +970,10 @@ export default function AdminPunchInOutScreen() {
                                 {formatRDTimeShort(new Date(punch.createdDate))}
                               </Text>
                             </View>
-                          ))
+                            );
+                          })
                         )}
-                        {punchesToday.length > HISTORY_COLLAPSED_LIMIT && (
+                        {historyEvents.length > HISTORY_COLLAPSED_LIMIT && (
                           <TouchableOpacity
                             style={styles.historyToggleBtn}
                             onPress={() => setHistoryShowAll((prev) => !prev)}
@@ -899,7 +981,7 @@ export default function AdminPunchInOutScreen() {
                             <Text style={styles.historyToggleText}>
                               {historyShowAll
                                 ? "Ver menos"
-                                : `Ver todos (${punchesToday.length})`}
+                                : `Ver todos (${historyEvents.length})`}
                             </Text>
                           </TouchableOpacity>
                         )}
@@ -1150,7 +1232,6 @@ export default function AdminPunchInOutScreen() {
             value={pickedTime}
             mode="time"
             display={Platform.OS === "ios" ? "spinner" : "default"}
-            maximumDate={new Date()}
             onChange={handleTimeChange}
           />
         )}
@@ -1181,36 +1262,52 @@ export default function AdminPunchInOutScreen() {
           onPress={openSelector}
           activeOpacity={0.85}
         >
+          <View style={styles.primaryBtnIcon}>
+            <Ionicons name="finger-print" size={20} color="#fff" />
+          </View>
           <Text style={styles.primaryBtnText}>Registrar Acceso - ADM TC</Text>
         </TouchableOpacity>
 
         {/* ── No finalizaron Jornada ── */}
-        <View style={styles.floatCard}>
+        <View style={styles.openSection}>
           <View style={styles.sectionHeaderRow}>
             <Ionicons name="alert-circle-outline" size={18} color="#D97706" />
-            <Text style={styles.sectionHeaderText}>
-              No finalizaron Jornada
-            </Text>
+            <Text style={styles.sectionHeaderText}>No finalizaron Jornada</Text>
+            {/* Se oculta en 0: el estado vacío ya dice que no queda nadie, y
+                un "0" mientras carga sería un dato falso. */}
+            {openRows.length > 0 && (
+              <View style={styles.pendingPill}>
+                <Ionicons name="alert-circle" size={14} color="#D97706" />
+                <Text style={styles.pendingPillText}>
+                  {openRows.length}{" "}
+                  {openRows.length === 1 ? "pendiente" : "pendientes"}
+                </Text>
+              </View>
+            )}
           </View>
 
           {loadingOpenRows ? (
-            <ActivityIndicator color="#2563EB" style={styles.inlineLoader} />
+            <View style={styles.floatCard}>
+              <ActivityIndicator color="#2563EB" style={styles.inlineLoader} />
+            </View>
           ) : openRows.length === 0 ? (
-            <View style={styles.emptyBlock}>
-              <Ionicons
-                name="checkmark-circle-outline"
-                size={30}
-                color="#D1D5DB"
-              />
-              <Text style={styles.emptyText}>
-                Todos cerraron su jornada
-              </Text>
+            <View style={styles.floatCard}>
+              <View style={styles.emptyBlock}>
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={30}
+                  color="#D1D5DB"
+                />
+                <Text style={styles.emptyText}>
+                  Todos cerraron su jornada
+                </Text>
+              </View>
             </View>
           ) : (
             openRows.map((row) => (
               <TouchableOpacity
                 key={row.punchId}
-                style={styles.openRow}
+                style={styles.openCard}
                 onPress={() =>
                   openPanelFor({
                     schoolUserId: row.schoolUserId,
@@ -1224,55 +1321,51 @@ export default function AdminPunchInOutScreen() {
                 }
                 activeOpacity={0.75}
               >
-                <View style={styles.avatarSmall}>
-                  {photoUri(row.photourl) ? (
-                    <Image
-                      source={{ uri: photoUri(row.photourl) as string }}
-                      style={styles.avatarSmallImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <Ionicons name="person" size={18} color="#9CA3AF" />
-                  )}
+                {/* Identidad del usuario */}
+                <View style={styles.openRowHeader}>
+                  <View style={styles.avatarSmall}>
+                    {photoUri(row.photourl) ? (
+                      <Image
+                        source={{ uri: photoUri(row.photourl) as string }}
+                        style={styles.avatarSmallImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Ionicons name="person" size={18} color="#9CA3AF" />
+                    )}
+                  </View>
+                  <View style={styles.resultInfo}>
+                    <Text style={styles.resultName} numberOfLines={1}>
+                      {row.fullName}
+                    </Text>
+                    <Text style={styles.resultMeta} numberOfLines={1}>
+                      {row.roleName}
+                    </Text>
+                    <Text style={styles.openRowDate}>
+                      {formatRDDateShort(new Date(row.createdDate))} ·{" "}
+                      {formatRDTimeShort(new Date(row.createdDate))}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
                 </View>
-                <View style={styles.resultInfo}>
-                  <Text style={styles.resultName} numberOfLines={1}>
-                    {row.fullName}
-                  </Text>
-                  <Text style={styles.resultMeta} numberOfLines={1}>
-                    {row.roleName}
-                  </Text>
-                  <Text style={styles.openRowDate}>
-                    {formatRDDateShort(new Date(row.createdDate))} ·{" "}
-                    {formatRDTimeShort(new Date(row.createdDate))}
-                  </Text>
-                  {(!!row.tagName || !!row.permissionType) && (
-                    <View style={styles.badgeRow}>
-                      {!!row.tagName && (
-                        <View style={styles.tagBadge}>
-                          <Text style={styles.tagBadgeText}>
-                            {row.tagName}
-                          </Text>
-                        </View>
-                      )}
-                      {!!row.permissionType && (
-                        <View style={styles.permBadge}>
-                          <Text style={styles.permBadgeText}>
-                            {row.permissionType}
-                            {row.permissionState
-                              ? ` · ${row.permissionState}`
-                              : ""}
-                          </Text>
-                        </View>
-                      )}
+
+                {/* Métricas: 3 columnas a lo ancho de la card */}
+                <View style={styles.metricRow}>
+                  {METRICS.map((metric) => (
+                    <View key={metric.key} style={styles.metricCol}>
+                      <View
+                        style={[styles.metricIcon, styles[metric.circleStyle]]}
+                      >
+                        <Ionicons
+                          name={metric.icon}
+                          size={16}
+                          color={metric.color}
+                        />
+                      </View>
+                      <Text style={styles.metricLabel}>{metric.label}</Text>
+                      <Text style={styles.metricValue}>{row[metric.key]}</Text>
                     </View>
-                  )}
-                </View>
-                <View style={styles.counters}>
-                  <Text style={styles.counterLabel}>Entradas</Text>
-                  <Text style={styles.counterValue}>{row.entradas}</Text>
-                  <Text style={styles.counterLabel}>Salidas</Text>
-                  <Text style={styles.counterValue}>{row.salidas}</Text>
+                  ))}
                 </View>
               </TouchableOpacity>
             ))
@@ -1289,6 +1382,10 @@ export default function AdminPunchInOutScreen() {
 const AVATAR_SIZE = 64;
 /** Lado del avatar de las filas de lista. */
 const AVATAR_SM_SIZE = 38;
+/** Lado del círculo de ícono de cada métrica de "No finalizaron Jornada". */
+const METRIC_ICON_SIZE = 32;
+/** Lado del círculo de ícono dentro del botón "Registrar Acceso - ADM TC". */
+const PRIMARY_BTN_ICON_SIZE = 34;
 
 function createStyles(
   scale: (size: number) => number,
@@ -1340,13 +1437,60 @@ function createStyles(
 
     /* ── Entrada: botón que abre el modal ── */
     primaryBtn: {
+      flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
+      gap: scale(10),
       backgroundColor: "#2563EB",
       borderRadius: RADIUS_LG,
-      paddingVertical: verticalScale(16),
+      paddingVertical: verticalScale(12),
+      // Elevación: lo despega del fondo y lo hace leer como control táctil.
+      // Misma receta que selectorCard, con la sombra un poco más marcada
+      // porque acá el contraste es azul sobre gris, no blanco sobre gris.
+      elevation: 4,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 6,
+    },
+    /**
+     * Círculo translúcido detrás del ícono — es lo que le da profundidad al
+     * botón: sobre el azul plano se lee como una capa por encima, no como un
+     * glifo pegado al fondo. Lado fijo, mismo criterio que los avatares.
+     */
+    primaryBtnIcon: {
+      width: PRIMARY_BTN_ICON_SIZE,
+      height: PRIMARY_BTN_ICON_SIZE,
+      // Círculo: mitad del lado fijo, no un radio de diseño.
+      borderRadius: PRIMARY_BTN_ICON_SIZE / 2,
+      backgroundColor: "rgba(255,255,255,0.18)",
+      alignItems: "center",
+      justifyContent: "center",
     },
     primaryBtnText: { fontSize: font(16), fontWeight: "700", color: "#fff" },
+    /**
+     * Pill de pendientes, al final del header de la sección.
+     *
+     * `marginLeft: "auto"` la empuja contra el borde derecho sin tocar
+     * sectionHeaderRow, que es compartido con las otras secciones. `alignSelf`
+     * la centra verticalmente respecto al título.
+     */
+    pendingPill: {
+      marginLeft: "auto",
+      alignSelf: "center",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(6),
+      backgroundColor: "#FEF3C7",
+      borderRadius: RADIUS_PILL,
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(5),
+    },
+    pendingPillText: {
+      fontSize: font(12),
+      fontWeight: "700",
+      color: "#D97706",
+    },
 
     /* ── Modal selector de usuario ── */
     selectorOverlay: {
@@ -1404,6 +1548,7 @@ function createStyles(
       fontWeight: "700",
       color: "#1D4ED8",
     },
+
     selectorSearchRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -1476,13 +1621,32 @@ function createStyles(
     },
 
     /* ── No finalizaron Jornada ── */
-    openRow: {
+    /** La sección ya no es UNA card con divisores: es un header suelto y una
+     *  card independiente por empleado, separadas por este gap. */
+    openSection: {
+      gap: verticalScale(10),
+      // Suma al gap del contentContainer: el botón quedaba muy pegado al
+      // header. Va acá y no en el gap general para no separar todo lo demás.
+      marginTop: verticalScale(14),
+    },
+    /**
+     * Card por empleado. Mismo lenguaje visual que floatCard (fondo blanco,
+     * borde sutil, RADIUS_XL) pero con padding vertical más corto: la fila
+     * apila identidad + métricas, y con el aire de floatCard cada tarjeta
+     * quedaba innecesariamente alta.
+     */
+    openCard: {
+      backgroundColor: "#fff",
+      borderRadius: RADIUS_XL,
+      borderWidth: 1.5,
+      borderColor: "#E5E7EB",
+      paddingHorizontal: scale(14),
+      paddingVertical: verticalScale(10),
+    },
+    openRowHeader: {
       flexDirection: "row",
-      alignItems: "flex-start",
+      alignItems: "center",
       gap: scale(10),
-      paddingVertical: verticalScale(12),
-      borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
     },
     openRowDate: {
       fontSize: font(11),
@@ -1490,44 +1654,34 @@ function createStyles(
       marginTop: verticalScale(2),
       fontWeight: "600",
     },
-    badgeRow: {
+    metricRow: {
       flexDirection: "row",
-      flexWrap: "wrap",
-      gap: scale(6),
-      marginTop: verticalScale(6),
+      marginTop: verticalScale(8),
+      gap: scale(8),
     },
-    tagBadge: {
-      backgroundColor: "#FEF3C7",
-      borderRadius: RADIUS_PILL,
-      paddingHorizontal: scale(8),
-      paddingVertical: verticalScale(2),
+    metricCol: { flex: 1, alignItems: "center" },
+    /** Círculo de ícono — lado fijo, mismo criterio que los avatares. */
+    metricIcon: {
+      width: METRIC_ICON_SIZE,
+      height: METRIC_ICON_SIZE,
+      // Círculo: mitad del lado fijo, no un radio de diseño.
+      borderRadius: METRIC_ICON_SIZE / 2,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: verticalScale(2),
     },
-    tagBadgeText: {
-      fontSize: font(11),
-      color: "#92400E",
-      fontWeight: "600",
-    },
-    permBadge: {
-      backgroundColor: "#EFF6FF",
-      borderRadius: RADIUS_PILL,
-      paddingHorizontal: scale(8),
-      paddingVertical: verticalScale(2),
-    },
-    permBadgeText: {
-      fontSize: font(11),
-      color: "#1D4ED8",
-      fontWeight: "600",
-    },
-    counters: { alignItems: "flex-end" },
-    counterLabel: {
+    metricIconEntry: { backgroundColor: "#DCFCE7" },
+    metricIconExit: { backgroundColor: "#FEE2E2" },
+    metricIconDays: { backgroundColor: "#EDE9FE" },
+    metricLabel: {
       fontSize: font(11),
       color: "#6B7280",
     },
-    counterValue: {
-      fontSize: font(15),
+    metricValue: {
+      fontSize: font(16),
       fontWeight: "700",
       color: "#142157",
-      marginBottom: verticalScale(2),
+      marginTop: verticalScale(1),
     },
 
     /* ── Avatares ── */
@@ -1727,8 +1881,6 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
     },
-    punchIconEntry: { backgroundColor: "#DCFCE7" },
-    punchIconExit: { backgroundColor: "#EFF6FF" },
     punchInfo: { flex: 1 },
     punchType: { fontSize: font(13), fontWeight: "600", color: "#111827" },
     punchStatus: {

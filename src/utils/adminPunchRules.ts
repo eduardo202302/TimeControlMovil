@@ -2,6 +2,8 @@ import axios from "axios";
 import type { UserSchedule } from "../../types/typeStore/SchoolStoreType";
 import {
   findOpenDayPunchForUser,
+  getPendingOpenDayDate,
+  getScheduleForDay,
   RD_UTC_OFFSET,
   toRD,
   toRDDateString,
@@ -105,6 +107,8 @@ export interface OpenWorkdayRow {
    */
   entradas: number;
   salidas: number;
+  /** Días de calendario RD transcurridos desde que quedó abierta la jornada. */
+  diasTrans: number;
   tagName: string | null;
   permissionType: string | null;
   permissionState: string | null;
@@ -160,8 +164,16 @@ function readCount(raw: unknown): number {
   return typeof n === "number" && Number.isFinite(n) ? n : 0;
 }
 
+/**
+ * Foto de perfil: `photourl` primero, `s3Photo` solo como respaldo.
+ *
+ * Es el orden que ya funciona en punchinout.tsx, que arma la URL del avatar
+ * únicamente con `photourl`. `s3Photo` se conserva como fallback para el caso
+ * en que un usuario tenga solo esa — no se descarta, pero no le gana a
+ * `photourl` cuando existen las dos.
+ */
 function readPhoto(su: AdminSchoolUser | null | undefined): string | null {
-  return su?.s3Photo ?? su?.photourl ?? null;
+  return su?.photourl ?? su?.s3Photo ?? null;
 }
 
 /** Un string del backend, o null si viene vacío/en blanco. */
@@ -172,18 +184,44 @@ function readText(raw: unknown): string | null {
 }
 
 /**
+ * Días de calendario transcurridos entre dos instantes, contados en zona RD.
+ *
+ * Cuenta DÍAS DE CALENDARIO, no bloques de 24h: una jornada abierta a las
+ * 23:30 del lunes ya lleva 1 día el martes a las 00:30. Es la semántica de un
+ * contador "Días Trans." en un reporte — lo que importa es cuántas veces pasó
+ * la medianoche, no las horas exactas.
+ *
+ * Se normaliza cada fecha con toRD() y se compara sobre Date.UTC de sus
+ * componentes de calendario, así el resultado no depende de la zona del
+ * dispositivo ni de horarios de verano.
+ *
+ * Una fecha futura da 0, no un negativo: "hace -2 días" no significa nada en
+ * esta lista.
+ */
+export function daysElapsedRD(from: Date, to: Date): number {
+  const a = toRD(from);
+  const b = toRD(to);
+  const dayFrom = Date.UTC(a.year, a.month, a.day);
+  const dayTo = Date.UTC(b.year, b.month, b.day);
+  const days = Math.round((dayTo - dayFrom) / 86_400_000);
+  return days > 0 ? days : 0;
+}
+
+/**
  * /punches/opendays → filas de la lista. Descarta las que no traigan
  * `schoolUser.id`: sin él no hay a quién ponchar, y una fila que no se puede
  * seleccionar solo confundiría.
  */
 export function toOpenWorkdayRows(
   punches: AdminOpenDayPunch[],
+  now: Date = new Date(),
 ): OpenWorkdayRow[] {
   const rows: OpenWorkdayRow[] = [];
   for (const punch of punches ?? []) {
     const su = punch.schoolUser;
     const schoolUserId = su?.id ?? punch.schoolUserId;
     if (typeof schoolUserId !== "number") continue;
+    const openedAt = getPendingOpenDayDate(punch);
     rows.push({
       punchId: punch.id,
       schoolUserId,
@@ -196,6 +234,10 @@ export function toOpenWorkdayRows(
       createdDate: punch.createdDate,
       entradas: readCount(su?.adminPunchCount?.admInitJornada),
       salidas: readCount(su?.adminPunchCount?.admFinJornada),
+      // getPendingOpenDayDate ya resuelve las tres formas de fecha que manda
+      // el backend (día suelto, ISO con zona, ISO sin zona) — no se re-parsea
+      // acá. Sin fecha legible, 0 en vez de un número inventado.
+      diasTrans: openedAt ? daysElapsedRD(openedAt, now) : 0,
       tagName: punch.tag?.name ?? null,
       permissionType: punch.permission?.typeTag?.name ?? null,
       permissionState: punch.permission?.stateTag?.name ?? null,
@@ -267,7 +309,7 @@ export function toEmployeeOption(raw: unknown): EmployeeOption | null {
       fullName: row.fullName ?? "Sin nombre",
       roleName: row.role?.name ?? "",
       code: row.code ?? null,
-      photourl: row.s3Photo ?? row.photourl ?? null,
+      photourl: row.photourl ?? row.s3Photo ?? null,
       email: readText(row.email),
       phone: readText(row.phone),
     };
@@ -362,32 +404,111 @@ export function buildAdminCreatedDate(day: Date, picked: Date): string {
   return `${toRDDateString(day)}T${pad(hours)}:${pad(minutes)}:00${RD_UTC_OFFSET}`;
 }
 
-// ─── Salvaguarda de hora futura ───────────────────────────────────────────────
-
-export const FUTURE_TIME_MESSAGE =
-  "No puedes registrar un ponche con una hora futura.";
-
 /**
- * Guard client-side: el backend NO valida esto hoy (su chequeo está comentado
- * "temporalmente"), así que un admin podría dejar registrada una salida que
- * todavía no ocurrió. Se bloquea acá.
+ * Fecha en que se abrió la jornada que sigue sin cerrar, o null si el panel no
+ * arrastra ninguna.
  *
- * Acepta el string ya construido o un Date, para poder llamarlo tanto desde el
- * time picker (antes de aceptar la selección) como justo antes del POST.
+ * Sale del InicioJornada de `openDayEvents` — mismo criterio que usan las
+ * filas de "No finalizaron Jornada", y se parsea con getPendingOpenDayDate,
+ * que ya resuelve las tres formas de fecha del backend.
+ *
+ * Si por lo que sea no hubiera un InicioJornada explícito, cae al primer
+ * evento de la lista: todos son del mismo día, así que la fecha es la misma.
  */
-export function isFutureCreatedDate(
-  createdDate: string | Date,
-  now: Date,
-): boolean {
-  const instant =
-    createdDate instanceof Date ? createdDate : new Date(createdDate);
-  if (Number.isNaN(instant.getTime())) return false;
-  return instant.getTime() > now.getTime();
+export function getOpenWorkdayDate(panel: AdminPunchPanel | null): Date | null {
+  const events = panel?.openDayEvents ?? [];
+  if (events.length === 0) return null;
+  const opening =
+    events.find((event) => event.type === ADMIN_PUNCH_TYPE_MAP.Jornada.inicio) ??
+    events.find((event) => event.type.startsWith("Inicio")) ??
+    events[0];
+  return getPendingOpenDayDate(opening);
 }
 
-/** La selección del picker, recortada a "ahora" si se fue al futuro. */
-export function clampPickedTimeToNow(picked: Date, now: Date): Date {
-  return picked.getTime() > now.getTime() ? now : picked;
+/**
+ * Los eventos que muestra "Historial del Día".
+ *
+ * Con una jornada abierta de un día anterior, `punchesToday` no la contiene:
+ * los ponches de esa jornada viven en `openDayEvents`, que ya es la lista
+ * COMPLETA de ese día (mismo shape, no un subconjunto). Mostrar punchesToday
+ * ahí dejaría el historial vacío justo cuando más se necesita ver qué pasó.
+ */
+export function getHistoryEvents(panel: AdminPunchPanel | null): PunchEvent[] {
+  return hasOpenWorkday(panel)
+    ? (panel?.openDayEvents ?? [])
+    : (panel?.punchesToday ?? []);
+}
+
+/**
+ * El DÍA que lleva el `createdDate` del ponche.
+ *
+ * Al cerrar una jornada que quedó abierta un día anterior, la fecha tiene que
+ * ser la de ESA jornada, no la de hoy: el backend valida que coincidan y
+ * rechaza el cierre con "La fecha debe coincidir con el día del InicioJornada
+ * que se está cerrando" — el mismo error que el ponchador normal ya evita en
+ * su modal de "Jornada Incompleta".
+ *
+ * Solo aplica a FinJornada con jornada abierta arrastrada. Todo lo demás
+ * (InicioJornada, Break, y el cierre de una jornada de hoy) va con `today`.
+ * Si la fecha de apertura no se puede leer, cae a `today` en vez de adivinar.
+ */
+export function getAdminPunchDay(
+  panel: AdminPunchPanel | null,
+  action: AdminNextAction,
+  today: Date,
+): Date {
+  if (action.type !== ADMIN_PUNCH_TYPE_MAP.Jornada.fin) return today;
+  if (!hasOpenWorkday(panel)) return today;
+  return getOpenWorkdayDate(panel) ?? today;
+}
+
+/**
+ * Hora con la que abre el time picker.
+ *
+ * Para cerrar una jornada (FinJornada) arranca SIEMPRE en el `workExitTime`
+ * del horario del empleado para EL DÍA DE ESA JORNADA — hoy, o el día en que
+ * quedó abierta si se arrastra de antes —, sin compararlo contra la hora
+ * actual: el admin casi siempre está cerrando una salida a la hora
+ * programada, así que es el valor que menos ediciones necesita.
+ *
+ * Puede quedar en el futuro (cerrar a las 15:00 una jornada que termina
+ * 17:00) y eso se envía tal cual: no hay validación de hora futura, ni acá ni
+ * en el backend ni en el webapp.
+ *
+ * El resto de las combinaciones (Entrada de Jornada, Break) y la ausencia de
+ * horario para hoy caen en "ahora".
+ */
+export function getSuggestedPunchTime(
+  panel: AdminPunchPanel | null,
+  action: AdminNextAction,
+  now: Date,
+): Date {
+  if (action.type !== ADMIN_PUNCH_TYPE_MAP.Jornada.fin) return now;
+
+  // El horario se busca por el DÍA DEL PONCHE, no por hoy: si la jornada quedó
+  // abierta un martes y se cierra un jueves, la salida que corresponde es la
+  // del martes. Se reusa getAdminPunchDay para que la fecha del createdDate y
+  // la del horario no puedan divergir. Mismo criterio que el modal de
+  // "Jornada Incompleta" de punchinout.tsx, que busca el schedule con
+  // pendingPunchDate en vez de con la fecha de hoy.
+  const day = getAdminPunchDay(panel, action, now);
+
+  // Mismo matching por weekDay que usa la pantalla para pintar Horario/Almuerzo.
+  const schedule = getScheduleForDay(panel?.userSchedules ?? [], day);
+  const exit = schedule?.workExitTime;
+  if (!exit) return now;
+
+  const [rawHour, rawMinute] = String(exit).split(":");
+  const hour = Number(rawHour);
+  const minute = Number(rawMinute);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return now;
+
+  const suggested = new Date(
+    `${toRDDateString(day)}T${pad(hour)}:${pad(minute)}:00${RD_UTC_OFFSET}`,
+  );
+  if (Number.isNaN(suggested.getTime())) return now;
+
+  return suggested;
 }
 
 // ─── Estado del empleado seleccionado ─────────────────────────────────────────
