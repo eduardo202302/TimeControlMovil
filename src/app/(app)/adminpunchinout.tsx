@@ -1959,7 +1959,7 @@ function createStyles(
     punchType: { fontSize: font(11), fontWeight: "600", color: "#111827" },
     /** Sin `color` propio: siempre se pisa con getStatusColor(punch.status). */
     punchStatus: {
-      fontSize: font(8),
+      fontSize: font(11),
       marginTop: verticalScale(1),
     },
     punchTime: { fontSize: font(11), fontWeight: "700", color: "#142157" },
