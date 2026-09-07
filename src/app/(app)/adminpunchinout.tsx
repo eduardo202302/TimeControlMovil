@@ -198,6 +198,12 @@ function formatRDDateNumeric(date: Date): string {
   return `${pad(day)}/${pad(month + 1)}/${year}`;
 }
 
+/** "04/09/26" — mismo formato que formatRDDateNumeric, año a 2 dígitos. */
+function formatRDDateNumericShort(date: Date): string {
+  const { year, month, day } = toRD(date);
+  return `${pad(day)}/${pad(month + 1)}/${pad(year % 100)}`;
+}
+
 /** "miércoles, 3 de septiembre" */
 function formatRDDateShort(date: Date): string {
   const { weekDay, day, month } = toRD(date);
@@ -1374,12 +1380,21 @@ export default function AdminPunchInOutScreen() {
                     <Text style={styles.resultName} numberOfLines={1}>
                       {row.fullName}
                     </Text>
-                    <Text style={styles.resultMeta} numberOfLines={1}>
-                      {row.roleName}
-                    </Text>
-                    <Text style={styles.openRowDate}>
-                      {formatRDDateShort(new Date(row.createdDate))} ·{" "}
-                      {formatRDTimeShort(new Date(row.createdDate))}
+                    <View style={styles.lastPunchRow}>
+                      <Ionicons
+                        name="calendar-outline"
+                        size={12}
+                        color="#6B7280"
+                      />
+                      <Text style={styles.lastPunchText}>
+                        Últ. Registro:{" "}
+                        {formatRDDateNumericShort(new Date(row.createdDate))}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.countBadge}>
+                    <Text style={styles.countBadgeText}>
+                      ID: {row.schoolUserId}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
@@ -1648,6 +1663,9 @@ function createStyles(
       fontSize: font(14),
       fontWeight: "700",
       color: "#111827",
+      // El nombre puede compartir fila con el badge de ID y el chevron —
+      // sin esto, un nombre largo empuja el layout en vez de truncarse.
+      flexShrink: 1,
     },
     resultId: { fontWeight: "700", color: "#2563EB" },
     resultMeta: {
@@ -1684,12 +1702,18 @@ function createStyles(
       alignItems: "center",
       gap: scale(10),
     },
-    openRowDate: {
-      fontSize: font(11),
-      color: "#D97706",
-      marginTop: verticalScale(2),
-      fontWeight: "600",
+    /** Ícono + "Últ. Registro: ..." — mismo texto secundario gris de la card
+     *  (resultMeta), con el ícono de calendario delante. */
+    lastPunchRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(4),
+      marginTop: verticalScale(1),
     },
+    /** Mismo tamaño/color que resultMeta (texto secundario gris de la card) —
+     *  sin su marginTop propio, que ya lo aporta lastPunchRow y desalinearía
+     *  el texto respecto al ícono de calendario si se duplicara. */
+    lastPunchText: { fontSize: font(12), color: "#6B7280" },
     metricRow: {
       flexDirection: "row",
       marginTop: verticalScale(8),
