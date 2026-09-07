@@ -32,6 +32,7 @@ import {
 } from "react-native";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import {
+  buildAdminCreatedDate,
   createAdminPunch,
   daysElapsedRD,
   fetchEmployeePunchPanel,
@@ -46,7 +47,6 @@ import {
   isAdminBreakEnabled,
   isAdminLunchVisible,
   searchEmployees,
-  buildAdminCreatedDate,
   validateAdminPunchTime,
   type AdminCategory,
   type AdminPunchPanel,
@@ -371,7 +371,11 @@ export default function AdminPunchInOutScreen() {
       }
       // Sin filtro de rol: se muestra todo lo que devuelve el backend
       // (empleados y admins por igual) — decisión confirmada.
-      const found = await searchEmployees({ token, urlColegio, query: trimmed });
+      const found = await searchEmployees({
+        token,
+        urlColegio,
+        query: trimmed,
+      });
       if (seq !== searchSeq.current) return;
       setResults(found);
       setSearching(false);
@@ -490,7 +494,8 @@ export default function AdminPunchInOutScreen() {
     }
     let photo: ImagePicker.ImagePickerAsset | null = null;
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
           "Permiso requerido",
@@ -755,7 +760,9 @@ export default function AdminPunchInOutScreen() {
                       <View style={styles.avatarContainer}>
                         {photoUri(employee.photourl) ? (
                           <Image
-                            source={{ uri: photoUri(employee.photourl) as string }}
+                            source={{
+                              uri: photoUri(employee.photourl) as string,
+                            }}
                             style={styles.avatarImage}
                             resizeMode="cover"
                           />
@@ -782,15 +789,27 @@ export default function AdminPunchInOutScreen() {
                     </View>
 
                     {loadingPanel ? (
-                      <ActivityIndicator color="#2563EB" style={styles.inlineLoader} />
+                      <ActivityIndicator
+                        color="#2563EB"
+                        style={styles.inlineLoader}
+                      />
                     ) : todaySchedule ? (
                       <View style={styles.scheduleTable}>
                         <View
                           style={[styles.scheduleCol, styles.scheduleColWork]}
                         >
                           <View style={styles.scheduleColHead}>
-                            <Ionicons name="time-outline" size={14} color="#2563EB" />
-                            <Text style={[styles.scheduleLabel, styles.scheduleLabelWork]}>
+                            <Ionicons
+                              name="time-outline"
+                              size={14}
+                              color="#2563EB"
+                            />
+                            <Text
+                              style={[
+                                styles.scheduleLabel,
+                                styles.scheduleLabelWork,
+                              ]}
+                            >
                               Horario
                             </Text>
                           </View>
@@ -801,7 +820,10 @@ export default function AdminPunchInOutScreen() {
                         </View>
                         {!!todaySchedule.lunchEntryTime && (
                           <View
-                            style={[styles.scheduleCol, styles.scheduleColLunch]}
+                            style={[
+                              styles.scheduleCol,
+                              styles.scheduleColLunch,
+                            ]}
                           >
                             <View style={styles.scheduleColHead}>
                               <Ionicons
@@ -810,7 +832,10 @@ export default function AdminPunchInOutScreen() {
                                 color="#D97706"
                               />
                               <Text
-                                style={[styles.scheduleLabel, styles.scheduleLabelLunch]}
+                                style={[
+                                  styles.scheduleLabel,
+                                  styles.scheduleLabelLunch,
+                                ]}
                               >
                                 Almuerzo
                               </Text>
@@ -824,8 +849,14 @@ export default function AdminPunchInOutScreen() {
                       </View>
                     ) : (
                       <View style={styles.warnRow}>
-                        <Ionicons name="warning-outline" size={14} color="#D97706" />
-                        <Text style={styles.warnText}>Sin horario configurado</Text>
+                        <Ionicons
+                          name="warning-outline"
+                          size={14}
+                          color="#D97706"
+                        />
+                        <Text style={styles.warnText}>
+                          Sin horario configurado
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -849,7 +880,10 @@ export default function AdminPunchInOutScreen() {
                         return (
                           <TouchableOpacity
                             key={cat}
-                            style={[styles.tabBtn, active && styles.tabBtnActive]}
+                            style={[
+                              styles.tabBtn,
+                              active && styles.tabBtnActive,
+                            ]}
                             onPress={() => setCategory(cat)}
                             activeOpacity={0.75}
                           >
@@ -897,16 +931,25 @@ export default function AdminPunchInOutScreen() {
                           onPress={() => setTagModalVisible(true)}
                           activeOpacity={0.8}
                         >
-                          <Ionicons name="cafe-outline" size={20} color="#D97706" />
+                          <Ionicons
+                            name="cafe-outline"
+                            size={20}
+                            color="#D97706"
+                          />
                           <Text
                             style={[
                               styles.tagSelectorText,
-                              selectedTagName != null && styles.tagSelectorTextValue,
+                              selectedTagName != null &&
+                                styles.tagSelectorTextValue,
                             ]}
                           >
                             {selectedTagName ?? "Selecciona un motivo"}
                           </Text>
-                          <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                          <Ionicons
+                            name="chevron-down"
+                            size={16}
+                            color="#9CA3AF"
+                          />
                         </TouchableOpacity>
                       </>
                     )}
@@ -915,7 +958,8 @@ export default function AdminPunchInOutScreen() {
                       style={[
                         styles.registerBtn,
                         nextAction.kind === "fin" && styles.registerBtnExit,
-                        (loadingPanel || submitting) && styles.registerBtnDisabled,
+                        (loadingPanel || submitting) &&
+                          styles.registerBtnDisabled,
                       ]}
                       onPress={handlePressRegister}
                       disabled={loadingPanel || submitting}
@@ -931,7 +975,9 @@ export default function AdminPunchInOutScreen() {
                         color="#fff"
                       />
                       <View style={styles.registerTextWrap}>
-                        <Text style={styles.registerBtnText}>{nextAction.label}</Text>
+                        <Text style={styles.registerBtnText}>
+                          {nextAction.label}
+                        </Text>
                         <Text style={styles.registerBtnSub}>
                           ({nextAction.category})
                         </Text>
@@ -947,11 +993,12 @@ export default function AdminPunchInOutScreen() {
                       activeOpacity={0.7}
                     >
                       <View style={styles.sectionHeaderRow}>
-                        <Ionicons name="list-outline" size={18} color="#2563EB" />
-                        <Text
-                          style={styles.historyTitleText}
-                          numberOfLines={2}
-                        >
+                        <Ionicons
+                          name="list-outline"
+                          size={18}
+                          color="#2563EB"
+                        />
+                        <Text style={styles.historyTitleText} numberOfLines={2}>
                           {historyTitle}
                         </Text>
                       </View>
@@ -971,7 +1018,11 @@ export default function AdminPunchInOutScreen() {
                           />
                         ) : historyEvents.length === 0 ? (
                           <View style={styles.emptyBlock}>
-                            <Ionicons name="time-outline" size={30} color="#D1D5DB" />
+                            <Ionicons
+                              name="time-outline"
+                              size={30}
+                              color="#D1D5DB"
+                            />
                             <Text style={styles.emptyText}>Sin registros</Text>
                           </View>
                         ) : (
@@ -982,47 +1033,49 @@ export default function AdminPunchInOutScreen() {
                             // saliendo del tipo.
                             const statusColor = getStatusColor(punch.status);
                             return (
-                            <View key={punch.id} style={styles.punchRow}>
-                              <View
-                                style={[
-                                  styles.punchIcon,
-                                  // Mismo color del ícono al ~13% de opacidad:
-                                  // el círculo acompaña al estado sin necesidad
-                                  // de un mapa de tintes paralelo que mantener.
-                                  { backgroundColor: `${statusColor}22` },
-                                ]}
-                              >
-                                <Ionicons
-                                  name={
-                                    punch.type.includes("Break")
-                                      ? "cafe-outline"
-                                      : punch.type.includes("Almuerzo")
-                                        ? "restaurant-outline"
-                                        : "briefcase-outline"
-                                  }
-                                  size={16}
-                                  color={statusColor}
-                                />
-                              </View>
-                              <View style={styles.punchInfo}>
-                                <Text style={styles.punchType}>
-                                  {getPunchTypeLabel(punch.type)}
-                                </Text>
-                                {!!punch.status && (
-                                  <Text
-                                    style={[
-                                      styles.punchStatus,
-                                      { color: statusColor },
-                                    ]}
-                                  >
-                                    {punch.status}
+                              <View key={punch.id} style={styles.punchRow}>
+                                <View
+                                  style={[
+                                    styles.punchIcon,
+                                    // Mismo color del ícono al ~13% de opacidad:
+                                    // el círculo acompaña al estado sin necesidad
+                                    // de un mapa de tintes paralelo que mantener.
+                                    { backgroundColor: `${statusColor}22` },
+                                  ]}
+                                >
+                                  <Ionicons
+                                    name={
+                                      punch.type.includes("Break")
+                                        ? "cafe-outline"
+                                        : punch.type.includes("Almuerzo")
+                                          ? "restaurant-outline"
+                                          : "briefcase-outline"
+                                    }
+                                    size={16}
+                                    color={statusColor}
+                                  />
+                                </View>
+                                <View style={styles.punchInfo}>
+                                  <Text style={styles.punchType}>
+                                    {getPunchTypeLabel(punch.type)}
                                   </Text>
-                                )}
+                                  {!!punch.status && (
+                                    <Text
+                                      style={[
+                                        styles.punchStatus,
+                                        { color: statusColor },
+                                      ]}
+                                    >
+                                      {punch.status}
+                                    </Text>
+                                  )}
+                                </View>
+                                <Text style={styles.punchTime}>
+                                  {formatRDTimeShort(
+                                    new Date(punch.createdDate),
+                                  )}
+                                </Text>
                               </View>
-                              <Text style={styles.punchTime}>
-                                {formatRDTimeShort(new Date(punch.createdDate))}
-                              </Text>
-                            </View>
                             );
                           })
                         )}
@@ -1045,125 +1098,146 @@ export default function AdminPunchInOutScreen() {
               </>
             ) : (
               <>
-              {/* Header: título + cantidad en vivo + cerrar */}
-              <View style={styles.selectorHeader}>
-                <View style={styles.selectorHeaderIcon}>
-                  <Ionicons name="people-outline" size={22} color="#2563EB" />
-                </View>
-                <Text style={styles.selectorTitle}>Seleccionar Usuario</Text>
-                <View style={styles.countBadge}>
-                  <Text style={styles.countBadgeText}>
-                    Cant. {results.length}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={closeSelector}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons name="close" size={22} color="#9CA3AF" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Búsqueda: input + limpiar + lupa + cámara */}
-              <View style={styles.selectorSearchRow}>
-                <View style={styles.searchInputWrap}>
-                  <TextInput
-                    style={styles.searchInput}
-                    placeholder="Nombre, cédula o código"
-                    placeholderTextColor="#9CA3AF"
-                    value={query}
-                    onChangeText={setQuery}
-                    autoCorrect={false}
-                    autoFocus
-                    returnKeyType="search"
-                    onSubmitEditing={() => runSearch(query)}
-                  />
-                  {query.length > 0 && (
-                    <TouchableOpacity
-                      onPress={() => setQuery("")}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                      <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-                {/* La lupa dispara la búsqueda YA, sin esperar el debounce. */}
-                <TouchableOpacity
-                  style={styles.iconBtnPrimary}
-                  onPress={() => runSearch(query)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="search" size={20} color="#fff" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.iconBtnAccent}
-                  onPress={handleIdentifyByPhoto}
-                  disabled={identifying}
-                  activeOpacity={0.8}
-                >
-                  {identifying ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Ionicons name="camera-outline" size={20} color="#fff" />
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {/* Resultados en vivo */}
-              <ScrollView
-                style={styles.selectorList}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-              >
-                {searching ? (
-                  <ActivityIndicator color="#2563EB" style={styles.inlineLoader} />
-                ) : query.trim().length < SEARCH_MIN_CHARS ? (
-                  <View style={styles.emptyBlock}>
-                    <Ionicons name="search-outline" size={28} color="#D1D5DB" />
-                    <Text style={styles.emptyText}>
-                      Escribe al menos {SEARCH_MIN_CHARS} caracteres
+                {/* Header: título + cantidad en vivo + cerrar */}
+                <View style={styles.selectorHeader}>
+                  <View style={styles.selectorHeaderIcon}>
+                    <Ionicons name="people-outline" size={22} color="#2563EB" />
+                  </View>
+                  <Text style={styles.selectorTitle}>Seleccionar Usuario</Text>
+                  <View style={styles.countBadge}>
+                    <Text style={styles.countBadgeText}>
+                      Cant. {results.length}
                     </Text>
                   </View>
-                ) : results.length === 0 ? (
-                  <View style={styles.emptyBlock}>
-                    <Ionicons name="person-outline" size={28} color="#D1D5DB" />
-                    <Text style={styles.emptyText}>Sin resultados</Text>
+                  <TouchableOpacity
+                    onPress={closeSelector}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="close" size={22} color="#9CA3AF" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Búsqueda: input + limpiar + lupa + cámara */}
+                <View style={styles.selectorSearchRow}>
+                  <View style={styles.searchInputWrap}>
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Nombre, cédula, email o código"
+                      placeholderTextColor="#9CA3AF"
+                      value={query}
+                      onChangeText={setQuery}
+                      autoCorrect={false}
+                      autoFocus
+                      returnKeyType="search"
+                      onSubmitEditing={() => runSearch(query)}
+                    />
+                    {query.length > 0 && (
+                      <TouchableOpacity
+                        onPress={() => setQuery("")}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Ionicons
+                          name="close-circle"
+                          size={18}
+                          color="#9CA3AF"
+                        />
+                      </TouchableOpacity>
+                    )}
                   </View>
-                ) : (
-                  results.map((option) => (
-                    <TouchableOpacity
-                      key={option.schoolUserId}
-                      style={styles.resultRow}
-                      onPress={() => selectEmployee(option)}
-                      activeOpacity={0.75}
-                    >
-                      <View style={styles.avatarSmall}>
-                        {photoUri(option.photourl) ? (
-                          <Image
-                            source={{ uri: photoUri(option.photourl) as string }}
-                            style={styles.avatarSmallImage}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <Ionicons name="person" size={18} color="#9CA3AF" />
-                        )}
-                      </View>
-                      <View style={styles.resultInfo}>
-                        <Text style={styles.resultName} numberOfLines={2}>
-                          {option.fullName}{" "}
-                          <Text style={styles.resultId}>
-                            (ID: {option.schoolUserId})
+                  {/* La lupa dispara la búsqueda YA, sin esperar el debounce. */}
+                  <TouchableOpacity
+                    style={styles.iconBtnPrimary}
+                    onPress={() => runSearch(query)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="search" size={20} color="#fff" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.iconBtnAccent}
+                    onPress={handleIdentifyByPhoto}
+                    disabled={identifying}
+                    activeOpacity={0.8}
+                  >
+                    {identifying ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Ionicons name="camera-outline" size={20} color="#fff" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* Resultados en vivo */}
+                <ScrollView
+                  style={styles.selectorList}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  {searching ? (
+                    <ActivityIndicator
+                      color="#2563EB"
+                      style={styles.inlineLoader}
+                    />
+                  ) : query.trim().length < SEARCH_MIN_CHARS ? (
+                    <View style={styles.emptyBlock}>
+                      <Ionicons
+                        name="search-outline"
+                        size={28}
+                        color="#D1D5DB"
+                      />
+                      <Text style={styles.emptyText}>
+                        Escribe al menos {SEARCH_MIN_CHARS} caracteres
+                      </Text>
+                    </View>
+                  ) : results.length === 0 ? (
+                    <View style={styles.emptyBlock}>
+                      <Ionicons
+                        name="person-outline"
+                        size={28}
+                        color="#D1D5DB"
+                      />
+                      <Text style={styles.emptyText}>Sin resultados</Text>
+                    </View>
+                  ) : (
+                    results.map((option) => (
+                      <TouchableOpacity
+                        key={option.schoolUserId}
+                        style={styles.resultRow}
+                        onPress={() => selectEmployee(option)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={styles.avatarSmall}>
+                          {photoUri(option.photourl) ? (
+                            <Image
+                              source={{
+                                uri: photoUri(option.photourl) as string,
+                              }}
+                              style={styles.avatarSmallImage}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <Ionicons name="person" size={18} color="#9CA3AF" />
+                          )}
+                        </View>
+                        <View style={styles.resultInfo}>
+                          <Text style={styles.resultName} numberOfLines={2}>
+                            {option.fullName}{" "}
+                            <Text style={styles.resultId}>
+                              (ID: {option.schoolUserId})
+                            </Text>
                           </Text>
-                        </Text>
-                        <Text style={styles.resultMeta} numberOfLines={2}>
-                          {formatEmployeeContact(option)}
-                        </Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
-                    </TouchableOpacity>
-                  ))
-                )}
-              </ScrollView>
+                          <Text style={styles.resultMeta} numberOfLines={2}>
+                            {formatEmployeeContact(option)}
+                          </Text>
+                        </View>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={16}
+                          color="#9CA3AF"
+                        />
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </ScrollView>
               </>
             )}
           </View>
@@ -1251,7 +1325,9 @@ export default function AdminPunchInOutScreen() {
               {!!selectedTagName && (
                 <Text style={styles.modalMessage}>
                   Motivo:{" "}
-                  <Text style={styles.modalMessageStrong}>{selectedTagName}</Text>
+                  <Text style={styles.modalMessageStrong}>
+                    {selectedTagName}
+                  </Text>
                 </Text>
               )}
               <View style={styles.modalActions}>
@@ -1351,9 +1427,7 @@ export default function AdminPunchInOutScreen() {
                   size={30}
                   color="#D1D5DB"
                 />
-                <Text style={styles.emptyText}>
-                  Todos cerraron su jornada
-                </Text>
+                <Text style={styles.emptyText}>Todos cerraron su jornada</Text>
               </View>
             </View>
           ) : (
@@ -1933,7 +2007,11 @@ function createStyles(
     },
     registerBtnExit: { backgroundColor: "#2563EB" },
     registerBtnDisabled: { opacity: 0.6 },
-    registerTextWrap: { flexDirection: "row", alignItems: "baseline", gap: scale(6) },
+    registerTextWrap: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      gap: scale(6),
+    },
     registerBtnText: { fontSize: font(16), fontWeight: "700", color: "#fff" },
     registerBtnSub: { fontSize: font(12), color: "rgba(255,255,255,0.85)" },
 
