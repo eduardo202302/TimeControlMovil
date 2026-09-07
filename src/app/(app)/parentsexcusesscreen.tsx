@@ -21,7 +21,7 @@ import {
   User,
 } from "lucide-react-native";
 
-import { getStudents } from "../../api/getStudents";
+import { getStudents, type Student } from "../../api/getStudents";
 import { APP_BACKGROUND } from "@/constants/colors";
 import {
   RADIUS_LG,
@@ -39,7 +39,7 @@ export default function ParentsExcusesScreen() {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [estudiante, setEstudiante] = useState("");
-  const [estudiantes, setEstudiantes] = useState<any[]>([]);
+  const [estudiantes, setEstudiantes] = useState<Student[]>([]);
 
   // ✅ CARGAR ESTUDIANTES AUTOMÁTICO
   useEffect(() => {
@@ -124,7 +124,7 @@ export default function ParentsExcusesScreen() {
                       />
                     ) : (
                       estudiantes.map((e) => (
-                        <Picker.Item key={e.id} label={e.name} value={e.id} />
+                        <Picker.Item key={e.id} label={e.fullName} value={e.id} />
                       ))
                     )}
                   </Picker>
