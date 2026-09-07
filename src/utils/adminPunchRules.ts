@@ -1,7 +1,6 @@
 import axios from "axios";
 import type { UserSchedule } from "../../types/typeStore/SchoolStoreType";
 import {
-  findOpenDayPunchForUser,
   getPendingOpenDayDate,
   getScheduleForDay,
   RD_UTC_OFFSET,
@@ -27,14 +26,15 @@ import {
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
-/** Las dos únicas pestañas del ponchador admin (el webapp no expone Almuerzo). */
-export type AdminCategory = "Jornada" | "Break";
+/** Las tres pestañas del ponchador admin. */
+export type AdminCategory = "Jornada" | "Almuerzo" | "Break";
 
 export const ADMIN_PUNCH_TYPE_MAP: Record<
   AdminCategory,
   { inicio: string; fin: string }
 > = {
   Jornada: { inicio: "InicioJornada", fin: "FinJornada" },
+  Almuerzo: { inicio: "InicioAlmuerzo", fin: "FinAlmuerzo" },
   Break: { inicio: "InicioBreak", fin: "FinBreak" },
 };
 
@@ -144,7 +144,7 @@ export interface AdminNextAction {
   kind: "inicio" | "fin";
   /** El `type` exacto que va en el payload. */
   type: string;
-  /** Etiqueta del botón — "Entrada" / "Salida". */
+  /** Etiqueta del botón — "Entrada" / "Fin". */
   label: string;
   /** Solo InicioBreak necesita motivo (tagId). */
   requiresTag: boolean;
@@ -244,21 +244,6 @@ export function toOpenWorkdayRows(
     });
   }
   return rows;
-}
-
-/**
- * Aísla la jornada abierta de un empleado dentro de la lista escuela-completa
- * de /punches/opendays. Reusa findOpenDayPunchForUser (punchRules.ts) — el
- * endpoint y el criterio son los mismos que ya usa el ponchador normal.
- */
-export function findOpenWorkdayForUser(
-  punches: AdminOpenDayPunch[],
-  schoolUserId: number,
-): AdminOpenDayPunch | null {
-  return findOpenDayPunchForUser(
-    punches,
-    schoolUserId,
-  ) as AdminOpenDayPunch | null;
 }
 
 /**
@@ -562,19 +547,106 @@ export function getNextAdminAction(
     category,
     kind,
     type,
-    label: kind === "inicio" ? "Entrada" : "Salida",
+    // "Fin", no "Salida": mismo vocabulario que PUNCH_TYPE_LABELS en la
+    // pantalla (FinJornada → "Fin Jornada", FinAlmuerzo → "Fin Almuerzo") —
+    // antes el botón decía "Salida" y el historial, del mismo ponche recién
+    // creado, decía "Fin". Dos palabras para la misma acción.
+    label: kind === "inicio" ? "Entrada" : "Fin",
     requiresTag: type === ADMIN_PUNCH_TYPE_MAP.Break.inicio,
   };
 }
 
 /**
- * El Break solo tiene sentido con la jornada activa — mismo bloqueo que ya
- * aplica handleRegister en punchinout.tsx ("Debes iniciar la jornada
+ * El Break solo tiene sentido con una jornada activa HOY — mismo bloqueo que
+ * ya aplica handleRegister en punchinout.tsx ("Debes iniciar la jornada
  * primero"), pero evaluado sobre el panel del empleado objetivo.
+ *
+ * Ojo: NO alcanza con hasOpenWorkday. El backend valida InicioBreak contra
+ * hasActiveWorkStartForDay(db, schoolUserId, today, trx) — el reloj del
+ * SERVIDOR, filtrando por DATE(createdDate) = hoy (createPunchEventHelpers.js,
+ * UserPunchEvents/handlers.js:1698) — y una jornada abierta de un día ANTERIOR
+ * no cuenta como activa hoy, sin importar qué createdDate mande el ponche de
+ * Break. Ofrecer el tab en ese caso garantiza el rechazo "Debe existir una
+ * jornada activa ... antes de InicioBreak" (createPunchEventTypeHandlers.js).
+ *
+ * Por eso se mira ÚNICAMENTE punchesToday (el mismo criterio con el que el
+ * backend arma "today"), ignorando openDayEvents.
+ */
+export function hasJornadaAbiertaHoy(panel: AdminPunchPanel | null): boolean {
+  const types = ADMIN_PUNCH_TYPE_MAP.Jornada;
+  const last = [...acceptedPunches(panel)]
+    .reverse()
+    .find((p) => p.type === types.inicio || p.type === types.fin);
+  return last?.type === types.inicio;
+}
+
+/**
+ * true si el último evento de Almuerzo de HOY es un InicioAlmuerzo sin
+ * FinAlmuerzo posterior — o sea, el almuerzo está abierto en este momento.
+ */
+export function isAlmuerzoAbierto(panel: AdminPunchPanel | null): boolean {
+  const types = ADMIN_PUNCH_TYPE_MAP.Almuerzo;
+  const last = [...acceptedPunches(panel)]
+    .reverse()
+    .find((p) => p.type === types.inicio || p.type === types.fin);
+  return last?.type === types.inicio;
+}
+
+/**
+ * true si el último evento de Break de HOY es un InicioBreak sin FinBreak
+ * posterior — análogo a isAlmuerzoAbierto, para la mitad simétrica de la
+ * exclusión mutua (isAdminLunchVisible).
+ */
+export function isBreakAbierto(panel: AdminPunchPanel | null): boolean {
+  const types = ADMIN_PUNCH_TYPE_MAP.Break;
+  const last = [...acceptedPunches(panel)]
+    .reverse()
+    .find((p) => p.type === types.inicio || p.type === types.fin);
+  return last?.type === types.inicio;
+}
+
+/**
+ * true si ya existe un FinAlmuerzo hoy — el almuerzo ya se tomó y se cerró.
+ * Distinto de isAlmuerzoAbierto: mientras está abierto (InicioAlmuerzo sin
+ * cerrar) NO cuenta como "tomado" todavía.
+ */
+export function hasAlmuerzoTomadoHoy(panel: AdminPunchPanel | null): boolean {
+  const types = ADMIN_PUNCH_TYPE_MAP.Almuerzo;
+  return acceptedPunches(panel).some((p) => p.type === types.fin);
+}
+
+/**
+ * Visibilidad del tab Almuerzo: hace falta una jornada activa HOY (mismo gate
+ * que Break — sin eso el backend rechaza InicioAlmuerzo con "Debe existir una
+ * jornada activa...") y que el almuerzo de hoy no se haya tomado ya (un solo
+ * almuerzo por día — FinAlmuerzo cierra el ciclo).
+ *
+ * Mientras el almuerzo está ABIERTO (no tomado todavía, solo iniciado) el tab
+ * se mantiene visible: hace falta para poder mostrar el botón "Fin".
+ *
+ * Simetría con isAdminBreakEnabled: NO puede coexistir con un Break abierto —
+ * misma exclusión mutua real (createPunchEventTypeHandlers.js:566-588:
+ * InicioAlmuerzo con hasActiveInicioBreak rechaza con "Ya existe un
+ * InicioBreak activo. Debe cerrarlo antes de iniciar un InicioAlmuerzo.").
+ */
+export function isAdminLunchVisible(panel: AdminPunchPanel | null): boolean {
+  return (
+    hasJornadaAbiertaHoy(panel) &&
+    !hasAlmuerzoTomadoHoy(panel) &&
+    !isBreakAbierto(panel)
+  );
+}
+
+/**
+ * El Break solo tiene sentido con una jornada activa HOY, y NO puede
+ * coexistir con un Almuerzo abierto — exclusión mutua real
+ * (createPunchEventTypeHandlers.js:566-588: InicioBreak con
+ * hasActiveInicioAlmuerzo rechaza con "Ya existe un InicioAlmuerzo activo.
+ * Debe cerrarlo antes de iniciar un InicioBreak."). Se replica acá para que
+ * la UI no ofrezca una acción que el backend va a rechazar siempre.
  */
 export function isAdminBreakEnabled(panel: AdminPunchPanel | null): boolean {
-  if (hasOpenWorkday(panel)) return true;
-  return getNextAdminAction(panel, "Jornada").kind === "fin";
+  return hasJornadaAbiertaHoy(panel) && !isAlmuerzoAbierto(panel);
 }
 
 // ─── Red ──────────────────────────────────────────────────────────────────────
@@ -703,22 +775,12 @@ export async function searchEmployees({
       ...authHeaders(token),
       params,
     });
-    console.log("SEARCH EMPLOYEES REQUEST:", {
-      url: `${urlColegio}/users?${buildEmployeeSearchQueryString(params)}`,
-      status: response.status,
-      success: response.data?.success,
-      rawData: response.data,
-    });
     if (!response.data?.success) return [];
     return extractTableRows(response.data.data)
       .map(toEmployeeOption)
       .filter((option): option is EmployeeOption => option !== null);
   } catch (error: any) {
-    console.error("SEARCH EMPLOYEES FAILED:", {
-      url: `${urlColegio}/users?${buildEmployeeSearchQueryString(params)}`,
-      status: error?.response?.status,
-      body: error?.response?.data,
-    });
+    logFailure("searchEmployees:", error);
     return [];
   }
 }

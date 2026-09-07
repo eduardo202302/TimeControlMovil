@@ -11,9 +11,14 @@ import {
   getAdminPunchDay,
   getHistoryEvents,
   getNextAdminAction,
+  hasAlmuerzoTomadoHoy,
+  hasJornadaAbiertaHoy,
   getOpenWorkdayDate,
   getSuggestedPunchTime,
   isAdminBreakEnabled,
+  isAdminLunchVisible,
+  isAlmuerzoAbierto,
+  isBreakAbierto,
   normalizeAdminPanel,
   toEmployeeOption,
   toOpenWorkdayRows,
@@ -21,7 +26,7 @@ import {
   type AdminPunchPanel,
 } from "../adminPunchRules";
 import type { UserSchedule } from "../../../types/typeStore/SchoolStoreType";
-import { toRDDateString, type PunchEvent, type Tag } from "../punchRules";
+import { toRDDateString, type PunchEvent } from "../punchRules";
 
 const TARGET_ID = 501;
 
@@ -150,7 +155,7 @@ describe("getNextAdminAction — Jornada", () => {
       panel({ punchesToday: [punch({ type: "InicioJornada" })] }),
       "Jornada",
     );
-    expect(next).toMatchObject({ kind: "fin", type: "FinJornada", label: "Salida" });
+    expect(next).toMatchObject({ kind: "fin", type: "FinJornada", label: "Fin" });
   });
 
   test("con jornada ya cerrada hoy → vuelve a Entrada", () => {
@@ -253,6 +258,299 @@ describe("getNextAdminAction — Break", () => {
   });
 });
 
+describe("getNextAdminAction — Almuerzo", () => {
+  test("sin ponches → Entrada, sin motivo", () => {
+    const next = getNextAdminAction(panel({}), "Almuerzo");
+    expect(next).toMatchObject({
+      kind: "inicio",
+      type: "InicioAlmuerzo",
+      label: "Entrada",
+      requiresTag: false,
+    });
+  });
+
+  test("con InicioAlmuerzo → Fin, sin motivo", () => {
+    const next = getNextAdminAction(
+      panel({ punchesToday: [punch({ type: "InicioAlmuerzo" })] }),
+      "Almuerzo",
+    );
+    expect(next).toMatchObject({
+      kind: "fin",
+      type: "FinAlmuerzo",
+      label: "Fin",
+      requiresTag: false,
+    });
+  });
+
+  test("almuerzo cerrado → vuelve a Entrada", () => {
+    const next = getNextAdminAction(
+      panel({
+        punchesToday: [
+          punch({ id: 1, type: "InicioAlmuerzo" }),
+          punch({ id: 2, type: "FinAlmuerzo" }),
+        ],
+      }),
+      "Almuerzo",
+    );
+    expect(next.kind).toBe("inicio");
+  });
+
+  test("una jornada abierta de un día previo NO empuja Almuerzo a Fin", () => {
+    // La lógica de "jornada previa abierta → Salida" es exclusiva de Jornada
+    // (category === "Jornada" en getNextAdminAction) — Almuerzo no la hereda.
+    const next = getNextAdminAction(
+      panel({ openDayEvents: [punch({ type: "InicioJornada" })] }),
+      "Almuerzo",
+    );
+    expect(next.kind).toBe("inicio");
+  });
+
+  test("los ponches de Jornada/Break no afectan la pestaña Almuerzo", () => {
+    const next = getNextAdminAction(
+      panel({
+        punchesToday: [
+          punch({ id: 1, type: "InicioJornada" }),
+          punch({ id: 2, type: "InicioBreak" }),
+        ],
+      }),
+      "Almuerzo",
+    );
+    expect(next.kind).toBe("inicio");
+  });
+
+  test("un intento rechazado no cuenta como almuerzo iniciado", () => {
+    for (const status of ["Error de Imagen", "Fuera de área"]) {
+      const next = getNextAdminAction(
+        panel({ punchesToday: [punch({ type: "InicioAlmuerzo", status })] }),
+        "Almuerzo",
+      );
+      expect(next.kind).toBe("inicio");
+    }
+  });
+});
+
+describe("hasJornadaAbiertaHoy", () => {
+  test("sin ponches, no hay jornada abierta hoy", () => {
+    expect(hasJornadaAbiertaHoy(panel({}))).toBe(false);
+  });
+
+  test("con InicioJornada de hoy sin cerrar, abierta", () => {
+    expect(
+      hasJornadaAbiertaHoy(
+        panel({ punchesToday: [punch({ type: "InicioJornada" })] }),
+      ),
+    ).toBe(true);
+  });
+
+  test("con la jornada de hoy ya cerrada, no está abierta", () => {
+    expect(
+      hasJornadaAbiertaHoy(
+        panel({
+          punchesToday: [
+            punch({ id: 1, type: "InicioJornada" }),
+            punch({ id: 2, type: "FinJornada" }),
+          ],
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  test("una jornada abierta de un día previo NO cuenta — solo mira hoy", () => {
+    expect(
+      hasJornadaAbiertaHoy(
+        panel({ openDayEvents: [punch({ type: "InicioJornada" })] }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("isAlmuerzoAbierto", () => {
+  test("sin ponches de almuerzo, cerrado", () => {
+    expect(isAlmuerzoAbierto(panel({}))).toBe(false);
+  });
+
+  test("con InicioAlmuerzo sin FinAlmuerzo, abierto", () => {
+    expect(
+      isAlmuerzoAbierto(
+        panel({ punchesToday: [punch({ type: "InicioAlmuerzo" })] }),
+      ),
+    ).toBe(true);
+  });
+
+  test("con InicioAlmuerzo + FinAlmuerzo, cerrado", () => {
+    expect(
+      isAlmuerzoAbierto(
+        panel({
+          punchesToday: [
+            punch({ id: 1, type: "InicioAlmuerzo" }),
+            punch({ id: 2, type: "FinAlmuerzo" }),
+          ],
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  test("los ponches de Jornada/Break no afectan a Almuerzo", () => {
+    expect(
+      isAlmuerzoAbierto(
+        panel({
+          punchesToday: [
+            punch({ id: 1, type: "InicioJornada" }),
+            punch({ id: 2, type: "InicioBreak" }),
+          ],
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("isBreakAbierto", () => {
+  test("sin ponches de break, cerrado", () => {
+    expect(isBreakAbierto(panel({}))).toBe(false);
+  });
+
+  test("con InicioBreak sin FinBreak, abierto", () => {
+    expect(
+      isBreakAbierto(
+        panel({ punchesToday: [punch({ type: "InicioBreak" })] }),
+      ),
+    ).toBe(true);
+  });
+
+  test("con InicioBreak + FinBreak, cerrado", () => {
+    expect(
+      isBreakAbierto(
+        panel({
+          punchesToday: [
+            punch({ id: 1, type: "InicioBreak" }),
+            punch({ id: 2, type: "FinBreak" }),
+          ],
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  test("los ponches de Jornada/Almuerzo no afectan a Break", () => {
+    expect(
+      isBreakAbierto(
+        panel({
+          punchesToday: [
+            punch({ id: 1, type: "InicioJornada" }),
+            punch({ id: 2, type: "InicioAlmuerzo" }),
+          ],
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("hasAlmuerzoTomadoHoy", () => {
+  test("sin FinAlmuerzo hoy, no se ha tomado", () => {
+    expect(hasAlmuerzoTomadoHoy(panel({}))).toBe(false);
+  });
+
+  test("con el almuerzo todavía ABIERTO, aún no cuenta como tomado", () => {
+    expect(
+      hasAlmuerzoTomadoHoy(
+        panel({ punchesToday: [punch({ type: "InicioAlmuerzo" })] }),
+      ),
+    ).toBe(false);
+  });
+
+  test("con FinAlmuerzo presente, ya se tomó", () => {
+    expect(
+      hasAlmuerzoTomadoHoy(
+        panel({
+          punchesToday: [
+            punch({ id: 1, type: "InicioAlmuerzo" }),
+            punch({ id: 2, type: "FinAlmuerzo" }),
+          ],
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  test("un FinAlmuerzo rechazado no cuenta como tomado", () => {
+    expect(
+      hasAlmuerzoTomadoHoy(
+        panel({
+          punchesToday: [
+            punch({ type: "FinAlmuerzo", status: "Error de Imagen" }),
+          ],
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("visibilidad de tabs — las 5 combinaciones de la especificación", () => {
+  test("sin jornada: nada visible salvo Jornada", () => {
+    const p = panel({});
+    expect(isAdminLunchVisible(p)).toBe(false);
+    expect(isAdminBreakEnabled(p)).toBe(false);
+  });
+
+  test("jornada abierta sin almuerzo tomado: Almuerzo + Break visibles", () => {
+    const p = panel({ punchesToday: [punch({ type: "InicioJornada" })] });
+    expect(isAdminLunchVisible(p)).toBe(true);
+    expect(isAdminBreakEnabled(p)).toBe(true);
+  });
+
+  test("almuerzo abierto: Break oculto (exclusión mutua real)", () => {
+    // createPunchEventTypeHandlers.js:566-588 — InicioBreak con
+    // hasActiveInicioAlmuerzo rechaza con "Ya existe un InicioAlmuerzo
+    // activo. Debe cerrarlo antes de iniciar un InicioBreak."
+    const p = panel({
+      punchesToday: [
+        punch({ id: 1, type: "InicioJornada" }),
+        punch({ id: 2, type: "InicioAlmuerzo" }),
+      ],
+    });
+    expect(isAdminLunchVisible(p)).toBe(true); // sigue visible: hace falta para el Fin
+    expect(isAdminBreakEnabled(p)).toBe(false);
+  });
+
+  test("break abierto: Almuerzo oculto (simétrico — exclusión mutua real)", () => {
+    // createPunchEventTypeHandlers.js:566-588 — InicioAlmuerzo con
+    // hasActiveInicioBreak rechaza con "Ya existe un InicioBreak activo.
+    // Debe cerrarlo antes de iniciar un InicioAlmuerzo."
+    const p = panel({
+      punchesToday: [
+        punch({ id: 1, type: "InicioJornada" }),
+        punch({ id: 2, type: "InicioBreak" }),
+      ],
+    });
+    expect(isAdminLunchVisible(p)).toBe(false);
+    expect(isAdminBreakEnabled(p)).toBe(true); // sigue visible: hace falta para el Fin
+  });
+
+  test("almuerzo cerrado: Almuerzo oculto, Break visible", () => {
+    const p = panel({
+      punchesToday: [
+        punch({ id: 1, type: "InicioJornada" }),
+        punch({ id: 2, type: "InicioAlmuerzo" }),
+        punch({ id: 3, type: "FinAlmuerzo" }),
+      ],
+    });
+    expect(isAdminLunchVisible(p)).toBe(false);
+    expect(isAdminBreakEnabled(p)).toBe(true);
+  });
+
+  test("jornada cerrada con almuerzo pendiente de hoy: todo oculto salvo Jornada", () => {
+    // Estado anómalo (InicioAlmuerzo que nunca se cerró, pero la jornada sí):
+    // sin jornada activa hoy, ni Almuerzo ni Break tienen sentido.
+    const p = panel({
+      punchesToday: [
+        punch({ id: 1, type: "InicioJornada" }),
+        punch({ id: 2, type: "InicioAlmuerzo" }),
+        punch({ id: 3, type: "FinJornada" }),
+      ],
+    });
+    expect(isAdminLunchVisible(p)).toBe(false);
+    expect(isAdminBreakEnabled(p)).toBe(false);
+  });
+});
+
 describe("isAdminBreakEnabled", () => {
   test("sin jornada activa, el Break queda deshabilitado", () => {
     expect(isAdminBreakEnabled(panel({}))).toBe(false);
@@ -266,10 +564,29 @@ describe("isAdminBreakEnabled", () => {
     ).toBe(true);
   });
 
-  test("con jornada abierta de un día previo, habilitado", () => {
+  test("REGRESIÓN: jornada abierta de un día previo NO habilita Break", () => {
+    // El backend valida InicioBreak contra hasActiveWorkStartForDay(...,
+    // today, ...) con SU PROPIO reloj, filtrando DATE(createdDate) = hoy
+    // (UserPunchEvents/handlers.js:1698 + createPunchEventHelpers.js). Una
+    // jornada abierta de un día ANTERIOR no cuenta como activa hoy, sin
+    // importar qué createdDate mande el ponche de Break — ofrecer el tab acá
+    // garantiza el rechazo "Debe existir una jornada activa ... antes de
+    // InicioBreak".
     expect(
       isAdminBreakEnabled(
         panel({ openDayEvents: [punch({ type: "InicioJornada" })] }),
+      ),
+    ).toBe(false);
+  });
+
+  test("jornada abierta de un día previo + jornada iniciada HOY, habilitado", () => {
+    // Con ambas presentes, lo que decide es la de HOY — igual que el backend.
+    expect(
+      isAdminBreakEnabled(
+        panel({
+          openDayEvents: [punch({ id: 90, type: "InicioJornada" })],
+          punchesToday: [punch({ id: 1, type: "InicioJornada" })],
+        }),
       ),
     ).toBe(true);
   });
@@ -285,6 +602,16 @@ describe("isAdminBreakEnabled", () => {
         }),
       ),
     ).toBe(false);
+  });
+
+  test("un intento rechazado no cuenta como jornada iniciada hoy", () => {
+    for (const status of ["Error de Imagen", "Fuera de área"]) {
+      expect(
+        isAdminBreakEnabled(
+          panel({ punchesToday: [punch({ type: "InicioJornada", status })] }),
+        ),
+      ).toBe(false);
+    }
   });
 });
 

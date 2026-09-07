@@ -44,6 +44,7 @@ import {
   getSuggestedPunchTime,
   identifyEmployeeByPhoto,
   isAdminBreakEnabled,
+  isAdminLunchVisible,
   searchEmployees,
   buildAdminCreatedDate,
   type AdminCategory,
@@ -55,8 +56,10 @@ import {
   getBreakTagCategoryId,
   getScheduleForDay,
   getStatusColor,
+  RD_UTC_OFFSET,
   tagsOfCategory,
   toRD,
+  toRDDateString,
   WEEK_DAYS,
   type Tag,
 } from "../../utils/punchRules";
@@ -105,6 +108,8 @@ const MONTH_NAMES: Record<number, string> = {
 
 const CATEGORY_ICONS: Record<AdminCategory, keyof typeof Ionicons.glyphMap> = {
   Jornada: "briefcase-outline",
+  // Mismo ícono que ya usa el historial para InicioAlmuerzo/FinAlmuerzo.
+  Almuerzo: "restaurant-outline",
   Break: "cafe-outline",
 };
 
@@ -253,7 +258,26 @@ export default function AdminPunchInOutScreen() {
 
   // El día del ponche es SIEMPRE el de la jornada en curso (hoy). Solo la hora
   // es editable — igual que el webapp.
-  const today = useMemo(() => new Date(), []);
+  //
+  // `todayKey` es la fecha de calendario RD como string ("2026-09-05"): se
+  // recalcula en cada render (es barato), pero su VALOR solo cambia cuando el
+  // día de calendario realmente cambia. `today` se reconstruye A PARTIR de esa
+  // key (anclada a mediodía RD, mismo criterio que parseBackendDate en
+  // punchRules.ts para fechas sin hora) y se memoiza sobre ella — antes
+  // quedaba congelado con deps [] al montar la pantalla, así que un panel
+  // abierto cruzando la medianoche seguía calculando createdDate/
+  // todaySchedule con la fecha de AYER. Con esta key, `today` se actualiza
+  // solo en el primer render posterior a la medianoche (esta pantalla no
+  // tiene un reloj corriendo cada segundo como punchinout.tsx, pero
+  // re-renderiza seguido: cambio de tab, refresh del panel, confirmación de
+  // ponche) y de paso se mantiene referencialmente ESTABLE entre renders del
+  // mismo día, sin invalidar en cada tecla los useMemo que dependen de ella
+  // (createdDate, todaySchedule).
+  const todayKey = toRDDateString(new Date());
+  const today = useMemo(
+    () => new Date(`${todayKey}T12:00:00${RD_UTC_OFFSET}`),
+    [todayKey],
+  );
 
   // ── Motivos del break ──
   // La categoría sale de la config de la escuela
@@ -530,6 +554,18 @@ export default function AdminPunchInOutScreen() {
     [panel, category],
   );
   const breakEnabled = useMemo(() => isAdminBreakEnabled(panel), [panel]);
+  const almuerzoVisible = useMemo(() => isAdminLunchVisible(panel), [panel]);
+  /**
+   * Tabs que se muestran — ocultas por completo cuando no aplican, no
+   * deshabilitadas: un admin no debería ver un botón "Almuerzo"/"Break" que
+   * el backend va a rechazar siempre. Jornada está SIEMPRE presente.
+   */
+  const visibleCategories = useMemo<AdminCategory[]>(() => {
+    const cats: AdminCategory[] = ["Jornada"];
+    if (almuerzoVisible) cats.push("Almuerzo");
+    if (breakEnabled) cats.push("Break");
+    return cats;
+  }, [almuerzoVisible, breakEnabled]);
   const todaySchedule = useMemo(
     () => getScheduleForDay(panel?.userSchedules ?? [], today),
     [panel, today],
@@ -576,10 +612,12 @@ export default function AdminPunchInOutScreen() {
   const selectedTagName =
     breakTags.find((t) => t.id === selectedTagId)?.name ?? null;
 
-  // Si el Break deja de estar disponible (jornada cerrada), volver a Jornada.
+  // Si la pestaña activa deja de estar visible (ej. se cerró el almuerzo justo
+  // mientras el admin estaba parado en ese tab), volver a Jornada — que
+  // siempre está presente en visibleCategories.
   useEffect(() => {
-    if (category === "Break" && !breakEnabled) setCategory("Jornada");
-  }, [category, breakEnabled]);
+    if (!visibleCategories.includes(category)) setCategory("Jornada");
+  }, [category, visibleCategories]);
 
   // ── Registro del ponche ──
   const handlePressRegister = useCallback(() => {
@@ -789,31 +827,24 @@ export default function AdminPunchInOutScreen() {
                     </View>
 
                     <View style={styles.tabs}>
-                      {(["Jornada", "Break"] as AdminCategory[]).map((cat) => {
-                        const disabled = cat === "Break" && !breakEnabled;
+                      {visibleCategories.map((cat) => {
                         const active = category === cat;
                         return (
                           <TouchableOpacity
                             key={cat}
-                            style={[
-                              styles.tabBtn,
-                              active && styles.tabBtnActive,
-                              disabled && styles.tabBtnDisabled,
-                            ]}
+                            style={[styles.tabBtn, active && styles.tabBtnActive]}
                             onPress={() => setCategory(cat)}
-                            disabled={disabled}
                             activeOpacity={0.75}
                           >
                             <Ionicons
                               name={CATEGORY_ICONS[cat]}
                               size={20}
-                              color={active ? "#fff" : disabled ? "#9CA3AF" : "#2563EB"}
+                              color={active ? "#fff" : "#2563EB"}
                             />
                             <Text
                               style={[
                                 styles.tabText,
                                 active && styles.tabTextActive,
-                                disabled && styles.tabTextDisabled,
                               ]}
                             >
                               {cat}
@@ -961,7 +992,12 @@ export default function AdminPunchInOutScreen() {
                                   {getPunchTypeLabel(punch.type)}
                                 </Text>
                                 {!!punch.status && (
-                                  <Text style={styles.punchStatus}>
+                                  <Text
+                                    style={[
+                                      styles.punchStatus,
+                                      { color: statusColor },
+                                    ]}
+                                  >
                                     {punch.status}
                                   </Text>
                                 )}
@@ -1811,10 +1847,8 @@ function createStyles(
       paddingVertical: verticalScale(12),
     },
     tabBtnActive: { backgroundColor: "#2563EB" },
-    tabBtnDisabled: { backgroundColor: "#F3F4F6" },
     tabText: { fontSize: font(13), fontWeight: "600", color: "#2563EB" },
     tabTextActive: { color: "#fff" },
-    tabTextDisabled: { color: "#9CA3AF" },
     fieldLabel: {
       fontSize: font(12),
       fontWeight: "600",
@@ -1883,9 +1917,9 @@ function createStyles(
     },
     punchInfo: { flex: 1 },
     punchType: { fontSize: font(13), fontWeight: "600", color: "#111827" },
+    /** Sin `color` propio: siempre se pisa con getStatusColor(punch.status). */
     punchStatus: {
       fontSize: font(11),
-      color: "#6B7280",
       marginTop: verticalScale(1),
     },
     punchTime: { fontSize: font(13), fontWeight: "700", color: "#142157" },
