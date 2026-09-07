@@ -949,7 +949,7 @@ export default function AdminPunchInOutScreen() {
                       <View style={styles.sectionHeaderRow}>
                         <Ionicons name="list-outline" size={18} color="#2563EB" />
                         <Text
-                          style={styles.sectionHeaderText}
+                          style={styles.historyTitleText}
                           numberOfLines={2}
                         >
                           {historyTitle}
@@ -1069,7 +1069,7 @@ export default function AdminPunchInOutScreen() {
                 <View style={styles.searchInputWrap}>
                   <TextInput
                     style={styles.searchInput}
-                    placeholder="Nombre, cédula, email o código"
+                    placeholder="Nombre, cédula o código"
                     placeholderTextColor="#9CA3AF"
                     value={query}
                     onChangeText={setQuery}
@@ -1495,6 +1495,11 @@ function createStyles(
       fontWeight: "700",
       color: "#142157",
     },
+    historyTitleText: {
+      fontSize: font(14),
+      fontWeight: "700",
+      color: "#142157",
+    },
     inlineLoader: { marginVertical: verticalScale(16) },
 
     /* ── Entrada: botón que abre el modal ── */
@@ -1656,7 +1661,7 @@ function createStyles(
     },
     searchInput: {
       flex: 1,
-      fontSize: font(14),
+      fontSize: font(12),
       color: "#111827",
       // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- 0 resetea el padding por defecto del TextInput en Android, no es un valor de diseño
       padding: 0,
@@ -1951,13 +1956,13 @@ function createStyles(
       justifyContent: "center",
     },
     punchInfo: { flex: 1 },
-    punchType: { fontSize: font(13), fontWeight: "600", color: "#111827" },
+    punchType: { fontSize: font(11), fontWeight: "600", color: "#111827" },
     /** Sin `color` propio: siempre se pisa con getStatusColor(punch.status). */
     punchStatus: {
-      fontSize: font(11),
+      fontSize: font(8),
       marginTop: verticalScale(1),
     },
-    punchTime: { fontSize: font(13), fontWeight: "700", color: "#142157" },
+    punchTime: { fontSize: font(11), fontWeight: "700", color: "#142157" },
     historyToggleBtn: {
       alignItems: "center",
       paddingVertical: verticalScale(10),
