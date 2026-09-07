@@ -2,6 +2,7 @@ import axios from "axios";
 import type { UserSchedule } from "../../types/typeStore/SchoolStoreType";
 import {
   getPendingOpenDayDate,
+  getRDMinutes,
   getScheduleForDay,
   RD_UTC_OFFSET,
   toRD,
@@ -40,12 +41,20 @@ export const ADMIN_PUNCH_TYPE_MAP: Record<
 
 /**
  * Estados que el backend asigna a un intento rechazado. Un punch con uno de
- * estos NO cambia el estado de la jornada — misma lista que ya filtra
- * getNextPunchType en punchinout.tsx.
+ * estos NO cambia el estado de la jornada — calcado de INVALID_TIMELINE_STATUSES
+ * / isInvalidTimelineStatus en AdminPunchInOutForm/helpers.js del webapp, que
+ * es la misma lista que decide qué cuenta como "último registro válido" para
+ * validateTimeSelection (getLastValidPunchTime más abajo). Los dos primeros ya
+ * estaban acá (misma lista que filtra getNextPunchType en punchinout.tsx); se
+ * agregan los cuatro restantes para que ambos archivos coincidan.
  */
 export const REJECTED_PUNCH_STATUSES: ReadonlySet<string> = new Set([
   "Error de Imagen",
   "Fuera de área",
+  "Fuera perímetro",
+  "Imagen Fraudulenta",
+  "Invalido",
+  "Inválido",
 ]);
 
 /** Contadores de ponches hechos por un admin, tal cual los expone el backend. */
@@ -510,6 +519,77 @@ function acceptedPunches(panel: AdminPunchPanel | null): PunchEvent[] {
 /** true si el empleado arrastra un InicioJornada sin cerrar de un día previo. */
 export function hasOpenWorkday(panel: AdminPunchPanel | null): boolean {
   return (panel?.openDayEvents ?? []).length > 0;
+}
+
+/**
+ * Fecha del último evento VÁLIDO (no rechazado) de una lista, o null si no hay
+ * ninguno — calcado de `findLast(normalizedTimelineData, item =>
+ * !isInvalidTimelineStatus(item))` en validateTimeSelection
+ * (AdminPunchInOutForm/index.jsx). Se asume la lista ya en orden cronológico
+ * ascendente, mismo criterio que el resto del archivo (punchesToday/
+ * openDayEvents llegan así del backend).
+ */
+export function getLastValidPunchTime(events: PunchEvent[]): Date | null {
+  const last = [...events].reverse().find((e) => !isRejected(e));
+  return last ? new Date(last.createdDate) : null;
+}
+
+/** Resultado de validateAdminPunchTime. */
+export interface AdminTimeValidation {
+  valid: boolean;
+  errorMessage: string | null;
+}
+
+/**
+ * Valida la hora elegida en el time picker del Ponche ADM — calcado de
+ * validateTimeSelection (AdminPunchInOutForm/index.jsx:555-592).
+ *
+ * TECHO: la hora elegida no puede ser mayor a la hora actual. ÚNICA
+ * excepción: cerrar (FinJornada) una jornada arrastrada de un día anterior
+ * (`hasOpenWorkday`) — ahí no hay "hora actual" de referencia porque el día
+ * que se está cerrando no es hoy. El webapp replica esto mismo mirando
+ * `user.dateOpen` en vez de la categoría/acción puntual, pero en este panel
+ * dateOpen presente y "cerrar una jornada arrastrada" son la misma situación:
+ * la única acción posible con una jornada arrastrada es FinJornada.
+ *
+ * PISO: la hora elegida no puede ser menor a la del último registro VÁLIDO
+ * del día correspondiente — `getHistoryEvents(panel)` ya resuelve cuál es ese
+ * día (openDayEvents si hay jornada arrastrada, punchesToday si no), mismo
+ * criterio que usa `normalizedTimelineData` en el webapp (index.jsx:276-286).
+ *
+ * Ambas comparaciones son por HORA DEL DÍA (minutos desde medianoche en zona
+ * RD), no por instante absoluto: el `picked` que llega acá siempre trae la
+ * fecha de HOY (viene del time picker), aunque el día que se está cerrando
+ * sea uno anterior — comparar por Date.getTime() directo daría falsos
+ * negativos/positivos en ese caso. Mismo criterio que el `toMinutes` del
+ * webapp, que compara sobre strings "HH:mm", no sobre fechas completas.
+ */
+export function validateAdminPunchTime(
+  panel: AdminPunchPanel | null,
+  action: AdminNextAction,
+  picked: Date,
+  now: Date,
+): AdminTimeValidation {
+  const isClosingDraggedWorkday =
+    action.type === ADMIN_PUNCH_TYPE_MAP.Jornada.fin && hasOpenWorkday(panel);
+
+  if (!isClosingDraggedWorkday && getRDMinutes(picked) > getRDMinutes(now)) {
+    return {
+      valid: false,
+      errorMessage: "No puede seleccionar una hora mayor a la hora actual",
+    };
+  }
+
+  const lastValid = getLastValidPunchTime(getHistoryEvents(panel));
+  if (lastValid && getRDMinutes(picked) < getRDMinutes(lastValid)) {
+    const { hours, minutes } = toRD(lastValid);
+    return {
+      valid: false,
+      errorMessage: `No puede seleccionar una hora menor al último registro (${pad(hours)}:${pad(minutes)})`,
+    };
+  }
+
+  return { valid: true, errorMessage: null };
 }
 
 /**

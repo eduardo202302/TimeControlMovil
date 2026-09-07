@@ -13,6 +13,7 @@ import {
   getNextAdminAction,
   hasAlmuerzoTomadoHoy,
   hasJornadaAbiertaHoy,
+  getLastValidPunchTime,
   getOpenWorkdayDate,
   getSuggestedPunchTime,
   isAdminBreakEnabled,
@@ -22,6 +23,7 @@ import {
   normalizeAdminPanel,
   toEmployeeOption,
   toOpenWorkdayRows,
+  validateAdminPunchTime,
   type AdminOpenDayPunch,
   type AdminPunchPanel,
 } from "../adminPunchRules";
@@ -1259,5 +1261,247 @@ describe("normalizeAdminPanel", () => {
 
   test("un payload nulo no rompe el render", () => {
     expect(normalizeAdminPanel(null).punchesToday).toEqual([]);
+  });
+});
+
+// ── validateAdminPunchTime — calcado de validateTimeSelection (webapp) ────────
+
+describe("getLastValidPunchTime", () => {
+  test("lista vacía → null", () => {
+    expect(getLastValidPunchTime([])).toBeNull();
+  });
+
+  test("un evento rechazado al final no cuenta — se toma el válido anterior", () => {
+    const valido = punch({
+      id: 1,
+      status: "A Tiempo",
+      createdDate: "2026-09-04T13:00:00.000Z", // 09:00 RD
+    });
+    const rechazado = punch({
+      id: 2,
+      status: "Fuera de área",
+      createdDate: "2026-09-04T14:00:00.000Z", // 10:00 RD
+    });
+    expect(getLastValidPunchTime([valido, rechazado])).toEqual(
+      new Date(valido.createdDate),
+    );
+  });
+
+  test("con un válido después del rechazado, se toma ESE — el último válido", () => {
+    const rechazado = punch({
+      id: 1,
+      status: "Error de Imagen",
+      createdDate: "2026-09-04T13:00:00.000Z",
+    });
+    const valido = punch({
+      id: 2,
+      status: "A Tiempo",
+      createdDate: "2026-09-04T14:00:00.000Z",
+    });
+    expect(getLastValidPunchTime([rechazado, valido])).toEqual(
+      new Date(valido.createdDate),
+    );
+  });
+
+  test("todos rechazados → null", () => {
+    expect(
+      getLastValidPunchTime([
+        punch({ status: "Fuera de área" }),
+        punch({ status: "Error de Imagen" }),
+      ]),
+    ).toBeNull();
+  });
+});
+
+describe("validateAdminPunchTime", () => {
+  test("TECHO — mensaje exacto del webapp cuando la hora elegida es mayor a la actual", () => {
+    const action = getNextAdminAction(panel({}), "Jornada"); // InicioJornada
+    const now = new Date("2026-09-04T13:00:00.000Z"); // 09:00 RD
+    const picked = new Date("2026-09-04T14:00:00.000Z"); // 10:00 RD
+    expect(validateAdminPunchTime(panel({}), action, picked, now)).toEqual({
+      valid: false,
+      errorMessage: "No puede seleccionar una hora mayor a la hora actual",
+    });
+  });
+
+  test("PISO — mensaje exacto del webapp, con la hora real del último registro", () => {
+    const ultimoValido = punch({
+      id: 1,
+      type: "InicioJornada",
+      createdDate: "2026-09-04T14:00:00.000Z", // 10:00 RD
+    });
+    const p = panel({ punchesToday: [ultimoValido] });
+    const action = getNextAdminAction(p, "Break"); // InicioBreak, no depende del techo
+    const now = new Date("2026-09-04T15:00:00.000Z"); // 11:00 RD
+    const picked = new Date("2026-09-04T13:00:00.000Z"); // 09:00 RD — menor al último registro
+    expect(validateAdminPunchTime(p, action, picked, now)).toEqual({
+      valid: false,
+      errorMessage: "No puede seleccionar una hora menor al último registro (10:00)",
+    });
+  });
+
+  test("FinJornada de HOY (sin jornada arrastrada) SÍ respeta el techo", () => {
+    const p = panel({
+      punchesToday: [punch({ id: 1, type: "InicioJornada" })],
+    });
+    const action = getNextAdminAction(p, "Jornada"); // FinJornada, hoy
+    const now = new Date("2026-09-04T13:00:00.000Z"); // 09:00 RD
+    const picked = new Date("2026-09-04T14:00:00.000Z"); // 10:00 RD
+    const result = validateAdminPunchTime(p, action, picked, now);
+    expect(result.valid).toBe(false);
+    expect(result.errorMessage).toBe(
+      "No puede seleccionar una hora mayor a la hora actual",
+    );
+  });
+
+  test("excepción: FinJornada con jornada arrastrada SALTA el techo", () => {
+    const abierta = punch({
+      id: 90,
+      type: "InicioJornada",
+      createdDate: "2026-09-02T11:00:00.000Z", // 07:00 RD del 2-sep
+    });
+    const p = panel({ openDayEvents: [abierta] });
+    const action = getNextAdminAction(p, "Jornada"); // FinJornada, jornada arrastrada
+    const now = new Date("2026-09-04T12:00:00.000Z"); // 08:00 RD — "ahora" es temprano
+    const picked = new Date("2026-09-04T03:00:00.000Z"); // 23:00 RD — mayor a "ahora", igual pasa
+    expect(validateAdminPunchTime(p, action, picked, now)).toEqual({
+      valid: true,
+      errorMessage: null,
+    });
+  });
+
+  test("excepción: el piso SIGUE aplicando contra openDayEvents (el día de apertura), no contra punchesToday", () => {
+    const abierta = punch({
+      id: 90,
+      type: "InicioJornada",
+      createdDate: "2026-09-02T13:00:00.000Z", // 09:00 RD del 2-sep
+    });
+    // Si el piso mirara punchesToday por error, este ponche de HOY a las 07:00
+    // dejaría pasar un picked de 08:00 sin bloquear — la prueba solo pasa si
+    // se usa openDayEvents (09:00) como referencia real.
+    const deHoy = punch({
+      id: 1,
+      type: "InicioJornada",
+      createdDate: "2026-09-04T11:00:00.000Z", // 07:00 RD
+    });
+    const p = panel({ openDayEvents: [abierta], punchesToday: [deHoy] });
+    const action = getNextAdminAction(p, "Jornada"); // FinJornada, jornada arrastrada
+    const now = new Date("2026-09-04T12:00:00.000Z"); // 08:00 RD
+    const picked = new Date("2026-09-04T12:00:00.000Z"); // 08:00 RD — menor a las 09:00 de apertura
+    expect(validateAdminPunchTime(p, action, picked, now)).toEqual({
+      valid: false,
+      errorMessage: "No puede seleccionar una hora menor al último registro (09:00)",
+    });
+  });
+
+  test("Almuerzo en día normal SÍ respeta el techo", () => {
+    const p = panel({
+      punchesToday: [punch({ id: 1, type: "InicioJornada" })],
+    });
+    const action = getNextAdminAction(p, "Almuerzo"); // InicioAlmuerzo
+    const now = new Date("2026-09-04T13:00:00.000Z"); // 09:00 RD
+    const picked = new Date("2026-09-04T14:00:00.000Z"); // 10:00 RD
+    const result = validateAdminPunchTime(p, action, picked, now);
+    expect(result.valid).toBe(false);
+    expect(result.errorMessage).toBe(
+      "No puede seleccionar una hora mayor a la hora actual",
+    );
+  });
+
+  test("Almuerzo en día normal SÍ respeta el piso", () => {
+    const inicioHoy = punch({
+      id: 1,
+      type: "InicioJornada",
+      createdDate: "2026-09-04T14:00:00.000Z", // 10:00 RD
+    });
+    const p = panel({ punchesToday: [inicioHoy] });
+    const action = getNextAdminAction(p, "Almuerzo"); // InicioAlmuerzo
+    const now = new Date("2026-09-04T15:00:00.000Z"); // 11:00 RD
+    const picked = new Date("2026-09-04T13:00:00.000Z"); // 09:00 RD
+    const result = validateAdminPunchTime(p, action, picked, now);
+    expect(result.valid).toBe(false);
+    expect(result.errorMessage).toBe(
+      "No puede seleccionar una hora menor al último registro (10:00)",
+    );
+  });
+
+  test("Break en día normal SÍ respeta el techo", () => {
+    const p = panel({
+      punchesToday: [punch({ id: 1, type: "InicioJornada" })],
+    });
+    const action = getNextAdminAction(p, "Break"); // InicioBreak
+    const now = new Date("2026-09-04T13:00:00.000Z"); // 09:00 RD
+    const picked = new Date("2026-09-04T14:00:00.000Z"); // 10:00 RD
+    const result = validateAdminPunchTime(p, action, picked, now);
+    expect(result.valid).toBe(false);
+    expect(result.errorMessage).toBe(
+      "No puede seleccionar una hora mayor a la hora actual",
+    );
+  });
+
+  test("Break en día normal SÍ respeta el piso", () => {
+    const inicioHoy = punch({
+      id: 1,
+      type: "InicioJornada",
+      createdDate: "2026-09-04T14:00:00.000Z", // 10:00 RD
+    });
+    const p = panel({ punchesToday: [inicioHoy] });
+    const action = getNextAdminAction(p, "Break"); // InicioBreak
+    const now = new Date("2026-09-04T15:00:00.000Z"); // 11:00 RD
+    const picked = new Date("2026-09-04T13:00:00.000Z"); // 09:00 RD
+    const result = validateAdminPunchTime(p, action, picked, now);
+    expect(result.valid).toBe(false);
+    expect(result.errorMessage).toBe(
+      "No puede seleccionar una hora menor al último registro (10:00)",
+    );
+  });
+
+  test("un intento rechazado no cuenta como último registro para el piso", () => {
+    const rechazado = punch({
+      id: 1,
+      type: "InicioJornada",
+      status: "Fuera de área",
+      createdDate: "2026-09-04T15:00:00.000Z", // 11:00 RD — el más tardío, pero inválido
+    });
+    const valido = punch({
+      id: 2,
+      type: "InicioBreak",
+      status: "A Tiempo",
+      createdDate: "2026-09-04T13:00:00.000Z", // 09:00 RD
+    });
+    const p = panel({ punchesToday: [valido, rechazado] });
+    const action = getNextAdminAction(p, "Break");
+    const now = new Date("2026-09-04T16:00:00.000Z"); // 12:00 RD
+    const picked = new Date("2026-09-04T14:00:00.000Z"); // 10:00 RD — mayor al válido, no al rechazado
+    expect(validateAdminPunchTime(p, action, picked, now)).toEqual({
+      valid: true,
+      errorMessage: null,
+    });
+  });
+
+  test("límites inclusivos — igual a la hora actual y al último registro, ambos pasan", () => {
+    const ultimo = punch({
+      id: 1,
+      type: "InicioJornada",
+      createdDate: "2026-09-04T13:00:00.000Z", // 09:00 RD
+    });
+    const p = panel({ punchesToday: [ultimo] });
+    const action = getNextAdminAction(p, "Break");
+    const now = new Date("2026-09-04T13:00:00.000Z"); // 09:00 RD — igual al picked
+    const picked = new Date("2026-09-04T13:00:00.000Z"); // 09:00 RD — igual al último registro
+    expect(validateAdminPunchTime(p, action, picked, now)).toEqual({
+      valid: true,
+      errorMessage: null,
+    });
+  });
+
+  test("sin ponches previos, sin jornada arrastrada, solo aplica el techo", () => {
+    const action = getNextAdminAction(panel({}), "Jornada");
+    const now = new Date("2026-09-04T13:00:00.000Z"); // 09:00 RD
+    const picked = new Date("2026-09-04T12:00:00.000Z"); // 08:00 RD
+    expect(validateAdminPunchTime(panel({}), action, picked, now)).toEqual({
+      valid: true,
+      errorMessage: null,
+    });
   });
 });

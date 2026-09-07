@@ -47,6 +47,7 @@ import {
   isAdminLunchVisible,
   searchEmployees,
   buildAdminCreatedDate,
+  validateAdminPunchTime,
   type AdminCategory,
   type AdminPunchPanel,
   type EmployeeOption,
@@ -631,8 +632,18 @@ export default function AdminPunchInOutScreen() {
       Alert.alert("Motivo requerido", "Selecciona el motivo del break.");
       return;
     }
+    const timeValidation = validateAdminPunchTime(
+      panel,
+      nextAction,
+      pickedTime,
+      new Date(),
+    );
+    if (!timeValidation.valid) {
+      Alert.alert("Hora inválida", timeValidation.errorMessage ?? undefined);
+      return;
+    }
     setConfirmVisible(true);
-  }, [nextAction, breakTags.length, selectedTagId]);
+  }, [panel, nextAction, breakTags.length, selectedTagId, pickedTime]);
 
   const handleConfirmRegister = useCallback(async () => {
     if (!employee) return;
