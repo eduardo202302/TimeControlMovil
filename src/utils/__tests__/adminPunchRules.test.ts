@@ -1128,12 +1128,14 @@ describe("query string de GET /users (el selector venía vacío sin `fields`)", 
     );
   });
 
-  test("las cuatro columnas buscables están presentes", () => {
+  test("match exacto del apiConfig.fields real del webapp (UserProfileCard.jsx:73)", () => {
     expect(EMPLOYEE_SEARCH_FIELDS.split(",")).toEqual([
       "user.fullName",
-      "user.nickName",
+      "role.name",
       "user.cedula",
-      "code",
+      "id",
+      "user.phone",
+      "user.email",
     ]);
   });
 
@@ -1152,14 +1154,24 @@ describe("query string de GET /users (el selector venía vacío sin `fields`)", 
     }
   });
 
-  test("`code` va sin alias — es columna de la tabla base (schoolusers)", () => {
-    expect(EMPLOYEE_SEARCH_FIELDS.split(",")).toContain("code");
+  test("`id` va sin alias — es columna de la tabla base (schoolusers)", () => {
+    expect(EMPLOYEE_SEARCH_FIELDS.split(",")).toContain("id");
   });
 
-  test("el query string completo, en orden: all, fields, rows, page", () => {
+  test("el query string completo, en orden: all, fields, rows, page, isActive, roleId[]!, settings#isTimeControl, orderKey", () => {
     expect(qs()).toBe(
-      "all=ana&fields=user.fullName%2Cuser.nickName%2Cuser.cedula%2Ccode&rows=10&page=1",
+      "all=ana&fields=user.fullName%2Crole.name%2Cuser.cedula%2Cid%2Cuser.phone%2Cuser.email&rows=10&page=1&isActive=1&roleId%5B%5D%21=1%2C5&settings%23isTimeControl=true&orderKey=user.fullName",
     );
+  });
+
+  test("orderKey, isActive, roleId[]! y settings#isTimeControl viajan SIEMPRE — no condicionales al texto", () => {
+    // Calcado de fetchClients (UserSelectorModal.jsx:41-62): solo `fields`
+    // queda condicionado a que haya searchQuery, los demás no.
+    const params = buildEmployeeSearchParams({ query: "ana" });
+    expect(params.orderKey).toBe("user.fullName");
+    expect(params.isActive).toBe(1);
+    expect(params["roleId[]!"]).toBe("1,5");
+    expect(params["settings#isTimeControl"]).toBe(true);
   });
 
   test("rows/page por defecto son 10 y 1", () => {
@@ -1179,6 +1191,10 @@ describe("query string de GET /users (el selector venía vacío sin `fields`)", 
       fields: EMPLOYEE_SEARCH_FIELDS,
       rows: 50,
       page: 3,
+      isActive: 1,
+      "roleId[]!": "1,5",
+      "settings#isTimeControl": true,
+      orderKey: "user.fullName",
     });
   });
 

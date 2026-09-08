@@ -798,20 +798,44 @@ export async function fetchOpenWorkdaysAdmin({
  * agregara `.undefined`, que es el 500 de "Unknown column
  * 'user:fullName.undefined'".
  *
- * `code` no lleva alias: es columna de la tabla base (`schoolusers`), y
- * getTableQuery le antepone el baseTable solo (methods.js:250-252).
+ * `id` y `code` no llevan alias: son columnas de la tabla base
+ * (`schoolusers`), y getTableQuery le antepone el baseTable solo
+ * (methods.js:250-252).
  *
  * Ojo: `fields` afecta ÚNICAMENTE el WHERE del filtro `all`. No recorta el
  * SELECT — las columnas devueltas las decide el `withGraphFetched` del
  * handler, así que email/teléfono siguen viniendo.
+ *
+ * Lista EXACTA del `apiConfig.fields` real del selector de empleados del
+ * webapp (UserProfileCard/index.jsx:73, dentro de AdminPunchInOut) — no
+ * `user.nickName`/`code` como se armó originalmente acá (esos sí existen
+ * como columnas, pero el webapp busca por `role.name`/`id`/`user.phone`/
+ * `user.email` en su lugar).
  */
 export const EMPLOYEE_SEARCH_FIELDS =
-  "user.fullName,user.nickName,user.cedula,code";
+  "user.fullName,role.name,user.cedula,id,user.phone,user.email";
 
 /**
  * Los params de GET /users, en el orden en que viajan. Se extrae del fetch
  * para poder fijar el query string exacto en un test: el bug anterior fue
  * justamente un param faltante, invisible desde la firma de la función.
+ *
+ * `orderKey`, `isActive`, `roleId[]!` y `settings#isTimeControl` viajan
+ * SIEMPRE, no solo cuando hay texto de búsqueda — calcado de fetchClients
+ * (UserSelectorModal.jsx:41-62), que los arma fuera del `if (searchQuery)`
+ * que solo condiciona `fields`:
+ *   - `orderKey: "user.fullName"` — mismo `apiConfig.orderKey` que pasa
+ *     UserProfileCard.jsx:74; sin esto el orden de resultados no coincide
+ *     con el del webapp.
+ *   - `isActive: 1` — solo empleados activos.
+ *   - `"roleId[]!": "1,5"` — excluye Master (1) y Padres/Tutores (5), mismo
+ *     `omitRolesId` que pasa UserProfileCard.jsx:75. El backend interpreta el
+ *     sufijo `!` como negación (NOT IN), y el array `[1, 5]` de la config
+ *     llega a este string porque `new URLSearchParams` hace `String([1, 5])`
+ *     → "1,5" al construir el query real.
+ *   - `"settings#isTimeControl": true` — sintaxis JSON-path del motor
+ *     genérico de tabla (filtra por un campo JSON anidado), tal cual la
+ *     manda UserProfileCard.jsx:76. No es un typo ni un formato inventado acá.
  */
 export function buildEmployeeSearchParams({
   query,
@@ -823,13 +847,22 @@ export function buildEmployeeSearchParams({
   page?: number;
   rows?: number;
   fields?: string;
-}): Record<string, string | number> {
-  return { all: query, fields, rows, page };
+}): Record<string, string | number | boolean> {
+  return {
+    all: query,
+    fields,
+    rows,
+    page,
+    isActive: 1,
+    "roleId[]!": "1,5",
+    "settings#isTimeControl": true,
+    orderKey: "user.fullName",
+  };
 }
 
 /** El query string tal cual sale al cable — el que hay que pegar al diagnosticar. */
 export function buildEmployeeSearchQueryString(
-  params: Record<string, string | number>,
+  params: Record<string, string | number | boolean>,
 ): string {
   return new URLSearchParams(
     Object.entries(params).map(([key, value]) => [key, String(value)]),
