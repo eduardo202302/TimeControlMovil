@@ -753,7 +753,7 @@ export default function AdminPunchInOutScreen() {
                       activeOpacity={0.7}
                     >
                       <Ionicons name="arrow-back" size={18} color="#2563EB" />
-                      <Text style={styles.backText}>Cambiar empleado</Text>
+                      <Text style={styles.backText}>Cambiar usuario</Text>
                     </TouchableOpacity>
 
                     <View style={styles.employeeHeader}>
@@ -874,6 +874,23 @@ export default function AdminPunchInOutScreen() {
                       </Text>
                     </View>
 
+                    {/* Hora editable */}
+                    <Text style={styles.fieldLabel}>Hora actual del registro</Text>
+                    <TouchableOpacity
+                      style={styles.timeSelector}
+                      onPress={() => setShowTimePicker(true)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="time-outline" size={20} color="#2563EB" />
+                      <Text style={styles.timeSelectorText}>
+                        {formatRDTimeShort(pickedTime)}
+                      </Text>
+                      <Text style={styles.timeSelectorDate}>
+                        {formatRDDateShort(today)}
+                      </Text>
+                      <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                    </TouchableOpacity>
+
                     <View style={styles.tabs}>
                       {visibleCategories.map((cat) => {
                         const active = category === cat;
@@ -904,23 +921,6 @@ export default function AdminPunchInOutScreen() {
                         );
                       })}
                     </View>
-
-                    {/* Hora editable */}
-                    <Text style={styles.fieldLabel}>Hora del ponche</Text>
-                    <TouchableOpacity
-                      style={styles.timeSelector}
-                      onPress={() => setShowTimePicker(true)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="time-outline" size={20} color="#2563EB" />
-                      <Text style={styles.timeSelectorText}>
-                        {formatRDTimeShort(pickedTime)}
-                      </Text>
-                      <Text style={styles.timeSelectorDate}>
-                        {formatRDDateShort(today)}
-                      </Text>
-                      <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
-                    </TouchableOpacity>
 
                     {/* Motivo del break */}
                     {nextAction.requiresTag && breakTags.length > 0 && (
