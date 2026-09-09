@@ -55,6 +55,7 @@ import {
 } from "../../utils/adminPunchRules";
 import {
   getBreakTagCategoryId,
+  getPunchBreakTagName,
   getScheduleForDay,
   getStatusColor,
   RD_UTC_OFFSET,
@@ -1031,6 +1032,7 @@ export default function AdminPunchInOutScreen() {
                             // tardanza no pueden verse igual. El ícono sigue
                             // saliendo del tipo.
                             const statusColor = getStatusColor(punch.status);
+                            const breakTagName = getPunchBreakTagName(punch);
                             return (
                               <View key={punch.id} style={styles.punchRow}>
                                 <View
@@ -1058,15 +1060,26 @@ export default function AdminPunchInOutScreen() {
                                   <Text style={styles.punchType}>
                                     {getPunchTypeLabel(punch.type)}
                                   </Text>
-                                  {!!punch.status && (
-                                    <Text
-                                      style={[
-                                        styles.punchStatus,
-                                        { color: statusColor },
-                                      ]}
-                                    >
-                                      {punch.status}
-                                    </Text>
+                                  {(!!punch.status || !!breakTagName) && (
+                                    <View style={styles.punchPillRow}>
+                                      {!!punch.status && (
+                                        <Text
+                                          style={[
+                                            styles.punchStatus,
+                                            { color: statusColor },
+                                          ]}
+                                        >
+                                          {punch.status}
+                                        </Text>
+                                      )}
+                                      {!!breakTagName && (
+                                        <View style={styles.breakTagPill}>
+                                          <Text style={styles.breakTagPillText}>
+                                            {breakTagName}
+                                          </Text>
+                                        </View>
+                                      )}
+                                    </View>
                                   )}
                                 </View>
                                 <Text style={styles.punchTime}>
@@ -2034,10 +2047,28 @@ function createStyles(
     },
     punchInfo: { flex: 1 },
     punchType: { fontSize: font(11), fontWeight: "600", color: "#111827" },
+    punchPillRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(6),
+      marginTop: verticalScale(1),
+    },
     /** Sin `color` propio: siempre se pisa con getStatusColor(punch.status). */
     punchStatus: {
       fontSize: font(11),
-      marginTop: verticalScale(1),
+    },
+    /** Pill neutro para el tipo de break (punch.tag?.name) — mismo gris que
+     * el resto de badges neutros del archivo (avatarPlaceholder, modalBtnGhost). */
+    breakTagPill: {
+      backgroundColor: "#F3F4F6",
+      borderRadius: RADIUS_PILL,
+      paddingHorizontal: scale(8),
+      paddingVertical: verticalScale(1),
+    },
+    breakTagPillText: {
+      fontSize: font(11),
+      fontWeight: "600",
+      color: "#6B7280",
     },
     punchTime: { fontSize: font(11), fontWeight: "700", color: "#142157" },
     historyToggleBtn: {

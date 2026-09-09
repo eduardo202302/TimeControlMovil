@@ -89,7 +89,6 @@ export interface AdminSchoolUser {
 export interface AdminOpenDayPunch extends PunchEvent {
   schoolUser?: AdminSchoolUser | null;
   adminUser?: AdminSchoolUser | null;
-  tag?: Tag | null;
   permission?: {
     typeTag?: Tag | null;
     stateTag?: Tag | null;

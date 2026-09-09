@@ -1,6 +1,7 @@
 /// <reference types="jest" />
 import {
   getBreakTagCategoryId,
+  getPunchBreakTagName,
   readCategoryDefaultId,
   tagsOfCategory,
   type Tag,
@@ -106,5 +107,23 @@ describe("tagsOfCategory", () => {
       categoryDefaultIds: { catBreakTypeId: { label: "Tipos de Break", value: 30 } },
     });
     expect(tagsOfCategory(tags, categoryId).map((t) => t.id)).toEqual([2, 3]);
+  });
+});
+
+describe("getPunchBreakTagName (pill de motivo en el historial del Ponche ADM)", () => {
+  test("con tag: devuelve el nombre para pintar el pill", () => {
+    const punch = {
+      tag: {
+        id: 2,
+        name: "Café",
+        categoryId: 30,
+        category: { id: 30, name: "Tipos de Break" },
+      },
+    };
+    expect(getPunchBreakTagName(punch)).toBe("Café");
+  });
+
+  test("sin tag: devuelve undefined — Jornada/Almuerzo sin motivo no pintan pill vacío", () => {
+    expect(getPunchBreakTagName({ tag: undefined })).toBeUndefined();
   });
 });

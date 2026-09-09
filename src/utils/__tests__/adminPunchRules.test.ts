@@ -907,7 +907,7 @@ describe("toOpenWorkdayRows", () => {
       role: { name: "Docente" },
       adminPunchCount: { admInitJornada: 2, admFinJornada: "1" },
     },
-    tag: { id: 3, name: "Personal" },
+    tag: { id: 3, name: "Personal", categoryId: 1 },
     permission: {
       typeTag: { id: 4, name: "Salud" },
       stateTag: { id: 5, name: "Aprobado" },

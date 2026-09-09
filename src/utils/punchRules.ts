@@ -38,6 +38,13 @@ export interface PunchEvent {
    * "punch" que devuelve GET /punches/opendays): todo punch trae su dueño.
    */
   schoolUserId?: number;
+  tagId?: number;
+  tag?: {
+    id: number;
+    name: string;
+    categoryId: number;
+    category?: { id: number; name: string };
+  };
 }
 
 /**
@@ -305,6 +312,17 @@ export function getStatusColor(status: string | null | undefined): string {
   if (status === "Error de Imagen") return "#DC2626";
   if (status === "Fuera de área") return "#DC2626";
   return "#16A34A";
+}
+
+/**
+ * Nombre del motivo de break a mostrar en el pill del historial (Ponche ADM).
+ * `undefined` cuando el punch no trae `tag` — Jornada/Almuerzo sin motivo no
+ * deben renderizar un pill vacío.
+ */
+export function getPunchBreakTagName(
+  punch: Pick<PunchEvent, "tag">,
+): string | undefined {
+  return punch.tag?.name;
 }
 
 // ─── Tags y categorías de la escuela ─────────────────────────────────────────
