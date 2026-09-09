@@ -486,15 +486,26 @@ describe("hasAlmuerzoTomadoHoy", () => {
 });
 
 describe("visibilidad de tabs — las 5 combinaciones de la especificación", () => {
+  // Horario de hoy con almuerzo completo — usado en los casos donde
+  // isAdminLunchVisible se espera true por la lógica de historial.
+  const lunchSchedule: UserSchedule = {
+    id: 1,
+    weekDay: "Viernes",
+    workEntryTime: "08:00:00",
+    workExitTime: "17:00:00",
+    lunchEntryTime: "12:00:00",
+    lunchExitTime: "13:00:00",
+  };
+
   test("sin jornada: nada visible salvo Jornada", () => {
     const p = panel({});
-    expect(isAdminLunchVisible(p)).toBe(false);
+    expect(isAdminLunchVisible(p, lunchSchedule)).toBe(false);
     expect(isAdminBreakEnabled(p)).toBe(false);
   });
 
   test("jornada abierta sin almuerzo tomado: Almuerzo + Break visibles", () => {
     const p = panel({ punchesToday: [punch({ type: "InicioJornada" })] });
-    expect(isAdminLunchVisible(p)).toBe(true);
+    expect(isAdminLunchVisible(p, lunchSchedule)).toBe(true);
     expect(isAdminBreakEnabled(p)).toBe(true);
   });
 
@@ -508,7 +519,7 @@ describe("visibilidad de tabs — las 5 combinaciones de la especificación", ()
         punch({ id: 2, type: "InicioAlmuerzo" }),
       ],
     });
-    expect(isAdminLunchVisible(p)).toBe(true); // sigue visible: hace falta para el Fin
+    expect(isAdminLunchVisible(p, lunchSchedule)).toBe(true); // sigue visible: hace falta para el Fin
     expect(isAdminBreakEnabled(p)).toBe(false);
   });
 
@@ -522,7 +533,7 @@ describe("visibilidad de tabs — las 5 combinaciones de la especificación", ()
         punch({ id: 2, type: "InicioBreak" }),
       ],
     });
-    expect(isAdminLunchVisible(p)).toBe(false);
+    expect(isAdminLunchVisible(p, lunchSchedule)).toBe(false);
     expect(isAdminBreakEnabled(p)).toBe(true); // sigue visible: hace falta para el Fin
   });
 
@@ -534,7 +545,7 @@ describe("visibilidad de tabs — las 5 combinaciones de la especificación", ()
         punch({ id: 3, type: "FinAlmuerzo" }),
       ],
     });
-    expect(isAdminLunchVisible(p)).toBe(false);
+    expect(isAdminLunchVisible(p, lunchSchedule)).toBe(false);
     expect(isAdminBreakEnabled(p)).toBe(true);
   });
 
@@ -548,8 +559,54 @@ describe("visibilidad de tabs — las 5 combinaciones de la especificación", ()
         punch({ id: 3, type: "FinJornada" }),
       ],
     });
-    expect(isAdminLunchVisible(p)).toBe(false);
+    expect(isAdminLunchVisible(p, lunchSchedule)).toBe(false);
     expect(isAdminBreakEnabled(p)).toBe(false);
+  });
+});
+
+describe("isAdminLunchVisible — horario de almuerzo requerido (paridad con face-class-web hasLunchScheduleConfigured)", () => {
+  const jornadaAbierta = panel({
+    punchesToday: [punch({ type: "InicioJornada" })],
+  });
+
+  test("jornada abierta + horario con almuerzo completo (lunchEntryTime y lunchExitTime) → true", () => {
+    const schedule: UserSchedule = {
+      id: 1,
+      weekDay: "Viernes",
+      workEntryTime: "08:00:00",
+      workExitTime: "17:00:00",
+      lunchEntryTime: "12:00:00",
+      lunchExitTime: "13:00:00",
+    };
+    expect(isAdminLunchVisible(jornadaAbierta, schedule)).toBe(true);
+  });
+
+  test("jornada abierta + sin lunchEntryTime/lunchExitTime en el horario → false", () => {
+    const schedule: UserSchedule = {
+      id: 1,
+      weekDay: "Viernes",
+      workEntryTime: "08:00:00",
+      workExitTime: "17:00:00",
+      lunchEntryTime: null,
+      lunchExitTime: null,
+    };
+    expect(isAdminLunchVisible(jornadaAbierta, schedule)).toBe(false);
+  });
+
+  test("jornada abierta + sin ningún horario para hoy (todaySchedule null) → false", () => {
+    expect(isAdminLunchVisible(jornadaAbierta, null)).toBe(false);
+  });
+
+  test("jornada abierta + horario con solo lunchEntryTime (falta lunchExitTime) → false", () => {
+    const schedule: UserSchedule = {
+      id: 1,
+      weekDay: "Viernes",
+      workEntryTime: "08:00:00",
+      workExitTime: "17:00:00",
+      lunchEntryTime: "12:00:00",
+      lunchExitTime: null,
+    };
+    expect(isAdminLunchVisible(jornadaAbierta, schedule)).toBe(false);
   });
 });
 

@@ -36,6 +36,7 @@ import {
   tagsOfCategory,
   getApprovedPermissionsToday,
   getPendingOpenDayDate,
+  getPunchBreakTagName,
   getPunctuality,
   getRDDayIndex,
   getScheduleForDay,
@@ -2158,6 +2159,7 @@ export default function PunchInOut() {
                       displayStatus === "Error de Imagen" ||
                       displayStatus === "Fuera de área";
                     const isEarlyBadge = displayStatus === "Anticipada";
+                    const breakTagName = getPunchBreakTagName(punch);
 
                     return (
                       <View key={punch.id} style={styles.punchRow}>
@@ -2226,6 +2228,18 @@ export default function PunchInOut() {
                                   </Text>
                                 </View>
                               )
+                            )}
+                            {!!breakTagName && (
+                              <View style={[styles.punchBadge, styles.badgeNeutral]}>
+                                <Text
+                                  style={[
+                                    styles.punchBadgeText,
+                                    { color: "#6B7280" },
+                                  ]}
+                                >
+                                  {breakTagName}
+                                </Text>
+                              </View>
                             )}
                             {punch.permissionId != null && (
                               <View style={styles.permissionBadgeSmall}>
@@ -2736,6 +2750,9 @@ const styles = StyleSheet.create({
   badgeOnTime: { backgroundColor: "#DCFCE7" },
   badgeLate: { backgroundColor: "#FEE2E2" },
   badgeEarly: { backgroundColor: "#FEF3C7" },
+  /** Pill neutro para el tipo de break (punch.tag?.name) — mismo tono gris
+   * que lastPunchPillNeutral, reusado como fondo para este badge. */
+  badgeNeutral: { backgroundColor: "#F3F4F6" },
   punchBadgeText: { fontSize: 11, fontWeight: "700" },
   badgeOvertime: {
     backgroundColor: "#EFF6FF",

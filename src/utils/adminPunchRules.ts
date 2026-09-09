@@ -707,8 +707,20 @@ export function hasAlmuerzoTomadoHoy(panel: AdminPunchPanel | null): boolean {
  * misma exclusión mutua real (createPunchEventTypeHandlers.js:566-588:
  * InicioAlmuerzo con hasActiveInicioBreak rechaza con "Ya existe un
  * InicioBreak activo. Debe cerrarlo antes de iniciar un InicioAlmuerzo.").
+ *
+ * Además, sin horario de almuerzo configurado para hoy el tab se oculta
+ * siempre, sin importar el historial — mismo criterio que
+ * hasLunchScheduleConfigured en face-class-web
+ * (AdminPunchInOutForm/helpers.js:283-284): hace falta lunchEntryTime Y
+ * lunchExitTime en el horario del día.
  */
-export function isAdminLunchVisible(panel: AdminPunchPanel | null): boolean {
+export function isAdminLunchVisible(
+  panel: AdminPunchPanel | null,
+  todaySchedule: UserSchedule | null,
+): boolean {
+  if (!todaySchedule?.lunchEntryTime || !todaySchedule?.lunchExitTime) {
+    return false;
+  }
   return (
     hasJornadaAbiertaHoy(panel) &&
     !hasAlmuerzoTomadoHoy(panel) &&

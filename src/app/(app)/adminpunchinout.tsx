@@ -566,7 +566,14 @@ export default function AdminPunchInOutScreen() {
     [panel, category],
   );
   const breakEnabled = useMemo(() => isAdminBreakEnabled(panel), [panel]);
-  const almuerzoVisible = useMemo(() => isAdminLunchVisible(panel), [panel]);
+  const todaySchedule = useMemo(
+    () => getScheduleForDay(panel?.userSchedules ?? [], today),
+    [panel, today],
+  );
+  const almuerzoVisible = useMemo(
+    () => isAdminLunchVisible(panel, todaySchedule),
+    [panel, todaySchedule],
+  );
   /**
    * Tabs que se muestran — ocultas por completo cuando no aplican, no
    * deshabilitadas: un admin no debería ver un botón "Almuerzo"/"Break" que
@@ -578,10 +585,6 @@ export default function AdminPunchInOutScreen() {
     if (breakEnabled) cats.push("Break");
     return cats;
   }, [almuerzoVisible, breakEnabled]);
-  const todaySchedule = useMemo(
-    () => getScheduleForDay(panel?.userSchedules ?? [], today),
-    [panel, today],
-  );
   /**
    * Historial: con una jornada abierta de un día anterior son SUS eventos
    * (openDayEvents), no los de hoy — si no, el historial queda vacío justo
@@ -843,6 +846,18 @@ export default function AdminPunchInOutScreen() {
                             <Text style={styles.scheduleValue}>
                               {to12h(todaySchedule.lunchEntryTime)} –{" "}
                               {to12h(todaySchedule.lunchExitTime)}
+                            </Text>
+                          </View>
+                        )}
+                        {!todaySchedule.lunchEntryTime && (
+                          <View style={styles.warnRow}>
+                            <Ionicons
+                              name="warning-outline"
+                              size={14}
+                              color="#D97706"
+                            />
+                            <Text style={styles.warnText}>
+                              Almuerzo: No configurado
                             </Text>
                           </View>
                         )}
