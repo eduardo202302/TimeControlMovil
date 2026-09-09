@@ -494,18 +494,17 @@ export default function AdminPunchInOutScreen() {
     }
     let photo: ImagePicker.ImagePickerAsset | null = null;
     try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
           "Permiso requerido",
-          "Necesitas permitir el acceso a la galería para identificar al empleado.",
+          "Necesitas permitir el acceso a la cámara para identificar al empleado.",
         );
         return;
       }
       // Mismos parámetros de captura que el ponchador normal — el backend
       // espera el mismo base64 en `photourl`.
-      const result = await ImagePicker.launchImageLibraryAsync({
+      const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ["images"],
         allowsEditing: false,
         quality: 0.4,
