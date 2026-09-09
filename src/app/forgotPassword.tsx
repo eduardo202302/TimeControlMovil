@@ -2,6 +2,7 @@ import FormForgotPassword from "@/components/login/FormForgotPassword";
 import ResetPassword from "@/components/login/Reset-password";
 import VerifyPin from "@/components/login/Verify-pin";
 import { useResponsive } from "@/constants/responsive";
+import { AUTH_SCREEN_BACKGROUND } from "@/constants/authColors";
 import { useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -60,7 +61,7 @@ function createStyles(scale: (size: number) => number) {
     container: {
       flex: 1,
       width: "100%",
-      backgroundColor: "#dfe9ff",
+      backgroundColor: AUTH_SCREEN_BACKGROUND,
     },
     authContainer: {
       flexGrow: 1,

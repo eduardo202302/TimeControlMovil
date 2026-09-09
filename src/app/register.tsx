@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { AUTH_SCREEN_BACKGROUND, AUTH_PANEL_BACKGROUND, AUTH_CARD_BACKGROUND, AUTH_INPUT_BACKGROUND } from "@/constants/authColors";
 import { registerUser } from "../../api/Login/loginAuthentication";
 import { registerSchema } from "../../schema/registerSchema";
 import { useSchoolStore } from "../../store/useSchoolStore";
@@ -81,7 +82,7 @@ export default function Register() {
     <KeyboardAvoidingView
       behavior="padding"
       keyboardVerticalOffset={0}
-      style={{ flex: 1, backgroundColor: "#dfe9ff" }}
+      style={{ flex: 1, backgroundColor: AUTH_SCREEN_BACKGROUND }}
     >
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -357,7 +358,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    backgroundColor: "#dfe9ff",
+    backgroundColor: AUTH_SCREEN_BACKGROUND,
   },
   companies: {
     flexDirection: "row",
@@ -369,7 +370,7 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     padding: 25,
     borderRadius: 32,
-    backgroundColor: "#eef4ff",
+    backgroundColor: AUTH_PANEL_BACKGROUND,
   },
   logo: {
     alignItems: "center",
@@ -385,7 +386,7 @@ const styles = StyleSheet.create({
     borderRadius: 33,
     padding: 18,
     marginHorizontal: -12,
-    backgroundColor: "white",
+    backgroundColor: AUTH_CARD_BACKGROUND,
   },
   cardTitle: {
     fontSize: 17,
@@ -412,7 +413,7 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     borderRadius: 8,
     paddingHorizontal: 10,
-    backgroundColor: "#f9fbff",
+    backgroundColor: AUTH_INPUT_BACKGROUND,
   },
   inputFocused: {
     borderColor: "#4c6fbf",

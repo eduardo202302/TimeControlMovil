@@ -20,6 +20,12 @@ import {
   RADIUS_3XL,
   useResponsive,
 } from "@/constants/responsive";
+import {
+  AUTH_CARD_BACKGROUND,
+  AUTH_INPUT_BACKGROUND,
+  AUTH_PANEL_BACKGROUND,
+  AUTH_SCREEN_BACKGROUND,
+} from "@/constants/authColors";
 
 export default function ResetPassword({
   name,
@@ -309,7 +315,7 @@ function createLocalStyles(
       borderColor: "#ddd",
       borderRadius: scale(8),
       paddingHorizontal: scale(10),
-      backgroundColor: "#f9fbff",
+      backgroundColor: AUTH_INPUT_BACKGROUND,
     },
     inputFocused: {
       borderColor: "#4c6fbf",
@@ -338,7 +344,7 @@ function createStyles(
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: "#dfe9ff",
+      backgroundColor: AUTH_SCREEN_BACKGROUND,
       justifyContent: "center",
       alignItems: "center",
     },
@@ -354,7 +360,7 @@ function createStyles(
       marginTop: verticalScale(6),
     },
     card: {
-      backgroundColor: "white",
+      backgroundColor: AUTH_CARD_BACKGROUND,
       borderRadius: RADIUS_XL,
       padding: scale(18),
       marginHorizontal: -scale(12),
@@ -372,7 +378,7 @@ function createStyles(
       maxWidth: 480,
       padding: scale(25),
       borderRadius: RADIUS_3XL,
-      backgroundColor: "#eef4ff",
+      backgroundColor: AUTH_PANEL_BACKGROUND,
     },
     button: {
       backgroundColor: "#2d5fd3",

@@ -4,6 +4,11 @@
   RADIUS_XL,
   useResponsive,
 } from "@/constants/responsive";
+import {
+  AUTH_CARD_BACKGROUND,
+  AUTH_INPUT_BACKGROUND,
+  AUTH_PANEL_BACKGROUND,
+} from "@/constants/authColors";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
 import { router } from "expo-router";
@@ -521,7 +526,7 @@ function createLocalStyles(
       // 8 coincide con RADIUS_SM â€” usar constante importada
       borderRadius: scale(8),
       paddingHorizontal: scale(10),
-      backgroundColor: "#f9fbff",
+      backgroundColor: AUTH_INPUT_BACKGROUND,
     },
     inputFocused: {
       borderColor: "#4c6fbf",
@@ -558,7 +563,7 @@ function createStyles(
       maxWidth: 480,
       padding: scale(25),
       borderRadius: RADIUS_3XL,
-      backgroundColor: "#eef4ff",
+      backgroundColor: AUTH_PANEL_BACKGROUND,
     },
     errorText: {
       color: "#EF4444",
@@ -576,7 +581,7 @@ function createStyles(
       marginTop: verticalScale(6),
     },
     card: {
-      backgroundColor: "white",
+      backgroundColor: AUTH_CARD_BACKGROUND,
       borderRadius: RADIUS_XL,
       padding: scale(18),
       marginHorizontal: -scale(12),

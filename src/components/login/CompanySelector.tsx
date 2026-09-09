@@ -1,6 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useResponsive, RADIUS_XL, RADIUS_MD } from "@/constants/responsive";
+import {
+  AUTH_CARD_BACKGROUND,
+  AUTH_INPUT_BACKGROUND,
+} from "@/constants/authColors";
 import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
 
 interface CompanySelectorProps {
@@ -90,7 +94,7 @@ function createStyles(
     card: {
       width: "100%",
       maxWidth: 400,
-      backgroundColor: "white",
+      backgroundColor: AUTH_CARD_BACKGROUND,
       borderRadius: RADIUS_XL,
       padding: scale(20),
     },
@@ -122,7 +126,7 @@ function createStyles(
       borderColor: "#e0e6ef",
       borderRadius: RADIUS_MD,
       padding: scale(12),
-      backgroundColor: "#f9fbff",
+      backgroundColor: AUTH_INPUT_BACKGROUND,
     },
     companyInfo: {
       flexDirection: "row",

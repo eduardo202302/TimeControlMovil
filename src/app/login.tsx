@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useResponsive } from "@/constants/responsive";
+import { AUTH_SCREEN_BACKGROUND } from "@/constants/authColors";
 import { useSchoolStore } from "../../store/useSchoolStore";
 
 const Login = () => {
@@ -73,7 +74,7 @@ function createStyles(scale: (size: number) => number) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: "#dfe9ff",
+      backgroundColor: AUTH_SCREEN_BACKGROUND,
     },
     scrollContent: {
       flexGrow: 1,
