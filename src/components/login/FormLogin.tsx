@@ -1,13 +1,11 @@
 ﻿import {
   RADIUS_3XL,
   RADIUS_MD,
-  RADIUS_XL,
   useResponsive,
 } from "@/constants/responsive";
 import {
   AUTH_CARD_BACKGROUND,
   AUTH_INPUT_BACKGROUND,
-  AUTH_PANEL_BACKGROUND,
 } from "@/constants/authColors";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
@@ -298,46 +296,46 @@ export default function FormLogin({ name, image }: FormLoginProps) {
 
   return (
     <View style={styles.phone}>
-      <View style={styles.companies}>
-        <View>
-          <Image
-            source={require("../../../assets/images/logos/logoMini.png")}
-            style={styles.logoImage}
-          />
+      <View style={styles.card}>
+        <View style={styles.companies}>
+          <View>
+            <Image
+              source={require("../../../assets/images/logos/logoMini.png")}
+              style={styles.logoImage}
+            />
+          </View>
+          <View>
+            <Text style={styles.logoTitle}>FaceClass</Text>
+          </View>
         </View>
-        <View>
-          <Text style={styles.logoTitle}>FaceClass</Text>
+        <View style={styles.logo}>
+          {urlColegio && name ? (
+            <Image
+              source={{ uri: `${urlColegio}/${image}` }}
+              style={styles.logoImage}
+            />
+          ) : null}
+          <Text style={styles.logoTitle}>{name}</Text>
         </View>
-      </View>
-      <View style={styles.logo}>
-        {urlColegio && name ? (
-          <Image
-            source={{ uri: `${urlColegio}/${image}` }}
-            style={styles.logoImage}
-          />
-        ) : null}
-        <Text style={styles.logoTitle}>{name}</Text>
-      </View>
 
-      {mensaje && (
-        <View
-          style={[
-            styles.msg,
-            mensaje.tipo === "error" ? styles.msgError : styles.msgSuccess,
-          ]}
-        >
-          <Text
+        {mensaje && (
+          <View
             style={[
-              styles.msgText,
-              { color: mensaje.tipo === "error" ? "#b54a00" : "#0a6644" },
+              styles.msg,
+              mensaje.tipo === "error" ? styles.msgError : styles.msgSuccess,
             ]}
           >
-            {mensaje.texto}
-          </Text>
-        </View>
-      )}
+            <Text
+              style={[
+                styles.msgText,
+                { color: mensaje.tipo === "error" ? "#b54a00" : "#0a6644" },
+              ]}
+            >
+              {mensaje.texto}
+            </Text>
+          </View>
+        )}
 
-      <View style={styles.card}>
         <Text style={styles.cardTitle}>Iniciar Sesión</Text>
 
         <Controller
@@ -557,13 +555,12 @@ function createStyles(
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
+      marginBottom: verticalScale(10),
     },
     phone: {
       width: "90%",
       maxWidth: 480,
-      padding: scale(25),
-      borderRadius: RADIUS_3XL,
-      backgroundColor: AUTH_PANEL_BACKGROUND,
+      padding: scale(4),
     },
     errorText: {
       color: "#EF4444",
@@ -582,9 +579,10 @@ function createStyles(
     },
     card: {
       backgroundColor: AUTH_CARD_BACKGROUND,
-      borderRadius: RADIUS_XL,
+      borderRadius: RADIUS_3XL,
       padding: scale(18),
-      marginHorizontal: -scale(12),
+      paddingTop: scale(26),
+      marginHorizontal: -scale(8),
     },
     cardTitle: {
       fontSize: font(17),

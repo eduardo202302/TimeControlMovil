@@ -67,7 +67,7 @@ function createStyles(scale: (size: number) => number) {
       flexGrow: 1,
       justifyContent: "center",
       alignItems: "center",
-      padding: scale(19),
+      padding: scale(24),
     },
   });
 }

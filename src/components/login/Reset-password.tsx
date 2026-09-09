@@ -10,21 +10,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { resetPassword } from "../../../api/Login/loginAuthentication";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { NewPasswordType } from "../../../types/typesLogin/ForgotPasswordType";
 import {
   RADIUS_MD,
-  RADIUS_XL,
   RADIUS_3XL,
   useResponsive,
 } from "@/constants/responsive";
 import {
   AUTH_CARD_BACKGROUND,
   AUTH_INPUT_BACKGROUND,
-  AUTH_PANEL_BACKGROUND,
-  AUTH_SCREEN_BACKGROUND,
 } from "@/constants/authColors";
 
 export default function ResetPassword({
@@ -60,7 +56,7 @@ export default function ResetPassword({
   const onSubmit = async (data: NewPasswordType) => {
     if (data.password !== data.confirmPassword) {
       setMensaje({
-        texto: "Las contraseÃ±as no coinciden",
+        texto: "Las contraseñas no coinciden",
         tipo: "error",
       });
       return;
@@ -72,14 +68,14 @@ export default function ResetPassword({
 
     if (!response.success) {
       setMensaje({
-        texto: response.message || "Error al restablecer la contraseÃ±a",
+        texto: response.message || "Error al restablecer la contraseña",
         tipo: "error",
       });
       return;
     }
 
     setMensaje({
-      texto: "ContraseÃ±a actualizada correctamente",
+      texto: "Contraseña actualizada correctamente",
       tipo: "success",
     });
 
@@ -89,8 +85,9 @@ export default function ResetPassword({
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.phone}>
+    <View style={styles.phone}>
+      {/* Card */}
+      <View style={styles.card}>
         {/* Header empresa */}
         <View style={styles.companies}>
           <Image
@@ -133,97 +130,94 @@ export default function ResetPassword({
           </View>
         )}
 
-        {/* Card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Nueva ContraseÃ±a</Text>
+        <Text style={styles.cardTitle}>Nueva Contraseña</Text>
 
-          {/* Password */}
-          <Controller
-            name="password"
-            control={control}
-            rules={{ required: "La contraseÃ±a es requerida" }}
-            render={({ field, fieldState }) => (
-              <>
-                <InputField
-                  styles={inputStyles}
-                  icon="lock-closed-outline"
-                  placeholder="Nueva contraseÃ±a"
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  secureTextEntry={!showPassword}
-                  rightIcon={
-                    <TouchableOpacity
-                      onPress={() => setShowPassword(!showPassword)}
-                    >
-                      <Ionicons
-                        name={
-                          showPassword ? "eye-off-outline" : "eye-outline"
-                        }
-                        size={18}
-                        color="#999"
-                      />
-                    </TouchableOpacity>
-                  }
-                />
-                {fieldState.error && (
-                  <Text style={styles.errorText}>
-                    {fieldState.error.message}
-                  </Text>
-                )}
-              </>
-            )}
-          />
+        {/* Password */}
+        <Controller
+          name="password"
+          control={control}
+          rules={{ required: "La contraseña es requerida" }}
+          render={({ field, fieldState }) => (
+            <>
+              <InputField
+                styles={inputStyles}
+                icon="lock-closed-outline"
+                placeholder="Nueva contraseña"
+                value={field.value}
+                onChangeText={field.onChange}
+                secureTextEntry={!showPassword}
+                rightIcon={
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    <Ionicons
+                      name={
+                        showPassword ? "eye-off-outline" : "eye-outline"
+                      }
+                      size={18}
+                      color="#999"
+                    />
+                  </TouchableOpacity>
+                }
+              />
+              {fieldState.error && (
+                <Text style={styles.errorText}>
+                  {fieldState.error.message}
+                </Text>
+              )}
+            </>
+          )}
+        />
 
-          {/* Confirm password */}
-          <Controller
-            name="confirmPassword"
-            control={control}
-            rules={{ required: "Confirma la contraseÃ±a" }}
-            render={({ field, fieldState }) => (
-              <>
-                <InputField
-                  styles={inputStyles}
-                  icon="lock-closed-outline"
-                  placeholder="Confirmar contraseÃ±a"
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  secureTextEntry={!showPassword}
-                  rightIcon={
-                    <TouchableOpacity
-                      onPress={() => setShowPassword(!showPassword)}
-                    >
-                      <Ionicons
-                        name={
-                          showPassword ? "eye-off-outline" : "eye-outline"
-                        }
-                        size={18}
-                        color="#999"
-                      />
-                    </TouchableOpacity>
-                  }
-                />
-                {fieldState.error && (
-                  <Text style={styles.errorText}>
-                    {fieldState.error.message}
-                  </Text>
-                )}
-              </>
-            )}
-          />
+        {/* Confirm password */}
+        <Controller
+          name="confirmPassword"
+          control={control}
+          rules={{ required: "Confirma la contraseña" }}
+          render={({ field, fieldState }) => (
+            <>
+              <InputField
+                styles={inputStyles}
+                icon="lock-closed-outline"
+                placeholder="Confirmar contraseña"
+                value={field.value}
+                onChangeText={field.onChange}
+                secureTextEntry={!showPassword}
+                rightIcon={
+                  <TouchableOpacity
+                    onPress={() => setShowPassword(!showPassword)}
+                  >
+                    <Ionicons
+                      name={
+                        showPassword ? "eye-off-outline" : "eye-outline"
+                      }
+                      size={18}
+                      color="#999"
+                    />
+                  </TouchableOpacity>
+                }
+              />
+              {fieldState.error && (
+                <Text style={styles.errorText}>
+                  {fieldState.error.message}
+                </Text>
+              )}
+            </>
+          )}
+        />
 
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleSubmit(onSubmit)}
-          >
-            <Text style={styles.buttonText}>Cambiar contraseÃ±a</Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleSubmit(onSubmit)}
+        >
+          <Text style={styles.buttonText}>Cambiar contraseña</Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => router.replace("/login")}>
-            <Text style={styles.back}>Volver al login</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={() => router.replace("/login")}>
+          <Text style={styles.back}>Volver al login</Text>
+        </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -342,16 +336,11 @@ function createStyles(
   font: (size: number) => number,
 ) {
   return StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: AUTH_SCREEN_BACKGROUND,
-      justifyContent: "center",
-      alignItems: "center",
-    },
     companies: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
+      marginBottom: verticalScale(10),
     },
     logoTitle: {
       fontSize: font(20),
@@ -361,9 +350,10 @@ function createStyles(
     },
     card: {
       backgroundColor: AUTH_CARD_BACKGROUND,
-      borderRadius: RADIUS_XL,
+      borderRadius: RADIUS_3XL,
       padding: scale(18),
-      marginHorizontal: -scale(12),
+      paddingTop: scale(26),
+      marginHorizontal: -scale(8),
     },
     cardTitle: {
       fontSize: font(17),
@@ -376,9 +366,7 @@ function createStyles(
     phone: {
       width: "90%",
       maxWidth: 480,
-      padding: scale(25),
-      borderRadius: RADIUS_3XL,
-      backgroundColor: AUTH_PANEL_BACKGROUND,
+      padding: scale(4),
     },
     button: {
       backgroundColor: "#2d5fd3",

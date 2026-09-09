@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { AUTH_SCREEN_BACKGROUND, AUTH_PANEL_BACKGROUND, AUTH_CARD_BACKGROUND, AUTH_INPUT_BACKGROUND } from "@/constants/authColors";
+import { AUTH_SCREEN_BACKGROUND, AUTH_CARD_BACKGROUND, AUTH_INPUT_BACKGROUND } from "@/constants/authColors";
 import { registerUser } from "../../api/Login/loginAuthentication";
 import { registerSchema } from "../../schema/registerSchema";
 import { useSchoolStore } from "../../store/useSchoolStore";
@@ -89,21 +89,20 @@ export default function Register() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.phone}>
-          <View style={styles.companies}>
-            <View>
-              <Text style={styles.logoTitle}>FaceClass</Text>
-            </View>
-          </View>
-          <View style={styles.logo}>
-            <Image
-              source={{ uri: `${urlColegio}/${logo}` }}
-              style={{ width: 100, height: 100 }}
-            />
-            <Text style={styles.logoTitle}>{name}</Text>
-          </View>
-
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Registro de Usuario</Text>
+            <View style={styles.companies}>
+              <View>
+                <Text style={styles.logoTitle}>FaceClass</Text>
+              </View>
+            </View>
+            <View style={styles.logo}>
+              <Image
+                source={{ uri: `${urlColegio}/${logo}` }}
+                style={{ width: 100, height: 100 }}
+              />
+              <Text style={styles.logoTitle}>{name}</Text>
+            </View>
+
             {mensaje && (
               <View
                 style={[
@@ -123,6 +122,7 @@ export default function Register() {
                 </Text>
               </View>
             )}
+            <Text style={styles.cardTitle}>Registro de Usuario</Text>
             <Controller
               name="fullName"
               control={control}
@@ -364,13 +364,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 10,
   },
   phone: {
     width: "100%",
     maxWidth: 480,
-    padding: 25,
-    borderRadius: 32,
-    backgroundColor: AUTH_PANEL_BACKGROUND,
+    padding: 4,
   },
   logo: {
     alignItems: "center",
@@ -383,9 +382,10 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   card: {
-    borderRadius: 33,
+    borderRadius: 32,
     padding: 18,
-    marginHorizontal: -12,
+    paddingTop: 26,
+    marginHorizontal: -8,
     backgroundColor: AUTH_CARD_BACKGROUND,
   },
   cardTitle: {

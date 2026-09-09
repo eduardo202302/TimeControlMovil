@@ -10,21 +10,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { validatePin } from "../../../api/Login/loginAuthentication";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { ValidaPin } from "../../../types/typesLogin/ForgotPasswordType";
 import {
   RADIUS_MD,
-  RADIUS_XL,
   RADIUS_3XL,
   useResponsive,
 } from "@/constants/responsive";
 import {
   AUTH_CARD_BACKGROUND,
   AUTH_INPUT_BACKGROUND,
-  AUTH_PANEL_BACKGROUND,
-  AUTH_SCREEN_BACKGROUND,
 } from "@/constants/authColors";
 
 interface FormLoginProps {
@@ -69,8 +65,9 @@ const VerifyPin = ({ name, image, onNext }: FormLoginProps) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.phone}>
+    <View style={styles.phone}>
+      {/* Card */}
+      <View style={styles.card}>
         {/* Header empresa */}
         <View style={styles.companies}>
           <Image
@@ -111,51 +108,48 @@ const VerifyPin = ({ name, image, onNext }: FormLoginProps) => {
           </View>
         )}
 
-        {/* Card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Cambiar ContraseÃ±a</Text>
+        <Text style={styles.cardTitle}>Cambiar Contraseña</Text>
 
-          <Text style={styles.pinLabel}>Ingresar PIN:</Text>
+        <Text style={styles.pinLabel}>Ingresar PIN:</Text>
 
-          <Controller
-            name="pin"
-            control={control}
-            rules={{ required: "El pin es requerido" }}
-            render={({ field, fieldState }) => (
-              <>
-                <InputField
-                  styles={inputStyles}
-                  icon="key-outline"
-                  placeholder="CÃ³digo PIN"
-                  value={field.value}
-                  onChangeText={field.onChange}
-                  keyboardType="number-pad"
-                />
+        <Controller
+          name="pin"
+          control={control}
+          rules={{ required: "El pin es requerido" }}
+          render={({ field, fieldState }) => (
+            <>
+              <InputField
+                styles={inputStyles}
+                icon="key-outline"
+                placeholder="Código PIN"
+                value={field.value}
+                onChangeText={field.onChange}
+                keyboardType="number-pad"
+              />
 
-                {fieldState.error && (
-                  <Text style={styles.errorText}>
-                    {fieldState.error.message}
-                  </Text>
-                )}
-              </>
-            )}
-          />
+              {fieldState.error && (
+                <Text style={styles.errorText}>
+                  {fieldState.error.message}
+                </Text>
+              )}
+            </>
+          )}
+        />
 
-          {/* BotÃ³n */}
-          <TouchableOpacity
-            style={styles.button}
-            onPress={handleSubmit(onSubmit)}
-          >
-            <Text style={styles.buttonText}>Enviar</Text>
-          </TouchableOpacity>
+        {/* Botón */}
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleSubmit(onSubmit)}
+        >
+          <Text style={styles.buttonText}>Enviar</Text>
+        </TouchableOpacity>
 
-          {/* Volver */}
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.back}>Volver</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Volver */}
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.back}>Volver</Text>
+        </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 export default VerifyPin;
@@ -275,16 +269,11 @@ function createStyles(
   font: (size: number) => number,
 ) {
   return StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: AUTH_SCREEN_BACKGROUND,
-      justifyContent: "center",
-      alignItems: "center",
-    },
     companies: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
+      marginBottom: verticalScale(10),
     },
     logoTitle: {
       fontSize: font(20),
@@ -294,9 +283,10 @@ function createStyles(
     },
     card: {
       backgroundColor: AUTH_CARD_BACKGROUND,
-      borderRadius: RADIUS_XL,
+      borderRadius: RADIUS_3XL,
       padding: scale(18),
-      marginHorizontal: -scale(12),
+      paddingTop: scale(26),
+      marginHorizontal: -scale(8),
     },
     cardTitle: {
       fontSize: font(17),
@@ -314,9 +304,7 @@ function createStyles(
     phone: {
       width: "90%",
       maxWidth: 480,
-      padding: scale(25),
-      borderRadius: RADIUS_3XL,
-      backgroundColor: AUTH_PANEL_BACKGROUND,
+      padding: scale(4),
     },
     button: {
       backgroundColor: "#2d5fd3",
