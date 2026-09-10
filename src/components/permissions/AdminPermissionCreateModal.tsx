@@ -345,7 +345,7 @@ function CreateForm({
   // ── Validación ────────────────────────────────────────────────────────────
   const errors = useMemo(() => {
     const found: Partial<Record<FieldKey, string>> = {};
-    if (!employee) found.employee = "Selecciona el empleado.";
+    if (!employee) found.employee = "Selecciona el usuario.";
     if (!action) found.action = "Selecciona la acción del permiso.";
     if (!type) found.type = "Selecciona el tipo de permiso.";
     if (!subject.trim()) found.subject = "El asunto es requerido.";
@@ -428,14 +428,15 @@ function CreateForm({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Empleado ── */}
+        {/* ── Información: usuario, acción y tipo ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="person-outline" size={18} color="#2563EB" />
-            <Text style={styles.cardTitle}>
-              Empleado <Text style={styles.required}>*</Text>
-            </Text>
+            <Ionicons name="people-outline" size={18} color="#2563EB" />
+            <Text style={styles.cardTitle}>Información</Text>
           </View>
+          <Text style={styles.label}>
+            Usuario <Text style={styles.required}>*</Text>
+          </Text>
           {employee ? (
             <View style={styles.employeeRow}>
               <View style={styles.employeeInfo}>
@@ -458,23 +459,16 @@ function CreateForm({
               activeOpacity={0.75}
             >
               <Ionicons name="search-outline" size={16} color="#2563EB" />
-              <Text style={styles.selectPlaceholder}>Buscar empleado</Text>
+              <Text style={styles.selectPlaceholder}>Buscar usuario</Text>
             </TouchableOpacity>
           )}
           {!!errorFor("employee") && <Text style={styles.fieldError}>{errorFor("employee")}</Text>}
-        </View>
 
-        {/* ── Información ── */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="pricetags-outline" size={18} color="#2563EB" />
-            <Text style={styles.cardTitle}>Información</Text>
-          </View>
           {catalogError ? (
-            <Text style={styles.fieldError}>{catalogError}</Text>
+            <Text style={[styles.fieldError, styles.labelSpaced]}>{catalogError}</Text>
           ) : (
             <>
-              <Text style={styles.label}>
+              <Text style={[styles.label, styles.labelSpaced]}>
                 Acción <Text style={styles.required}>*</Text>
               </Text>
               <TouchableOpacity
@@ -778,7 +772,7 @@ function CreateForm({
             >
               <Ionicons name="arrow-back" size={22} color="#111827" />
             </TouchableOpacity>
-            <Text style={styles.topBarTitle}>Seleccionar Empleado</Text>
+            <Text style={styles.topBarTitle}>Seleccionar Usuario</Text>
             <View style={styles.topBarSpacer} />
           </View>
           <View style={styles.searchBox}>
