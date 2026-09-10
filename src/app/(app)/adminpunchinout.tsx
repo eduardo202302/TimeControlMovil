@@ -159,7 +159,7 @@ const METRICS: {
  * fallback mostraría el identificador crudo, p. ej. "FinJornadaAdicional".
  */
 const PUNCH_TYPE_LABELS: Record<string, string> = {
-  InicioJornada: "Entrada Jornada",
+  InicioJornada: "Inicio Jornada",
   FinJornada: "Fin Jornada",
   InicioJornadaAdicional: "Inicio Jornada Adicional",
   FinJornadaAdicional: "Fin Jornada Adicional",
