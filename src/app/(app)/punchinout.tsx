@@ -164,7 +164,7 @@ function getTodaySchedule(
 function getPunchTypeLabel(type: string): string {
   const labels: Record<string, string> = {
     InicioJornada: "Inicio Jornada",
-    FinJornada: "Salida Jornada",
+    FinJornada: "Fin Jornada",
     InicioAlmuerzo: "Entrada Almuerzo",
     FinAlmuerzo: "Salida Almuerzo",
     InicioBreak: "Inicio Break",
