@@ -5,6 +5,7 @@ import DateTimePicker, {
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -49,6 +50,22 @@ import TagOptionSheet from "./TagOptionSheet";
 /** Mismo debounce y mínimo que el selector de Ponche ADM. */
 const SEARCH_DEBOUNCE_MS = 400;
 const SEARCH_MIN_CHARS = 2;
+
+/**
+ * Copia deliberada de PHOTO_HOST/photoUri() de adminpunchinout.tsx (local a
+ * ese archivo): se duplica en vez de importar para no acoplar esta pantalla a
+ * Ponche ADM. `photourl` es una ruta relativa que el backend sirve por su ruta
+ * estática pública; si ya viene absoluta se usa tal cual.
+ */
+const PHOTO_HOST = "https://timecontrol.wsmax.net:8600";
+
+/** Lado del avatar de las filas — mismo AVATAR_SM_SIZE de Ponche ADM. */
+const AVATAR_SM_SIZE = 38;
+
+function photoUri(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  return raw.startsWith("http") ? raw : `${PHOTO_HOST}/${raw}`;
+}
 
 const AUSENCIA_ACTION_NAME = "ausencia";
 const WEEK_DAY_NAMES = Object.values(WEEK_DAYS);
@@ -136,6 +153,27 @@ interface AdminPermissionCreateModalProps {
 }
 
 type CreateStyles = ReturnType<typeof createStyles>;
+
+/** Foto del usuario (`photourl ?? s3Photo`, ya resuelto en EmployeeOption) o
+ * ícono genérico — mismo avatar de las filas de Ponche ADM. */
+function UserAvatar({
+  photourl,
+  styles,
+}: {
+  photourl: string | null;
+  styles: CreateStyles;
+}) {
+  const uri = photoUri(photourl);
+  return (
+    <View style={styles.avatarSmall}>
+      {uri ? (
+        <Image source={{ uri }} style={styles.avatarSmallImage} resizeMode="cover" />
+      ) : (
+        <Ionicons name="person" size={18} color="#9CA3AF" />
+      )}
+    </View>
+  );
+}
 
 export default function AdminPermissionCreateModal({
   visible,
@@ -439,7 +477,13 @@ function CreateForm({
           </Text>
           {employee ? (
             <View style={styles.employeeRow}>
-              <View style={styles.employeeInfo}>
+              <UserAvatar photourl={employee.photourl} styles={styles} />
+              {/* Tocar el usuario reabre el picker para cambiarlo. */}
+              <TouchableOpacity
+                style={styles.employeeInfo}
+                onPress={() => setSelectorOpen(true)}
+                activeOpacity={0.75}
+              >
                 <Text style={styles.employeeName} numberOfLines={2}>
                   {employee.fullName}{" "}
                   <Text style={styles.employeeId}>(ID: {employee.schoolUserId})</Text>
@@ -447,9 +491,14 @@ function CreateForm({
                 <Text style={styles.employeeMeta} numberOfLines={2}>
                   {formatEmployeeContact(employee)}
                 </Text>
-              </View>
-              <TouchableOpacity onPress={() => setSelectorOpen(true)} hitSlop={8}>
-                <Text style={styles.linkText}>Cambiar</Text>
+              </TouchableOpacity>
+              {/* X: limpia la selección sin reabrir el picker. */}
+              <TouchableOpacity
+                onPress={() => setEmployee(null)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityLabel="Quitar usuario"
+              >
+                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
               </TouchableOpacity>
             </View>
           ) : (
@@ -757,74 +806,110 @@ function CreateForm({
         onClose={() => setTagSheet(null)}
       />
 
-      {/* ── Selector de empleado ── */}
+      {/* ── Picker de usuario — calcado del de Ponche ADM, sin cámara ni
+          contador "Cant.": acá se elige UN solo usuario. ── */}
       <Modal
         visible={selectorOpen}
-        animationType="slide"
+        transparent
+        animationType="fade"
         onRequestClose={() => setSelectorOpen(false)}
       >
-        <View style={styles.screen}>
-          <View style={styles.topBar}>
-            <TouchableOpacity
-              style={styles.backBtn}
-              onPress={() => setSelectorOpen(false)}
-              activeOpacity={0.7}
+        <View style={styles.selectorOverlay}>
+          <View style={styles.selectorCard}>
+            <View style={styles.selectorHeader}>
+              <View style={styles.selectorHeaderIcon}>
+                <Ionicons name="people-outline" size={22} color="#2563EB" />
+              </View>
+              <Text style={styles.selectorTitle}>Seleccionar Usuario</Text>
+              <TouchableOpacity
+                onPress={() => setSelectorOpen(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityLabel="Cerrar"
+              >
+                <Ionicons name="close" size={22} color="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.selectorSearchRow}>
+              <View style={styles.searchInputWrap}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Nombre, cédula, email o código"
+                  placeholderTextColor="#9CA3AF"
+                  value={query}
+                  onChangeText={setQuery}
+                  autoCorrect={false}
+                  autoFocus
+                  returnKeyType="search"
+                  onSubmitEditing={() => runSearch(query)}
+                />
+                {query.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setQuery("")}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                  </TouchableOpacity>
+                )}
+              </View>
+              {/* La búsqueda ya es en vivo (debounce de arriba); la lupa solo
+                  la adelanta, igual que en Ponche ADM. */}
+              <TouchableOpacity
+                style={styles.iconBtnPrimary}
+                onPress={() => runSearch(query)}
+                activeOpacity={0.8}
+                accessibilityLabel="Buscar"
+              >
+                <Ionicons name="search" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.selectorList}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              <Ionicons name="arrow-back" size={22} color="#111827" />
-            </TouchableOpacity>
-            <Text style={styles.topBarTitle}>Seleccionar Usuario</Text>
-            <View style={styles.topBarSpacer} />
+              {searching ? (
+                <ActivityIndicator color="#2563EB" style={styles.inlineLoader} />
+              ) : query.trim().length < SEARCH_MIN_CHARS ? (
+                <View style={styles.emptyBlock}>
+                  <Ionicons name="search-outline" size={28} color="#D1D5DB" />
+                  <Text style={styles.emptyText}>
+                    Escribe al menos {SEARCH_MIN_CHARS} caracteres
+                  </Text>
+                </View>
+              ) : results.length === 0 ? (
+                <View style={styles.emptyBlock}>
+                  <Ionicons name="person-outline" size={28} color="#D1D5DB" />
+                  <Text style={styles.emptyText}>Sin resultados</Text>
+                </View>
+              ) : (
+                results.map((option) => (
+                  <TouchableOpacity
+                    key={option.schoolUserId}
+                    style={styles.resultRow}
+                    onPress={() => {
+                      setEmployee(option);
+                      setSelectorOpen(false);
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <UserAvatar photourl={option.photourl} styles={styles} />
+                    <View style={styles.resultInfo}>
+                      <Text style={styles.resultName} numberOfLines={2}>
+                        {option.fullName}{" "}
+                        <Text style={styles.resultId}>(ID: {option.schoolUserId})</Text>
+                      </Text>
+                      <Text style={styles.resultMeta} numberOfLines={2}>
+                        {formatEmployeeContact(option)}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
           </View>
-          <View style={styles.searchBox}>
-            <Ionicons name="search-outline" size={18} color="#9CA3AF" />
-            <TextInput
-              style={styles.searchInput}
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Nombre, email, teléfono o ID"
-              placeholderTextColor="#9CA3AF"
-              autoFocus
-              autoCorrect={false}
-            />
-          </View>
-          <ScrollView
-            contentContainerStyle={styles.results}
-            keyboardShouldPersistTaps="handled"
-          >
-            {searching ? (
-              <ActivityIndicator color="#2563EB" style={styles.resultsLoader} />
-            ) : query.trim().length < SEARCH_MIN_CHARS ? (
-              <Text style={styles.resultsEmpty}>
-                Escribe al menos {SEARCH_MIN_CHARS} caracteres
-              </Text>
-            ) : results.length === 0 ? (
-              <Text style={styles.resultsEmpty}>Sin resultados</Text>
-            ) : (
-              results.map((option) => (
-                <TouchableOpacity
-                  key={option.schoolUserId}
-                  style={styles.resultRow}
-                  onPress={() => {
-                    setEmployee(option);
-                    setSelectorOpen(false);
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons name="person-circle-outline" size={28} color="#9CA3AF" />
-                  <View style={styles.employeeInfo}>
-                    <Text style={styles.employeeName} numberOfLines={2}>
-                      {option.fullName}{" "}
-                      <Text style={styles.employeeId}>(ID: {option.schoolUserId})</Text>
-                    </Text>
-                    <Text style={styles.employeeMeta} numberOfLines={2}>
-                      {formatEmployeeContact(option)}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
-                </TouchableOpacity>
-              ))
-            )}
-          </ScrollView>
         </View>
       </Modal>
 
@@ -982,7 +1067,18 @@ function createStyles(
     dayChipActive: { backgroundColor: "#2563EB", borderColor: "#2563EB" },
     dayChipText: { fontSize: font(12), fontWeight: "600", color: "#374151" },
     dayChipTextActive: { color: "#fff" },
-    employeeRow: { flexDirection: "row", alignItems: "center", gap: scale(10) },
+    /** Usuario elegido: misma caja que los selects del formulario. */
+    employeeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+      borderWidth: 1,
+      borderColor: "#D1D5DB",
+      borderRadius: RADIUS_MD,
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(8),
+      backgroundColor: "#fff",
+    },
     employeeInfo: { flex: 1 },
     employeeName: { fontSize: font(14), fontWeight: "700", color: "#111827" },
     employeeId: { fontSize: font(12), fontWeight: "500", color: "#6B7280" },
@@ -1048,41 +1144,130 @@ function createStyles(
     saveBtn: { backgroundColor: "#2563EB" },
     saveBtnBusy: { opacity: 0.7 },
     saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
-    searchBox: {
+    /* ── Picker de usuario: valores calcados de adminpunchinout.tsx ── */
+    selectorOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: scale(20),
+    },
+    selectorCard: {
+      width: "100%",
+      // Mismo tope/criterio que el picker de Ponche ADM.
+      maxWidth: 440,
+      maxHeight: "88%",
+      backgroundColor: "#fff",
+      borderRadius: RADIUS_2XL,
+      padding: scale(20),
+      elevation: 10,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+    },
+    selectorHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+      paddingBottom: verticalScale(14),
+      borderBottomWidth: 1,
+      borderBottomColor: "#F3F4F6",
+    },
+    /** Ícono de cabecera: tamaño fijo, mismo criterio que Ponche ADM. */
+    selectorHeaderIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: RADIUS_LG,
+      backgroundColor: "#EFF6FF",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    selectorTitle: {
+      flex: 1,
+      fontSize: font(17),
+      fontWeight: "700",
+      color: "#111827",
+    },
+    selectorSearchRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      margin: scale(16),
-      paddingHorizontal: scale(12),
-      borderWidth: 1,
-      borderColor: "#D1D5DB",
+      marginTop: verticalScale(14),
+    },
+    /** Botón cuadrado de ícono — lado fijo, mismo criterio que los avatares. */
+    iconBtnPrimary: {
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "#2563EB",
       borderRadius: RADIUS_MD,
-      backgroundColor: "#fff",
+    },
+    selectorList: { marginTop: verticalScale(6) },
+    searchInputWrap: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(8),
+      backgroundColor: "#F9FAFB",
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      borderRadius: RADIUS_MD,
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(10),
     },
     searchInput: {
       flex: 1,
-      fontSize: font(14),
+      fontSize: font(12),
       color: "#111827",
-      paddingVertical: verticalScale(11),
-    },
-    results: { paddingHorizontal: scale(16), paddingBottom: verticalScale(40) },
-    resultsLoader: { marginTop: verticalScale(24) },
-    resultsEmpty: {
-      fontSize: font(13),
-      color: "#6B7280",
-      textAlign: "center",
-      marginTop: verticalScale(24),
+      // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- 0 resetea el padding por defecto del TextInput en Android, no es un valor de diseño
+      padding: 0,
     },
     resultRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: scale(10),
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_LG,
-      paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
-      marginBottom: verticalScale(8),
+      borderTopWidth: 1,
+      borderTopColor: "#F3F4F6",
     },
+    resultInfo: { flex: 1 },
+    resultName: {
+      fontSize: font(14),
+      fontWeight: "700",
+      color: "#111827",
+      flexShrink: 1,
+    },
+    resultId: { fontWeight: "700", color: "#2563EB" },
+    resultMeta: {
+      fontSize: font(12),
+      color: "#6B7280",
+      marginTop: verticalScale(1),
+    },
+    avatarSmall: {
+      width: AVATAR_SM_SIZE,
+      height: AVATAR_SM_SIZE,
+      // Círculo: mitad del lado fijo, no un radio de diseño.
+      borderRadius: AVATAR_SM_SIZE / 2,
+      backgroundColor: "#F3F4F6",
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+    },
+    avatarSmallImage: {
+      width: AVATAR_SM_SIZE,
+      height: AVATAR_SM_SIZE,
+      // Círculo: mitad del lado fijo, no un radio de diseño.
+      borderRadius: AVATAR_SM_SIZE / 2,
+    },
+    inlineLoader: { marginVertical: verticalScale(16) },
+    emptyBlock: {
+      alignItems: "center",
+      gap: scale(6),
+      paddingVertical: verticalScale(20),
+    },
+    emptyText: { fontSize: font(13), color: "#9CA3AF" },
     pickerOverlay: {
       flex: 1,
       backgroundColor: "rgba(0,0,0,0.45)",
