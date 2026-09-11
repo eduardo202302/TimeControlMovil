@@ -386,6 +386,22 @@ export interface PermissionEditDraft {
   removedAttachmentIndexes: number[];
 }
 
+/**
+ * "Solicitante" del detalle administrativo: quién hizo el POST del permiso
+ * (`requestedSchoolUser`), NO el dueño (`schoolUser`, que ya se muestra en el
+ * header). Sin fallback al dueño a propósito — en el histórico hay ~97
+ * registros (createdDate entre 06-may y 08-jul-2026) con
+ * requestedSchoolUserId NULL, y mostrar ahí el dueño confundiría "quién lo
+ * pidió" con "de quién es".
+ */
+export function permissionRequesterName(
+  permission: Pick<MyPermission, "requestedSchoolUser"> | null | undefined,
+): string {
+  const name = permission?.requestedSchoolUser?.user?.fullName;
+  const trimmed = typeof name === "string" ? name.trim() : "";
+  return trimmed || "No disponible";
+}
+
 /** El backend lo guarda como boolean o como 1 (handlers.js:913). */
 export function readOverTime(raw: unknown): boolean {
   return raw === true || raw === 1;

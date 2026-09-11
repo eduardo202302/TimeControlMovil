@@ -29,7 +29,7 @@ import {
   type MyPermission,
   type PermissionTagRef,
 } from "../../utils/permissionRules";
-import { readOverTime } from "../../utils/adminPermissionRules";
+import { permissionRequesterName, readOverTime } from "../../utils/adminPermissionRules";
 import { normalizePermissionName, toRD } from "../../utils/punchRules";
 import { formatDisplayDate, formatDisplayTime } from "../timeoff/RevisionFinalModal";
 
@@ -227,6 +227,8 @@ export default function AdminPermissionDetailModal({
                     </Text>
                   </View>
                 )}
+                <InfoRow label="Teléfono" value={text(requester?.phone)} styles={styles} />
+                <InfoRow label="Email" value={text(requester?.email)} styles={styles} />
               </View>
 
               {/* ── Información administrativa ── */}
@@ -236,9 +238,7 @@ export default function AdminPermissionDetailModal({
                   <Text style={styles.cardTitle}>Información</Text>
                 </View>
                 <InfoRow label="ID" value={String(permission.id)} styles={styles} />
-                <InfoRow label="Solicitado por" value={text(requester?.fullName)} styles={styles} />
-                <InfoRow label="Teléfono" value={text(requester?.phone)} styles={styles} />
-                <InfoRow label="Email" value={text(requester?.email)} styles={styles} />
+                <InfoRow label="Solicitante" value={permissionRequesterName(permission)} styles={styles} />
                 <InfoRow label="Canal" value={text(permission.canal)} styles={styles} />
                 <InfoRow
                   label="F. Creación"

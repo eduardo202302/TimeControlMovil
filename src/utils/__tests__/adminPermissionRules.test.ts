@@ -28,6 +28,7 @@ import {
   patchPermission,
   PERMISSION_PATCH_FIELDS,
   permissionEditSnapshot,
+  permissionRequesterName,
   readCategoryId,
   readOverTime,
   rejectionJustificationError,
@@ -807,6 +808,40 @@ describe("overTime", () => {
     [null, false],
   ])("isOvertimeAction(%p) → %p", (name, expected) => {
     expect(isOvertimeAction(name)).toBe(expected);
+  });
+});
+
+// ─── Solicitante (requestedSchoolUser) ───────────────────────────────────────
+
+describe("permissionRequesterName", () => {
+  it("devuelve el nombre de quien hizo el POST, no el dueño del permiso", () => {
+    expect(
+      permissionRequesterName({
+        requestedSchoolUser: { user: { fullName: "Juan Pérez" } },
+      } as any),
+    ).toBe("Juan Pérez");
+  });
+
+  it('cae a "No disponible" cuando requestedSchoolUser es null (histórico sin requestedSchoolUserId)', () => {
+    expect(permissionRequesterName({ requestedSchoolUser: null } as any)).toBe(
+      "No disponible",
+    );
+  });
+
+  it('cae a "No disponible" cuando requestedSchoolUser.user es undefined', () => {
+    expect(
+      permissionRequesterName({ requestedSchoolUser: { user: undefined } } as any),
+    ).toBe("No disponible");
+  });
+
+  it('cae a "No disponible" sin el permiso, y con fullName vacío/espacios', () => {
+    expect(permissionRequesterName(null)).toBe("No disponible");
+    expect(permissionRequesterName(undefined)).toBe("No disponible");
+    expect(
+      permissionRequesterName({
+        requestedSchoolUser: { user: { fullName: "   " } },
+      } as any),
+    ).toBe("No disponible");
   });
 
   it("isOverTimeLocked: bloqueado por acción de horas extras o en modo Ver", () => {
