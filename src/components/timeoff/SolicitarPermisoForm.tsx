@@ -1078,10 +1078,24 @@ export default function SolicitarPermisoForm() {
           </View>
 
           {catalogLoading ? (
-            <View style={styles.catalogState}>
-              <ActivityIndicator size="small" color="#2563EB" />
-              <Text style={styles.catalogStateText}>Cargando catálogo…</Text>
-            </View>
+            // Mismos labels + contenedor `select` que el estado cargado (no un
+            // spinner suelto): reserva el alto final de las 2 filas para que
+            // "Detalles"/"Fecha y Hora" no salten cuando el catálogo responda.
+            <>
+              <Text style={styles.label}>
+                Acción <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.select}>
+                <View style={styles.skeletonBar} />
+              </View>
+
+              <Text style={[styles.label, styles.labelSpaced]}>
+                Tipo Permiso <Text style={styles.required}>*</Text>
+              </Text>
+              <View style={styles.select}>
+                <View style={styles.skeletonBar} />
+              </View>
+            </>
           ) : catalogError ? (
             <View style={styles.catalogState}>
               <Ionicons name="alert-circle-outline" size={18} color="#DC2626" />
@@ -1829,6 +1843,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   selectDisabled: { opacity: 0.55 },
+  /** Alto ~= line-height de selectText (fontSize 14, sin lineHeight
+   * explícito) — mismo contenedor `select`, así que el alto del box no
+   * cambia entre catalogLoading y el estado cargado. */
+  skeletonBar: { width: 120, height: 17, borderRadius: 4, backgroundColor: "#E5E7EB" },
   selectText: { flex: 1, fontSize: 14, color: "#9CA3AF" },
   selectTextFilled: { color: "#111827", fontWeight: "600" },
   row: { flexDirection: "row", gap: 12 },
