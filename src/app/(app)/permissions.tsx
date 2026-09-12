@@ -150,7 +150,7 @@ function PermissionCard({
           {stateEditable && <Ionicons name="chevron-down" size={12} color={state.color} />}
         </TouchableOpacity>
         <View style={styles.cardTopRight}>
-          {decision.expired && (
+          {!isHistorical && decision.expired && (
             <View style={styles.expiredMark}>
               <Ionicons name="alert-circle" size={11} color="#B91C1C" />
               <Text style={styles.expiredMarkText}>Vencido</Text>
