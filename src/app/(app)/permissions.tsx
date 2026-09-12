@@ -45,6 +45,7 @@ import {
   isPermissionExpired,
   isRejectionStateTag,
   patchPermission,
+  permissionDeleteConfirmationLabel,
   resolveStateTagDefinition,
   updatePermissionState,
   type CategoryDefaultIds,
@@ -790,9 +791,9 @@ export default function PermissionsScreen() {
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Confirmar Eliminar</Text>
             <Text style={styles.modalMessage}>¿Está seguro que desea eliminar este permiso?</Text>
-            {!!deleteTarget?.subject && (
+            {!!deleteTarget && (
               <Text style={styles.modalFocus} numberOfLines={2}>
-                {deleteTarget.subject}
+                {permissionDeleteConfirmationLabel(deleteTarget)}
               </Text>
             )}
             <View style={styles.modalButtons}>

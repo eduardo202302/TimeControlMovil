@@ -28,6 +28,7 @@ import {
   patchPermission,
   PERMISSION_PATCH_FIELDS,
   permissionEditSnapshot,
+  permissionDeleteConfirmationLabel,
   permissionRequesterName,
   readCategoryId,
   readOverTime,
@@ -857,6 +858,54 @@ describe("permissionRequesterName", () => {
     ).toBe("No disponible");
   });
 
+});
+
+// ─── Confirmar Eliminar ──────────────────────────────────────────────────────
+
+describe("permissionDeleteConfirmationLabel", () => {
+  it('con actionTag: "Permiso de {acción en minúscula} de {nombre}"', () => {
+    expect(
+      permissionDeleteConfirmationLabel({
+        actionTag: { name: "Ausencia" },
+        schoolUser: { user: { fullName: "Juan Pérez" } },
+      } as any),
+    ).toBe("Permiso de ausencia de Juan Pérez");
+  });
+
+  it("baja a minúscula con .toLowerCase() nativo — conserva tildes/ñ", () => {
+    expect(
+      permissionDeleteConfirmationLabel({
+        actionTag: { name: "Salida Anticipada" },
+        schoolUser: { user: { fullName: "María Núñez" } },
+      } as any),
+    ).toBe("Permiso de salida anticipada de María Núñez");
+  });
+
+  it('sin actionTag: NO duplica "permiso" — "Permiso de {nombre}"', () => {
+    expect(
+      permissionDeleteConfirmationLabel({
+        actionTag: null,
+        schoolUser: { user: { fullName: "Juan Pérez" } },
+      } as any),
+    ).toBe("Permiso de Juan Pérez");
+  });
+
+  it('sin schoolUser.user.fullName: cae a "este usuario"', () => {
+    expect(
+      permissionDeleteConfirmationLabel({
+        actionTag: { name: "Ausencia" },
+        schoolUser: null,
+      } as any),
+    ).toBe("Permiso de ausencia de este usuario");
+  });
+
+  it('sin permiso: "Permiso de este usuario"', () => {
+    expect(permissionDeleteConfirmationLabel(null)).toBe("Permiso de este usuario");
+    expect(permissionDeleteConfirmationLabel(undefined)).toBe("Permiso de este usuario");
+  });
+});
+
+describe("isOverTimeLocked", () => {
   it("isOverTimeLocked: bloqueado por acción de horas extras o en modo Ver", () => {
     expect(isOverTimeLocked({ actionName: "Horas Extras", readOnly: false })).toBe(true);
     expect(isOverTimeLocked({ actionName: "Salida", readOnly: true })).toBe(true);

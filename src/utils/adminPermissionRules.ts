@@ -411,6 +411,28 @@ export function permissionRequesterName(
   return trimmed || "No disponible";
 }
 
+/**
+ * La línea destacada del modal "Confirmar Eliminar": "Permiso de {acción} de
+ * {nombre}".
+ *
+ * `actionTag.name` se baja a minúsculas con `.toLowerCase()` nativo a
+ * propósito, NO con normalizePermissionName — ese helper además saca tildes,
+ * y acá el nombre del catálogo (p.ej. "Ausencia") debe quedar legible tal
+ * cual, solo en minúscula.
+ *
+ * Sin `actionTag` no se arma "Permiso de permiso de X": se omite el segundo
+ * "de" y queda "Permiso de {nombre}".
+ */
+export function permissionDeleteConfirmationLabel(
+  permission: Pick<MyPermission, "actionTag" | "schoolUser"> | null | undefined,
+): string {
+  const actionName = permission?.actionTag?.name;
+  const ownerName = permission?.schoolUser?.user?.fullName ?? "este usuario";
+  return actionName
+    ? `Permiso de ${actionName.toLowerCase()} de ${ownerName}`
+    : `Permiso de ${ownerName}`;
+}
+
 /** El backend lo guarda como boolean o como 1 (handlers.js:913). */
 export function readOverTime(raw: unknown): boolean {
   return raw === true || raw === 1;
