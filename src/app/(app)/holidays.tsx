@@ -160,7 +160,9 @@ export default function HolidaysScreen() {
         setLoading(false);
         setRefreshing(false);
         setLoadingMore(false);
-        setListError("No hay sesión activa.");
+        setListError(
+          "No tienes un inicio de jornada activo. Para ver tus días feriados, inicia una jornada o comunícate con un administrador.",
+        );
         return;
       }
 
@@ -445,10 +447,10 @@ function createStyles(
       paddingVertical: verticalScale(3),
     },
     workingBadgeOn: { backgroundColor: "#DCFCE7" },
-    workingBadgeOff: { backgroundColor: "#F3F4F6" },
+    workingBadgeOff: { backgroundColor: "#FEE2E2" },
     workingBadgeText: { fontSize: font(10), fontWeight: "700" },
     workingBadgeTextOn: { color: "#15803D" },
-    workingBadgeTextOff: { color: "#6B7280" },
+    workingBadgeTextOff: { color: "#B91C1C" },
     cardMetaRow: {
       flexDirection: "row",
       alignItems: "center",
