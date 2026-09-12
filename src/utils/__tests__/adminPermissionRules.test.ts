@@ -111,17 +111,28 @@ describe("ADMIN_PERMISSION_FIELDS", () => {
 });
 
 describe("buildAdminPermissionsParams", () => {
-  it("sin búsqueda: el query string exacto, sin `all` ni `schoolUserId`", () => {
-    const qs = buildAdminPermissionsQueryString(buildAdminPermissionsParams({}));
+  it("Local sin búsqueda: orderKey=permissionDate/asc, sin `all` ni `schoolUserId`", () => {
+    const qs = buildAdminPermissionsQueryString(
+      buildAdminPermissionsParams({ source: "local" }),
+    );
     expect(qs).toBe(
-      `page=1&orderKey=id&orderDir=desc&rows=${ADMIN_PERMISSION_ROWS}&fields=${encodeURIComponent(ADMIN_PERMISSION_FIELDS).replace(/%20/g, "+")}`,
+      `page=1&orderKey=permissionDate&orderDir=asc&rows=${ADMIN_PERMISSION_ROWS}&fields=${encodeURIComponent(ADMIN_PERMISSION_FIELDS).replace(/%20/g, "+")}`,
     );
     expect(qs).not.toContain("all=");
     expect(qs).not.toContain("schoolUserId");
   });
 
+  it("Histórico sin búsqueda: orderKey=id/desc, sin cambios", () => {
+    const qs = buildAdminPermissionsQueryString(
+      buildAdminPermissionsParams({ source: "historico" }),
+    );
+    expect(qs).toBe(
+      `page=1&orderKey=id&orderDir=desc&rows=${ADMIN_PERMISSION_ROWS}&fields=${encodeURIComponent(ADMIN_PERMISSION_FIELDS).replace(/%20/g, "+")}`,
+    );
+  });
+
   it("con búsqueda: agrega `all` recortado, antes de `fields`", () => {
-    const params = buildAdminPermissionsParams({ search: "  Pérez ", page: 3 });
+    const params = buildAdminPermissionsParams({ source: "local", search: "  Pérez ", page: 3 });
     expect(params.all).toBe("Pérez");
     expect(params.page).toBe(3);
     expect(Object.keys(params)).toEqual([
@@ -135,7 +146,9 @@ describe("buildAdminPermissionsParams", () => {
   });
 
   it("una búsqueda de solo espacios no manda `all`", () => {
-    expect(buildAdminPermissionsParams({ search: "   " })).not.toHaveProperty("all");
+    expect(
+      buildAdminPermissionsParams({ source: "local", search: "   " }),
+    ).not.toHaveProperty("all");
   });
 });
 

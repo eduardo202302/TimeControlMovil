@@ -74,22 +74,31 @@ export const ADMIN_PERMISSION_SOURCE_LABELS: Record<PermissionSource, string> = 
  * cuando hay búsqueda: mandarlo vacío filtraría contra la cadena vacía.
  *
  * NO lleva `schoolUserId` — ver la nota de arriba del módulo.
+ *
+ * El orden difiere por `source`: Local ordena por `permissionDate` ascendente
+ * (la más cercana primero) porque `userdaypermissions.permissionDate` es
+ * columna real de la tabla base y el handler no exige whitelist ni join para
+ * ordenar por ella. Histórico se queda en `id` descendente — `userdaypermissionsh`
+ * es de solo lectura y no hay pedido de cambiarlo.
  */
 export function buildAdminPermissionsParams({
+  source,
   page = 1,
   rows = ADMIN_PERMISSION_ROWS,
   search = "",
   fields = ADMIN_PERMISSION_FIELDS,
 }: {
+  source: PermissionSource;
   page?: number;
   rows?: number;
   search?: string;
   fields?: string;
 }): Record<string, string | number> {
+  const isLocal = source === "local";
   const params: Record<string, string | number> = {
     page,
-    orderKey: "id",
-    orderDir: "desc",
+    orderKey: isLocal ? "permissionDate" : "id",
+    orderDir: isLocal ? "asc" : "desc",
     rows,
   };
   const term = search.trim();
@@ -625,7 +634,7 @@ export async function fetchAdminPermissionsPage({
 }): Promise<AdminPermissionsPage> {
   const response = await axios.get(`${urlColegio}/${PERMISSION_ROUTES[source]}`, {
     ...authHeaders(token),
-    params: buildAdminPermissionsParams({ page, rows, search }),
+    params: buildAdminPermissionsParams({ source, page, rows, search }),
   });
   if (!response.data?.success) return { items: [], count: null, hasMore: false };
 
