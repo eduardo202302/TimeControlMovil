@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -200,6 +200,17 @@ function EditForm({
   );
   const isRejection = isRejectionStateTag(targetTag);
 
+  /**
+   * Si el estado destino deja de ser rechazo/cancelación, el comentario
+   * escrito para justificarlo no debe sobrevivir: se descarta volviendo al
+   * valor guardado, para que no viaje en el payload con un estado al que ya
+   * no aplica.
+   */
+  useEffect(() => {
+    if (!isRejection) setComments(snapshot.comments);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo debe correr cuando isRejection cambia, no en cada tecla de `comments`
+  }, [isRejection]);
+
   const draft = useMemo<PermissionEditDraft>(
     () => ({
       stateTagId,
@@ -385,33 +396,35 @@ function EditForm({
           </View>
         </View>
 
-        {/* ── Comentario ── */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="chatbox-ellipses-outline" size={18} color="#2563EB" />
-            <Text style={styles.cardTitle}>
-              Comentario {isRejection && <Text style={styles.required}>(Requerido)</Text>}
-            </Text>
+        {/* ── Comentario: solo aplica a rechazo/cancelación ── */}
+        {isRejection && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Ionicons name="chatbox-ellipses-outline" size={18} color="#2563EB" />
+              <Text style={styles.cardTitle}>
+                Comentario <Text style={styles.required}>(Requerido)</Text>
+              </Text>
+            </View>
+            <TextInput
+              style={[
+                styles.input,
+                styles.textarea,
+                readOnly && styles.inputDisabled,
+                showErrors && !!justificationError && styles.inputInvalid,
+              ]}
+              value={comments}
+              onChangeText={setComments}
+              editable={!readOnly}
+              multiline
+              textAlignVertical="top"
+              placeholder="Describe el motivo"
+              placeholderTextColor="#9CA3AF"
+            />
+            {showErrors && !!justificationError && (
+              <Text style={styles.fieldError}>{justificationError}</Text>
+            )}
           </View>
-          <TextInput
-            style={[
-              styles.input,
-              styles.textarea,
-              readOnly && styles.inputDisabled,
-              showErrors && !!justificationError && styles.inputInvalid,
-            ]}
-            value={comments}
-            onChangeText={setComments}
-            editable={!readOnly}
-            multiline
-            textAlignVertical="top"
-            placeholder="Escriba el motivo aquí…"
-            placeholderTextColor="#9CA3AF"
-          />
-          {showErrors && !!justificationError && (
-            <Text style={styles.fieldError}>{justificationError}</Text>
-          )}
-        </View>
+        )}
 
         {/* ── Adjuntos ── */}
         <View style={styles.card}>
