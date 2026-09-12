@@ -265,6 +265,9 @@ export default function PermissionsScreen() {
   // ── Listado ───────────────────────────────────────────────────────────────
   const [items, setItems] = useState<MyPermission[]>([]);
   const [hasMore, setHasMore] = useState(false);
+  /** Total de Local para el badge del toggle — de `count` del backend, no de
+   * `items.length` (eso es solo lo cargado hasta ahora vía "cargar más"). */
+  const [localCount, setLocalCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -406,6 +409,11 @@ export default function PermissionsScreen() {
         pageRef.current = page;
         setHasMore(result.hasMore);
         setItems((previous) => (mode === "append" ? [...previous, ...result.items] : result.items));
+        // `append` es la misma búsqueda, no cambia el total. Se gatea además
+        // por `source === "local"`: el badge es solo de Local, así que un
+        // fetch de Histórico no debe pisar el conteo con el total de la otra
+        // tabla — se queda con el último valor conocido hasta volver a Local.
+        if (mode !== "append" && source === "local") setLocalCount(result.count);
       } catch (error: any) {
         if (requestId !== requestIdRef.current) return;
         console.error("permissions/load:", error?.response?.data?.message ?? error?.message);
@@ -643,6 +651,7 @@ export default function PermissionsScreen() {
         <View style={styles.segmented}>
           {SOURCES.map((option) => {
             const active = source === option;
+            const showBadge = option === "local" && !!localCount;
             return (
               <TouchableOpacity
                 key={option}
@@ -651,7 +660,9 @@ export default function PermissionsScreen() {
                 activeOpacity={0.8}
               >
                 <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
-                  {ADMIN_PERMISSION_SOURCE_LABELS[option]}
+                  {showBadge
+                    ? `${ADMIN_PERMISSION_SOURCE_LABELS[option]} (${localCount})`
+                    : ADMIN_PERMISSION_SOURCE_LABELS[option]}
                 </Text>
               </TouchableOpacity>
             );
