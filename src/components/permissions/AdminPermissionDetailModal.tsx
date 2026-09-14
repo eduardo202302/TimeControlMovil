@@ -172,7 +172,7 @@ export default function AdminPermissionDetailModal({
             <Ionicons name="arrow-back" size={22} color="#111827" />
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>
-            {permission ? `Permiso #${permission.id}` : "Detalle del Permiso"}
+            {permission ? `Permiso ID: ${permission.id}` : "Detalle del Permiso"}
           </Text>
           <View style={styles.topBarSpacer} />
         </View>
@@ -195,14 +195,9 @@ export default function AdminPermissionDetailModal({
             >
               {/* ── Encabezado ── */}
               <View style={styles.card}>
-                <View style={styles.headerRow}>
-                  <Text style={styles.personName}>
-                    Solicitado por: {text(requester?.fullName) || "—"}
-                  </Text>
-                  <View style={styles.idBadge}>
-                    <Text style={styles.idBadgeText}>#{permission.id}</Text>
-                  </View>
-                </View>
+                <Text style={styles.personName}>
+                  Solicitado por: {text(requester?.fullName) || "—"}
+                </Text>
                 <View style={styles.chipRow}>
                   {[permission.stateTag, permission.actionTag, permission.typeTag]
                     .filter((tag): tag is PermissionTagRef => !!tag?.name)
@@ -455,23 +450,7 @@ function createStyles(
       marginBottom: verticalScale(10),
     },
     cardTitle: { fontSize: font(15), fontWeight: "700", color: "#111827" },
-    headerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: scale(8),
-    },
-    idBadge: {
-      backgroundColor: "#EFF6FF",
-      borderRadius: RADIUS_PILL,
-      paddingHorizontal: scale(10),
-      paddingVertical: verticalScale(4),
-    },
-    idBadgeText: {
-      fontSize: font(12),
-      fontWeight: "700",
-      color: "#1D4ED8",
-    },
-    personName: { flex: 1, fontSize: font(17), fontWeight: "700", color: "#111827" },
+    personName: { fontSize: font(17), fontWeight: "700", color: "#111827" },
     chipRow: {
       flexDirection: "row",
       flexWrap: "wrap",
