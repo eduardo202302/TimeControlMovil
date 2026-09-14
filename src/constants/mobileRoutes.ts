@@ -1,6 +1,6 @@
 /**
  * Rutas reales de `src/app/(app)/` (sin el grupo). `role.defaultMenu.path`
- * viene del backend y puede apuntar a una ruta solo-webapp (p. ej. "/users")
+ * viene del backend y puede apuntar a una ruta solo-webapp (p. ej. "/roles")
  * o venir vacío — cualquiera de esos casos produciría "Unmatched Route" si
  * se navegara tal cual.
  */
@@ -17,6 +17,7 @@ export const VALID_MOBILE_PATHS: Set<string> = new Set([
   "/adminpunchinout",
   "/permissions",
   "/holidays",
+  "/users",
 ]);
 
 export const DEFAULT_MOBILE_PATH = "/punchinout";
