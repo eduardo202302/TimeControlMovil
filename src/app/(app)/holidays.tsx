@@ -20,6 +20,7 @@ import {
   useResponsive,
 } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
+import * as Storage from "../../utils/storage";
 import HolidaysFormModal from "../../components/holidays/HolidaysFormModal";
 import {
   capitalizeDay,
@@ -129,7 +130,30 @@ export default function HolidaysScreen() {
     [scale, verticalScale, font],
   );
 
-  const { token, urlColegio } = useSchoolStore();
+  /** Estado local con fallback a SecureStore — mismo patrón que
+   * permissions.tsx: si el store de Zustand todavía no hidrató (carrera
+   * al arrancar la app), se resuelve leyendo el valor persistido directo. */
+  const [token, setToken] = useState<string | null>(() => useSchoolStore.getState().token);
+  const [urlColegio, setUrlColegio] = useState<string | null>(
+    () => useSchoolStore.getState().urlColegio,
+  );
+
+  useEffect(() => {
+    let alive = true;
+    const resolve = async () => ({
+      token: useSchoolStore.getState().token ?? (await Storage.getItemAsync("token")),
+      urlColegio:
+        useSchoolStore.getState().urlColegio ?? (await Storage.getItemAsync("urlColegio")),
+    });
+    resolve().then((value) => {
+      if (!alive) return;
+      setToken(value.token);
+      setUrlColegio(value.urlColegio);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const [filter, setFilter] = useState<HolidaysFilter>("true");
   const [items, setItems] = useState<Holiday[]>([]);
@@ -200,8 +224,7 @@ export default function HolidaysScreen() {
 
   useEffect(() => {
     load("replace");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `load` ya depende de `filter`
-  }, [filter]);
+  }, [load]);
 
   const handleEndReached = useCallback(() => {
     if (loading || loadingMore || refreshing || !hasMore) return;
