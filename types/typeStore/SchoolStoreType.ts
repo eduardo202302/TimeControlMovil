@@ -25,6 +25,17 @@ export interface SchoolSettings {
   radioPermitido?: number;
   cedula?: boolean;
   cedulaRequerida?: boolean;
+  // Flags del módulo Usuarios — mismas claves que lee el mapStateToProps de
+  // MtnUserCrud en el webapp. Ya vienen en `school.settings`; solo se tipan.
+  // `isAccessControl` es el "companyIsTimeControlDefault" del webapp.
+  isAccessControl?: boolean;
+  isValidLocationDefault?: boolean;
+  isImageRequiredDefault?: boolean;
+  isWorkingLunch?: boolean;
+  isWorkingLunchDefault?: boolean;
+  // Horario de la escuela por día (arreglo de {weekDay, workEntryTime,
+  // workExitTime, …}) — el `companySchedules` del webapp.
+  schedulesAdd?: unknown;
   [key: string]: unknown;
 }
 
@@ -45,6 +56,24 @@ export interface UserSchedule {
 export interface Address {
   latitude?: number;
   longitude?: number;
+  // Campos de la dirección de un usuario (AdressEntity/MapAddressSelector del
+  // webapp). Todos opcionales: una dirección "solo texto" trae únicamente
+  // formattedAddress, y la de la sede usa solo latitude/longitude.
+  id?: number;
+  title?: string;
+  province?: string;
+  city?: string;
+  sector?: string;
+  zone?: string;
+  street?: string;
+  streetNumber?: string;
+  building?: string;
+  apartmentNumber?: string;
+  postalCode?: string;
+  phone?: string;
+  referenceToArrive?: string;
+  formattedAddress?: string;
+  location?: { lat: number; lng: number } | Record<string, never>;
   [key: string]: unknown;
 }
 

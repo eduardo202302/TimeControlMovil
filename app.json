@@ -27,7 +27,12 @@
         "foregroundImage": "./assets/images/logos/logo_adaptive.png",
         "backgroundColor": "#E6F4FE"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyB9eh4EYxyjQhXXOXMQBFOC4e5Ryvmlwn8"
+        }
+      }
     },
     "web": {
       "output": "static",
