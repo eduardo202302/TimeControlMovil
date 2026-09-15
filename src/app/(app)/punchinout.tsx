@@ -688,7 +688,7 @@ export default function PunchInOut() {
         const res = await rawAxios.post(
           `${baseUrl}/authentication/chooseschool`,
           { schoolId },
-          { headers: { Authorization: `Bearer ${token}` } },
+          { headers: { Authorization: `Bearer ${token}`, platform: "App" } },
         );
 
         if (!res.data?.success) return;

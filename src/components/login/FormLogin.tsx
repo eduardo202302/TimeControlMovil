@@ -205,7 +205,12 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       const res = await rawAxios.post(
         `${baseUrl}/authentication/chooseschool`,
         { schoolId: schoolUser.schoolId },
-        { headers: { Authorization: `Bearer ${pendingLogin.token}` } },
+        {
+          headers: {
+            Authorization: `Bearer ${pendingLogin.token}`,
+            platform: "App",
+          },
+        },
       );
 
       const scopedToken = res.data?.data?.token;

@@ -15,7 +15,7 @@ const loginAuthentication = async (data: LoginType) => {
 
   const api = axios.create({
     baseURL: urlSchool || "",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", platform: "App" },
   });
 
   try {
