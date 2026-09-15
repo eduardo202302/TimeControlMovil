@@ -22,7 +22,7 @@ import {
 } from "react-native";
 import { loginAuthentication } from "../../../api/Login/loginAuthentication";
 import { getMenuItems } from "../../../api/menu/getMenuItems";
-import { useSchoolStore } from "../../../store/useSchoolStore";
+import { buildCompanySettings, useSchoolStore } from "../../../store/useSchoolStore";
 import { resolveMobilePath } from "../../constants/mobileRoutes";
 import { LoginType } from "../../../types/typesLogin/LoginType";
 import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
@@ -219,6 +219,12 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       }
 
       useSchoolStore.getState().setToken(scopedToken);
+      const companySettings = buildCompanySettings(
+        res.data?.data?.school?.settings,
+      );
+      if (companySettings) {
+        useSchoolStore.getState().setCompanySettings(companySettings);
+      }
       setCompanySelectorVisible(false);
       await completeLogin(
         schoolUser,
@@ -271,9 +277,55 @@ export default function FormLogin({ name, image }: FormLoginProps) {
           });
           setCompanySelectorVisible(true);
         } else {
-          // Una sola compañía → entrar normal (pasar datos directo, sin depender del estado)
+          // Una sola compañía → también se re-scopea vía chooseschool: el
+          // token de /login es ambiguo (sin schoolId) y los endpoints
+          // protegidos por schoolStrategy lo rechazan, y además es lo que
+          // alimenta companySettings (categoryDefaultIds de excusas/permisos,
+          // schedulesAdd, entryTime, exitTime). Si el re-scopeo falla, se
+          // conserva el comportamiento anterior (entrar con el token de login).
+          const schoolUser = schoolUsers[0] ?? null;
+          if (schoolUser) {
+            try {
+              const baseUrl =
+                urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
+              const rawAxios = axios.create();
+              const res = await rawAxios.post(
+                `${baseUrl}/authentication/chooseschool`,
+                { schoolId: schoolUser.schoolId },
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    platform: "App",
+                  },
+                },
+              );
+              const scopedToken = res.data?.data?.token;
+              const companySettings = buildCompanySettings(
+                res.data?.data?.school?.settings,
+              );
+              if (res.data?.success && scopedToken) {
+                if (companySettings) {
+                  useSchoolStore.getState().setCompanySettings(companySettings);
+                }
+                await completeLogin(
+                  schoolUser,
+                  response.data,
+                  scopedToken,
+                  menuItems,
+                  data.usuario,
+                  data.password,
+                );
+                return;
+              }
+              console.warn(
+                "chooseschool sin éxito en una sola compañía; se sigue con el token de login",
+              );
+            } catch (error) {
+              console.error("chooseschool (una sola compañía):", error);
+            }
+          }
           await completeLogin(
-            schoolUsers[0] ?? null,
+            schoolUser,
             response.data,
             token,
             menuItems,

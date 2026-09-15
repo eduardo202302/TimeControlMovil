@@ -2,9 +2,30 @@ import axios from "axios";
 import * as Storage from "../utils/storage";
 import { decodeJWT } from "../utils/session";
 
+/**
+ * Mismo criterio de `fields` que `apiConfig.fields` de StudentsSelector en el
+ * webapp. OJO: contra el backend real (Students/handlers.js →
+ * utils.getTableQuery) `fields` solo alimenta el filtro de búsqueda "all"
+ * (que esta pantalla no usa) — no es una proyección de columnas. Se manda
+ * igual por paridad con el webapp, pero no limita ni agrega nada a la
+ * respuesta: el backend siempre hace `.withGraphFetched('course')` y
+ * devuelve la fila completa, tenga o no `fields`.
+ */
+const STUDENT_FIELDS = "fullName,code,id,photourl,course.fullName,course.listNumber";
+
+/**
+ * `course` es ManyToMany (un estudiante puede tener varias matrículas) —
+ * confirmado en Students.js: `extra: ['date','status','listNumber']` cuelga
+ * `listNumber` de cada curso vía la tabla `enrollments`. El webapp accede
+ * siempre a `course[0]` (ClientSelectorModal.jsx), nunca a `course` como
+ * objeto suelto — se tipa igual acá.
+ */
 export interface Student {
   id: number;
   fullName: string;
+  code?: string | null;
+  photourl?: string | null;
+  course?: { fullName?: string | null; listNumber?: number | null }[];
 }
 
 interface GetStudentsResponse {
@@ -39,7 +60,10 @@ export const getStudents = async (): Promise<Student[]> => {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        ...(hasValidParentId && { params: { parentId } }),
+        params: {
+          fields: STUDENT_FIELDS,
+          ...(hasValidParentId ? { parentId } : {}),
+        },
       },
     );
 

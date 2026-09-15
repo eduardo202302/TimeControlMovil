@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import {
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -11,9 +12,19 @@ import {
 } from "react-native";
 import { RADIUS_2XL, RADIUS_LG, RADIUS_MD, useResponsive } from "@/constants/responsive";
 
+/** Lado del avatar de las filas — mismo AVATAR_SM_SIZE que las filas de
+ * resultado de AdminPermissionCreateModal.tsx, un punto más chico porque acá
+ * el sheet ya trae buscador + checkbox compitiendo por el mismo ancho. */
+const OPTION_AVATAR_SIZE = 32;
+
 export interface MultiSelectOption {
   id: number;
   name: string;
+  /** Línea secundaria en gris debajo del nombre (curso, código, etc.). Si no
+   * se pasa (ni `avatarUrl`), la fila se ve exactamente igual que antes. */
+  subtitle?: string;
+  /** Si no hay foto, se muestra un ícono de persona genérico. */
+  avatarUrl?: string;
 }
 
 interface TagMultiSelectSheetProps {
@@ -88,6 +99,11 @@ export default function TagMultiSelectSheet({
             ) : (
               filtered.map((option) => {
                 const selected = selectedIds.includes(option.id);
+                // Solo se dibuja el avatar si el caller manda subtitle o
+                // avatarUrl — así el uso actual (tags simples de Usuarios)
+                // no cambia de aspecto.
+                const showAvatar =
+                  option.subtitle !== undefined || option.avatarUrl !== undefined;
                 return (
                   <TouchableOpacity
                     key={option.id}
@@ -95,17 +111,37 @@ export default function TagMultiSelectSheet({
                     onPress={() => toggle(option.id)}
                     activeOpacity={0.75}
                   >
+                    {showAvatar && (
+                      <View style={styles.avatar}>
+                        {option.avatarUrl ? (
+                          <Image
+                            source={{ uri: option.avatarUrl }}
+                            style={styles.avatarImage}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <Ionicons name="person" size={16} color="#9CA3AF" />
+                        )}
+                      </View>
+                    )}
                     <Ionicons
                       name={selected ? "checkbox" : "square-outline"}
                       size={20}
                       color={selected ? "#2563EB" : "#9CA3AF"}
                     />
-                    <Text
-                      style={[styles.optionText, selected && styles.optionTextSelected]}
-                      numberOfLines={2}
-                    >
-                      {option.name}
-                    </Text>
+                    <View style={styles.optionTextGroup}>
+                      <Text
+                        style={[styles.optionText, selected && styles.optionTextSelected]}
+                        numberOfLines={2}
+                      >
+                        {option.name}
+                      </Text>
+                      {!!option.subtitle && (
+                        <Text style={styles.optionSubtitle} numberOfLines={1}>
+                          {option.subtitle}
+                        </Text>
+                      )}
+                    </View>
                   </TouchableOpacity>
                 );
               })
@@ -183,8 +219,30 @@ function createStyles(
       marginBottom: verticalScale(4),
     },
     optionSelected: { backgroundColor: "#EFF6FF" },
-    optionText: { flex: 1, fontSize: font(14), color: "#374151" },
+    optionTextGroup: { flex: 1 },
+    optionText: { fontSize: font(14), color: "#374151" },
     optionTextSelected: { color: "#1D4ED8", fontWeight: "700" },
+    optionSubtitle: {
+      fontSize: font(12),
+      color: "#6B7280",
+      marginTop: verticalScale(1),
+    },
+    avatar: {
+      width: OPTION_AVATAR_SIZE,
+      height: OPTION_AVATAR_SIZE,
+      // Círculo: mitad del lado fijo, no un radio de diseño.
+      borderRadius: OPTION_AVATAR_SIZE / 2,
+      backgroundColor: "#F3F4F6",
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+    },
+    avatarImage: {
+      width: OPTION_AVATAR_SIZE,
+      height: OPTION_AVATAR_SIZE,
+      // Círculo: mitad del lado fijo, no un radio de diseño.
+      borderRadius: OPTION_AVATAR_SIZE / 2,
+    },
     doneBtn: {
       marginTop: verticalScale(8),
       alignItems: "center",

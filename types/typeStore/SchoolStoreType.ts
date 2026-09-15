@@ -162,6 +162,23 @@ export interface User {
   [key: string]: unknown;
 }
 
+/**
+ * Subconjunto de `school.settings` que necesitan los módulos de Excusas
+ * (Face Class): catálogo de categorías por defecto (`stateTagId` de una
+ * excusa nueva sale de `categoryDefaultIds.catExcuseStatedId`, no lo resuelve
+ * el backend solo) y el horario laboral de la sede, para validar que un
+ * rango de ausencia caiga solo en días hábiles — mismo criterio que
+ * `isAbsenceRangeOnlyCompanyWorkingDays` en el webapp. Deliberadamente NO es
+ * el objeto `school`/`settings` completo (ver `SchoolSettings` arriba): solo
+ * estas 4 claves, para no depender de todo lo que `chooseschool` devuelva.
+ */
+export interface CompanySettings {
+  categoryDefaultIds: Record<string, unknown>;
+  schedulesAdd: UserSchedule[];
+  entryTime: string;
+  exitTime: string;
+}
+
 // ─── Store type extendido ─────────────────────────────────────────────────────
 
 export interface SchoolStore {
@@ -179,6 +196,9 @@ export interface SchoolStore {
   menuTree: MenuTree[];
   role: RoleItem | null;
 
+  // Campo nuevo — company.settings de chooseschool (ver CompanySettings)
+  companySettings: CompanySettings | null;
+
   // Acciones existentes
   setSchool: (school: School) => void;
   setUrlColegio: (url: string) => void;
@@ -190,6 +210,7 @@ export interface SchoolStore {
   // Acción nueva
   setMenuResolution: (user: User, menuItems: MenuItem[]) => void;
   setRole: (role: RoleItem) => void;
+  setCompanySettings: (companySettings: CompanySettings) => void;
 
   // Cerrar sesión
   logout: () => void;

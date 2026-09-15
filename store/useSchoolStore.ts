@@ -1,7 +1,29 @@
 import { create } from "zustand";
-import { SchoolStore } from "../types/typeStore/SchoolStoreType";
+import {
+  CompanySettings,
+  SchoolStore,
+} from "../types/typeStore/SchoolStoreType";
 import { MenuItem } from "../types/typesMenu/MenuTypes";
 import { resolveRoute } from "../utils/resolveRoute";
+
+/**
+ * `raw` es `school.settings` tal cual llega de chooseschool (objeto grande,
+ * sin tipar en el backend). Extrae solo las 4 claves de `CompanySettings` —
+ * ver el comentario de esa interfaz para el porqué. Devuelve `null` si `raw`
+ * no es un objeto, para que el caller decida no pisar el valor previo del
+ * store con datos vacíos (p. ej. si `chooseschool` no trajo `school`).
+ */
+export function buildCompanySettings(raw: unknown): CompanySettings | null {
+  if (!raw || typeof raw !== "object") return null;
+  const settings = raw as Record<string, unknown>;
+  return {
+    categoryDefaultIds:
+      (settings.categoryDefaultIds as Record<string, unknown>) ?? {},
+    schedulesAdd: (settings.schedulesAdd as CompanySettings["schedulesAdd"]) ?? [],
+    entryTime: typeof settings.entryTime === "string" ? settings.entryTime : "",
+    exitTime: typeof settings.exitTime === "string" ? settings.exitTime : "",
+  };
+}
 
 export const useSchoolStore = create<SchoolStore>((set) => ({
   // ─── Estado existente ───────────────────────────────────────────────────────
@@ -17,6 +39,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   allowedMenuItems: [],
   menuTree: [],
   role: null,
+  companySettings: null,
 
   // ─── Acciones existentes (sin cambios) ──────────────────────────────────────
   setSchool: (school) => set({ school }),
@@ -37,6 +60,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       allowedMenuItems: [],
       menuTree: [],
       role: null,
+      companySettings: null,
     }),
 
   // ─── Cerrar sesión — conserva urlColegio y school para poder volver a login ─
@@ -50,6 +74,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       allowedMenuItems: [],
       menuTree: [],
       role: null,
+      companySettings: null,
     }),
 
   // ─── Acción nueva: resuelve app + ruta + menú tras el login ─────────────────
@@ -70,4 +95,5 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   },
 
   setRole: (role) => set({ role }),
+  setCompanySettings: (companySettings) => set({ companySettings }),
 }));

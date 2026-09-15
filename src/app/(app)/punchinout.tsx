@@ -22,7 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSchoolStore } from "../../../store/useSchoolStore";
+import { buildCompanySettings, useSchoolStore } from "../../../store/useSchoolStore";
 import type {
   School,
   SchoolSettings,
@@ -699,7 +699,13 @@ export default function PunchInOut() {
         // Mantener los settings frescos del backend (tolerancias, etc.)
         const freshSettings = (res.data?.data?.school ?? res.data?.school)
           ?.settings as SchoolSettings | undefined;
-        if (freshSettings) setSchoolSettings(freshSettings);
+        if (freshSettings) {
+          setSchoolSettings(freshSettings);
+          const companySettings = buildCompanySettings(freshSettings);
+          if (companySettings) {
+            useSchoolStore.getState().setCompanySettings(companySettings);
+          }
+        }
 
         // Comparar solo los campos relevantes (ignorar createdDate y campos extra)
         const normalize = (s: UserSchedule[]) =>
