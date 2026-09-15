@@ -113,7 +113,13 @@ export default function UserSettingsTab({ ctl, styles }: UserSettingsTabProps) {
 
   return (
     <>
-      {company.companyIsTimeControlDefault && capabilities.canApplyTimeControl && (
+      {/* "Crea Excusas" es independiente de Time Control (ver
+          buildUserSettingsPayload/applyRoleChange en userFormRules.ts: viaja
+          y se resetea aparte de los 4 settings de TC). Antes esta card se
+          ocultaba entera sin TC, dejando ese toggle inalcanzable aunque el
+          rol sí lo permitiera — ahora se muestra si `permissions` tiene algo
+          que ofrecer, sea por TC o por createExcuses. */}
+      {permissions.length > 0 && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>

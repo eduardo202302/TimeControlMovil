@@ -325,7 +325,7 @@ export default function UsersScreen() {
 
   // ── Modal de usuario ──────────────────────────────────────────────────────
   const [formVisible, setFormVisible] = useState(false);
-  const [formMode, setFormMode] = useState<"add" | "edit">("add");
+  const [formMode, setFormMode] = useState<"add" | "edit" | "watch">("add");
   const [formUser, setFormUser] = useState<SchoolUserRow | null>(null);
 
   const openCreate = useCallback(() => {
@@ -334,9 +334,10 @@ export default function UsersScreen() {
     setFormVisible(true);
   }, []);
 
-  /** Tocar la card abre en edit (el lápiz del webapp); watch solo desde el ojo del modal. */
+  /** Tocar la card abre en edit si el usuario está activo; inactivo abre en
+   * watch (el ícono del header permite pasar a edit desde ahí). */
   const openUser = useCallback((item: SchoolUserRow) => {
-    setFormMode("edit");
+    setFormMode(item.isActive === true ? "edit" : "watch");
     setFormUser(item);
     setFormVisible(true);
   }, []);

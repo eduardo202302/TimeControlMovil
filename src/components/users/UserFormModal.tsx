@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -58,8 +58,27 @@ export default function UserFormModal({
     [scale, verticalScale, font],
   );
 
+  /**
+   * El botón/gesto de retroceso de Android dispara onRequestClose del Modal
+   * nativo, que vive en ESTE componente (fuera de UserForm/useUserForm) y no
+   * conoce ctl.isDirty. Sin este ref, ese camino cerraba el modal sin pedir
+   * confirmación aunque hubiera cambios sin guardar — se guarda ahí la MISMA
+   * requestClose que usan la flecha del header y "Cancelar".
+   */
+  const requestCloseRef = useRef<() => void>(onClose);
+  useEffect(() => {
+    requestCloseRef.current = onClose;
+  }, [onClose]);
+  const registerRequestClose = useCallback((fn: () => void) => {
+    requestCloseRef.current = fn;
+  }, []);
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={() => requestCloseRef.current()}
+    >
       <View style={styles.screen}>
         {/* Montado solo mientras está visible: cada apertura arranca con su
             propio snapshot, igual que HolidaysFormModal. */}
@@ -74,6 +93,7 @@ export default function UserFormModal({
             styles={styles}
             onClose={onClose}
             onSaved={onSaved}
+            registerRequestClose={registerRequestClose}
           />
         )}
       </View>
@@ -90,6 +110,9 @@ interface UserFormProps {
   styles: UserFormStyles;
   onClose: () => void;
   onSaved: () => void;
+  /** Le pasa a UserFormModal la requestClose vigente (con ctl.isDirty al día)
+   * para que el back-button de Android la use en vez de cerrar directo. */
+  registerRequestClose: (fn: () => void) => void;
 }
 
 function UserForm({
@@ -101,6 +124,7 @@ function UserForm({
   styles,
   onClose,
   onSaved,
+  registerRequestClose,
 }: UserFormProps) {
   const ctl = useUserForm({ initialMode, userId: user?.id ?? null, token, urlColegio });
   const [activeTab, setActiveTab] = useState<UserTabId>("info");
@@ -133,6 +157,10 @@ function UserForm({
     if (ctl.isDirty) setExitConfirmVisible(true);
     else onClose();
   }, [ctl.isDirty, onClose]);
+
+  useEffect(() => {
+    registerRequestClose(requestClose);
+  }, [registerRequestClose, requestClose]);
 
   const handleSave = useCallback(async () => {
     const result = await ctl.submit();
@@ -179,7 +207,10 @@ function UserForm({
           {title}
         </Text>
         {initialMode !== "add" ? (
-          // Alterna edit ↔ watch, igual que los mode buttons del IKModal del webapp.
+          // Alterna edit ↔ watch, igual que los mode buttons del IKModal del
+          // webapp. El ícono muestra la ACCIÓN disponible, no el modo actual:
+          // en watch se ofrece "editar" (lápiz); en edit se ofrece "solo
+          // lectura" (ojo).
           <TouchableOpacity
             style={[styles.iconBtn, ctl.isWatch && styles.iconBtnActive]}
             onPress={ctl.toggleWatch}
@@ -187,7 +218,7 @@ function UserForm({
             accessibilityLabel={ctl.isWatch ? "Editar" : "Solo lectura"}
           >
             <Ionicons
-              name={ctl.isWatch ? "eye" : "eye-outline"}
+              name={ctl.isWatch ? "pencil" : "eye-outline"}
               size={22}
               color={ctl.isWatch ? "#2563EB" : "#6B7280"}
             />
