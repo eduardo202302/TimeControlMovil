@@ -10,7 +10,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { RADIUS_2XL, RADIUS_LG, RADIUS_MD, useResponsive } from "@/constants/responsive";
+import { FOOTER_BORDER, TEXT_PRIMARY } from "@/constants/colors";
+import {
+  RADIUS_2XL,
+  RADIUS_LG,
+  RADIUS_MD,
+  RADIUS_PILL,
+  useResponsive,
+} from "@/constants/responsive";
 
 /** Lado del avatar de las filas — mismo AVATAR_SM_SIZE que las filas de
  * resultado de AdminPermissionCreateModal.tsx, un punto más chico porque acá
@@ -34,6 +41,13 @@ interface TagMultiSelectSheetProps {
   /** Ids seleccionados, en orden de selección. */
   selectedIds: number[];
   emptyText?: string;
+  /**
+   * Badge "Cant.N" junto al título — N = `options.length` (las opciones
+   * disponibles en la lista, no las seleccionadas). Mismo patrón que
+   * `countBadge` de ClientSelectorModal.jsx en el webapp. Default false: no
+   * afecta los usos existentes en Usuarios, que no la pasan.
+   */
+  showCount?: boolean;
   onChange: (ids: number[]) => void;
   onClose: () => void;
 }
@@ -50,6 +64,7 @@ export default function TagMultiSelectSheet({
   options,
   selectedIds,
   emptyText = "Sin opciones disponibles",
+  showCount = false,
   onChange,
   onClose,
 }: TagMultiSelectSheetProps) {
@@ -78,6 +93,11 @@ export default function TagMultiSelectSheet({
             <Text style={styles.title} numberOfLines={1}>
               {title}
             </Text>
+            {showCount && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>Cant.{options.length}</Text>
+              </View>
+            )}
             <TouchableOpacity onPress={onClose} hitSlop={8}>
               <Ionicons name="close" size={20} color="#6B7280" />
             </TouchableOpacity>
@@ -186,6 +206,14 @@ function createStyles(
       marginBottom: verticalScale(10),
     },
     title: { flex: 1, fontSize: font(16), fontWeight: "700", color: "#111827" },
+    countBadge: {
+      backgroundColor: FOOTER_BORDER,
+      borderRadius: RADIUS_PILL,
+      paddingHorizontal: scale(8),
+      paddingVertical: verticalScale(2),
+      marginRight: scale(8),
+    },
+    countBadgeText: { fontSize: font(12), fontWeight: "700", color: TEXT_PRIMARY },
     searchBox: {
       flexDirection: "row",
       alignItems: "center",
