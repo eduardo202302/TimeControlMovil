@@ -123,10 +123,10 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         await Storage.deleteItemAsync("recordarme");
       }
 
-      // Armar user completo con el rol de la compaÃ±Ã­a seleccionada.
-      // Reordenar schoolUsers para que la compaÃ±Ã­a elegida quede en [0],
-      // asÃ­ el resto de la app (horarios, settings, foto, permisos, geocerca)
-      // que lee schoolUsers[0] usa la compaÃ±Ã­a correcta.
+      // Armar user completo con el rol de la compañía seleccionada.
+      // Reordenar schoolUsers para que la compañía elegida quede en [0],
+      // así el resto de la app (horarios, settings, foto, permisos, geocerca)
+      // que lee schoolUsers[0] usa la compañía correcta.
       const selectedId = selected?.id ?? selected?.schoolId;
       const reorderedSchoolUsers = (loginData?.user?.schoolUsers ?? [])
         .slice()
@@ -154,7 +154,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         userSchedules: schedules,
       };
 
-      // Resolver app + ruta + Ã¡rbol de menÃº
+      // Resolver app + ruta + árbol de menú
       setMenuResolution(fullUser as any, menuItems);
 
       // Persistir en SecureStore
@@ -164,7 +164,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       await Storage.setItemAsync("user", JSON.stringify(fullUser));
       await Storage.setItemAsync("menuItems", JSON.stringify(menuItems));
 
-      // Guardar la foto del usuario correspondiente a la compaÃ±Ã­a seleccionada
+      // Guardar la foto del usuario correspondiente a la compañía seleccionada
       const selectedPhoto = (selected as any)?.photourl;
       const selectedS3Photo = (selected as any)?.s3Photo;
       if (selectedPhoto) {
@@ -179,7 +179,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       }
 
       setMensaje({
-        texto: "AutenticaciÃ³n exitosa. Redirigiendo...",
+        texto: "Autenticación exitosa. Redirigiendo...",
         tipo: "success",
       });
 
@@ -195,9 +195,9 @@ export default function FormLogin({ name, image }: FormLoginProps) {
   const handleSelectCompany = async (schoolUser: SchoolUser) => {
     if (!pendingLogin) return;
 
-    // El token de /login es ambiguo (sin schoolId) â€” los endpoints protegidos
-    // por schoolStrategy lo rechazan. Hay que re-scopearlo a la compaÃ±Ã­a
-    // elegida vÃ­a chooseschool antes de completar el login. Mismo patrÃ³n de
+    // El token de /login es ambiguo (sin schoolId) — los endpoints protegidos
+    // por schoolStrategy lo rechazan. Hay que re-scopearlo a la compañía
+    // elegida vía chooseschool antes de completar el login. Mismo patrón de
     // llamada que el poller de horario en punchinout.tsx:637-642.
     try {
       const baseUrl = urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
@@ -215,7 +215,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
 
       const scopedToken = res.data?.data?.token;
       if (!res.data?.success || !scopedToken) {
-        throw new Error("chooseschool no devolviÃ³ un token vÃ¡lido");
+        throw new Error("chooseschool no devolvió un token válido");
       }
 
       useSchoolStore.getState().setToken(scopedToken);
@@ -231,7 +231,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
     } catch (error) {
       console.error("Error en chooseschool:", error);
       setMensaje({
-        texto: "No se pudo seleccionar la compaÃ±Ã­a. Intenta de nuevo.",
+        texto: "No se pudo seleccionar la compañía. Intenta de nuevo.",
         tipo: "error",
       });
     }
@@ -261,7 +261,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         ]);
 
         if (schoolUsers.length > 1) {
-          // Usuario pertenece a varias compaÃ±Ã­as â†’ mostrar selector
+          // Usuario pertenece a varias compañías → mostrar selector
           setPendingLogin({
             token,
             loginData: response.data,
@@ -271,7 +271,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
           });
           setCompanySelectorVisible(true);
         } else {
-          // Una sola compaÃ±Ã­a â†’ entrar normal (pasar datos directo, sin depender del estado)
+          // Una sola compañía → entrar normal (pasar datos directo, sin depender del estado)
           await completeLogin(
             schoolUsers[0] ?? null,
             response.data,
@@ -284,14 +284,14 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       } else {
         setMensaje({
           texto:
-            "Error en la autenticaciÃ³n. Por favor, verifica tus credenciales.",
+            "Error en la autenticación. Por favor, verifica tus credenciales.",
           tipo: "error",
         });
       }
     } catch (error) {
       console.error("Error en login:", error);
       setMensaje({
-        texto: "OcurriÃ³ un error. Intenta de nuevo.",
+        texto: "Ocurrió un error. Intenta de nuevo.",
         tipo: "error",
       });
     } finally {
@@ -526,7 +526,7 @@ function createLocalStyles(
       alignItems: "center",
       borderWidth: 1,
       borderColor: "#ddd",
-      // 8 coincide con RADIUS_SM â€” usar constante importada
+      // 8 coincide con RADIUS_SM — usar constante importada
       borderRadius: scale(8),
       paddingHorizontal: scale(10),
       backgroundColor: AUTH_INPUT_BACKGROUND,
