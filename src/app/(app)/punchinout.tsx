@@ -1765,6 +1765,10 @@ export default function PunchInOut() {
               <View
                 style={[
                   styles.lastPunchPill,
+                  {
+                    paddingHorizontal: isTablet ? 12 : 9,
+                    paddingVertical: isTablet ? 5 : 4,
+                  },
                   !lastPunch
                     ? styles.lastPunchPillNeutral
                     : lastPunchDisplayStatus === "Error de Imagen" ||
@@ -1786,7 +1790,7 @@ export default function PunchInOut() {
                       ? "alert-circle-outline"
                       : "time-outline"
                   }
-                  size={14}
+                  size={isTablet ? 14 : 12}
                   color={
                     !lastPunch
                       ? "#6B7280"
@@ -1806,6 +1810,7 @@ export default function PunchInOut() {
                   style={[
                     styles.lastPunchPillText,
                     {
+                      fontSize: font(isTablet ? 14 : 12),
                       color: !lastPunch
                         ? "#6B7280"
                         : lastPunchDisplayStatus === "Error de Imagen" ||
@@ -1872,7 +1877,13 @@ export default function PunchInOut() {
 
           {todaySchedule ? (
             <View style={styles.scheduleTable}>
-              <View style={[styles.scheduleTableCol, styles.scheduleChipWork]}>
+              <View
+                style={[
+                  styles.scheduleTableCol,
+                  { paddingHorizontal: isTablet ? 8 : 5 },
+                  styles.scheduleChipWork,
+                ]}
+              >
                 <View style={styles.scheduleTableRow}>
                   <Ionicons name="time-outline" size={14} color="#2563EB" />
                   <Text
@@ -1881,14 +1892,24 @@ export default function PunchInOut() {
                     Horario
                   </Text>
                 </View>
-                <Text style={styles.scheduleTableValue}>
+                <Text
+                  style={[
+                    styles.scheduleTableValue,
+                    { fontSize: font(isTablet ? 13 : 11) },
+                  ]}
+                  numberOfLines={1}
+                >
                   {to12h(todaySchedule.workEntryTime)} –{" "}
                   {to12h(todaySchedule.workExitTime)}
                 </Text>
               </View>
               {todaySchedule.lunchEntryTime && (
                 <View
-                  style={[styles.scheduleTableCol, styles.scheduleChipLunch]}
+                  style={[
+                    styles.scheduleTableCol,
+                    { paddingHorizontal: isTablet ? 8 : 5 },
+                    styles.scheduleChipLunch,
+                  ]}
                 >
                   <View style={styles.scheduleTableRow}>
                     <Ionicons
@@ -1902,10 +1923,16 @@ export default function PunchInOut() {
                       Almuerzo
                     </Text>
                   </View>
-                  <Text style={styles.scheduleTableValue}>
-                    {to12h(todaySchedule.lunchEntryTime)} –{" "}
-                    {to12h(todaySchedule.lunchExitTime ?? "")}
-                  </Text>
+                  <Text
+                      style={[
+                        styles.scheduleTableValue,
+                        { fontSize: font(isTablet ? 13 : 11) },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {to12h(todaySchedule.lunchEntryTime)} –{" "}
+                      {to12h(todaySchedule.lunchExitTime ?? "")}
+                    </Text>
                 </View>
               )}
             </View>
