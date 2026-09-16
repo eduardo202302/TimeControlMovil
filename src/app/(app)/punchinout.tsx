@@ -8,7 +8,7 @@ import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -1035,7 +1035,12 @@ export default function PunchInOut() {
     [],
   );
 
+  const isSubmittingRef = useRef(false);
+
   const handleRegister = async () => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    try {
     const token = await getToken();
     if (!urlColegio || !token) {
       Alert.alert("Error", "No hay conexión activa.");
@@ -1395,6 +1400,9 @@ export default function PunchInOut() {
       Alert.alert("Error", msg);
     } finally {
       setLoading(false);
+    }
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
