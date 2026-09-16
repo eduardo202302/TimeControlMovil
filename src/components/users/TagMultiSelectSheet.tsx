@@ -75,11 +75,16 @@ export default function TagMultiSelectSheet({
   );
   const [query, setQuery] = useState("");
 
+  const sorted = useMemo(
+    () => [...options].sort((a, b) => a.name.localeCompare(b.name, "es")),
+    [options],
+  );
+
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
-    if (!term) return options;
-    return options.filter((option) => option.name.toLowerCase().includes(term));
-  }, [options, query]);
+    if (!term) return sorted;
+    return sorted.filter((option) => option.name.toLowerCase().includes(term));
+  }, [sorted, query]);
 
   const toggle = (id: number) => {
     onChange(selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id]);

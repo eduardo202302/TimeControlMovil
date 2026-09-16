@@ -1,6 +1,11 @@
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import {
+  Calendar,
+  LocaleConfig,
+  type CalendarProps,
+  type DateData,
+} from "react-native-calendars";
 import {
   CARD_BACKGROUND,
   FOOTER_BORDER,
@@ -9,24 +14,39 @@ import {
   TEXT_PLACEHOLDER,
   TEXT_PRIMARY,
 } from "@/constants/colors";
-import { RADIUS_MD, RADIUS_SM, useResponsive } from "@/constants/responsive";
+import { RADIUS_MD, useResponsive } from "@/constants/responsive";
+
+/** Header y días de la semana en español (la librería lee el locale global
+ * del módulo — se configura una sola vez, es el reemplazo de los
+ * MONTH_NAMES/DAY_NAMES propios del grid custom). */
+LocaleConfig.locales["es"] = {
+  monthNames: [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+  ],
+  monthNamesShort: [
+    "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+    "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+  ],
+  dayNames: [
+    "Domingo", "Lunes", "Martes", "Miércoles",
+    "Jueves", "Viernes", "Sábado",
+  ],
+  dayNamesShort: ["D", "L", "M", "M", "J", "V", "S"],
+  today: "Hoy",
+};
+LocaleConfig.defaultLocale = "es";
 
 /**
- * Grilla de calendario a 2 clics para elegir un rango de ausencia — portado
+ * Calendario de rango a 2 toques para elegir los días de ausencia — portado
  * de `AbsenceCalendar` del webapp (misma UX: 1er tap fija start=end, 2do tap
- * ajusta el extremo más cercano). Sin librería externa, igual que el target.
+ * ajusta el extremo más cercano). Construido sobre `<Calendar>` de
+ * react-native-calendars (librería JS pura, sin módulos nativos): selección
+ * en modo "period" y días no permitidos como disabled nativo.
  */
 export interface AbsenceRange {
   start: Date;
   end: Date;
-}
-
-interface CalendarDay {
-  day: number;
-  isCurrentMonth: boolean;
-  date: Date;
-  isToday: boolean;
-  isPast: boolean;
 }
 
 interface AbsenceCalendarProps {
@@ -36,12 +56,6 @@ interface AbsenceCalendarProps {
   isDateAllowed?: (date: Date) => boolean;
 }
 
-const MONTH_NAMES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
-const DAY_NAMES = ["DOM", "LUN", "MAR", "MIE", "JUE", "VIE", "SAB"];
-
 function sameDay(a: Date, b: Date): boolean {
   return a.getTime() === b.getTime();
 }
@@ -50,6 +64,19 @@ function startOfDay(date: Date): Date {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+function toDateKey(date: Date): string {
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  return `${date.getFullYear()}-${mm}-${dd}`;
+}
+
+function dateFromKey(key: string): Date | null {
+  const [y, m, d] = key.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const date = new Date(y, m - 1, d);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 /** Mismo criterio que `isAbsenceRangeOnlyCompanyWorkingDays`, pero sin
@@ -88,8 +115,37 @@ export default function AbsenceCalendar({
     () => createStyles(scale, verticalScale, font),
     [scale, verticalScale, font],
   );
+  const calendarTheme = useMemo<CalendarProps["theme"]>(
+    () => ({
+      calendarBackground: CARD_BACKGROUND,
+      selectedDayBackgroundColor: PRIMARY_COLOR,
+      selectedDayTextColor: CARD_BACKGROUND,
+      todayTextColor: PRIMARY_COLOR,
+      dayTextColor: TEXT_PRIMARY,
+      monthTextColor: TEXT_PRIMARY,
+      textDisabledColor: TEXT_PLACEHOLDER,
+      arrowColor: PRIMARY_COLOR,
+      textDayFontSize: font(14),
+      textDayHeaderFontSize: font(11),
+      textMonthFontSize: font(14),
+      textDayFontWeight: "400",
+      textDayHeaderFontWeight: "600",
+      textMonthFontWeight: "600",
+    }),
+    [font],
+  );
 
-  const [currentMonth, setCurrentMonth] = useState(() => {
+  // Mes visible: se inicializa en el mes del rango (o el actual) y luego solo
+  // lo mueve la navegación del usuario — `current` fija el mes inicial del
+  // Calendar y NO debe cambiar después, o la librería saltaría de mes. El
+  // `displayMonth` (que sí se actualiza con onMonthChange) se usa para armar
+  // las marks del mes visible.
+  const [current] = useState(() => {
+    const base = selectedRange?.start ?? new Date();
+    const first = new Date(base.getFullYear(), base.getMonth(), 1);
+    return toDateKey(first);
+  });
+  const [displayMonth, setDisplayMonth] = useState(() => {
     const base = selectedRange?.start ?? new Date();
     return new Date(base.getFullYear(), base.getMonth(), 1);
   });
@@ -100,6 +156,7 @@ export default function AbsenceCalendar({
 
   // Sincroniza con selectedRange (p. ej. al restaurar un borrador de
   // AsyncStorage) — descarta el rango si ya no cumple isDateAllowed.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!selectedRange) {
       setStartDate(null);
@@ -117,6 +174,7 @@ export default function AbsenceCalendar({
     setEndDate((prev) => (prev && sameDay(prev, end) ? prev : end));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onChange se llama solo para descartar rango inválido, no debe re-disparar el efecto
   }, [selectedRange, isDateAllowed]);
+  // eslint-enable react-hooks/set-state-in-effect
 
   const applyRange = useCallback(
     (nextStart: Date | null, nextEnd: Date | null) => {
@@ -134,68 +192,80 @@ export default function AbsenceCalendar({
     [isDateAllowed, onChange],
   );
 
-  const year = currentMonth.getFullYear();
-  const month = currentMonth.getMonth();
-
-  const calendarDays = useMemo<CalendarDay[]>(() => {
-    const today = startOfDay(new Date());
-    const firstDayOfMonth = new Date(year, month, 1);
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const firstDayWeekday = firstDayOfMonth.getDay();
-    const prevMonthDays = new Date(year, month, 0).getDate();
-
-    const days: CalendarDay[] = [];
-    for (let i = firstDayWeekday - 1; i >= 0; i -= 1) {
-      days.push({
-        day: prevMonthDays - i,
-        isCurrentMonth: false,
-        date: new Date(year, month - 1, prevMonthDays - i),
-        isToday: false,
-        isPast: false,
-      });
-    }
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      const date = startOfDay(new Date(year, month, day));
-      days.push({
-        day,
-        isCurrentMonth: true,
-        date,
-        isToday: sameDay(date, today),
-        isPast: date.getTime() < today.getTime(),
-      });
-    }
-    const remaining = 42 - days.length;
-    for (let day = 1; day <= remaining; day += 1) {
-      days.push({
-        day,
-        isCurrentMonth: false,
-        date: new Date(year, month + 1, day),
-        isToday: false,
-        isPast: false,
-      });
-    }
-    return days;
-  }, [year, month]);
-
-  const navigateMonth = useCallback((direction: number) => {
-    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + direction, 1));
+  const handleMonthChange = useCallback((date: DateData) => {
+    setDisplayMonth(new Date(date.year, date.month - 1, 1));
   }, []);
 
-  const isDayAllowed = useCallback(
-    (dayData: CalendarDay) => {
-      if (!dayData.isCurrentMonth) return false;
-      if (!isDateAllowed) return true;
-      return isDateAllowed(dayData.date);
-    },
-    [isDateAllowed],
-  );
+  const markedDates = useMemo(() => {
+    const marks: Record<
+      string,
+      {
+        disabled?: boolean;
+        disableTouchEvent?: boolean;
+        startingDay?: boolean;
+        endingDay?: boolean;
+        color?: string;
+        textColor?: string;
+      }
+    > = {};
+    const today = startOfDay(new Date());
+    const daysInMonth = new Date(
+      displayMonth.getFullYear(),
+      displayMonth.getMonth() + 1,
+      0,
+    ).getDate();
+
+    const hasRange = !!startDate && !!endDate;
+    const rangeStart =
+      hasRange &&
+      (startDate!.getTime() <= endDate!.getTime() ? startDate : endDate);
+    const rangeEnd =
+      hasRange &&
+      (startDate!.getTime() <= endDate!.getTime() ? endDate : startDate);
+    const rangeStartKey = rangeStart ? toDateKey(rangeStart) : null;
+    const rangeEndKey = rangeEnd ? toDateKey(rangeEnd) : null;
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = startOfDay(
+        new Date(displayMonth.getFullYear(), displayMonth.getMonth(), day),
+      );
+      const key = toDateKey(date);
+      const mark: (typeof marks)[string] = {};
+
+      // Días no permitidos: la librería los deshabilita nativo (sin lógica
+      // propia de bloqueo). Pasados también (mismo criterio que el grid previo).
+      const isPast = date.getTime() < today.getTime();
+      const notAllowed = !!isDateAllowed && !isDateAllowed(date);
+      if (isPast || notAllowed) {
+        mark.disabled = true;
+        mark.disableTouchEvent = true;
+      }
+
+      // Rango en modo "period" — mismo patrón de la doc oficial: startingDay
+      // en un extremo, endingDay en el otro, color para los días del medio.
+      if (hasRange && rangeStartKey && rangeEndKey) {
+        if (key >= rangeStartKey && key <= rangeEndKey) {
+          mark.startingDay = key === rangeStartKey;
+          mark.endingDay = key === rangeEndKey;
+          mark.color = PRIMARY_COLOR;
+          mark.textColor = CARD_BACKGROUND;
+        }
+      }
+
+      if (Object.keys(mark).length > 0) marks[key] = mark;
+    }
+    return marks;
+  }, [displayMonth, startDate, endDate, isDateAllowed]);
 
   const handleDayPress = useCallback(
-    (dayData: CalendarDay) => {
-      if (!dayData.isCurrentMonth || dayData.isPast) return;
-      if (!isDayAllowed(dayData)) return;
-
-      const clicked = dayData.date;
+    (day: DateData) => {
+      // Días de otros meses que asoman en la grilla del mes visible: no son
+      // seleccionables (el grid previo los pintaba vacíos/deshabilitados).
+      if (day.year !== displayMonth.getFullYear() || day.month !== displayMonth.getMonth() + 1) {
+        return;
+      }
+      const clicked = dateFromKey(day.dateString);
+      if (!clicked) return;
 
       if (!startDate) {
         applyRange(clicked, clicked);
@@ -233,18 +303,7 @@ export default function AbsenceCalendar({
         applyRange(startDate, clicked);
       }
     },
-    [startDate, endDate, isDayAllowed, applyRange],
-  );
-
-  const isInRange = useCallback(
-    (dayData: CalendarDay) => {
-      if (!startDate || !dayData.isCurrentMonth) return false;
-      if (endDate) {
-        return dayData.date.getTime() >= startDate.getTime() && dayData.date.getTime() <= endDate.getTime();
-      }
-      return sameDay(dayData.date, startDate);
-    },
-    [startDate, endDate],
+    [startDate, endDate, applyRange, displayMonth],
   );
 
   const totalDays =
@@ -256,72 +315,15 @@ export default function AbsenceCalendar({
 
   return (
     <View style={styles.calendar}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigateMonth(-1)}
-          style={styles.navButton}
-          hitSlop={8}
-        >
-          <ChevronLeft size={18} color={PRIMARY_COLOR} />
-        </TouchableOpacity>
-        <Text style={styles.monthTitle}>
-          {MONTH_NAMES[month]} {year}
-        </Text>
-        <TouchableOpacity
-          onPress={() => navigateMonth(1)}
-          style={styles.navButton}
-          hitSlop={8}
-        >
-          <ChevronRight size={18} color={PRIMARY_COLOR} />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.weekDaysRow}>
-        {DAY_NAMES.map((d) => (
-          <Text key={d} style={styles.weekDayLabel}>
-            {d}
-          </Text>
-        ))}
-      </View>
-
-      <View style={styles.daysGrid}>
-        {calendarDays.map((dayData, index) => {
-          const allowed = isDayAllowed(dayData);
-          const disabled = dayData.isPast || !dayData.isCurrentMonth || !allowed;
-          const inRange = isInRange(dayData);
-          const isEdge =
-            (!!startDate && sameDay(dayData.date, startDate)) ||
-            (!!endDate && sameDay(dayData.date, endDate));
-
-          return (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.dayCell,
-                dayData.isCurrentMonth && !dayData.isPast && !allowed && styles.dayCellNonWorking,
-                inRange && styles.dayCellInRange,
-                isEdge && styles.dayCellEdge,
-              ]}
-              disabled={disabled}
-              onPress={() => handleDayPress(dayData)}
-              activeOpacity={0.7}
-            >
-              {dayData.isCurrentMonth && (
-                <Text
-                  style={[
-                    styles.dayText,
-                    dayData.isPast && styles.dayTextMuted,
-                    !allowed && !dayData.isPast && styles.dayTextMuted,
-                    (inRange || isEdge) && styles.dayTextSelected,
-                  ]}
-                >
-                  {dayData.day}
-                </Text>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <Calendar
+        current={current}
+        onDayPress={handleDayPress}
+        onMonthChange={handleMonthChange}
+        markingType="period"
+        markedDates={markedDates}
+        theme={calendarTheme}
+        enableSwipeMonths
+      />
 
       {startDate && (
         <View style={styles.selectedInfo}>
@@ -349,72 +351,6 @@ function createStyles(
       padding: scale(10),
       borderWidth: 1,
       borderColor: INPUT_BORDER,
-    },
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: verticalScale(8),
-    },
-    navButton: {
-      padding: scale(6),
-    },
-    monthTitle: {
-      fontWeight: "600",
-      fontSize: font(14),
-      color: TEXT_PRIMARY,
-    },
-    weekDaysRow: {
-      flexDirection: "row",
-    },
-    weekDayLabel: {
-      width: `${100 / 7}%`,
-      textAlign: "center",
-      fontSize: font(10),
-      fontWeight: "600",
-      color: TEXT_PLACEHOLDER,
-      marginBottom: verticalScale(4),
-    },
-    daysGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-    },
-    dayCell: {
-      width: `${100 / 7}%`,
-      aspectRatio: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: RADIUS_SM,
-    },
-    // Gris propio del calendario, no de colors.ts: coincide en hex con
-    // FOOTER_BORDER ("#F3F4F6") por casualidad, pero ese token es para bordes
-    // de footer — usarlo acá para "día no laborable" sería un nombre
-    // engañoso. Se documenta en vez de forzar un import semánticamente falso.
-    dayCellNonWorking: {
-      backgroundColor: "#f3f4f6",
-    },
-    // Tinte de rango (celeste claro) — no tiene equivalente en colors.ts,
-    // es un color propio de este calendario (mismo criterio que el gris de
-    // arriba: no forzar un token que no significa esto).
-    dayCellInRange: {
-      backgroundColor: "#dbeafe",
-    },
-    dayCellEdge: {
-      backgroundColor: PRIMARY_COLOR,
-    },
-    dayText: {
-      fontSize: font(13),
-      color: TEXT_PRIMARY,
-    },
-    // Coincide en hex con INPUT_BORDER ("#D1D5DB") — sí se tokeniza porque
-    // ahí el nombre calza: es el mismo gris "deshabilitado/neutro" que ya usa
-    // el resto del sistema para bordes de input.
-    dayTextMuted: {
-      color: INPUT_BORDER,
-    },
-    dayTextSelected: {
-      color: CARD_BACKGROUND,
-      fontWeight: "700",
     },
     selectedInfo: {
       marginTop: verticalScale(10),
