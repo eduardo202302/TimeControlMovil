@@ -11,6 +11,7 @@ import {
   setupAxiosInterceptors,
 } from "../utils/session";
 import * as Storage from "../utils/storage";
+import { toRDDateString } from "../utils/punchRules";
 
 export default function RootLayout() {
   const { setSchool, setUrlColegio, setToken, setMenuResolution } =
@@ -136,6 +137,30 @@ export default function RootLayout() {
       clearInterval(updatePoller);
       appStateListener.remove();
     };
+  }, []);
+
+  // ── Reiniciar la app al cambio de día (hora RD) ────────────────────────────────
+  useEffect(() => {
+    const checkDateRollover = async () => {
+      const today = toRDDateString(new Date());
+      const lastActiveDate = await Storage.getItemAsync("lastActiveDate");
+      if (lastActiveDate && lastActiveDate !== today) {
+        await Updates.reloadAsync();
+        return;
+      }
+      await Storage.setItemAsync("lastActiveDate", today);
+    };
+
+    checkDateRollover();
+
+    const appStateListener = AppState.addEventListener(
+      "change",
+      (nextState) => {
+        if (nextState === "active") checkDateRollover();
+      },
+    );
+
+    return () => appStateListener.remove();
   }, []);
 
   return (
