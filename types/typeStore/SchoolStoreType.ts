@@ -163,20 +163,29 @@ export interface User {
 }
 
 /**
- * Subconjunto de `school.settings` que necesitan los módulos de Excusas
- * (Face Class): catálogo de categorías por defecto (`stateTagId` de una
- * excusa nueva sale de `categoryDefaultIds.catExcuseStatedId`, no lo resuelve
- * el backend solo) y el horario laboral de la sede, para validar que un
+ * Subconjunto de `school.settings` que necesitan los módulos de Face Class
+ * (Excusas y Tardanzas): catálogo de categorías por defecto (`stateTagId` de
+ * una excusa nueva sale de `categoryDefaultIds.catExcuseStatedId`, no lo
+ * resuelve el backend solo), el horario laboral de la sede, para validar que un
  * rango de ausencia caiga solo en días hábiles — mismo criterio que
- * `isAbsenceRangeOnlyCompanyWorkingDays` en el webapp. Deliberadamente NO es
- * el objeto `school`/`settings` completo (ver `SchoolSettings` arriba): solo
- * estas 4 claves, para no depender de todo lo que `chooseschool` devuelva.
+ * `isAbsenceRangeOnlyCompanyWorkingDays` en el webapp —, y las dos claves de
+ * Tardanzas (umbral del semáforo y modo Manual/Automática). Deliberadamente NO
+ * es el objeto `school`/`settings` completo (ver `SchoolSettings` arriba):
+ * solo estas claves, para no depender de todo lo que `chooseschool` devuelva.
  */
 export interface CompanySettings {
   categoryDefaultIds: Record<string, unknown>;
   schedulesAdd: UserSchedule[];
   entryTime: string;
   exitTime: string;
+  /**
+   * Umbral que decide las luces del semáforo de Tardanzas — misma lectura de
+   * UI que el webapp (default 3). El backend usa su propio default (4) al
+   * crear la tardanza; ver buildCompanySettings en store/useSchoolStore.ts.
+   */
+  daysLateAbsence: number;
+  /** "Manual" (input de hora editable) | "Automatica" (hora del dispositivo). */
+  tardinessMode: string;
 }
 
 // ─── Store type extendido ─────────────────────────────────────────────────────

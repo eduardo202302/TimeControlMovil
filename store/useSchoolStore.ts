@@ -8,7 +8,7 @@ import { resolveRoute } from "../utils/resolveRoute";
 
 /**
  * `raw` es `school.settings` tal cual llega de chooseschool (objeto grande,
- * sin tipar en el backend). Extrae solo las 4 claves de `CompanySettings` —
+ * sin tipar en el backend). Extrae solo las claves de `CompanySettings` —
  * ver el comentario de esa interfaz para el porqué. Devuelve `null` si `raw`
  * no es un objeto, para que el caller decida no pisar el valor previo del
  * store con datos vacíos (p. ej. si `chooseschool` no trajo `school`).
@@ -22,6 +22,21 @@ export function buildCompanySettings(raw: unknown): CompanySettings | null {
     schedulesAdd: (settings.schedulesAdd as CompanySettings["schedulesAdd"]) ?? [],
     entryTime: typeof settings.entryTime === "string" ? settings.entryTime : "",
     exitTime: typeof settings.exitTime === "string" ? settings.exitTime : "",
+    // Default decimal: la UI de Tardanzas decide 3 vs 4 luces con `=== 4` —
+    // misma lectura que `get(company, "settings.daysLateAbsence", 3)` del
+    // webapp. El backend usa su propio default (4) AL GUARDAR; no se duplica acá.
+    daysLateAbsence:
+      typeof settings.daysLateAbsence === "number" &&
+      Number.isFinite(settings.daysLateAbsence)
+        ? settings.daysLateAbsence
+        : 3,
+    // "Manual" muestra input de hora en Tardanzas; "Automatica" (o ausencia)
+    // usa la hora del dispositivo. Valores reales del webapp (TrafficLight).
+    tardinessMode:
+      typeof settings.tardinessMode === "string" &&
+      settings.tardinessMode.trim() !== ""
+        ? settings.tardinessMode
+        : "Automatica",
   };
 }
 

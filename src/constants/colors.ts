@@ -21,6 +21,12 @@ export const TEXT_PRIMARY = "#111827";
 export const TEXT_SECONDARY = "#374151";
 export const TEXT_PLACEHOLDER = "#9CA3AF";
 export const PRIMARY_COLOR = "#2563EB";
+/**
+ * Tint suave de PRIMARY_COLOR para avatares/badges/íconos de fondo — el
+ * "chip" azul claro que usan Tardanzas y otras pantallas. Valor fijo elegido
+ * a mano (RGB 219, 234, 254), no una derivación calculada en runtime.
+ */
+export const PRIMARY_TINT_BACKGROUND = "#DBEAFE";
 export const ERROR_COLOR = "#DC2626";
 export const FOOTER_BORDER = "#F3F4F6";
 /**
