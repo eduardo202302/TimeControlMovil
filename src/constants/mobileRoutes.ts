@@ -17,6 +17,7 @@ export const VALID_MOBILE_PATHS: Set<string> = new Set([
   "/adminpunchinout",
   "/permissions",
   "/excuses",
+  "/myexcuses",
   "/holidays",
   "/users",
 ]);

@@ -26,6 +26,8 @@ import {
   excuseReporterName,
   fetchAdminExcusesPage,
   fetchExcuseDetail,
+  fetchExcusesh,
+  fetchMyExcusesPage,
   getExcuseDateRange,
   getGotoTagIds,
   isRejectionExcuseStateName,
@@ -133,6 +135,21 @@ describe("buildExcusesParams", () => {
   it("un stateTagId inválido (0, NaN) no viaja", () => {
     expect(buildExcusesParams({ stateTagId: 0 })).not.toHaveProperty("stateTag.id");
     expect(buildExcusesParams({ stateTagId: null })).not.toHaveProperty("stateTag.id");
+  });
+
+  it("schoolUsersId viaja como columna propia solo si se manda", () => {
+    const params = buildExcusesParams({ schoolUsersId: 224 });
+    expect(params.schoolUsersId).toBe(224);
+    expect(Object.keys(params)).toEqual([
+      "page",
+      "orderKey",
+      "orderDir",
+      "rows",
+      "schoolUsersId",
+      "fields",
+    ]);
+    expect(buildExcusesParams({})).not.toHaveProperty("schoolUsersId");
+    expect(buildExcusesParams({ schoolUsersId: null })).not.toHaveProperty("schoolUsersId");
   });
 });
 
@@ -697,6 +714,154 @@ describe("fetchAdminExcusesPage", () => {
   });
 });
 
+describe("fetchExcusesh", () => {
+  const body = (items: unknown[], count?: number) => ({
+    data: { success: true, data: { items, count: count ?? items.length } },
+  });
+
+  it("pega a /excusesh con los params del listado y el filtro schoolUsersId", async () => {
+    mockedGet.mockResolvedValue(body([{ id: 9 }]));
+
+    const page = await fetchExcusesh({
+      token: TOKEN,
+      urlColegio: URL,
+      search: "si",
+      schoolUsersId: 224,
+    });
+
+    expect(page.items).toEqual([{ id: 9 }]);
+    expect(mockedGet).toHaveBeenCalledTimes(1);
+    const [url, config] = mockedGet.mock.calls[0];
+    expect(url).toBe(`${URL}/excusesh`);
+    expect(config.params).toMatchObject({
+      page: 1,
+      orderKey: "id",
+      orderDir: "desc",
+      rows: EXCUSES_ROWS,
+      all: "si",
+      schoolUsersId: 224,
+      fields: EXCUSE_FIELDS,
+    });
+  });
+
+  it("schoolUsersId no viaja si no se manda", async () => {
+    mockedGet.mockResolvedValue(body([{ id: 1 }]));
+    await fetchExcusesh({ token: TOKEN, urlColegio: URL });
+    expect(mockedGet.mock.calls[0][1].params).not.toHaveProperty("schoolUsersId");
+  });
+});
+
+describe("fetchMyExcusesPage — pagina cruzando excuses + excusesh como el webapp", () => {
+  const body = (items: unknown[], count?: number) => ({
+    data: { success: true, data: { items, count: count ?? items.length } },
+  });
+  const fullNormal = () =>
+    Array.from({ length: EXCUSES_ROWS }, (_, i) => ({ id: i + 1 }));
+
+  it("página dentro de lo normal: se pide LA MISMA page a /excuses y una llamada chica de count del histórico", async () => {
+    // countNormal=40 → página 1 (offset 0) cae toda dentro de lo normal.
+    mockedGet.mockResolvedValueOnce(body(fullNormal(), 40));
+    mockedGet.mockResolvedValueOnce(body([{ id: 90 }], 12)); // count del histórico
+
+    const page = await fetchMyExcusesPage({ token: TOKEN, urlColegio: URL });
+
+    expect(mockedGet).toHaveBeenCalledTimes(2);
+    const normalCall = mockedGet.mock.calls[0];
+    expect(normalCall[0]).toBe(`${URL}/excuses`);
+    // El fetch normal siempre usa la page/rows COMBINADA (igual que el webapp).
+    expect(normalCall[1].params).toMatchObject({ page: 1, rows: EXCUSES_ROWS });
+    const histCountCall = mockedGet.mock.calls[1];
+    expect(histCountCall[0]).toBe(`${URL}/excusesh`);
+    expect(histCountCall[1].params).toMatchObject({ page: 1, rows: 1 });
+
+    expect(page.items).toHaveLength(EXCUSES_ROWS);
+    expect(page.items[0]).toMatchObject({ id: 1, isHistorical: false });
+    expect(page.items.every((item) => item.isHistorical === false)).toBe(true);
+    // total = 40 + 12 = 52 y page * rows = 15 → hay más.
+    expect(page.hasMore).toBe(true);
+  });
+
+  it("última página normal corta: rellena con el inicio del histórico", async () => {
+    // countNormal=17, page 2 → globalOffset 15 < 17 → 2 normales + 13 históricas.
+    mockedGet.mockResolvedValueOnce(body([{ id: 16 }, { id: 17 }], 17));
+    mockedGet.mockResolvedValueOnce(
+      body(Array.from({ length: 13 }, (_, i) => ({ id: 100 + i })), 30),
+    );
+
+    const page = await fetchMyExcusesPage({ token: TOKEN, urlColegio: URL, page: 2 });
+
+    expect(mockedGet).toHaveBeenCalledTimes(2);
+    const fillCall = mockedGet.mock.calls[1];
+    expect(fillCall[0]).toBe(`${URL}/excusesh`);
+    expect(fillCall[1].params).toMatchObject({ page: 1, rows: 13 });
+
+    expect(page.items).toHaveLength(EXCUSES_ROWS);
+    expect(page.items.slice(0, 2).every((item) => item.isHistorical === false)).toBe(true);
+    expect(page.items.slice(2).every((item) => item.isHistorical === true)).toBe(true);
+    expect(page.items[2]).toMatchObject({ id: 100, isHistorical: true });
+    // total = 17 + 30 = 47 y page * rows = 30 → hay más.
+    expect(page.hasMore).toBe(true);
+  });
+
+  it("offset dentro del histórico: histPage/remainder y corte con slice", async () => {
+    // countNormal=17, countHist=30, page 3 → globalOffset 30 ≥ 17 →
+    // historicalOffset 13, histPage floor(13/15)+1 = 1, histRemainder 13,
+    // pide rows=15+13 y corta con slice(13, 13+15).
+    mockedGet.mockResolvedValueOnce(body([{ id: 16 }, { id: 17 }], 17)); // normal, solo por el count
+    const hist = Array.from({ length: 30 }, (_, i) => ({ id: 100 + i }));
+    mockedGet.mockResolvedValueOnce(body(hist, 30));
+
+    const page = await fetchMyExcusesPage({ token: TOKEN, urlColegio: URL, page: 3 });
+
+    expect(mockedGet).toHaveBeenCalledTimes(2);
+    const histCall = mockedGet.mock.calls[1];
+    expect(histCall[0]).toBe(`${URL}/excusesh`);
+    expect(histCall[1].params).toMatchObject({
+      page: 1,
+      rows: EXCUSES_ROWS + 13,
+    });
+
+    expect(page.items).toHaveLength(EXCUSES_ROWS);
+    expect(page.items.every((item) => item.isHistorical === true)).toBe(true);
+    // slice(13, 28) sobre los 30 → ids 113..127.
+    expect(page.items[0]).toMatchObject({ id: 113, isHistorical: true });
+    expect(page.items[page.items.length - 1]).toMatchObject({ id: 127 });
+    // total = 17 + 30 = 47 y page * rows = 45 → hay más.
+    expect(page.hasMore).toBe(true);
+  });
+
+  it("cola combinada: hasMore falso (y el slice del webapp replica tal cual)", async () => {
+    // countNormal=17, countHist=30, page 4 → globalOffset 45, offset histórico 28.
+    mockedGet.mockResolvedValueOnce(body([{ id: 16 }, { id: 17 }], 17));
+    // página 2 con rows=28 sobre total 30 solo trae 2 filas (28 y 29).
+    mockedGet.mockResolvedValueOnce(body([{ id: 118 }, { id: 128 }], 30));
+
+    const page = await fetchMyExcusesPage({ token: TOKEN, urlColegio: URL, page: 4 });
+
+    // slice(13, 28) sobre 2 filas → vacío. Es la fórmula del webapp, no un arreglo.
+    expect(page.items).toHaveLength(0);
+    expect(page.hasMore).toBe(false); // 60 ≥ 47
+  });
+
+  it("schoolUsersId se replica en ambas tablas cuando se manda", async () => {
+    mockedGet.mockResolvedValueOnce(body(fullNormal(), 40));
+    mockedGet.mockResolvedValueOnce(body([{ id: 90 }], 12));
+
+    await fetchMyExcusesPage({
+      token: TOKEN,
+      urlColegio: URL,
+      search: "ana",
+      schoolUsersId: 224,
+    });
+
+    expect(mockedGet.mock.calls[0][1].params).toMatchObject({
+      all: "ana",
+      schoolUsersId: 224,
+    });
+    expect(mockedGet.mock.calls[1][1].params).toMatchObject({ schoolUsersId: 224 });
+  });
+});
+
 describe("fetchExcuseDetail", () => {
   it("pega a /excuses/{id} y devuelve el grafo", async () => {
     mockedGet.mockResolvedValue({ data: { success: true, data: { id: 42 } } });
@@ -710,6 +875,20 @@ describe("fetchExcuseDetail", () => {
   it("sin data devuelve null", async () => {
     mockedGet.mockResolvedValue({ data: { success: true, data: null } });
     expect(await fetchExcuseDetail({ token: TOKEN, urlColegio: URL, id: 1 })).toBeNull();
+  });
+
+  it("una fila histórica pega a /excusesh/{id} con table=\"excusesh\"", async () => {
+    mockedGet.mockResolvedValue({ data: { success: true, data: { id: 42 } } });
+
+    const excuse = await fetchExcuseDetail({
+      token: TOKEN,
+      urlColegio: URL,
+      id: 42,
+      table: "excusesh",
+    });
+
+    expect(mockedGet.mock.calls[0][0]).toBe(`${URL}/excusesh/42`);
+    expect(excuse?.id).toBe(42);
   });
 });
 

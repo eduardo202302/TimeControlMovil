@@ -24,6 +24,7 @@ const ROUTE_TITLES: Record<string, string> = {
   "/adminpunchinout": "Registrar Acceso ADM",
   "/permissions": "Consultar Permisos/Ausencias",
   "/excuses": "Excusas",
+  "/myexcuses": "Mis Excusas",
   "/holidays": "Días Feriados",
   "/dashboard": "Dashboard",
   "/users": "Usuarios",

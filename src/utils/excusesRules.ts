@@ -12,6 +12,10 @@
  * `schoolId` del JWT vía `where('student.schoolId', ...)`, no con un param
  * del cliente. La paginación es la simple (page/rows).
  *
+ * En la misma tabla viven "Mis Excusas" (fetchMyExcusesPage): la vista que
+ * combina `excuses` + `excusesh` con paginación cruzada, réplica del
+ * handlerData de Features/MyExcuses del webapp (ver su doc inline).
+ *
  * El PATCH del backend NO borra adjuntos: los `attachments`/`attachmentsAdm`
  * que superan 100 chars son data-URIs nuevas y se ANEXAN a las existentes;
  * una ruta corta (ya guardada) se ignora en silencio (Excuses/handlers.js:
@@ -60,19 +64,23 @@ export const EXCUSES_ROWS = 15;
  *
  * `stateTag.id` es un filtro de columna propio (el `fieldQueries` del handler
  * es todo lo que no sea rows/page/orderKey/orderDir/fields) que se usa para
- * "mostrar solo las de un estado".
+ * "mostrar solo las de un estado". `schoolUsersId` es otro filtro de columna:
+ * acota a la persona que solicitó, y por cómo arma `getTableQuery` el backend
+ * llega como `LIKE '%<id>%'` (filtro laxo, igual que manda el webapp).
  */
 export function buildExcusesParams({
   page = 1,
   rows = EXCUSES_ROWS,
   search = "",
   stateTagId,
+  schoolUsersId,
   fields = EXCUSE_FIELDS,
 }: {
   page?: number;
   rows?: number;
   search?: string;
   stateTagId?: number | null;
+  schoolUsersId?: number | null;
   fields?: string;
 }): Record<string, string | number> {
   const params: Record<string, string | number> = {
@@ -85,6 +93,9 @@ export function buildExcusesParams({
   if (term) params.all = term;
   if (stateTagId != null && Number.isFinite(stateTagId)) {
     params["stateTag.id"] = stateTagId;
+  }
+  if (schoolUsersId != null && Number.isFinite(schoolUsersId)) {
+    params.schoolUsersId = schoolUsersId;
   }
   params.fields = fields;
   return params;
@@ -624,27 +635,46 @@ export interface ExcusesPage {
   hasMore: boolean;
 }
 
-/**
- * Una página de la tabla `excuses`. `extractTableRows` absorbe las tres formas
- * de respuesta del motor genérico de tabla (`data` como arreglo, `{ items }` o
- * `{ rows }`), igual que en adminPermissionRules.
- */
-export async function fetchAdminExcusesPage({
-  token,
-  urlColegio,
-  page = 1,
-  rows = EXCUSES_ROWS,
-  search = "",
-  stateTagId,
-}: AuthArgs & {
+/** La tabla del backend a la que apunta un fetch: `excuses` o `excusesh`. */
+export type ExcuseTable = "excuses" | "excusesh";
+
+export interface ExcusesPageQuery {
   page?: number;
   rows?: number;
   search?: string;
   stateTagId?: number | null;
-}): Promise<ExcusesPage> {
-  const response = await axios.get(`${urlColegio}/excuses`, {
+  schoolUsersId?: number | null;
+}
+
+/**
+ * Una página de cualquiera de las dos tablas de excusas (`excuses` / `excusesh`).
+ *
+ * `extractTableRows` absorbe las tres formas de respuesta del motor genérico
+ * de tabla (`data` como arreglo, `{ items }` o `{ rows }`), igual que en
+ * adminPermissionRules.
+ *
+ * `schoolUsersId` filtra por la persona que solicitó (vista "Mis Excusas"):
+ * viaja como columna propia y, por cómo arma `getTableQuery` el backend, se
+ * aplica como `LIKE '%<id>%'` — el mismo filtro suelto que manda el webapp.
+ *
+ * `rows` también gobierna el `hasMore` cuando el envelope no trae `count`: una
+ * página corta (menos filas que `rows`) es la última (ver hasMore).
+ */
+async function fetchExcusesTable(
+  table: ExcuseTable,
+  {
+    token,
+    urlColegio,
+    page = 1,
+    rows = EXCUSES_ROWS,
+    search = "",
+    stateTagId,
+    schoolUsersId,
+  }: AuthArgs & ExcusesPageQuery,
+): Promise<ExcusesPage> {
+  const response = await axios.get(`${urlColegio}/${table}`, {
     ...authHeaders(token),
-    params: buildExcusesParams({ page, rows, search, stateTagId }),
+    params: buildExcusesParams({ page, rows, search, stateTagId, schoolUsersId }),
   });
   if (!response.data?.success) return { items: [], count: null, hasMore: false };
 
@@ -662,15 +692,182 @@ export async function fetchAdminExcusesPage({
   return { items, count, hasMore };
 }
 
+/**
+ * Una página de la tabla `excuses` (el listado administrativo completo de la
+ * escuela). Ver fetchExcusesTable.
+ */
+export function fetchAdminExcusesPage(
+  args: AuthArgs & ExcusesPageQuery,
+): Promise<ExcusesPage> {
+  return fetchExcusesTable("excuses", args);
+}
+
+/**
+ * Una página de la tabla HISTÓRICA `excusesh` (excusas archivadas). Mismo
+ * shape que fetchAdminExcusesPage pero apuntando a `GET /excusesh`. La usa
+ * fetchMyExcusesPage para combinar ambas tablas en la vista "Mis Excusas".
+ */
+export function fetchExcusesh(
+  args: AuthArgs & ExcusesPageQuery,
+): Promise<ExcusesPage> {
+  return fetchExcusesTable("excusesh", args);
+}
+
+/**
+ * Una excusa de la vista combinada "Mis Excusas" (excuses + excusesh).
+ *
+ * `isHistorical` es OBLIGATORIO propagarlo hasta la pantalla: los ids se
+ * repiten entre las dos tablas, y de este flag salen tanto las keys del
+ * listado como la ruta del detalle (/excusesh/{id}).
+ */
+export type MyExcuse = Excuse & { isHistorical: boolean };
+
+export interface MyExcusesPage {
+  items: MyExcuse[];
+  hasMore: boolean;
+}
+
+/**
+ * Una página de la vista combinada "Excusas + Histórico", calcada del
+ * handlerData de Features/MyExcuses del webapp.
+ *
+ * ALGORITMO (mantener sincronizado con el webapp):
+ *
+ * La lista combinada ordena PRIMERO todas las filas de `excuses` y LUEGO
+ * todas las de `excusesh`. El backend no lo hace combinado: page/rows se
+ * traducen a un offset global que cae en una de las dos tablas
+ *
+ *     globalOffset = (page - 1) * rows
+ *
+ * 1) Si `globalOffset < countNormal`: la página cae dentro de `excuses` — se
+ *    pide esa misma page a `excuses`. Si queda corta (última página de la
+ *    tabla normal con menos de `rows` filas), se rellena con el PRINCIPIO de
+ *    `excusesh` (page 1, rows = lo que falte).
+ *
+ * 2) Si no: el offset global cae dentro del histórico — se calculan la página
+ *    interna y el remainder, y se pide esa página con `rows + remainder` para
+ *    cortar el sobrante con slice. La fórmula (histPage y remainder) se
+ *    replica TAL CUAL del webapp, incluida su alineación de páginas: para
+ *    histPage >= 2 el offset pedido no coincide con el offset real y la
+ *    página puede salir vacía o saltada — es el comportamiento del webapp, no
+ *    corregirlo sin consultar.
+ *
+ * El fetch a `excuses` SIEMPRE se hace primero, aún en el caso 2: el `count`
+ * del envelope es el TOTAL del filtro (no el de la página), y es la única
+ * forma de saber cuántas filas hay antes del histórico — tan redundante como
+ * en el webapp, que conserva ese fetch a propósito.
+ *
+ * `count` cae a `items.length` si el envelope no lo trae (el webapp usa
+ * `count || items.length`). Si tras el reparto sigue sin `countHistorical`,
+ * se hace una llamada chica (page 1, rows 1) solo para conocerlo.
+ *
+ * `hasMore` se decide por el TOTAL combinado: `page * rows < total`.
+ */
+export async function fetchMyExcusesPage({
+  token,
+  urlColegio,
+  page = 1,
+  rows = EXCUSES_ROWS,
+  search = "",
+  schoolUsersId,
+}: AuthArgs & {
+  page?: number;
+  rows?: number;
+  search?: string;
+  schoolUsersId?: number | null;
+}): Promise<MyExcusesPage> {
+  const globalOffset = (page - 1) * rows;
+
+  const normal = await fetchExcusesTable("excuses", {
+    token,
+    urlColegio,
+    page,
+    rows,
+    search,
+    schoolUsersId,
+  });
+  const countNormal = normal.count ?? normal.items.length;
+
+  let items: MyExcuse[] = [];
+  let countHistorical: number | null = null;
+
+  if (globalOffset < countNormal) {
+    // Caso 1 — la página cae dentro de `excuses`.
+    const normalChunk = normal.items.map(
+      (item): MyExcuse => ({ ...item, isHistorical: false }),
+    );
+    const needed = rows - normalChunk.length;
+    if (needed > 0) {
+      // Última página de la tabla normal: se rellena con el inicio del
+      // histórico. El `count` de esa respuesta ya es el TOTAL del histórico.
+      const hist = await fetchExcusesTable("excusesh", {
+        token,
+        urlColegio,
+        page: 1,
+        rows: needed,
+        search,
+        schoolUsersId,
+      });
+      countHistorical = hist.count ?? hist.items.length;
+      items = [
+        ...normalChunk,
+        ...hist.items.map(
+          (item): MyExcuse => ({ ...item, isHistorical: true }),
+        ),
+      ];
+    } else {
+      items = normalChunk;
+    }
+  } else {
+    // Caso 2 — el offset global cae dentro del histórico.
+    const historicalOffset = globalOffset - countNormal;
+    const histPage = Math.floor(historicalOffset / rows) + 1;
+    const histRemainder = historicalOffset % rows;
+    const hist = await fetchExcusesTable("excusesh", {
+      token,
+      urlColegio,
+      page: histPage,
+      rows: rows + histRemainder,
+      search,
+      schoolUsersId,
+    });
+    countHistorical = hist.count ?? hist.items.length;
+    items = hist.items
+      .slice(histRemainder, histRemainder + rows)
+      .map((item): MyExcuse => ({ ...item, isHistorical: true }));
+  }
+
+  if (countHistorical == null) {
+    // Ninguna respuesta del histórico vino con `count`: una llamada chica
+    // solo para conocer el total y poder decidir hasMore. El webapp hace
+    // `resHistCount.count || 0` — se replica tal cual, sin usar items.
+    const countOnly = await fetchExcusesTable("excusesh", {
+      token,
+      urlColegio,
+      page: 1,
+      rows: 1,
+      search,
+      schoolUsersId,
+    });
+    countHistorical = countOnly.count ?? 0;
+  }
+
+  const total = countNormal + (countHistorical ?? 0);
+  return { items, hasMore: page * rows < total };
+}
+
 /** El detalle de una excusa cualquiera de la escuela (GET /excuses/{id}). */
 export async function fetchExcuseDetail({
   token,
   urlColegio,
   id,
+  table = "excuses",
 }: AuthArgs & {
   id: number;
+  /** "{table}/{id}": `excusesh` para las filas del histórico (ids repetidos). */
+  table?: ExcuseTable;
 }): Promise<Excuse | null> {
-  const response = await axios.get(`${urlColegio}/excuses/${id}`, authHeaders(token));
+  const response = await axios.get(`${urlColegio}/${table}/${id}`, authHeaders(token));
   if (!response.data?.success || !response.data.data) return null;
   return response.data.data as Excuse;
 }
