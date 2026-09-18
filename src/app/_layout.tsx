@@ -145,6 +145,7 @@ export default function RootLayout() {
       const today = toRDDateString(new Date());
       const lastActiveDate = await Storage.getItemAsync("lastActiveDate");
       if (lastActiveDate && lastActiveDate !== today) {
+        await Storage.setItemAsync("lastActiveDate", today);
         await Updates.reloadAsync();
         return;
       }
