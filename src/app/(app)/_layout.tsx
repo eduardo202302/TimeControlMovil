@@ -16,6 +16,7 @@ import DrawerMenu from "../../components/drawer/DrawerMenu";
 const ROUTE_TITLES: Record<string, string> = {
   "/punchinout": "Registrar Acceso",
   "/attendancetaking": "Asistencia",
+  "/adminattendancetaking": "Asistencia Adm.",
   "/tardiness": "Tardanzas",
   "/parentsexcusesscreen": "Excusas",
   "/timeoff": "Permisos",

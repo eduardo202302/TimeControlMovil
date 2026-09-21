@@ -37,6 +37,10 @@ export function buildCompanySettings(raw: unknown): CompanySettings | null {
       settings.tardinessMode.trim() !== ""
         ? settings.tardinessMode
         : "Automatica",
+    // Mismo default que el webapp: `get(company, "settings.attendanceMode", "")`
+    // en AdminAttendanceForm — "" cae al `default` del switch (foto + manual).
+    attendanceMode:
+      typeof settings.attendanceMode === "string" ? settings.attendanceMode : "",
   };
 }
 

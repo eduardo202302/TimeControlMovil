@@ -1,24 +1,45 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useMemo } from "react";
+import React, { useMemo, type ReactNode } from "react";
 import {
+  ActivityIndicator,
   Modal,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { RADIUS_2XL, RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
 import type { PermissionCatalogTag } from "../../utils/adminPermissionRules";
 
+/**
+ * Opción del sheet: un tag del catálogo, con `subtitle` opcional en gris
+ * debajo del nombre — mismo criterio que `MultiSelectOption.subtitle` de
+ * TagMultiSelectSheet. Sin `subtitle`, la fila se ve igual que antes.
+ */
+export type TagSheetOption = PermissionCatalogTag & { subtitle?: string | null };
+
 interface TagOptionSheetProps {
   visible: boolean;
   title: string;
-  options: PermissionCatalogTag[];
+  options: TagSheetOption[];
   selectedId?: number | null;
   emptyText?: string;
-  onSelect: (tag: PermissionCatalogTag) => void;
+  onSelect: (tag: TagSheetOption) => void;
   onClose: () => void;
+  /**
+   * Buscador controlado por el caller (búsqueda contra el backend, p. ej.
+   * GET /courses con `all`). Sin esta prop no se dibuja — los usos
+   * existentes (catálogos cortos en memoria) no cambian.
+   */
+  search?: { value: string; onChangeText: (text: string) => void; placeholder?: string };
+  /** Spinner en lugar de la lista (búsqueda en vuelo). */
+  loading?: boolean;
+  /** Contenido al final de la lista (p. ej. "Cargar más"). */
+  footer?: ReactNode;
+  /** Oculta el punto de color — para opciones que no son tags (cursos). */
+  hideColorDot?: boolean;
 }
 
 /** Selector de un tag del catálogo (estado, acción o tipo) con su color. */
@@ -30,6 +51,10 @@ export default function TagOptionSheet({
   emptyText = "Sin opciones disponibles",
   onSelect,
   onClose,
+  search,
+  loading = false,
+  footer,
+  hideColorDot = false,
 }: TagOptionSheetProps) {
   const { scale, verticalScale, font } = useResponsive();
   const styles = useMemo(
@@ -48,8 +73,27 @@ export default function TagOptionSheet({
               <Ionicons name="close" size={20} color="#6B7280" />
             </TouchableOpacity>
           </View>
-          <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-            {options.length === 0 ? (
+          {search && (
+            <View style={styles.searchBox}>
+              <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+              <TextInput
+                style={styles.searchInput}
+                value={search.value}
+                onChangeText={search.onChangeText}
+                placeholder={search.placeholder ?? "Buscar…"}
+                placeholderTextColor="#9CA3AF"
+                autoCorrect={false}
+              />
+            </View>
+          )}
+          <ScrollView
+            style={styles.list}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {loading ? (
+              <ActivityIndicator color="#2563EB" style={styles.loading} />
+            ) : options.length === 0 ? (
               <Text style={styles.empty}>{emptyText}</Text>
             ) : (
               options.map((tag) => {
@@ -61,20 +105,30 @@ export default function TagOptionSheet({
                     onPress={() => onSelect(tag)}
                     activeOpacity={0.75}
                   >
-                    <View
-                      style={[styles.dot, { backgroundColor: tag.color || "#CBD5E1" }]}
-                    />
-                    <Text
-                      style={[styles.optionText, selected && styles.optionTextSelected]}
-                      numberOfLines={2}
-                    >
-                      {tag.name}
-                    </Text>
+                    {!hideColorDot && (
+                      <View
+                        style={[styles.dot, { backgroundColor: tag.color || "#CBD5E1" }]}
+                      />
+                    )}
+                    <View style={styles.optionBody}>
+                      <Text
+                        style={[styles.optionText, selected && styles.optionTextSelected]}
+                        numberOfLines={2}
+                      >
+                        {tag.name}
+                      </Text>
+                      {!!tag.subtitle && (
+                        <Text style={styles.optionSubtitle} numberOfLines={1}>
+                          {tag.subtitle}
+                        </Text>
+                      )}
+                    </View>
                     {selected && <Ionicons name="checkmark" size={18} color="#2563EB" />}
                   </TouchableOpacity>
                 );
               })
             )}
+            {!loading && footer}
           </ScrollView>
         </View>
       </TouchableOpacity>
@@ -134,7 +188,26 @@ function createStyles(
       height: scale(12),
       borderRadius: RADIUS_PILL,
     },
-    optionText: { flex: 1, fontSize: font(14), color: "#374151" },
+    optionBody: { flex: 1 },
+    optionText: { fontSize: font(14), color: "#374151" },
+    optionSubtitle: { fontSize: font(12), color: "#6B7280", marginTop: verticalScale(2) },
+    searchBox: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(8),
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      borderRadius: RADIUS_MD,
+      paddingHorizontal: scale(10),
+      marginBottom: verticalScale(8),
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: font(14),
+      color: "#111827",
+      paddingVertical: verticalScale(8),
+    },
+    loading: { paddingVertical: verticalScale(20) },
     optionTextSelected: { color: "#1D4ED8", fontWeight: "700" },
   });
 }

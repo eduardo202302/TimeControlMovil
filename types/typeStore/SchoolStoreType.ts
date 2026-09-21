@@ -186,6 +186,12 @@ export interface CompanySettings {
   daysLateAbsence: number;
   /** "Manual" (input de hora editable) | "Automatica" (hora del dispositivo). */
   tardinessMode: string;
+  /**
+   * Modo de toma de asistencia: "Manual" | "Docente" (valores del webapp).
+   * Sin validación ni default en el backend — "" si no está configurado,
+   * que en `resolveAttendanceGating` cae al caso por defecto (foto + manual).
+   */
+  attendanceMode: string;
 }
 
 // ─── Store type extendido ─────────────────────────────────────────────────────

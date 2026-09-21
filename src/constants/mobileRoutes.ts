@@ -8,6 +8,7 @@ export const VALID_MOBILE_PATHS: Set<string> = new Set([
   "/home",
   "/dashboard",
   "/attendancetaking",
+  "/adminattendancetaking",
   "/tardiness",
   "/punchinout",
   "/timeoffscreen",
