@@ -29,7 +29,7 @@ import {
   type MyPermission,
   type PermissionTagRef,
 } from "../../utils/permissionRules";
-import { normalizePermissionName } from "../../utils/punchRules";
+import { normalizePermissionName, toRD } from "../../utils/punchRules";
 import { formatDisplayDate, formatDisplayTime } from "./RevisionFinalModal";
 
 /** Nombre de la acción que el backend trata como día completo (00:00–23:59) —
@@ -79,11 +79,15 @@ function attachmentIcon(path: string): keyof typeof Ionicons.glyphMap {
 function formatStamp(raw: string | null | undefined): string {
   if (!raw) return "";
   const value = String(raw).trim();
-  const date = formatDisplayDate(permissionDateKey(value));
-  const timePart = value.includes("T") ? value.split("T")[1] : "";
-  if (!timePart) return date;
-  const time = formatDisplayTime(timePart.slice(0, 5));
-  return time ? `${date} ${time}` : date;
+  if (!value.includes("T")) return formatDisplayDate(permissionDateKey(value));
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return formatDisplayDate(permissionDateKey(value));
+  const rd = toRD(parsed);
+  const date = `${String(rd.day).padStart(2, "0")}/${String(rd.month + 1).padStart(2, "0")}/${rd.year}`;
+  const time = formatDisplayTime(
+    `${String(rd.hours).padStart(2, "0")}:${String(rd.minutes).padStart(2, "0")}`,
+  );
+  return `${date} ${time}`;
 }
 
 export default function PermissionDetailView({
