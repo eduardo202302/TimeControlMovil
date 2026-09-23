@@ -2,6 +2,7 @@ import { create } from "zustand";
 import {
   CompanySettings,
   SchoolStore,
+  TeacherAttendanceToday,
 } from "../types/typeStore/SchoolStoreType";
 import { MenuItem } from "../types/typesMenu/MenuTypes";
 import { resolveRoute } from "../utils/resolveRoute";
@@ -44,6 +45,33 @@ export function buildCompanySettings(raw: unknown): CompanySettings | null {
   };
 }
 
+/**
+ * `raw` es el nodo `data` de la respuesta de chooseschool/login. Extrae la
+ * lista de asistencias de hoy del docente.
+ *
+ * A diferencia de `buildCompanySettings`, esta NO devuelve null para que el
+ * caller conserve el valor previo: devuelve `[]`, que es lo que el caller
+ * debe guardar. Mismo criterio que el reducer del webapp
+ * (`payload.data.teacherAttendancesToday || []`): un usuario sin ficha de
+ * docente no recibe el campo, y ahí la lista correcta es la vacía, no la de
+ * la sesión anterior.
+ *
+ * Lee las DOS claves con que el backend publica lo mismo:
+ *   - `teacherAttendancesToday` → chooseschool y rehydrate.
+ *   - `AttendancesToday` (con A mayúscula) → /authentication/login, rama de
+ *     una sola compañía. Ver el comentario de captura en FormLogin.
+ */
+export function buildAttendancesToday(raw: unknown): TeacherAttendanceToday[] {
+  if (!raw || typeof raw !== "object") return [];
+  const data = raw as Record<string, unknown>;
+  const list = data.teacherAttendancesToday ?? data.AttendancesToday;
+  if (!Array.isArray(list)) return [];
+  return list.filter(
+    (item): item is TeacherAttendanceToday =>
+      !!item && typeof item === "object" && typeof (item as { id?: unknown }).id === "number",
+  );
+}
+
 export const useSchoolStore = create<SchoolStore>((set) => ({
   // ─── Estado existente ───────────────────────────────────────────────────────
   school: null,
@@ -59,6 +87,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   menuTree: [],
   role: null,
   companySettings: null,
+  attendancesToday: [],
 
   // ─── Acciones existentes (sin cambios) ──────────────────────────────────────
   setSchool: (school) => set({ school }),
@@ -80,6 +109,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       menuTree: [],
       role: null,
       companySettings: null,
+      attendancesToday: [],
     }),
 
   // ─── Cerrar sesión — conserva urlColegio y school para poder volver a login ─
@@ -94,6 +124,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       menuTree: [],
       role: null,
       companySettings: null,
+      attendancesToday: [],
     }),
 
   // ─── Acción nueva: resuelve app + ruta + menú tras el login ─────────────────
@@ -115,4 +146,5 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
 
   setRole: (role) => set({ role }),
   setCompanySettings: (companySettings) => set({ companySettings }),
+  setAttendancesToday: (attendancesToday) => set({ attendancesToday }),
 }));

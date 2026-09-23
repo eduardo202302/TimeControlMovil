@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { TeacherAttendanceToday } from "../../types/typeStore/SchoolStoreType";
 
 /**
  * Reglas de "Asistencia Adm." (Face Class, menú id:25 `/adminattendancetaking`).
@@ -16,6 +17,10 @@ import axios from "axios";
  *     trae ≥1 elemento, `students` se ignora completo. Solo se procesan las
  *     fotos que empiezan con "data:image/" (las rutas ya guardadas se
  *     descartan en silencio y NO se pueden borrar).
+ *   - GET  /attendance/teacher/{subjectId} → la clase del docente logueado
+ *     (teacherId sale del token) para esa materia, con `weekday` = hoy y
+ *     `startTime <= ahora < endTime`. Mismo contrato de respuesta que
+ *     /attendance/course/{courseId}, incluido `attendanceFound: false`.
  *   - GET  /courses — buscador genérico de tabla (ver buildCourseSearchParams).
  *
  * TODOS los errores del módulo responden HTTP 200: se mira siempre `success`,
@@ -461,6 +466,142 @@ export function isLocalImage(value: string): boolean {
   return value.startsWith("data:image/");
 }
 
+// ─── Clase en curso del docente (Asistencia, menú de Face Class) ─────────────
+
+/**
+ * Nombres que usa el backend en `schedule.weekday`, indexados por
+ * `Date.getDay()` (0 = Domingo). Copiados tal cual del webapp
+ * (`getCurrentDay` de AttendanceTaking/TeacherSchedule), tildes incluidas:
+ * "Miércoles" y "Sábado" se comparan con === contra lo guardado en BD.
+ */
+export const SPANISH_WEEKDAYS = [
+  "Domingo",
+  "Lunes",
+  "Martes",
+  "Miércoles",
+  "Jueves",
+  "Viernes",
+  "Sábado",
+] as const;
+
+/** Meses en español, indexados por `Date.getMonth()`. */
+const SPANISH_MONTHS = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+] as const;
+
+/**
+ * `getTimeLabel(fecha, "D [de] MMMM [del] YYYY")` del webapp: "19 de
+ * septiembre del 2026". Acepta un Date o el string que venga del backend
+ * (`createdDate`); devuelve "" si no parsea.
+ */
+export function formatDayMonthYear(raw: Date | string | null | undefined): string {
+  if (raw == null || raw === "") return "";
+  const date = raw instanceof Date ? raw : new Date(raw);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getDate()} de ${SPANISH_MONTHS[date.getMonth()]} del ${date.getFullYear()}`;
+}
+
+/** `getCurrentDay` del webapp. */
+export function currentWeekdayName(now: Date = new Date()): string {
+  return SPANISH_WEEKDAYS[now.getDay()];
+}
+
+/** "HH:MM[:SS]" → minutos desde medianoche, o null si no parsea. */
+function timeToMinutes(raw: string | null | undefined): number | null {
+  if (typeof raw !== "string") return null;
+  const [hours, minutes] = raw.split(":").map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  return hours * 60 + minutes;
+}
+
+/**
+ * `hasAvailableClassesToday` de AttendanceTaking (webapp): filtra por
+ * `schedule.weekday === día de hoy en español` y compara la ventana REAL de
+ * hoy (`startTime`/`endTime` del nivel superior, NO las del schedule
+ * recurrente) en minutos contra la hora actual.
+ *
+ * Dos diferencias deliberadas con el webapp, ninguna de comportamiento:
+ *   - devuelve el item en vez de un booleano, porque la pantalla necesita
+ *     además resaltar esa fila en TeacherScheduleCard;
+ *   - usa `find` en vez de `some`. Con varias clases solapadas se queda con
+ *     la primera, que es la más temprana: el backend ordena la lista por
+ *     `schedule.startTime asc`.
+ *
+ * El rango es cerrado en los dos extremos (`<= endTime`), igual que el
+ * webapp. OJO: el backend es más estricto en
+ * GET /attendance/teacher/{subjectId} (`endTime > ahora`), así que en el
+ * minuto exacto del fin la UI puede creer que hay clase y el GET responder
+ * `attendanceFound: false`. Es el comportamiento actual del webapp; el caller
+ * lo pinta como estado vacío con el mensaje del backend.
+ */
+export function hasAvailableClassesToday(
+  attendancesToday: TeacherAttendanceToday[] | null | undefined,
+  now: Date = new Date(),
+): TeacherAttendanceToday | null {
+  if (!Array.isArray(attendancesToday) || attendancesToday.length === 0) return null;
+  const currentDay = currentWeekdayName(now);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const found = attendancesToday
+    .filter((item) => item?.schedule?.weekday === currentDay)
+    .find((item) => {
+      const start = timeToMinutes(item?.startTime);
+      const end = timeToMinutes(item?.endTime);
+      if (start === null || end === null) return false;
+      return currentMinutes >= start && currentMinutes <= end;
+    });
+  return found ?? null;
+}
+
+/**
+ * `getCurrentSubject` de AttendanceForm (webapp) — port LITERAL, bugs
+ * incluidos. NO es un duplicado de `hasAvailableClassesToday`: el webapp las
+ * escribió por separado, en archivos distintos, y difieren en dos cosas:
+ *
+ *   1. NO filtra por `schedule.weekday`. Como la lista es "asistencias de
+ *      hoy", en teoría da igual… salvo que el backend arma la lista por
+ *      `attendance.date` y esa fila puede traer un `schedule` de otro día de
+ *      la semana. Entonces esta función devuelve una clase que NO es la de
+ *      hoy.
+ *   2. Compara STRINGS, no minutos: `now.toTimeString().slice(0, 8)` produce
+ *      siempre "HH:MM:SS", y se compara con `>=`/`<=` contra `startTime` y
+ *      `endTime` tal como llegan. Si el backend devolviera "HH:MM" (8 vs 5
+ *      caracteres) la comparación lexicográfica se rompe: "09:30:00" > "09:30".
+ *
+ * Consecuencia real: la pantalla puede decir "no tienes clases disponibles"
+ * (hasAvailableClassesToday = null) y esta, para el mismo instante, devolver
+ * una clase de otro día. Se replica tal cual a propósito — corregirlo aquí
+ * cambiaría qué materia se le pide al backend respecto del webapp. El
+ * `attendanceFound: false` del GET es lo que hoy contiene el daño.
+ *
+ * Devuelve el item completo; el webapp devuelve su `.schedule` y luego lee
+ * `subject.id`/`subject.name`. Misma información, un nivel más arriba.
+ */
+export function getCurrentSubject(
+  attendancesToday: TeacherAttendanceToday[] | null | undefined,
+  now: Date = new Date(),
+): TeacherAttendanceToday | null {
+  if (!Array.isArray(attendancesToday) || attendancesToday.length === 0) return null;
+  const currentTime = now.toTimeString().slice(0, 8);
+  const found = attendancesToday.find((item) => {
+    const startTime = item?.startTime ?? "";
+    const endTime = item?.endTime ?? "";
+    if (!startTime || !endTime) return false;
+    return currentTime >= startTime && currentTime <= endTime;
+  });
+  return found ?? null;
+}
+
 // ─── Cursos ──────────────────────────────────────────────────────────────────
 
 /** Tamaño de página del ClientSelectorModal del webapp. */
@@ -551,6 +692,41 @@ export async function fetchAdminAttendance(
     return { status: "found", data };
   } catch (error: any) {
     logFailure("fetchAdminAttendance:", error);
+    return {
+      status: "error",
+      message: readText(error?.response?.data?.message) ?? "Error de conexión.",
+    };
+  }
+}
+
+/**
+ * Paralelo exacto de `fetchAdminAttendance`, contra el endpoint del docente:
+ * el backend resuelve el `teacherId` desde el token, así que solo viaja la
+ * materia. Mismo contrato de respuesta (incluido `attendanceFound: false`
+ * cuando no hay clase en curso), mismo normalizado.
+ */
+export async function fetchTeacherAttendance(
+  subjectId: number,
+  { token, urlColegio }: AuthArgs,
+): Promise<FetchAttendanceResult> {
+  try {
+    const response = await axios.get(
+      `${urlColegio}/attendance/teacher/${subjectId}`,
+      authHeaders(token),
+    );
+    const body = response.data;
+    if (!body?.success) {
+      const message = readText(body?.message) ?? "No se pudo cargar la asistencia.";
+      if (body?.data?.attendanceFound === false) {
+        return { status: "notFound", message };
+      }
+      return { status: "error", message };
+    }
+    const data = normalizeAttendanceData(body.data);
+    if (!data) return { status: "error", message: "Respuesta de asistencia inválida." };
+    return { status: "found", data };
+  } catch (error: any) {
+    logFailure("fetchTeacherAttendance:", error);
     return {
       status: "error",
       message: readText(error?.response?.data?.message) ?? "Error de conexión.",

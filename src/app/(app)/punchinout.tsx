@@ -22,7 +22,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { buildCompanySettings, useSchoolStore } from "../../../store/useSchoolStore";
+import {
+  buildAttendancesToday,
+  buildCompanySettings,
+  useSchoolStore,
+} from "../../../store/useSchoolStore";
 import type {
   School,
   SchoolSettings,
@@ -706,6 +710,14 @@ export default function PunchInOut() {
             useSchoolStore.getState().setCompanySettings(companySettings);
           }
         }
+
+        // `teacherAttendancesToday` (nivel superior de `data`, hermano de
+        // token/school). Este poller es el ÚNICO refresco de la snapshot
+        // mientras dura la sesión: ni el backend ni el webapp tienen un
+        // endpoint que devuelva la lista completa otra vez.
+        useSchoolStore
+          .getState()
+          .setAttendancesToday(buildAttendancesToday(res.data?.data));
 
         // Comparar solo los campos relevantes (ignorar createdDate y campos extra)
         const normalize = (s: UserSchedule[]) =>

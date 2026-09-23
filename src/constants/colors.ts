@@ -38,3 +38,19 @@ export const FOOTER_BORDER = "#F3F4F6";
  * primero en centralizarse.
  */
 export const WARNING_COLOR = "#B45309";
+
+/**
+ * Cinta oscura del header de Asistencia (docente) — el `--ribbon` /
+ * `--fonstRibbon` de AttendanceForm en el webapp.
+ *
+ * En el webapp son configurables por colegio: App.jsx los inyecta en runtime
+ * desde `entitySettings.colors`. Mobile todavía no lee esa paleta, así que acá
+ * se fija el DEFAULT del backoffice (`DEFAULT_COMPANY_COLORS` de
+ * defaultCompanyColors.js), que es lo que ve cualquier colegio que no la haya
+ * personalizado. Si algún día mobile lee `entitySettings.colors`, estos dos
+ * pasan a ser el fallback.
+ */
+export const RIBBON_BACKGROUND = "#2C315B";
+export const RIBBON_TEXT = "#FFFFFF";
+/** Texto secundario sobre la cinta (fecha, etiquetas) — blanco atenuado. */
+export const RIBBON_TEXT_MUTED = "#C9CBE4";

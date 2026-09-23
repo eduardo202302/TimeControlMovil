@@ -194,6 +194,72 @@ export interface CompanySettings {
   attendanceMode: string;
 }
 
+/**
+ * Item de `teacherAttendancesToday` — la lista de asistencias de HOY del
+ * docente logueado. Llega en el NIVEL SUPERIOR de la respuesta de
+ * `chooseschool` (hermano de `token` y `school`, NO anidado bajo `school`) y
+ * la arma el backend filtrando `attendance.date` por `moment().format(
+ * "YYYY-MM-DD")` con `orderBy schedule.startTime asc`.
+ *
+ * Es una SNAPSHOT: ni el webapp ni mobile tienen endpoint de refresco de la
+ * lista completa — solo login/chooseschool la traen fresca (en mobile, el
+ * poller de punchinout la refresca de paso al re-llamar chooseschool).
+ *
+ * OJO con los dos pares de horas, que NO son lo mismo:
+ *   - `startTime`/`endTime` del nivel superior: la ventana REAL de la clase de
+ *     hoy (fila de `attendance`). Es la que decide "¿está en curso ahora?".
+ *   - `schedule.startTime`/`schedule.endTime`: el horario recurrente semanal.
+ *     Solo para mostrar en la UI.
+ * `schedule.weekday` es el nombre del día en español ("Lunes"), tal como lo
+ * guardó el backend — no se recalcula desde `date`.
+ */
+export interface TeacherAttendanceToday {
+  id: number;
+  scheduleId?: number;
+  date?: string | null;
+  status?: string | null;
+  notes?: string | null;
+  createdDate?: string | null;
+  /** Columna JSON — puede llegar como array o como string sin parsear. */
+  photos?: unknown;
+  statistics?: {
+    presente?: number;
+    tardanza?: number;
+    ausente?: number;
+    excusa?: number;
+    total?: number;
+    TardanzaEntrada?: number;
+  } | null;
+  /** Ventana real de hoy ("HH:MM" o "HH:MM:SS"). */
+  startTime?: string | null;
+  endTime?: string | null;
+  schedule?: {
+    id?: number;
+    courseId?: number;
+    subjectId?: number;
+    teacherId?: number;
+    /** Día en español ("Lunes"), no un índice. */
+    weekday?: string | null;
+    /** Horario recurrente — solo para mostrar, no para decidir "actual". */
+    startTime?: string | null;
+    endTime?: string | null;
+    startAt?: string | null;
+    endAt?: string | null;
+    schoolId?: number;
+    isActive?: boolean;
+    subject?: { id?: number; name?: string | null; [key: string]: unknown } | null;
+    course?: {
+      id?: number;
+      name?: string | null;
+      section?: string | null;
+      fullName?: string | null;
+      [key: string]: unknown;
+    } | null;
+    [key: string]: unknown;
+  } | null;
+  [key: string]: unknown;
+}
+
 // ─── Store type extendido ─────────────────────────────────────────────────────
 
 export interface SchoolStore {
@@ -214,6 +280,11 @@ export interface SchoolStore {
   // Campo nuevo — company.settings de chooseschool (ver CompanySettings)
   companySettings: CompanySettings | null;
 
+  // Campo nuevo — teacherAttendancesToday de chooseschool (ver
+  // TeacherAttendanceToday). Siempre array: [] cuando el usuario no es
+  // docente o no tiene clases hoy, nunca null.
+  attendancesToday: TeacherAttendanceToday[];
+
   // Acciones existentes
   setSchool: (school: School) => void;
   setUrlColegio: (url: string) => void;
@@ -226,6 +297,7 @@ export interface SchoolStore {
   setMenuResolution: (user: User, menuItems: MenuItem[]) => void;
   setRole: (role: RoleItem) => void;
   setCompanySettings: (companySettings: CompanySettings) => void;
+  setAttendancesToday: (attendancesToday: TeacherAttendanceToday[]) => void;
 
   // Cerrar sesión
   logout: () => void;

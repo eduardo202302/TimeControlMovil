@@ -22,7 +22,11 @@ import {
 } from "react-native";
 import { loginAuthentication } from "../../../api/Login/loginAuthentication";
 import { getMenuItems } from "../../../api/menu/getMenuItems";
-import { buildCompanySettings, useSchoolStore } from "../../../store/useSchoolStore";
+import {
+  buildAttendancesToday,
+  buildCompanySettings,
+  useSchoolStore,
+} from "../../../store/useSchoolStore";
 import { resolveMobilePath } from "../../constants/mobileRoutes";
 import { LoginType } from "../../../types/typesLogin/LoginType";
 import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
@@ -225,6 +229,13 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       if (companySettings) {
         useSchoolStore.getState().setCompanySettings(companySettings);
       }
+      // `teacherAttendancesToday` viaja en el nivel superior de `data`
+      // (hermano de token/school, no dentro de school). Se guarda siempre,
+      // aunque venga vacía: un usuario sin ficha de docente no trae el campo
+      // y ahí lo correcto es [], no la lista de la sesión anterior.
+      useSchoolStore
+        .getState()
+        .setAttendancesToday(buildAttendancesToday(res.data?.data));
       setCompanySelectorVisible(false);
       await completeLogin(
         schoolUser,
@@ -259,6 +270,15 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       if (response.success) {
         const { token } = response.data;
         const schoolUsers = response.data.user?.schoolUsers ?? [];
+        // Red de seguridad para la rama en que chooseschool falla y se entra
+        // con el token de /login: ese endpoint publica la misma lista, pero
+        // bajo `AttendancesToday` (con A mayúscula) y solo cuando el usuario
+        // tiene una sola compañía. buildAttendancesToday lee ambas claves.
+        // Si chooseschool sí responde, la captura de abajo la pisa con la
+        // snapshot buena.
+        useSchoolStore
+          .getState()
+          .setAttendancesToday(buildAttendancesToday(response.data));
         const currentUrl =
           urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
 
@@ -307,6 +327,10 @@ export default function FormLogin({ name, image }: FormLoginProps) {
                 if (companySettings) {
                   useSchoolStore.getState().setCompanySettings(companySettings);
                 }
+                // Mismo nivel superior que en handleSelectCompany.
+                useSchoolStore
+                  .getState()
+                  .setAttendancesToday(buildAttendancesToday(res.data?.data));
                 await completeLogin(
                   schoolUser,
                   response.data,
