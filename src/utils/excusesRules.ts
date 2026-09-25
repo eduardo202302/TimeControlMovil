@@ -186,9 +186,18 @@ export interface Excuse {
   stateTag?: ExcuseTag | null;
   typeTag?: PermissionTagRef | null;
 
-  student?: { id?: number; fullName?: string | null } | null;
+  student?: {
+    id?: number;
+    fullName?: string | null;
+    photourl?: string | null;
+    s3Photo?: string | null;
+    phone?: string | null;
+    code?: string | null;
+  } | null;
   enrollment?: {
     id?: number | null;
+    /** Nº de lista real (el webapp lee enrollment.listNumber, no course). */
+    listNumber?: number | string | null;
     course?: { id?: number | null; fullName?: string | null; listNumber?: number | null } | null;
   } | null;
   parent?: {

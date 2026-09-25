@@ -21,7 +21,6 @@ import {
   RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
-  RADIUS_SM,
   useResponsive,
 } from "@/constants/responsive";
 import {
@@ -34,7 +33,6 @@ import {
 import {
   allowedStateTags,
   buildExcuseEditPayload,
-  excuseAdminName,
   excuseEditSnapshot,
   excuseJustificationError,
   excuseReporterName,
@@ -93,6 +91,13 @@ type CrudStyles = ReturnType<typeof createStyles>;
 
 const CHIP_FALLBACK = { background: "#E2E8F0", text: "#475569" };
 
+const PHOTO_HOST = "https://timecontrol.wsmax.net:8600";
+
+function photoUri(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  return raw.startsWith("http") ? raw : `${PHOTO_HOST}/${raw}`;
+}
+
 function chipColors(tag: PermissionTagRef | null | undefined) {
   return {
     backgroundColor: tag?.color || CHIP_FALLBACK.background,
@@ -148,25 +153,6 @@ function attachmentIcon(path: string): keyof typeof Ionicons.glyphMap {
   return "document-attach-outline";
 }
 
-function InfoRow({
-  label,
-  value,
-  styles,
-}: {
-  label: string;
-  value: string;
-  styles: CrudStyles;
-}) {
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue} selectable>
-        {value || "—"}
-      </Text>
-    </View>
-  );
-}
-
 /** Barra superior común: botón de cierre + título centrado + área de acción. */
 function TopBar({
   title,
@@ -188,6 +174,48 @@ function TopBar({
       <View style={styles.topBarAction}>{right}</View>
     </View>
   );
+}
+
+/** Card colapsable, igual que CardContainer canCollapse del webapp. */
+function CollapsibleCard({
+  icon,
+  title,
+  defaultOpen = true,
+  styles,
+  children,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: React.ReactNode;
+  defaultOpen?: boolean;
+  styles: CrudStyles;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <View style={styles.card}>
+      <TouchableOpacity
+        style={[styles.cardHeader, !open && styles.cardHeaderCollapsed]}
+        onPress={() => setOpen((value) => !value)}
+        activeOpacity={0.7}
+      >
+        <Ionicons name={icon} size={18} color="#2563EB" />
+        <Text style={styles.cardTitle}>{title}</Text>
+        <Ionicons
+          name={open ? "chevron-up" : "chevron-down"}
+          size={16}
+          color="#9CA3AF"
+          style={styles.chevron}
+        />
+      </TouchableOpacity>
+      {open && children}
+    </View>
+  );
+}
+
+/** Punto de color del tag (DropdownTriggerWithColor del webapp). */
+function TagDot({ color, styles }: { color?: string | null; styles: CrudStyles }) {
+  if (!color) return null;
+  return <View style={[styles.tagDot, { backgroundColor: color }]} />;
 }
 
 export default function ExcuseCrudModal({
@@ -373,12 +401,6 @@ function CrudForm({
     [urlColegio],
   );
 
-  const renderThumbOrIcon = (path: string) => {
-    const uri = buildAttachmentUri(urlColegio, path);
-    if (!uri) return <Ionicons name="image-outline" size={18} color="#6B7280" />;
-    return <Image source={{ uri }} style={styles.attachmentThumb} resizeMode="cover" />;
-  };
-
   const handleAddFiles = useCallback(async () => {
     setFileNotice(null);
     setPickingFiles(true);
@@ -463,10 +485,28 @@ function CrudForm({
     setMode("watch");
   }, [snapshot]);
 
-  const stateColors = {
-    backgroundColor: targetTag?.color || CHIP_FALLBACK.background,
-    color: targetTag?.fontColor || CHIP_FALLBACK.text,
-  };
+  const studentPhoto = photoUri(excuse.student?.photourl || excuse.student?.s3Photo);
+  const listNumber = text(excuse.enrollment?.listNumber);
+  const courseName = text(excuse.enrollment?.course?.fullName);
+  const studentCode = text(excuse.student?.code);
+  const studentPhone = text(excuse.student?.phone);
+
+  const stateName = targetTag?.name ?? excuse.stateTag?.name ?? "—";
+  const stateDotColor = targetTag?.color || excuse.stateTag?.color || null;
+
+  // Quién Reporta — "Nombre - Relación" (fallback de relación del webapp).
+  const reporterName = excuseReporterName(excuse);
+  const relationship = excuse.parent?.relationship ?? "Madre/Padre";
+  const reporterLine = relationship ? `${reporterName} - ${relationship}` : reporterName;
+  const requestedAt = formatAuditStamp(excuse.createdDate);
+  const parentPhone = text(excuse.parent?.phone);
+  // El chip de Quién Reporta es el estado GUARDADO, no el que se está editando.
+  const persistedChip = chipColors(persistedDef ?? excuse.stateTag);
+  const persistedStateName = persistedDef?.name ?? excuse.stateTag?.name ?? "—";
+  const modifiedBy = text(excuse.modifiedByUser?.user?.fullName);
+  const createdBy = text(excuse.createdByUser?.user?.fullName);
+  const auditLabel = modifiedBy ? "Modificado por:" : createdBy ? "Creado por:" : "";
+  const auditName = modifiedBy || createdBy;
 
   return (
     <>
@@ -494,76 +534,64 @@ function CrudForm({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Solicitante ── */}
+          {/* ── 1. Tarjeta del estudiante (no colapsa) ── */}
           <View style={styles.card}>
-            <Text style={styles.personName}>{excuse.student?.fullName || "—"}</Text>
-            <Text style={styles.muted}>
-              {[excuse.enrollment?.course?.fullName, excuse.typeTag?.name]
-                .filter(Boolean)
-                .join(" · ") || "—"}
-            </Text>
-          </View>
-
-          {/* ── Quién Reporta ── */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="person-outline" size={18} color="#2563EB" />
-              <Text style={styles.cardTitle}>Quién Reporta</Text>
-            </View>
-            {/* Sin fallback "No disponible": el nombre queda vacío si no
-                existe; la relación tiene su fallback fijo del webapp. */}
-            <Text style={styles.personName}>{excuse.parent?.fullName ?? ""}</Text>
-            <Text style={styles.muted}>{excuse.parent?.relationship ?? "Madre/Padre"}</Text>
-            <Text style={styles.muted}>{excuseReporterName(excuse)}</Text>
-            {!!excuseAdminName(excuse) && (
-              <Text style={styles.muted}>{excuseAdminName(excuse)}</Text>
-            )}
-            {mode === "watch" && (
-              <>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Teléfono</Text>
-                  <Text style={styles.infoValue} selectable>
-                    {text(excuse.parent?.phone) || "—"}
-                  </Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Email</Text>
-                  <Text style={styles.infoValue} selectable>
-                    {text(excuse.parent?.email) || "—"}
-                  </Text>
-                </View>
-              </>
-            )}
-          </View>
-
-          {/* ── Estado ── */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="flag-outline" size={18} color="#2563EB" />
-              <Text style={styles.cardTitle}>Estado</Text>
-            </View>
-            {editing ? (
-              <TouchableOpacity
-                style={styles.select}
-                onPress={() => setStateSheetOpen(true)}
-                disabled={stateOptions.length === 0 || saving}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.stateChip, { backgroundColor: stateColors.backgroundColor }]}>
-                  <Text style={[styles.stateChipText, { color: stateColors.color }]}>
-                    {targetTag?.name ?? excuse.stateTag?.name ?? "—"}
-                  </Text>
-                </View>
-                <View style={styles.flex} />
-                <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
-              </TouchableOpacity>
-            ) : (
-              <View style={[styles.stateChip, { backgroundColor: stateColors.backgroundColor }]}>
-                <Text style={[styles.stateChipText, { color: stateColors.color }]}>
-                  {targetTag?.name ?? excuse.stateTag?.name ?? "—"}
-                </Text>
+            <View style={styles.studentRow}>
+              <View style={styles.avatarWrap}>
+                {studentPhoto ? (
+                  <Image source={{ uri: studentPhoto }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarFallback]}>
+                    <Ionicons name="person" size={26} color="#9CA3AF" />
+                  </View>
+                )}
+                {!!listNumber && (
+                  <View style={styles.listBadge}>
+                    <Text style={styles.listBadgeText}>{listNumber}</Text>
+                  </View>
+                )}
               </View>
-            )}
+              <View style={styles.flex}>
+                <Text style={styles.personName}>{excuse.student?.fullName || "—"}</Text>
+                {!!studentCode && <Text style={styles.muted}>Mat. {studentCode}</Text>}
+                {!!courseName && <Text style={styles.muted}>Aula: {courseName}</Text>}
+                {!!studentPhone && <Text style={styles.muted}>Tel. {studentPhone}</Text>}
+              </View>
+            </View>
+
+            <View style={styles.tagFields}>
+              {!!excuse.typeTag?.name && (
+                <View style={styles.tagField}>
+                  <Text style={styles.tagFieldLabel}>Tipo</Text>
+                  <View style={[styles.select, styles.selectDisabled]}>
+                    <TagDot color={excuse.typeTag?.color} styles={styles} />
+                    <Text style={styles.selectText} numberOfLines={1}>
+                      {excuse.typeTag.name}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              <View style={styles.tagField}>
+                <Text style={styles.tagFieldLabel}>Estado</Text>
+                {editing ? (
+                  <TouchableOpacity
+                    style={styles.select}
+                    onPress={() => setStateSheetOpen(true)}
+                    disabled={stateOptions.length === 0 || saving}
+                    activeOpacity={0.75}
+                  >
+                    <TagDot color={stateDotColor} styles={styles} />
+                    <Text style={styles.selectText} numberOfLines={1}>{stateName}</Text>
+                    <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+                ) : (
+                  <View style={[styles.select, styles.selectDisabled]}>
+                    <TagDot color={stateDotColor} styles={styles} />
+                    <Text style={styles.selectText} numberOfLines={1}>{stateName}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
             {editing && isRejection && (
               <Text style={styles.helper}>
                 Para rechazar o cancelar es obligatorio un comentario o un adjunto.
@@ -571,38 +599,187 @@ function CrudForm({
             )}
           </View>
 
-          {/* ── Información administrativa: solo en watch ── */}
-          {mode === "watch" && (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="information-circle-outline" size={18} color="#2563EB" />
-                <Text style={styles.cardTitle}>Información</Text>
+          {/* ── 2. Detalles ── */}
+          <CollapsibleCard icon="information-circle-outline" title="Detalles" styles={styles}>
+            <Text style={styles.label}>Asunto</Text>
+            {editing ? (
+              <TextInput
+                style={styles.input}
+                value={subject}
+                onChangeText={setSubject}
+                maxLength={255}
+                editable={!saving}
+                placeholder="—"
+                placeholderTextColor="#9CA3AF"
+              />
+            ) : (
+              <View style={[styles.input, styles.inputReadonly]}>
+                <Text style={styles.inputReadonlyText}>{text(excuse.subject) || "—"}</Text>
               </View>
-              <InfoRow label="Curso" value={text(excuse.enrollment?.course?.fullName)} styles={styles} />
-              <InfoRow
-                label="Nº de Lista"
-                value={text(excuse.enrollment?.course?.listNumber)}
-                styles={styles}
+            )}
+            <Text style={[styles.label, styles.labelSpaced]}>Motivo</Text>
+            {editing ? (
+              <TextInput
+                style={[styles.input, styles.textarea]}
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                textAlignVertical="top"
+                editable={!saving}
+                placeholder="—"
+                placeholderTextColor="#9CA3AF"
               />
-              <InfoRow label="Creado Por" value={excuseAdminName(excuse)} styles={styles} />
-              <InfoRow
-                label="F. Creación"
-                value={formatAuditStamp(excuse.createdDate)}
-                styles={styles}
-              />
-              <InfoRow
-                label="Modificado Por"
-                value={text(excuse.modifiedByUser?.user?.fullName)}
-                styles={styles}
-              />
-              <InfoRow
-                label="F. Modificación"
-                value={formatAuditStamp(excuse.updatedAt)}
-                styles={styles}
-              />
+            ) : (
+              <View style={[styles.input, styles.textarea, styles.inputReadonly]}>
+                <Text style={styles.inputReadonlyText}>{text(excuse.description) || "—"}</Text>
+              </View>
+            )}
+          </CollapsibleCard>
+
+          {/* ── 3. Quién Reporta ── */}
+          <CollapsibleCard icon="person-outline" title="Quién Reporta" styles={styles}>
+            <View style={styles.reporterBox}>
+              <Text style={styles.personName}>{reporterLine}</Text>
+              {!!requestedAt && <Text style={styles.muted}>Solicitado: {requestedAt}</Text>}
+              {!!parentPhone && <Text style={styles.muted}>Tel. {parentPhone}</Text>}
+              <View
+                style={[
+                  styles.stateChip,
+                  styles.reporterChip,
+                  { backgroundColor: persistedChip.backgroundColor },
+                ]}
+              >
+                <Text style={[styles.stateChipText, { color: persistedChip.color }]}>
+                  {persistedStateName}
+                </Text>
+              </View>
+              {!!auditLabel && (
+                <Text style={styles.auditLine}>
+                  {auditLabel} <Text style={styles.auditName}>{auditName}</Text>
+                </Text>
+              )}
             </View>
+          </CollapsibleCard>
+
+          {/* ── 4. Comentarios / Adjuntos Admin: SOLO en rechazo/cancelación
+              (showAdminCommentsSection del webapp), en watch y en edit ── */}
+          {isRejection && (
+            <CollapsibleCard
+              icon="chatbox-ellipses-outline"
+              title={
+                editing ? (
+                  <>
+                    Comentarios / Adjuntos Admin{" "}
+                    <Text style={styles.required}>(Requerido)</Text>
+                  </>
+                ) : (
+                  "Comentarios / Adjuntos Admin"
+                )
+              }
+              styles={styles}
+            >
+              <Text style={styles.label}>Comentario</Text>
+              {editing ? (
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.textarea,
+                    showErrors && !!justificationError && styles.inputInvalid,
+                  ]}
+                  value={comment}
+                  onChangeText={setComment}
+                  editable={!saving}
+                  multiline
+                  textAlignVertical="top"
+                  placeholder="Describe el motivo"
+                  placeholderTextColor="#9CA3AF"
+                />
+              ) : (
+                <View style={[styles.input, styles.textarea, styles.inputReadonly]}>
+                  <Text style={styles.inputReadonlyText}>{text(comment) || "—"}</Text>
+                </View>
+              )}
+              {showErrors && !!justificationError && (
+                <Text style={styles.fieldError}>{justificationError}</Text>
+              )}
+
+              <Text style={[styles.label, styles.labelSpaced]}>Adjuntos Admin</Text>
+              <View style={styles.adminFiles}>
+                {snapshot.attachmentsAdm.map((path, index) =>
+                  editing ? (
+                    <View key={`adm-${path}-${index}`} style={styles.fileRow}>
+                      <Ionicons name="document-attach-outline" size={16} color="#2563EB" />
+                      <Text style={styles.fileName} numberOfLines={1}>
+                        {attachmentFileName(path)}
+                      </Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      key={`adm-${path}-${index}`}
+                      style={styles.attachment}
+                      onPress={() => openAttachment(path)}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name={attachmentIcon(path)} size={18} color="#6B7280" />
+                      <Text style={styles.attachmentName} numberOfLines={1}>
+                        {attachmentFileName(path)}
+                      </Text>
+                      <Ionicons name="open-outline" size={16} color="#9CA3AF" />
+                    </TouchableOpacity>
+                  ),
+                )}
+
+                {newFiles.map((file) => (
+                  <View key={file.id} style={[styles.fileRow, styles.fileRowNew]}>
+                    <Ionicons name={getFileIcon(file.mimeType)} size={16} color="#15803D" />
+                    <Text style={styles.fileName} numberOfLines={1}>
+                      {file.name}
+                    </Text>
+                    {!!formatFileSize(file.size) && (
+                      <Text style={styles.fileSize}>{formatFileSize(file.size)}</Text>
+                    )}
+                    {editing && (
+                      <TouchableOpacity
+                        onPress={() =>
+                          setNewFiles((previous) => previous.filter((item) => item.id !== file.id))
+                        }
+                        hitSlop={8}
+                      >
+                        <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+
+                {editing && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.addFileBtn}
+                      onPress={handleAddFiles}
+                      disabled={pickingFiles || newBytes >= MAX_PAYLOAD_BYTES}
+                      activeOpacity={0.75}
+                    >
+                      {pickingFiles ? (
+                        <ActivityIndicator size="small" color="#2563EB" />
+                      ) : (
+                        <Ionicons name="cloud-upload-outline" size={18} color="#2563EB" />
+                      )}
+                      <Text style={styles.addFileText}>
+                        {pickingFiles ? "Procesando archivos…" : "Agregar archivos"}
+                      </Text>
+                    </TouchableOpacity>
+                    {!!fileNotice && <Text style={styles.helper}>{fileNotice}</Text>}
+                  </>
+                )}
+                {!editing && snapshot.attachmentsAdm.length === 0 && (
+                  <Text style={styles.emptyHint}>Sin adjuntos</Text>
+                )}
+              </View>
+            </CollapsibleCard>
           )}
 
+          {/* ── 5. Ausencia: se queda como está, solo pasa al final (orden
+              del webapp apilado) ── */}
           {/* ── Día/s de ausencia ── */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -633,184 +810,42 @@ function CrudForm({
             )}
           </View>
 
-          {/* ── Detalle ── */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="document-text-outline" size={18} color="#2563EB" />
-              <Text style={styles.cardTitle}>Detalle</Text>
-            </View>
-            <Text style={styles.label}>Asunto</Text>
-            {editing ? (
-              <TextInput
-                style={styles.input}
-                value={subject}
-                onChangeText={setSubject}
-                maxLength={255}
-                editable={!saving}
-                placeholder="—"
-                placeholderTextColor="#9CA3AF"
-              />
+          {/* ── 6. Adjuntos del solicitante: cerrada si no hay archivos ── */}
+          <CollapsibleCard
+            icon="attach-outline"
+            title="Adjuntos"
+            defaultOpen={studentAttachments.length > 0}
+            styles={styles}
+          >
+            {studentAttachments.length === 0 ? (
+              <Text style={styles.emptyHint}>Sin adjuntos</Text>
             ) : (
-              <Text style={styles.value}>{text(excuse.subject) || "—"}</Text>
-            )}
-            <Text style={[styles.label, styles.labelSpaced]}>Motivo</Text>
-            {editing ? (
-              <TextInput
-                style={[styles.input, styles.textarea]}
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                textAlignVertical="top"
-                editable={!saving}
-                placeholder="—"
-                placeholderTextColor="#9CA3AF"
-              />
-            ) : (
-              <Text style={styles.value}>{text(excuse.description) || "—"}</Text>
-            )}
-          </View>
-
-          {/* ── Comentario: en edición solo aplica a rechazo/cancelación ── */}
-          {editing && isRejection && (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="chatbox-ellipses-outline" size={18} color="#2563EB" />
-                <Text style={styles.cardTitle}>
-                  Comentario <Text style={styles.required}>(Requerido)</Text>
-                </Text>
+              <View style={styles.thumbGrid}>
+                {studentAttachments.map((path, index) => {
+                  const uri = buildAttachmentUri(urlColegio, path);
+                  return (
+                    <TouchableOpacity
+                      key={`std-${path}-${index}`}
+                      style={styles.thumbTile}
+                      onPress={() => openAttachment(path)}
+                      activeOpacity={0.75}
+                    >
+                      {isImageAttachment(path) && uri ? (
+                        <Image source={{ uri }} style={styles.thumbImage} resizeMode="cover" />
+                      ) : (
+                        <View style={styles.thumbIconBox}>
+                          <Ionicons name={attachmentIcon(path)} size={26} color="#6B7280" />
+                          <Text style={styles.thumbName} numberOfLines={1}>
+                            {attachmentFileName(path)}
+                          </Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-              <TextInput
-                style={[
-                  styles.input,
-                  styles.textarea,
-                  showErrors && !!justificationError && styles.inputInvalid,
-                ]}
-                value={comment}
-                onChangeText={setComment}
-                editable={!saving}
-                multiline
-                textAlignVertical="top"
-                placeholder="Describe el motivo"
-                placeholderTextColor="#9CA3AF"
-              />
-              {showErrors && !!justificationError && (
-                <Text style={styles.fieldError}>{justificationError}</Text>
-              )}
-            </View>
-          )}
-
-          {/* ── Comentario en watch: se muestra si ya existía ── */}
-          {mode === "watch" && !!text(comment) && (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="chatbox-ellipses-outline" size={18} color="#2563EB" />
-                <Text style={styles.cardTitle}>Comentario</Text>
-              </View>
-              <Text style={styles.value}>{text(comment)}</Text>
-            </View>
-          )}
-
-          {/* ── Adjuntos del solicitante: SIEMPRE visibles y solo lectura ── */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="attach-outline" size={18} color="#2563EB" />
-              <Text style={styles.cardTitle}>Adjuntos ({studentAttachments.length})</Text>
-            </View>
-            {studentAttachments.map((path, index) => (
-              <TouchableOpacity
-                key={`std-${path}-${index}`}
-                style={styles.attachment}
-                onPress={() => openAttachment(path)}
-                activeOpacity={0.75}
-              >
-                {renderThumbOrIcon(path)}
-                <Text style={styles.attachmentName} numberOfLines={1}>
-                  {attachmentFileName(path)}
-                </Text>
-                <Ionicons name="open-outline" size={16} color="#9CA3AF" />
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* ── Adjuntos administrativos: solo aparece cuando el estado
-              destino es rechazo/cancelación (faithful a showAdminCommentsSection
-              del webapp). Si no, se oculta COMPLETAMENTE — incl. el botón
-              de agregar y el ícono de quitar. ── */}
-          {isRejection && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="shield-checkmark-outline" size={18} color="#2563EB" />
-              <Text style={styles.cardTitle}>Adjuntos Administrativos</Text>
-            </View>
-
-            {snapshot.attachmentsAdm.map((path, index) =>
-              editing ? (
-                <View key={`adm-${path}-${index}`} style={styles.fileRow}>
-                  <Ionicons name="document-attach-outline" size={16} color="#2563EB" />
-                  <Text style={styles.fileName} numberOfLines={1}>
-                    {attachmentFileName(path)}
-                  </Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  key={`adm-${path}-${index}`}
-                  style={styles.attachment}
-                  onPress={() => openAttachment(path)}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons name={attachmentIcon(path)} size={18} color="#6B7280" />
-                  <Text style={styles.attachmentName} numberOfLines={1}>
-                    {attachmentFileName(path)}
-                  </Text>
-                  <Ionicons name="open-outline" size={16} color="#9CA3AF" />
-                </TouchableOpacity>
-              ),
             )}
-
-            {newFiles.map((file) => (
-              <View key={file.id} style={[styles.fileRow, styles.fileRowNew]}>
-                <Ionicons name={getFileIcon(file.mimeType)} size={16} color="#15803D" />
-                <Text style={styles.fileName} numberOfLines={1}>
-                  {file.name}
-                </Text>
-                {!!formatFileSize(file.size) && (
-                  <Text style={styles.fileSize}>{formatFileSize(file.size)}</Text>
-                )}
-                {editing && (
-                  <TouchableOpacity
-                    onPress={() =>
-                      setNewFiles((previous) => previous.filter((item) => item.id !== file.id))
-                    }
-                    hitSlop={8}
-                  >
-                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
-
-            {editing && (
-              <>
-                <TouchableOpacity
-                  style={styles.addFileBtn}
-                  onPress={handleAddFiles}
-                  disabled={pickingFiles || newBytes >= MAX_PAYLOAD_BYTES}
-                  activeOpacity={0.75}
-                >
-                  {pickingFiles ? (
-                    <ActivityIndicator size="small" color="#2563EB" />
-                  ) : (
-                    <Ionicons name="cloud-upload-outline" size={18} color="#2563EB" />
-                  )}
-                  <Text style={styles.addFileText}>
-                    {pickingFiles ? "Procesando archivos…" : "Agregar archivos"}
-                  </Text>
-                </TouchableOpacity>
-                {!!fileNotice && <Text style={styles.helper}>{fileNotice}</Text>}
-              </>
-            )}
-          </View>
-          )}
+          </CollapsibleCard>
 
           {!!submitError && (
             <View style={styles.errorBanner}>
@@ -1003,17 +1038,98 @@ function createStyles(
       marginBottom: verticalScale(10),
     },
     cardTitle: { fontSize: font(15), fontWeight: "700", color: "#111827" },
+    cardHeaderCollapsed: { marginBottom: verticalScale(0) },
+    chevron: { marginLeft: "auto" },
+    studentRow: { flexDirection: "row", alignItems: "center", gap: scale(14) },
+    avatarWrap: { position: "relative" },
+    avatar: {
+      width: scale(64),
+      height: scale(64),
+      borderRadius: scale(32),
+      backgroundColor: "#E5E7EB",
+    },
+    avatarFallback: { alignItems: "center", justifyContent: "center" },
+    listBadge: {
+      position: "absolute",
+      top: -scale(2),
+      left: -scale(2),
+      minWidth: scale(22),
+      height: scale(22),
+      borderRadius: scale(11),
+      paddingHorizontal: scale(4),
+      backgroundColor: "#22C55E",
+      borderWidth: 2,
+      borderColor: "#fff",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    listBadgeText: { fontSize: font(11), fontWeight: "700", color: "#fff" },
+    tagFields: {
+      flexDirection: "row",
+      gap: scale(10),
+      marginTop: verticalScale(14),
+    },
+    tagField: { flex: 1 },
+    tagFieldLabel: {
+      fontSize: font(11),
+      fontWeight: "600",
+      color: "#374151",
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginBottom: verticalScale(6),
+    },
+    selectDisabled: { opacity: 0.8 },
+    selectText: { flex: 1, fontSize: font(14), fontWeight: "500", color: "#111827" },
+    tagDot: {
+      width: 12,
+      height: 12,
+      borderRadius: RADIUS_PILL,
+      borderWidth: 1,
+      borderColor: "rgba(0,0,0,0.1)",
+    },
+    inputReadonly: { backgroundColor: "#F9FAFB" },
+    inputReadonlyText: { fontSize: font(14), color: "#111827", lineHeight: font(20) },
+    reporterBox: {
+      borderWidth: 1,
+      borderColor: "#F3F4F6",
+      borderRadius: RADIUS_LG,
+      padding: scale(14),
+      backgroundColor: "#fff",
+    },
+    reporterChip: { marginTop: verticalScale(10) },
+    auditLine: {
+      fontSize: font(12),
+      color: "#6B7280",
+      marginTop: verticalScale(8),
+      textAlign: "right",
+    },
+    auditName: { fontWeight: "700", color: "#111827" },
+    emptyHint: { fontSize: font(13), color: "#9CA3AF", fontStyle: "italic" },
+    thumbGrid: { flexDirection: "row", flexWrap: "wrap", gap: scale(8) },
+    thumbTile: {
+      width: "31%",
+      aspectRatio: 1,
+      borderRadius: RADIUS_MD,
+      borderWidth: 1,
+      borderColor: "#E5E7EB",
+      overflow: "hidden",
+      backgroundColor: APP_BACKGROUND,
+    },
+    thumbImage: { width: "100%", height: "100%" },
+    thumbIconBox: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      padding: scale(6),
+      gap: verticalScale(4),
+    },
+    thumbName: { fontSize: font(10), color: "#374151", textAlign: "center" },
+    adminFiles: { marginTop: verticalScale(6) },
     personName: { fontSize: font(16), fontWeight: "700", color: "#111827" },
     muted: { fontSize: font(12), color: "#6B7280", marginTop: verticalScale(4) },
     label: { fontSize: font(12), fontWeight: "600", color: "#374151" },
     labelSpaced: { marginTop: verticalScale(12) },
     required: { color: "#DC2626", fontWeight: "700" },
-    value: {
-      fontSize: font(14),
-      color: "#111827",
-      marginTop: verticalScale(3),
-      lineHeight: font(20),
-    },
     helper: {
       fontSize: font(12),
       color: "#92400E",
@@ -1073,12 +1189,6 @@ function createStyles(
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(9),
       marginBottom: verticalScale(8),
-    },
-    attachmentThumb: {
-      width: scale(34),
-      height: scale(34),
-      borderRadius: RADIUS_SM,
-      backgroundColor: "#E5E7EB",
     },
     attachmentName: {
       flex: 1,
