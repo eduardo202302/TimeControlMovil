@@ -340,6 +340,15 @@ export default function ParentsExcusesScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo debe correr una vez al montar, con el draftKey inicial
   }, []);
 
+  // Si el padre tiene un solo hijo, seleccionarlo por defecto (a menos que ya
+  // haya una selección restaurada del borrador).
+  useEffect(() => {
+    if (!draftLoaded || estudiantes.length !== 1) return;
+    setSelectedStudentIds((prev) =>
+      prev.length === 0 ? [String(estudiantes[0].id)] : prev,
+    );
+  }, [draftLoaded, estudiantes]);
+
   useEffect(() => {
     if (!draftLoaded) return;
     const data: DraftData = {
@@ -388,6 +397,17 @@ export default function ParentsExcusesScreen() {
     () => selectedStudentIds.map(Number),
     [selectedStudentIds],
   );
+  const selectedStudentsSummary = useMemo(() => {
+    const idSet = new Set(selectedStudentIds.map(Number));
+    const names = estudiantes
+      .filter((e) => idSet.has(e.id))
+      .map((e) => e.fullName)
+      .sort((a, b) => a.localeCompare(b, "es"));
+    if (names.length === 0) return "";
+    if (names.length <= 2) return names.join(", ");
+    const [first, second] = names;
+    return `${first}, ${second} y ${names.length - 2} más...`;
+  }, [estudiantes, selectedStudentIds]);
   const handleStudentSelectionChange = useCallback((ids: number[]) => {
     setSelectedStudentIds(ids.map(String));
   }, []);
@@ -667,7 +687,7 @@ export default function ParentsExcusesScreen() {
                 numberOfLines={1}
               >
                 {selectedStudentIds.length > 0
-                  ? `${selectedStudentIds.length} estudiante(s) seleccionado(s)`
+                  ? selectedStudentsSummary
                   : "Seleccionar estudiante(s)"}
               </Text>
               <ChevronDown size={16} color={TEXT_PLACEHOLDER} />
@@ -731,7 +751,7 @@ export default function ParentsExcusesScreen() {
               Motivo <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
-              placeholder="Describe el motivo de la ausencia o tardanza"
+              placeholder="Escriba el motivo de la excusa"
               placeholderTextColor={TEXT_PLACEHOLDER}
               style={[
                 styles.input,

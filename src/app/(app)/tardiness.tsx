@@ -116,6 +116,7 @@ export default function Tardanza() {
   // `searchSeq` descarta las respuestas de una búsqueda ya superada por otra
   // más nueva — mismatch de requests en vuelo con resultados en vivo.
   const searchSeq = useRef(0);
+  const searchInputRef = useRef<TextInput>(null);
 
   const runSearch = useCallback(
     async (term: string) => {
@@ -411,6 +412,9 @@ export default function Tardanza() {
             transparent
             animationType="fade"
             onRequestClose={() => setSearchModalVisible(false)}
+            onShow={() => {
+              setTimeout(() => searchInputRef.current?.focus(), 100);
+            }}
           >
             <TouchableOpacity
               style={styles.resultsOverlay}
@@ -434,13 +438,13 @@ export default function Tardanza() {
                 <View style={[styles.searchInputWrap, styles.modalSearchWrap]}>
                   <Search size={18} color={TEXT_PLACEHOLDER} />
                   <TextInput
+                    ref={searchInputRef}
                     style={styles.searchInput}
                     placeholder="Nombre, código o curso"
                     placeholderTextColor={TEXT_PLACEHOLDER}
                     value={query}
                     onChangeText={setQuery}
                     autoCorrect={false}
-                    autoFocus
                     returnKeyType="search"
                     onSubmitEditing={() => runSearch(query)}
                   />
