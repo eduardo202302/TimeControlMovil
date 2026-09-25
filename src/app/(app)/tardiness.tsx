@@ -6,7 +6,9 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -22,6 +24,7 @@ import {
   FOOTER_BORDER,
   INPUT_BORDER,
   PRIMARY_COLOR,
+  RIBBON_TEXT,
   TEXT_PLACEHOLDER,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
@@ -30,6 +33,7 @@ import {
   RADIUS_2XL,
   RADIUS_LG,
   RADIUS_MD,
+  RADIUS_PILL,
   useResponsive,
 } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
@@ -99,6 +103,7 @@ export default function Tardanza() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<StudentOption[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
   const [identifying, setIdentifying] = useState(false);
 
   // ── Paso "panel" ──
@@ -165,6 +170,7 @@ export default function Tardanza() {
         Alert.alert("Error", "No hay conexión activa.");
         return;
       }
+      setSearchModalVisible(false);
       // Ficha inmediata con historial vacío; el fetch completo lo reemplaza.
       setStudent({
         ...option,
@@ -294,8 +300,7 @@ export default function Tardanza() {
     }
   }, [student, urlColegio, getToken, tardinessMode, time, clearStudent]);
 
-  const courseName =
-    student?.course?.find((c) => c.fullName)?.fullName ?? null;
+  const courseName = student?.course?.find((c) => c.fullName)?.fullName ?? null;
 
   const photo = student ? photoUri(student.photourl) : null;
 
@@ -318,33 +323,18 @@ export default function Tardanza() {
             </View>
 
             <View style={styles.searchRow}>
-              <View style={styles.searchInputWrap}>
-                <Search size={18} color={TEXT_PLACEHOLDER} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Nombre, código o curso"
-                  placeholderTextColor={TEXT_PLACEHOLDER}
-                  value={query}
-                  onChangeText={setQuery}
-                  autoCorrect={false}
-                  autoFocus
-                  returnKeyType="search"
-                  onSubmitEditing={() => runSearch(query)}
-                />
-                {query.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => setQuery("")}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <X size={18} color={TEXT_PLACEHOLDER} />
-                  </TouchableOpacity>
-                )}
-              </View>
               <TouchableOpacity
-                style={[
-                  styles.iconBtn,
-                  identifying && styles.iconBtnBusy,
-                ]}
+                style={styles.searchInputWrap}
+                onPress={() => setSearchModalVisible(true)}
+                activeOpacity={0.8}
+              >
+                <Search size={18} color={TEXT_PLACEHOLDER} />
+                <Text style={styles.searchPlaceholder} numberOfLines={1}>
+                  Busca por nombre, código o curso
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.iconBtn, identifying && styles.iconBtnBusy]}
                 onPress={handleIdentifyByPhoto}
                 disabled={identifying}
                 activeOpacity={0.8}
@@ -390,7 +380,11 @@ export default function Tardanza() {
                 {/* Detalle tipo StudentCard del webapp: ícono + label + valor */}
                 <View style={styles.studentInfoBox}>
                   <View style={styles.infoRow}>
-                    <Ionicons name="card-outline" size={16} color={PRIMARY_COLOR} />
+                    <Ionicons
+                      name="card-outline"
+                      size={16}
+                      color={PRIMARY_COLOR}
+                    />
                     <Text style={styles.infoLabel}>Matrícula</Text>
                     <Text style={styles.infoValue} numberOfLines={1}>
                       {student.code || "—"}
@@ -409,60 +403,122 @@ export default function Tardanza() {
                   </View>
                 </View>
               </>
-            ) : (
-              <View style={styles.results}>
-                {searching ? (
-                  <View style={styles.emptyBlock}>
-                    <ActivityIndicator color={PRIMARY_COLOR} />
-                  </View>
-                ) : query.trim().length < SEARCH_MIN_CHARS ? (
-                  <View style={styles.emptyBlock}>
-                    <Search size={26} color="#D1D5DB" />
-                    <Text style={styles.emptyText}>
-                      Escribe al menos {SEARCH_MIN_CHARS} caracteres
+            ) : null}
+          </View>
+
+          <Modal
+            visible={searchModalVisible && !student}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setSearchModalVisible(false)}
+          >
+            <TouchableOpacity
+              style={styles.resultsOverlay}
+              activeOpacity={1}
+              onPress={() => {
+                setSearchModalVisible(false);
+                Keyboard.dismiss();
+              }}
+            >
+              <TouchableOpacity style={styles.resultsCard} activeOpacity={1}>
+                <View style={styles.resultsHeader}>
+                  <Text style={styles.resultsHeaderTitle}>
+                    Seleccionar Estudiantes
+                  </Text>
+                  <View style={styles.resultsCountBadge}>
+                    <Text style={styles.resultsCountBadgeText}>
+                      Cant.{results.length}
                     </Text>
                   </View>
-                ) : results.length === 0 ? (
-                  <View style={styles.emptyBlock}>
-                    <User size={26} color="#D1D5DB" />
-                    <Text style={styles.emptyText}>Sin resultados</Text>
-                  </View>
-                ) : (
-                  results.map((option) => (
+                </View>
+                <View style={[styles.searchInputWrap, styles.modalSearchWrap]}>
+                  <Search size={18} color={TEXT_PLACEHOLDER} />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Nombre, código o curso"
+                    placeholderTextColor={TEXT_PLACEHOLDER}
+                    value={query}
+                    onChangeText={setQuery}
+                    autoCorrect={false}
+                    autoFocus
+                    returnKeyType="search"
+                    onSubmitEditing={() => runSearch(query)}
+                  />
+                  {query.length > 0 && (
                     <TouchableOpacity
-                      key={option.id}
-                      style={styles.resultRow}
-                      onPress={() => selectById(option)}
-                      activeOpacity={0.75}
+                      onPress={() => setQuery("")}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     >
-                      <View style={styles.avatarSmall}>
-                        {photoUri(option.photourl) ? (
-                          <Image
-                            source={{ uri: photoUri(option.photourl) as string }}
-                            style={styles.avatarSmallImage}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <User size={16} color="#9CA3AF" />
-                        )}
-                      </View>
-                      <View style={styles.resultInfo}>
-                        <Text style={styles.resultName} numberOfLines={2}>
-                          {option.fullName}{" "}
-                          <Text style={styles.resultId}>(ID: {option.id})</Text>
-                        </Text>
-                        <Text style={styles.resultMeta} numberOfLines={2}>
-                          {option.course?.[0]?.fullName ??
-                            (option.code ? `Código ${option.code}` : "Sin curso")}
-                        </Text>
-                      </View>
-                      <Text style={styles.resultCaret}>›</Text>
+                      <X size={18} color={TEXT_PLACEHOLDER} />
                     </TouchableOpacity>
-                  ))
-                )}
-              </View>
-            )}
-          </View>
+                  )}
+                </View>
+                <ScrollView
+                  style={{ flexShrink: 1 }}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  <View style={styles.results}>
+                    {searching ? (
+                      <View style={styles.emptyBlock}>
+                        <ActivityIndicator color={PRIMARY_COLOR} />
+                      </View>
+                    ) : query.trim().length < SEARCH_MIN_CHARS ? (
+                      <View style={styles.emptyBlock}>
+                        <Search size={26} color="#D1D5DB" />
+                        <Text style={styles.emptyText}>
+                          Escribe al menos {SEARCH_MIN_CHARS} caracteres
+                        </Text>
+                      </View>
+                    ) : results.length === 0 ? (
+                      <View style={styles.emptyBlock}>
+                        <User size={26} color="#D1D5DB" />
+                        <Text style={styles.emptyText}>Sin resultados</Text>
+                      </View>
+                    ) : (
+                      results.map((option) => (
+                        <TouchableOpacity
+                          key={option.id}
+                          style={styles.resultRow}
+                          onPress={() => selectById(option)}
+                          activeOpacity={0.75}
+                        >
+                          <View style={styles.avatarSmall}>
+                            {photoUri(option.photourl) ? (
+                              <Image
+                                source={{
+                                  uri: photoUri(option.photourl) as string,
+                                }}
+                                style={styles.avatarSmallImage}
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <User size={16} color="#9CA3AF" />
+                            )}
+                          </View>
+                          <View style={styles.resultInfo}>
+                            <Text style={styles.resultName} numberOfLines={2}>
+                              {option.fullName}{" "}
+                              <Text style={styles.resultId}>
+                                (ID: {option.id})
+                              </Text>
+                            </Text>
+                            <Text style={styles.resultMeta} numberOfLines={2}>
+                              {option.course?.[0]?.fullName ??
+                                (option.code
+                                  ? `Código ${option.code}`
+                                  : "Sin curso")}
+                            </Text>
+                          </View>
+                          <Text style={styles.resultCaret}>›</Text>
+                        </TouchableOpacity>
+                      ))
+                    )}
+                  </View>
+                </ScrollView>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </Modal>
 
           {/* ── Card Tardanzas (semáforo) ── */}
           {!student ? (
@@ -574,6 +630,16 @@ function createStyles(
       color: TEXT_PRIMARY,
       paddingVertical: verticalScale(10),
     },
+    searchPlaceholder: {
+      flex: 1,
+      fontSize: font(14),
+      color: TEXT_PLACEHOLDER,
+      paddingVertical: verticalScale(12),
+    },
+    modalSearchWrap: {
+      flex: 0,
+      marginBottom: verticalScale(8),
+    },
     iconBtn: {
       width: scale(44),
       height: verticalScale(44),
@@ -586,10 +652,61 @@ function createStyles(
 
     /* ── Resultados ── */
     results: { gap: verticalScale(2) },
+    resultsOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      justifyContent: "flex-start",
+      alignItems: "center",
+      paddingTop: verticalScale(140),
+      paddingHorizontal: scale(16),
+    },
+    resultsHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: PRIMARY_COLOR,
+      paddingHorizontal: scale(16),
+      paddingVertical: verticalScale(14),
+      marginHorizontal: -scale(12),
+      marginTop: -scale(12),
+      marginBottom: verticalScale(14),
+      borderTopLeftRadius: RADIUS_2XL,
+      borderTopRightRadius: RADIUS_2XL,
+    },
+    resultsHeaderTitle: {
+      fontSize: font(18),
+      fontWeight: "700",
+      color: RIBBON_TEXT,
+    },
+    resultsCountBadge: {
+      backgroundColor: "#fff",
+      borderRadius: RADIUS_PILL,
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(4),
+    },
+    resultsCountBadgeText: {
+      fontSize: font(12),
+      fontWeight: "700",
+      color: PRIMARY_COLOR,
+    },
+    resultsCard: {
+      width: "100%",
+      maxWidth: 440,
+      maxHeight: "60%",
+      overflow: "hidden",
+      backgroundColor: "#fff",
+      borderRadius: RADIUS_2XL,
+      padding: scale(12),
+      elevation: 10,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+    },
     emptyBlock: {
       alignItems: "center",
       gap: verticalScale(8),
-      paddingVertical: verticalScale(40),
+      paddingVertical: verticalScale(16),
     },
     emptyText: {
       fontSize: font(13),
