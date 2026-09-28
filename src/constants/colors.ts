@@ -54,3 +54,47 @@ export const RIBBON_BACKGROUND = "#2C315B";
 export const RIBBON_TEXT = "#FFFFFF";
 /** Texto secundario sobre la cinta (fecha, etiquetas) — blanco atenuado. */
 export const RIBBON_TEXT_MUTED = "#C9CBE4";
+
+/**
+ * Rediseño v2 — reemplazos futuros de APP_BACKGROUND y CARD_BORDER. Se
+ * aplican en Fase 1/2; hoy no los usa nadie. Los originales se mantienen
+ * intactos hasta que la migración termine.
+ */
+export const APP_BACKGROUND_V2 = "#E9EDF7";
+export const CARD_BORDER_V2 = "#E6EAF0";
+
+/**
+ * Marca / acentos — hex que hoy están hardcodeados sueltos en pantallas y
+ * componentes (HEADER_NAVY ×15, PRIMARY_700 ×19, PRIMARY_TINT_50 ×31,
+ * TEXT_MUTED ×125). Se centralizan acá para que las fases siguientes los
+ * reemplacen sin inventar valores nuevos.
+ */
+export const HEADER_NAVY = "#142157";
+export const PRIMARY_700 = "#1D4ED8";
+export const PRIMARY_TINT_50 = "#EFF6FF";
+/** Gris intermedio: entre TEXT_SECONDARY (#374151) y TEXT_PLACEHOLDER (#9CA3AF). */
+export const TEXT_MUTED = "#6B7280";
+export const SUCCESS_COLOR = "#15803D";
+export const ACCENT_VIOLET = "#7C3AED";
+export const ACCENT_TEAL = "#0D9488";
+/**
+ * Ámbar para íconos/acentos. No confundir con WARNING_COLOR (#B45309), que es
+ * el ámbar más oscuro para TEXTO de aviso — este es más claro y no da
+ * contraste suficiente como color de texto sobre blanco.
+ */
+export const WARNING_ACCENT = "#D97706";
+
+/**
+ * Chips de ícono de sección (fondo / ícono). Los FG referencian tokens
+ * existentes en vez de repetir el hex, así un cambio de marca los arrastra.
+ */
+export const SECTION_CHIP_BLUE_BG = PRIMARY_TINT_BACKGROUND;
+export const SECTION_CHIP_BLUE_FG = PRIMARY_700;
+export const SECTION_CHIP_VIOLET_BG = "#EDE9FE";
+export const SECTION_CHIP_VIOLET_FG = ACCENT_VIOLET;
+export const SECTION_CHIP_TEAL_BG = "#CCFBF1";
+export const SECTION_CHIP_TEAL_FG = ACCENT_TEAL;
+export const SECTION_CHIP_AMBER_BG = "#FEF3C7";
+export const SECTION_CHIP_AMBER_FG = WARNING_ACCENT;
+export const SECTION_CHIP_RED_BG = "#FEE2E2";
+export const SECTION_CHIP_RED_FG = ERROR_COLOR;

@@ -98,6 +98,12 @@ export const FONT_XXL = 25;
  *
  * Los valores sueltos 31/33/39/48 son círculos (size / 2 de un avatar o botón)
  * — no son radios de diseño y no deben tokenizarse: se calculan desde el lado.
+ *
+ * Roles en el rediseño v2:
+ *   SM (8) chips/badges · LG (12) inputs/botones · XL (16) cards ·
+ *   2XL (20) modales/sheets · PILL tabs/pills.
+ *   MD (10) y 3XL (32): uso legado — se mantienen para lo existente, no usar
+ *   en código nuevo.
  */
 export const RADIUS_SM = 8;
 export const RADIUS_MD = 10;
