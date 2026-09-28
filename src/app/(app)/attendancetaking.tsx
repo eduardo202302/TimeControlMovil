@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { APP_BACKGROUND, PRIMARY_COLOR, TEXT_SECONDARY } from "@/constants/colors";
+import { APP_BACKGROUND_V2, PRIMARY_COLOR, TEXT_SECONDARY } from "@/constants/colors";
 import { RADIUS_2XL, useResponsive } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import AttendanceTabsView, {
@@ -224,7 +224,7 @@ function createStyles(
   font: (size: number) => number,
 ) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: APP_BACKGROUND },
+    screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     landingBody: { flex: 1 },
     landingContent: {
       padding: scale(16),

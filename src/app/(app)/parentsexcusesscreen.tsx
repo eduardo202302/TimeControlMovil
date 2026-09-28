@@ -29,6 +29,7 @@ import {
 
 import {
   APP_BACKGROUND,
+  APP_BACKGROUND_V2,
   CARD_BACKGROUND,
   CARD_BORDER,
   ERROR_COLOR,
@@ -964,7 +965,7 @@ function createStyles(
     // Pantalla directa (sin Modal ni landing) — mismo patrón que
     // timeoffscreen.tsx/SolicitarPermisoForm.tsx: hereda el header
     // compartido de (app)/_layout.tsx, esta pantalla solo pone el fondo.
-    screen: { flex: 1, backgroundColor: APP_BACKGROUND },
+    screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
 
     // Para el KeyboardAvoidingView.
     flex: { flex: 1 },

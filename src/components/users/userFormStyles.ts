@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native";
-import { APP_BACKGROUND } from "@/constants/colors";
+import { APP_BACKGROUND_V2 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
   RADIUS_2XL,
@@ -22,7 +22,7 @@ export function createUserFormStyles(
 ) {
   return StyleSheet.create({
     flex: { flex: 1 },
-    screen: { flex: 1, backgroundColor: APP_BACKGROUND },
+    screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     topBar: {
       flexDirection: "row",
       alignItems: "center",

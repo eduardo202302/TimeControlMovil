@@ -6,12 +6,13 @@ import {
   Image,
   Modal,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND } from "@/constants/colors";
+import { APP_BACKGROUND, APP_BACKGROUND_V2 } from "@/constants/colors";
 import {
   RADIUS_LG,
   RADIUS_MD,
@@ -136,6 +137,8 @@ export default function PermissionDetailView({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      {/* Topbar claro: íconos oscuros mientras está abierto; al desmontar vuelve el light-content del shell. */}
+      <StatusBar barStyle="dark-content" />
       <View style={styles.screen}>
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={onClose} activeOpacity={0.7}>
@@ -348,7 +351,7 @@ function createStyles(
   font: (size: number) => number,
 ) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: APP_BACKGROUND },
+    screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
 
     topBar: {
       flexDirection: "row",

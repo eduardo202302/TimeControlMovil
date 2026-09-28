@@ -12,7 +12,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import Animated, {
   Easing,
   FadeIn,
@@ -29,12 +32,24 @@ import Animated, {
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { MenuTree } from "../../../utils/resolveRoute";
 import {
+  ERROR_COLOR,
+  FOOTER_BORDER,
+  HEADER_NAVY,
+  HEADER_TEXT,
+  PRIMARY_COLOR,
+  PRIMARY_TINT_50,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_SECONDARY,
+} from "@/constants/colors";
+import {
   RADIUS_MD,
   RADIUS_SM,
   RADIUS_2XL,
   RADIUS_PILL,
   useResponsive,
 } from "@/constants/responsive";
+import { SHADOW_LG } from "@/constants/shadows";
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -84,6 +99,7 @@ function createStyles(
   scale: (size: number) => number,
   verticalScale: (size: number) => number,
   font: (size: number) => number,
+  insetTop: number,
 ) {
   return StyleSheet.create({
     overlay: {
@@ -104,15 +120,18 @@ function createStyles(
       height: "100%",
       zIndex: 1,
       backgroundColor: "#FFFFFF",
-      elevation: 16,
-      shadowColor: "#000",
-      shadowOffset: { width: -2, height: 0 },
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
+      // Offset positivo: la sombra cae hacia la derecha, sobre el backdrop.
+      ...SHADOW_LG,
+      shadowOffset: { width: 4, height: 0 },
     },
+    /**
+     * La SafeAreaView del panel no toma el borde superior: el header reserva
+     * insetTop para que el navy llegue hasta arriba, detrás de la status bar.
+     */
     header: {
       flexDirection: "column",
-      backgroundColor: "#1D4ED8",
+      backgroundColor: HEADER_NAVY,
+      paddingTop: insetTop,
       borderBottomLeftRadius: RADIUS_2XL,
       borderBottomRightRadius: RADIUS_2XL,
     },
@@ -155,7 +174,7 @@ function createStyles(
       justifyContent: "center",
     },
     companyName: {
-      color: "#FFFFFF",
+      color: HEADER_TEXT,
       fontSize: font(13),
       fontWeight: "700",
     },
@@ -192,12 +211,12 @@ function createStyles(
       borderRadius: 6,
       backgroundColor: "#22C55E",
       borderWidth: 2,
-      borderColor: "#1D4ED8",
+      borderColor: HEADER_NAVY,
     },
     appName: {
       // `maxWidth` se aplica inline (ver appNameMaxWidth) — depende de
       // drawerWidth.
-      color: "#FFFFFF",
+      color: HEADER_TEXT,
       fontSize: font(16),
       fontWeight: "700",
     },
@@ -215,7 +234,7 @@ function createStyles(
       paddingVertical: verticalScale(2),
     },
     roleBadgeText: {
-      color: "#FFFFFF",
+      color: HEADER_TEXT,
       fontSize: font(11),
       fontWeight: "600",
     },
@@ -240,16 +259,16 @@ function createStyles(
       paddingVertical: verticalScale(12),
       borderRadius: RADIUS_MD,
       gap: scale(10),
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FOOTER_BORDER,
     },
     sectionTitle: {
       flex: 1,
       fontSize: font(15),
       fontWeight: "600",
-      color: "#374151",
+      color: TEXT_SECONDARY,
     },
     sectionTitleActive: {
-      color: "#2563EB",
+      color: PRIMARY_COLOR,
     },
     submenu: {
       marginLeft: scale(8),
@@ -268,21 +287,21 @@ function createStyles(
       borderLeftColor: "transparent",
     },
     activeChildItem: {
-      backgroundColor: "#EFF6FF",
-      borderLeftColor: "#2563EB",
+      backgroundColor: PRIMARY_TINT_50,
+      borderLeftColor: PRIMARY_COLOR,
     },
     childText: {
       fontSize: font(14),
-      color: "#6B7280",
+      color: TEXT_MUTED,
     },
     activeChildText: {
-      color: "#2563EB",
+      color: PRIMARY_COLOR,
       fontWeight: "700",
     },
     userSection: {
       marginTop: verticalScale(8),
       borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
+      borderTopColor: FOOTER_BORDER,
       paddingTop: verticalScale(4),
     },
     logoutItem: {
@@ -301,7 +320,7 @@ function createStyles(
     logoutBtnText: {
       fontSize: font(12),
       fontWeight: "700",
-      color: "#DC2626",
+      color: ERROR_COLOR,
     },
     modalOverlay: {
       flex: 1,
@@ -376,7 +395,7 @@ function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
           onPress={() => onNavigate(section.parent.path)}
           activeOpacity={0.7}
         >
-          <Ionicons name={sectionIcon} size={20} color="#2563EB" />
+          <Ionicons name={sectionIcon} size={20} color={PRIMARY_COLOR} />
           <Text
             style={[styles.sectionTitle, isActive && styles.sectionTitleActive]}
           >
@@ -394,10 +413,10 @@ function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
         onPress={() => setExpanded(!expanded)}
         activeOpacity={0.7}
       >
-        <Ionicons name={sectionIcon} size={20} color="#2563EB" />
+        <Ionicons name={sectionIcon} size={20} color={PRIMARY_COLOR} />
         <Text style={styles.sectionTitle}>{section.parent.name}</Text>
         <Animated.View style={chevronStyle}>
-          <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+          <Ionicons name="chevron-forward" size={16} color={TEXT_PLACEHOLDER} />
         </Animated.View>
       </TouchableOpacity>
 
@@ -421,7 +440,7 @@ function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
                 <Ionicons
                   name={childIcon}
                   size={16}
-                  color={isActive ? "#2563EB" : "#9CA3AF"}
+                  color={isActive ? PRIMARY_COLOR : TEXT_PLACEHOLDER}
                 />
                 <Text
                   style={[styles.childText, isActive && styles.activeChildText]}
@@ -451,10 +470,11 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const { width, isTablet, scale, verticalScale, font } = useResponsive();
+  const insets = useSafeAreaInsets();
 
   const styles = useMemo(
-    () => createStyles(scale, verticalScale, font),
-    [scale, verticalScale, font],
+    () => createStyles(scale, verticalScale, font, insets.top),
+    [scale, verticalScale, font, insets.top],
   );
 
   /**
@@ -514,7 +534,7 @@ const confirmLogout = useCallback(async () => {
         exiting={SlideOutLeft.duration(220).easing(Easing.in(Easing.cubic))}
         style={[styles.drawer, { width: drawerWidth }]}
       >
-        <SafeAreaView style={{ flex: 1 }}>
+        <SafeAreaView style={{ flex: 1 }} edges={["left", "bottom"]}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.companyRow}>
@@ -527,7 +547,7 @@ const confirmLogout = useCallback(async () => {
                 />
               ) : (
                 <View style={styles.companyLogoFallback}>
-                  <Ionicons name="business-outline" size={18} color="#fff" />
+                  <Ionicons name="business-outline" size={18} color={HEADER_TEXT} />
                 </View>
               )}
               <Text
@@ -538,7 +558,7 @@ const confirmLogout = useCallback(async () => {
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={20} color="#374151" />
+              <Ionicons name="close" size={20} color={TEXT_SECONDARY} />
             </TouchableOpacity>
           </View>
           <View style={styles.headerLeft}>
@@ -553,7 +573,7 @@ const confirmLogout = useCallback(async () => {
                     resizeMode="cover"
                   />
                 ) : (
-                  <Ionicons name="person" size={22} color="#fff" />
+                  <Ionicons name="person" size={22} color={HEADER_TEXT} />
                 )}
               </View>
               <View style={styles.statusDot} />
@@ -629,7 +649,7 @@ const confirmLogout = useCallback(async () => {
                 onPress={handleLogout}
                 activeOpacity={0.75}
               >
-                <Ionicons name="log-out-outline" size={18} color="#DC2626" />
+                <Ionicons name="log-out-outline" size={18} color={ERROR_COLOR} />
                 <Text style={styles.logoutBtnText}>Cerrar Sesión</Text>
               </TouchableOpacity>
             </Animated.View>

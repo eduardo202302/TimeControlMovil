@@ -26,7 +26,7 @@ import type {
 } from "../../../types/typeStore/SchoolStoreType";
 import { normalizePermissionName, toRD, WEEK_DAYS } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
-import { APP_BACKGROUND } from "@/constants/colors";
+import { APP_BACKGROUND, APP_BACKGROUND_V2 } from "@/constants/colors";
 import { MAX_CONTENT_WIDTH, useResponsive } from "@/constants/responsive";
 import RevisionFinalModal, {
   formatDisplayDate,
@@ -1756,7 +1756,7 @@ export default function SolicitarPermisoForm() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: APP_BACKGROUND },
+  screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
   content: { padding: 16, gap: 16, paddingBottom: 40 },
   /**
    * Centra y limita el contenido en tablet, igual que punchinout.tsx. Sin esto

@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND } from "@/constants/colors";
+import { APP_BACKGROUND_V2 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
   RADIUS_MD,
@@ -415,7 +415,7 @@ function createStyles(
   return StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: APP_BACKGROUND,
+      backgroundColor: APP_BACKGROUND_V2,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(12),
     },

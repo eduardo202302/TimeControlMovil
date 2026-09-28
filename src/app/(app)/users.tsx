@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import {
-  APP_BACKGROUND,
+  APP_BACKGROUND_V2,
   ROW_ALERT_TINT_BACKGROUND,
   ROW_ALERT_TINT_BORDER,
 } from "@/constants/colors";
@@ -477,7 +477,7 @@ function createStyles(
   font: (size: number) => number,
 ) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: APP_BACKGROUND },
+    screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     contentTablet: {
       maxWidth: MAX_CONTENT_WIDTH,
       alignSelf: "center",

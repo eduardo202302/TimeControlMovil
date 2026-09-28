@@ -18,7 +18,7 @@ import {
   View,
 } from "react-native";
 import {
-  APP_BACKGROUND,
+  APP_BACKGROUND_V2,
   CARD_BACKGROUND,
   CARD_BORDER,
   FOOTER_BORDER,
@@ -604,7 +604,7 @@ function createStyles(
   return StyleSheet.create({
     /* Pantalla directa (sin Modal ni landing) — mismo patrón que
      * parentsexcusesscreen.tsx: hereda el header compartido de (app)/_layout.tsx. */
-    screen: { flex: 1, backgroundColor: APP_BACKGROUND },
+    screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     flex: { flex: 1 },
     content: {
       padding: scale(16),

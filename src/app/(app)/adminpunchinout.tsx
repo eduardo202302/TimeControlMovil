@@ -1,4 +1,4 @@
-import { APP_BACKGROUND } from "@/constants/colors";
+import { APP_BACKGROUND_V2 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
   RADIUS_2XL,
@@ -1556,7 +1556,7 @@ function createStyles(
   font: (size: number) => number,
 ) {
   return StyleSheet.create({
-    root: { flex: 1, backgroundColor: APP_BACKGROUND },
+    root: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     content: {
       padding: scale(16),
       gap: verticalScale(16),

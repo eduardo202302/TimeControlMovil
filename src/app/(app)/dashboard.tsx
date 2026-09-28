@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { APP_BACKGROUND } from "@/constants/colors";
+import { APP_BACKGROUND_V2 } from "@/constants/colors";
 import { useResponsive } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 
@@ -33,7 +33,7 @@ function createStyles(
   font: (size: number) => number,
 ) {
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: APP_BACKGROUND },
+    safe: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     content: {
       flex: 1,
       alignItems: "center",

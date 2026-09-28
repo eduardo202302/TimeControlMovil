@@ -9,6 +9,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Switch,
   Text,
@@ -16,7 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND } from "@/constants/colors";
+import { APP_BACKGROUND_V2 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
   RADIUS_2XL,
@@ -90,6 +91,8 @@ export default function HolidaysFormModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      {/* Topbar claro: íconos oscuros mientras está abierto; al desmontar vuelve el light-content del shell. */}
+      <StatusBar barStyle="dark-content" />
       <View style={styles.screen}>
         <View style={styles.topBar}>
           {/* Mismo bypass del "¿Salir sin guardar?" que ya tiene onRequestClose
@@ -616,7 +619,7 @@ function createStyles(
 ) {
   return StyleSheet.create({
     flex: { flex: 1 },
-    screen: { flex: 1, backgroundColor: APP_BACKGROUND },
+    screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     topBar: {
       flexDirection: "row",
       alignItems: "center",

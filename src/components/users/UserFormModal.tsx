@@ -7,6 +7,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  StatusBar,
   Text,
   TouchableOpacity,
   View,
@@ -79,6 +80,8 @@ export default function UserFormModal({
       animationType="slide"
       onRequestClose={() => requestCloseRef.current()}
     >
+      {/* Topbar claro: íconos oscuros mientras está abierto; al desmontar vuelve el light-content del shell. */}
+      <StatusBar barStyle="dark-content" />
       <View style={styles.screen}>
         {/* Montado solo mientras está visible: cada apertura arranca con su
             propio snapshot, igual que HolidaysFormModal. */}

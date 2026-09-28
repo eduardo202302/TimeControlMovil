@@ -98,3 +98,11 @@ export const SECTION_CHIP_AMBER_BG = "#FEF3C7";
 export const SECTION_CHIP_AMBER_FG = WARNING_ACCENT;
 export const SECTION_CHIP_RED_BG = "#FEE2E2";
 export const SECTION_CHIP_RED_FG = ERROR_COLOR;
+
+/**
+ * Header navy del shell (fondo HEADER_NAVY): texto/íconos en blanco y el
+ * fondo translúcido del botón de menú — blanco al 8% para que se lea como
+ * botón sin romper el bloque de color.
+ */
+export const HEADER_TEXT = "#FFFFFF";
+export const HEADER_BUTTON_BACKGROUND = "rgba(255,255,255,0.08)";

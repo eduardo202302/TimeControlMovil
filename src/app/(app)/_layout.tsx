@@ -8,9 +8,18 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { APP_BACKGROUND } from "@/constants/colors";
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import {
+    APP_BACKGROUND_V2,
+    HEADER_BUTTON_BACKGROUND,
+    HEADER_NAVY,
+    HEADER_TEXT,
+} from "@/constants/colors";
 import { RADIUS_MD, useResponsive } from "@/constants/responsive";
+import { SHADOW_MD } from "@/constants/shadows";
 import DrawerMenu from "../../components/drawer/DrawerMenu";
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -39,9 +48,10 @@ const ROUTE_TITLES: Record<string, string> = {
 
 export default function AppLayout() {
   const { scale, verticalScale, font } = useResponsive();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(
-    () => createStyles(scale, verticalScale, font),
-    [scale, verticalScale, font],
+    () => createStyles(scale, verticalScale, font, insets.top),
+    [scale, verticalScale, font, insets.top],
   );
 
   const [drawerVisible, setDrawerVisible] = useState(false);
@@ -49,8 +59,13 @@ export default function AppLayout() {
   const title = ROUTE_TITLES[pathname] ?? "Time Flow";
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <SafeAreaView style={styles.safe} edges={["left", "right", "bottom"]}>
+      {/*
+        Sin backgroundColor: con edge-to-edge (Android) la status bar es
+        transparente y lo que se ve detrás es el header navy, que reserva
+        insets.top por su cuenta.
+      */}
+      <StatusBar barStyle="light-content" />
 
       {/* Header compartido */}
       <View style={styles.header}>
@@ -59,7 +74,7 @@ export default function AppLayout() {
           style={styles.menuBtn}
           activeOpacity={0.7}
         >
-          <Ionicons name="menu" size={24} color="#111827" />
+          <Ionicons name="menu" size={24} color={HEADER_TEXT} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{title}</Text>
         <View style={styles.headerSpacer} />
@@ -83,18 +98,26 @@ function createStyles(
   scale: (size: number) => number,
   verticalScale: (size: number) => number,
   font: (size: number) => number,
+  insetTop: number,
 ) {
   return StyleSheet.create({
-    safe: { flex: 1, backgroundColor: APP_BACKGROUND },
+    safe: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
+    /**
+     * El SafeAreaView no toma el borde superior: el header se estira detrás
+     * de la status bar (insetTop) para que el navy llegue hasta arriba.
+     * zIndex para que la sombra caiga sobre el contenido del Slot.
+     */
     header: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      backgroundColor: "#fff",
+      backgroundColor: HEADER_NAVY,
       paddingHorizontal: scale(16),
-      paddingVertical: verticalScale(14),
-      borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
+      paddingTop: insetTop + verticalScale(14),
+      paddingBottom: verticalScale(14),
+      ...SHADOW_MD,
+      shadowColor: HEADER_NAVY,
+      zIndex: 1,
     },
     /** Tamaño fijo: botón de ícono, mismo criterio que avatarContainer en DrawerMenu.tsx. */
     menuBtn: {
@@ -103,9 +126,10 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
       borderRadius: RADIUS_MD,
+      backgroundColor: HEADER_BUTTON_BACKGROUND,
     },
     /** Spacer simétrico al menuBtn — mantiene el título centrado en el header. */
     headerSpacer: { width: 40 },
-    headerTitle: { fontSize: font(18), fontWeight: "700", color: "#142157" },
+    headerTitle: { fontSize: font(18), fontWeight: "700", color: HEADER_TEXT },
   });
 }
