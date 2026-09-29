@@ -13,15 +13,38 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { AUTH_SCREEN_BACKGROUND, AUTH_CARD_BACKGROUND, AUTH_INPUT_BACKGROUND } from "@/constants/authColors";
+import {
+  AUTH_BANNER_ERROR_BG,
+  AUTH_BANNER_ERROR_BORDER,
+  AUTH_BANNER_ERROR_TEXT,
+  AUTH_BANNER_SUCCESS_BG,
+  AUTH_BANNER_SUCCESS_BORDER,
+  AUTH_BANNER_SUCCESS_TEXT,
+  AUTH_BRAND,
+  AUTH_CARD_BACKGROUND,
+  AUTH_ICON_BUTTON,
+  AUTH_INPUT_BACKGROUND,
+  AUTH_INPUT_BORDER,
+  AUTH_INPUT_ICON,
+  AUTH_LABEL,
+  AUTH_PLACEHOLDER,
+  AUTH_REQUIRED,
+  AUTH_SCREEN_BACKGROUND,
+  AUTH_TEXT,
+} from "@/constants/authColors";
 import { registerUser } from "../../api/Login/loginAuthentication";
 import { registerSchema } from "../../schema/registerSchema";
 import { useSchoolStore } from "../../store/useSchoolStore";
 import { RegisterType } from "../../types/typesLogin/RegisterType";
 import { formatCedula, formatPhone } from "../../utils/metodos";
 import * as Storage from "../utils/storage";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ERROR_COLOR, PRIMARY_700, PRIMARY_COLOR } from "@/constants/colors";
+import { SHADOW_LG, SHADOW_PRIMARY } from "@/constants/shadows";
 
 export default function Register() {
+  // Sin SafeAreaView: la raíz reserva la status bar con el inset (edge-to-edge).
+  const insets = useSafeAreaInsets();
   const { school, urlColegio } = useSchoolStore();
   const { name, logo } = school || {};
   const [showPassword, setShowPassword] = useState(false);
@@ -82,7 +105,11 @@ export default function Register() {
     <KeyboardAvoidingView
       behavior="padding"
       keyboardVerticalOffset={0}
-      style={{ flex: 1, backgroundColor: AUTH_SCREEN_BACKGROUND }}
+      style={{
+        flex: 1,
+        backgroundColor: AUTH_SCREEN_BACKGROUND,
+        paddingTop: insets.top,
+      }}
     >
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -115,7 +142,7 @@ export default function Register() {
                 <Text
                   style={[
                     styles.msgText,
-                    { color: mensaje.tipo === "error" ? "#b54a00" : "#0a6644" },
+                    { color: mensaje.tipo === "error" ? AUTH_BANNER_ERROR_TEXT : AUTH_BANNER_SUCCESS_TEXT },
                   ]}
                 >
                   {mensaje.texto}
@@ -136,7 +163,7 @@ export default function Register() {
                     onChangeText={field.onChange}
                   />
                   {fieldState.error && (
-                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                    <Text style={{ color: ERROR_COLOR, marginTop: 4 }}>
                       {fieldState.error.message}
                     </Text>
                   )}
@@ -156,7 +183,7 @@ export default function Register() {
                     required={false}
                   />
                   {fieldState.error && (
-                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                    <Text style={{ color: ERROR_COLOR, marginTop: 4 }}>
                       {fieldState.error.message}
                     </Text>
                   )}
@@ -177,7 +204,7 @@ export default function Register() {
                     keyboardType="email-address"
                   />
                   {fieldState.error && (
-                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                    <Text style={{ color: ERROR_COLOR, marginTop: 4 }}>
                       {fieldState.error.message}
                     </Text>
                   )}
@@ -200,7 +227,7 @@ export default function Register() {
                     keyboardType="phone-pad"
                   />
                   {fieldState.error && (
-                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                    <Text style={{ color: ERROR_COLOR, marginTop: 4 }}>
                       {fieldState.error.message}
                     </Text>
                   )}
@@ -228,13 +255,13 @@ export default function Register() {
                             showPassword ? "eye-off-outline" : "eye-outline"
                           }
                           size={15}
-                          color="#999"
+                          color={AUTH_ICON_BUTTON}
                         />
                       </TouchableOpacity>
                     }
                   />
                   {fieldState.error && (
-                    <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                    <Text style={{ color: ERROR_COLOR, marginTop: 4 }}>
                       {fieldState.error.message}
                     </Text>
                   )}
@@ -263,7 +290,7 @@ export default function Register() {
                       required={school?.settings.cedulaRequerida}
                     />
                     {fieldState.error && (
-                      <Text style={{ color: "#e24b4a", marginTop: 4 }}>
+                      <Text style={{ color: ERROR_COLOR, marginTop: 4 }}>
                         {fieldState.error.message}
                       </Text>
                     )}
@@ -322,13 +349,13 @@ function InputField({
         <Ionicons
           name={icon as any}
           size={18}
-          color="#9aa4b4"
+          color={AUTH_INPUT_ICON}
           style={styles.inputIcon}
         />
         <TextInput
           style={styles.input}
           placeholder={placeholder}
-          placeholderTextColor="#bbb"
+          placeholderTextColor={AUTH_PLACEHOLDER}
           value={value}
           onChangeText={onChangeText}
           secureTextEntry={secureTextEntry}
@@ -343,7 +370,7 @@ function InputField({
             style={styles.clearButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="close-circle" size={12} color="#999" />
+            <Ionicons name="close-circle" size={12} color={AUTH_ICON_BUTTON} />
           </TouchableOpacity>
         ) : null}
         {rightIcon}
@@ -378,10 +405,11 @@ const styles = StyleSheet.create({
   logoTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#3c5fa6",
+    color: AUTH_BRAND,
     marginTop: 6,
   },
   card: {
+    ...SHADOW_LG,
     borderRadius: 32,
     padding: 18,
     paddingTop: 26,
@@ -391,7 +419,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 17,
     fontWeight: "600",
-    color: "#333",
+    color: AUTH_TEXT,
     marginBottom: 14,
   },
   labelGroup: {
@@ -399,24 +427,24 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 13,
-    color: "#555",
+    color: AUTH_LABEL,
     marginBottom: 4,
     fontWeight: "500",
   },
   required: {
-    color: "#e24b4a",
+    color: AUTH_REQUIRED,
   },
   inputGroup: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
+    borderColor: AUTH_INPUT_BORDER,
+    borderRadius: 12,
     paddingHorizontal: 10,
     backgroundColor: AUTH_INPUT_BACKGROUND,
   },
   inputFocused: {
-    borderColor: "#4c6fbf",
+    borderColor: PRIMARY_700,
     borderWidth: 1.5,
   },
   inputIcon: {
@@ -429,19 +457,20 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     fontSize: 14,
-    color: "#333",
+    color: AUTH_TEXT,
   },
   button: {
-    backgroundColor: "#2d5fd3",
+    ...SHADOW_PRIMARY,
+    backgroundColor: PRIMARY_COLOR,
     padding: 13,
-    borderRadius: 10,
+    borderRadius: 12,
     marginTop: 16,
   },
   buttonText: {
     color: "white",
     textAlign: "center",
     fontSize: 15,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   buttonOutline: {
     padding: 13,
@@ -458,14 +487,14 @@ const styles = StyleSheet.create({
   },
   msg: { marginTop: 10, padding: 8, borderRadius: 6, alignItems: "center" },
   msgError: {
-    backgroundColor: "#fff8f0",
+    backgroundColor: AUTH_BANNER_ERROR_BG,
     borderWidth: 1,
-    borderColor: "#ffcc80",
+    borderColor: AUTH_BANNER_ERROR_BORDER,
   },
   msgSuccess: {
-    backgroundColor: "#f0faf5",
+    backgroundColor: AUTH_BANNER_SUCCESS_BG,
     borderWidth: 1,
-    borderColor: "#a8dfc4",
+    borderColor: AUTH_BANNER_SUCCESS_BORDER,
   },
   msgText: { fontSize: 12 },
 });

@@ -1,7 +1,7 @@
 import { Stack, router } from "expo-router";
 import * as Updates from "expo-updates";
 import { useEffect, useRef } from "react";
-import { Alert, AppState } from "react-native";
+import { Alert, AppState, StatusBar } from "react-native";
 import { useSchoolStore } from "../../store/useSchoolStore";
 import { refreshSchoolData } from "../../api/authorization";
 import { resolveMobilePath } from "../constants/mobileRoutes";
@@ -165,12 +165,20 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <Stack>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="login" options={{ headerShown: false }} />
-      <Stack.Screen name="register" options={{ headerShown: false }} />
-      <Stack.Screen name="forgotPassword" options={{ headerShown: false }} />
-      <Stack.Screen name="(app)" options={{ headerShown: false }} />
-    </Stack>
+    <>
+      {/*
+        Base de la pila de StatusBar: íconos oscuros para las pantallas de
+        acceso (fondo #EEF4FF). (app)/_layout apila light-content encima
+        mientras la sesión está abierta; al desmontarse vuelve este.
+      */}
+      <StatusBar barStyle="dark-content" />
+      <Stack>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="register" options={{ headerShown: false }} />
+        <Stack.Screen name="forgotPassword" options={{ headerShown: false }} />
+        <Stack.Screen name="(app)" options={{ headerShown: false }} />
+      </Stack>
+    </>
   );
 }

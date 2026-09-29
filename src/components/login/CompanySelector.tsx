@@ -1,11 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { useResponsive, RADIUS_XL, RADIUS_MD } from "@/constants/responsive";
+import { RADIUS_LG, useResponsive } from "@/constants/responsive";
 import {
-  AUTH_CARD_BACKGROUND,
+  AUTH_BRAND,
   AUTH_INPUT_BACKGROUND,
+  AUTH_INPUT_BORDER,
+  AUTH_INPUT_ICON,
+  AUTH_LABEL,
+  AUTH_TEXT,
 } from "@/constants/authColors";
 import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
+import { DIALOG_OVERLAY, POPUP_CARD } from "@/styles/surfaces";
 
 interface CompanySelectorProps {
   visible: boolean;
@@ -33,7 +38,7 @@ export default function CompanySelector({
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.header}>
-            <Ionicons name="business-outline" size={22} color="#3c5fa6" />
+            <Ionicons name="business-outline" size={22} color={AUTH_BRAND} />
             <Text style={styles.title}>Elige tu compañía</Text>
             <Text style={styles.subtitle}>
               Tu usuario pertenece a varias compañías. Selecciona con cuál
@@ -64,7 +69,7 @@ export default function CompanySelector({
                     ) : null}
                   </View>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#9aa4b4" />
+                <Ionicons name="chevron-forward" size={18} color={AUTH_INPUT_ICON} />
               </TouchableOpacity>
             ))}
           </View>
@@ -85,17 +90,16 @@ function createStyles(
 ) {
   return StyleSheet.create({
     backdrop: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       justifyContent: "center",
       alignItems: "center",
       padding: scale(24),
     },
     card: {
+      ...POPUP_CARD,
       width: "100%",
       maxWidth: 400,
-      backgroundColor: AUTH_CARD_BACKGROUND,
-      borderRadius: RADIUS_XL,
       padding: scale(20),
     },
     header: {
@@ -105,7 +109,7 @@ function createStyles(
     title: {
       fontSize: font(18),
       fontWeight: "700",
-      color: "#333",
+      color: AUTH_TEXT,
       marginTop: verticalScale(8),
     },
     subtitle: {
@@ -124,7 +128,7 @@ function createStyles(
       justifyContent: "space-between",
       borderWidth: 1,
       borderColor: "#e0e6ef",
-      borderRadius: RADIUS_MD,
+      borderRadius: RADIUS_LG,
       padding: scale(12),
       backgroundColor: AUTH_INPUT_BACKGROUND,
     },
@@ -139,7 +143,7 @@ function createStyles(
       height: 40,
       // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- círculo (mitad de width/height fijos), no un radio de diseño
       borderRadius: 20,
-      backgroundColor: "#3c5fa6",
+      backgroundColor: AUTH_BRAND,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -161,14 +165,14 @@ function createStyles(
     cancelBtn: {
       marginTop: verticalScale(16),
       paddingVertical: verticalScale(12),
-      borderRadius: RADIUS_MD,
+      borderRadius: RADIUS_LG,
       borderWidth: 1,
-      borderColor: "#ddd",
+      borderColor: AUTH_INPUT_BORDER,
       alignItems: "center",
     },
     cancelText: {
       fontSize: font(15),
-      color: "#555",
+      color: AUTH_LABEL,
       fontWeight: "500",
     },
   });

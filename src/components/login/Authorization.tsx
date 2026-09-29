@@ -19,6 +19,16 @@ import {
   RADIUS_SM,
   useResponsive,
 } from "@/constants/responsive";
+import {
+  AUTH_BANNER_ERROR_BG,
+  AUTH_BANNER_ERROR_BORDER,
+  AUTH_BANNER_ERROR_TEXT,
+  AUTH_BANNER_SUCCESS_BG,
+  AUTH_BANNER_SUCCESS_BORDER,
+  AUTH_BANNER_SUCCESS_TEXT,
+} from "@/constants/authColors";
+import { CARD_BACKGROUND } from "@/constants/colors";
+import { tintedShadow } from "@/constants/shadows";
 
 const Authorization = ({ onClose }: { onClose: () => void }) => {
   const { isTablet, scale, verticalScale, font } = useResponsive();
@@ -238,7 +248,7 @@ const Authorization = ({ onClose }: { onClose: () => void }) => {
                 <Text
                   style={[
                     styles.msgText,
-                    { color: mensaje.tipo === "error" ? "#b54a00" : "#0a6644" },
+                    { color: mensaje.tipo === "error" ? AUTH_BANNER_ERROR_TEXT : AUTH_BANNER_SUCCESS_TEXT },
                   ]}
                 >
                   {mensaje.texto}
@@ -267,6 +277,8 @@ function createStyles(
       // 14 no coincide con ningún RADIUS_* — huérfano, scale() directo.
       borderRadius: scale(14),
       overflow: "hidden",
+      // Sin fondo propio la elevation no pinta en Android.
+      backgroundColor: CARD_BACKGROUND,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 12 },
       shadowOpacity: 0.35,
@@ -402,6 +414,7 @@ function createStyles(
     input: { flex: 1, fontSize: font(14), color: "#111", letterSpacing: 1 },
     inputIcon: { marginRight: scale(8) },
     sendBtn: {
+      ...tintedShadow("#1B3A6B"),
       backgroundColor: "#1B3A6B",
       borderRadius: RADIUS_SM,
       paddingVertical: verticalScale(14),
@@ -425,14 +438,14 @@ function createStyles(
       alignItems: "center",
     },
     msgError: {
-      backgroundColor: "#fff8f0",
+      backgroundColor: AUTH_BANNER_ERROR_BG,
       borderWidth: 1,
-      borderColor: "#ffcc80",
+      borderColor: AUTH_BANNER_ERROR_BORDER,
     },
     msgSuccess: {
-      backgroundColor: "#f0faf5",
+      backgroundColor: AUTH_BANNER_SUCCESS_BG,
       borderWidth: 1,
-      borderColor: "#a8dfc4",
+      borderColor: AUTH_BANNER_SUCCESS_BORDER,
     },
     msgText: { fontSize: font(12) },
     footerNote: {

@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { APP_BACKGROUND_V2 } from "@/constants/colors";
+import { APP_BACKGROUND_V2, TEXT_MUTED, TEXT_PRIMARY } from "@/constants/colors";
 import { useResponsive } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 
@@ -40,7 +40,7 @@ function createStyles(
       justifyContent: "center",
       gap: verticalScale(8),
     },
-    welcome: { fontSize: font(22), fontWeight: "700", color: "#111827" },
-    role: { fontSize: font(15), color: "#6B7280" },
+    welcome: { fontSize: font(22), fontWeight: "700", color: TEXT_PRIMARY },
+    role: { fontSize: font(15), color: TEXT_MUTED },
   });
 }

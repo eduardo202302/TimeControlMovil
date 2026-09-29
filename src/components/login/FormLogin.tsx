@@ -1,11 +1,22 @@
-﻿import {
-  RADIUS_3XL,
-  RADIUS_MD,
-  useResponsive,
-} from "@/constants/responsive";
+﻿import { RADIUS_3XL, RADIUS_LG, useResponsive } from "@/constants/responsive";
 import {
+  AUTH_BANNER_ERROR_BG,
+  AUTH_BANNER_ERROR_BORDER,
+  AUTH_BANNER_ERROR_TEXT,
+  AUTH_BANNER_SUCCESS_BG,
+  AUTH_BANNER_SUCCESS_BORDER,
+  AUTH_BANNER_SUCCESS_TEXT,
+  AUTH_BRAND,
   AUTH_CARD_BACKGROUND,
+  AUTH_ICON_BUTTON,
   AUTH_INPUT_BACKGROUND,
+  AUTH_INPUT_BORDER,
+  AUTH_INPUT_ICON,
+  AUTH_LABEL,
+  AUTH_MUTED_TEXT,
+  AUTH_PLACEHOLDER,
+  AUTH_REQUIRED,
+  AUTH_TEXT,
 } from "@/constants/authColors";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
@@ -32,6 +43,8 @@ import { LoginType } from "../../../types/typesLogin/LoginType";
 import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
 import * as Storage from "../../utils/storage";
 import CompanySelector from "./CompanySelector";
+import { ERROR_COLOR, PRIMARY_700, PRIMARY_COLOR } from "@/constants/colors";
+import { SHADOW_LG, SHADOW_PRIMARY } from "@/constants/shadows";
 
 interface FormLoginProps {
   name?: string;
@@ -409,7 +422,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
             <Text
               style={[
                 styles.msgText,
-                { color: mensaje.tipo === "error" ? "#b54a00" : "#0a6644" },
+                { color: mensaje.tipo === "error" ? AUTH_BANNER_ERROR_TEXT : AUTH_BANNER_SUCCESS_TEXT },
               ]}
             >
               {mensaje.texto}
@@ -459,7 +472,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
                     <Ionicons
                       name={showPassword ? "eye-off-outline" : "eye-outline"}
                       size={18}
-                      color="#999"
+                      color={AUTH_ICON_BUTTON}
                     />
                   </TouchableOpacity>
                 }
@@ -479,7 +492,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
             <Ionicons
               name={remember ? "checkbox" : "square-outline"}
               size={18}
-              color="#4c6fbf"
+              color={PRIMARY_700}
             />
             <Text style={styles.rememberText}>Recordarme</Text>
           </TouchableOpacity>
@@ -549,13 +562,13 @@ function InputField({
         <Ionicons
           name={icon as any}
           size={18}
-          color="#9aa4b4"
+          color={AUTH_INPUT_ICON}
           style={styles.inputIcon}
         />
         <TextInput
           style={styles.input}
           placeholder={placeholder}
-          placeholderTextColor="#bbb"
+          placeholderTextColor={AUTH_PLACEHOLDER}
           value={value}
           onChangeText={onChangeText}
           secureTextEntry={secureTextEntry}
@@ -570,7 +583,7 @@ function InputField({
             style={styles.clearButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="close-circle" size={12} color="#999" />
+            <Ionicons name="close-circle" size={12} color={AUTH_ICON_BUTTON} />
           </TouchableOpacity>
         ) : null}
         {rightIcon}
@@ -590,25 +603,24 @@ function createLocalStyles(
     },
     label: {
       fontSize: font(13),
-      color: "#555",
+      color: AUTH_LABEL,
       marginBottom: verticalScale(4),
       fontWeight: "500",
     },
     required: {
-      color: "#e24b4a",
+      color: AUTH_REQUIRED,
     },
     inputGroup: {
       flexDirection: "row",
       alignItems: "center",
       borderWidth: 1,
-      borderColor: "#ddd",
-      // 8 coincide con RADIUS_SM — usar constante importada
-      borderRadius: scale(8),
+      borderColor: AUTH_INPUT_BORDER,
+      borderRadius: RADIUS_LG,
       paddingHorizontal: scale(10),
       backgroundColor: AUTH_INPUT_BACKGROUND,
     },
     inputFocused: {
-      borderColor: "#4c6fbf",
+      borderColor: PRIMARY_700,
       borderWidth: 1.5,
     },
     inputIcon: {
@@ -621,7 +633,7 @@ function createLocalStyles(
       flex: 1,
       paddingVertical: verticalScale(10),
       fontSize: font(14),
-      color: "#333",
+      color: AUTH_TEXT,
     },
   });
 }
@@ -644,7 +656,7 @@ function createStyles(
       padding: scale(4),
     },
     errorText: {
-      color: "#EF4444",
+      color: ERROR_COLOR,
       fontSize: font(11),
       marginTop: verticalScale(4),
       marginLeft: scale(4),
@@ -655,10 +667,11 @@ function createStyles(
     logoTitle: {
       fontSize: font(20),
       fontWeight: "600",
-      color: "#3c5fa6",
+      color: AUTH_BRAND,
       marginTop: verticalScale(6),
     },
     card: {
+      ...SHADOW_LG,
       backgroundColor: AUTH_CARD_BACKGROUND,
       borderRadius: RADIUS_3XL,
       padding: scale(18),
@@ -668,7 +681,7 @@ function createStyles(
     cardTitle: {
       fontSize: font(17),
       fontWeight: "600",
-      color: "#333",
+      color: AUTH_TEXT,
       marginBottom: verticalScale(14),
     },
     options: {
@@ -678,27 +691,28 @@ function createStyles(
       marginTop: verticalScale(4),
     },
     rememberMe: { flexDirection: "row", alignItems: "center", gap: scale(6) },
-    rememberText: { fontSize: font(13), color: "#555" },
-    forgot: { fontSize: font(13), color: "#4c6fbf" },
+    rememberText: { fontSize: font(13), color: AUTH_LABEL },
+    forgot: { fontSize: font(13), color: PRIMARY_700 },
     button: {
-      backgroundColor: "#2d5fd3",
+      ...SHADOW_PRIMARY,
+      backgroundColor: PRIMARY_COLOR,
       padding: scale(13),
-      borderRadius: RADIUS_MD,
+      borderRadius: RADIUS_LG,
       marginTop: verticalScale(18),
     },
     buttonText: {
       color: "white",
       textAlign: "center",
       fontSize: font(15),
-      fontWeight: "500",
+      fontWeight: "600",
     },
     register: {
       flexDirection: "row",
       justifyContent: "center",
       marginTop: verticalScale(14),
     },
-    registerText: { fontSize: font(13), color: "#666" },
-    registerLink: { fontSize: font(13), color: "#4c6fbf", fontWeight: "500" },
+    registerText: { fontSize: font(13), color: AUTH_MUTED_TEXT },
+    registerLink: { fontSize: font(13), color: PRIMARY_700, fontWeight: "600" },
     msg: {
       marginTop: verticalScale(10),
       padding: scale(8),
@@ -706,14 +720,14 @@ function createStyles(
       alignItems: "center",
     },
     msgError: {
-      backgroundColor: "#fff8f0",
+      backgroundColor: AUTH_BANNER_ERROR_BG,
       borderWidth: 1,
-      borderColor: "#ffcc80",
+      borderColor: AUTH_BANNER_ERROR_BORDER,
     },
     msgSuccess: {
-      backgroundColor: "#f0faf5",
+      backgroundColor: AUTH_BANNER_SUCCESS_BG,
       borderWidth: 1,
-      borderColor: "#a8dfc4",
+      borderColor: AUTH_BANNER_SUCCESS_BORDER,
     },
     msgText: { fontSize: font(12) },
   });
