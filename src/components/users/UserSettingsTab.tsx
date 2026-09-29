@@ -13,6 +13,9 @@ import TagCreateSheet from "./TagCreateSheet";
 import TagMultiSelectSheet from "./TagMultiSelectSheet";
 import type { UserFormController } from "./useUserForm";
 import type { UserFormStyles } from "./userFormStyles";
+import { SECTION_ICON_COLOR } from "@/constants/colors";
+import { useResponsive } from "@/constants/responsive";
+import SectionIcon from "@/components/ui/SectionIcon";
 
 interface UserSettingsTabProps {
   ctl: UserFormController;
@@ -23,6 +26,8 @@ type DefField = "branchTagId" | "departmentTagId";
 
 /** Tab "Configuración" — port de SubComponents/UserSettings. */
 export default function UserSettingsTab({ ctl, styles }: UserSettingsTabProps) {
+  // Solo para el lado del chip de SectionIcon; el resto de estilos llega por props.
+  const { scale } = useResponsive();
   const { form, isWatch, company, capabilities, categories, allTags } = ctl;
   const [multiCategory, setMultiCategory] = useState<UserCategory | null>(null);
   const [defTarget, setDefTarget] = useState<DefField | null>(null);
@@ -123,7 +128,9 @@ export default function UserSettingsTab({ ctl, styles }: UserSettingsTabProps) {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <Ionicons name="settings-outline" size={16} color="#2563EB" />
+              <SectionIcon tone="violet" size={scale(28)}>
+                <Ionicons name="settings-outline" size={16} color={SECTION_ICON_COLOR} />
+              </SectionIcon>
               <Text style={styles.cardTitle}>Permisos</Text>
             </View>
           </View>
@@ -152,7 +159,9 @@ export default function UserSettingsTab({ ctl, styles }: UserSettingsTabProps) {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
-            <Ionicons name="business-outline" size={16} color="#2563EB" />
+            <SectionIcon tone="blue" size={scale(28)}>
+              <Ionicons name="business-outline" size={16} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Sucursal y Departamento</Text>
           </View>
         </View>

@@ -20,7 +20,6 @@ import {
   RADIUS_MD,
   RADIUS_PILL,
   RADIUS_SM,
-  RADIUS_XL,
   useResponsive,
 } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
@@ -41,6 +40,7 @@ import {
   type UserCategory,
   type UsersStatusFilter,
 } from "../../utils/usersRules";
+import { CARD_ROW, FAB_SURFACE } from "@/styles/surfaces";
 
 type Styles = ReturnType<typeof createStyles>;
 
@@ -527,10 +527,7 @@ function createStyles(
       flexGrow: 1,
     },
     card: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_ROW,
       paddingHorizontal: scale(14),
       paddingVertical: verticalScale(12),
     },
@@ -644,20 +641,14 @@ function createStyles(
     footerLoader: { paddingVertical: verticalScale(14) },
     // Mismo FAB que holidays.tsx / permissions.tsx.
     fab: {
+      ...FAB_SURFACE,
       position: "absolute",
       right: scale(20),
       bottom: verticalScale(28),
       width: scale(56),
       height: scale(56),
-      borderRadius: RADIUS_PILL,
-      backgroundColor: "#2563EB",
       alignItems: "center",
       justifyContent: "center",
-      elevation: 6,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.2,
-      shadowRadius: 6,
     },
   });
 }

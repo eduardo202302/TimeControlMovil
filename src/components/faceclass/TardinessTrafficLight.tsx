@@ -13,14 +13,14 @@ import {
 } from "react-native";
 import {
   CARD_BACKGROUND,
-  CARD_BORDER,
   FOOTER_BORDER,
   INPUT_BORDER,
   PRIMARY_COLOR,
   TEXT_PRIMARY,
+  SECTION_ICON_COLOR,
 } from "@/constants/colors";
+import SectionIcon from "@/components/ui/SectionIcon";
 import {
-  RADIUS_2XL,
   RADIUS_MD,
   useResponsive,
 } from "@/constants/responsive";
@@ -30,6 +30,7 @@ import {
   type StudentTardiness,
 } from "../../utils/tardinessRules";
 import { formatDisplayTime } from "../timeoff/RevisionFinalModal";
+import { CARD_FORM, POPUP_CARD } from "@/styles/surfaces";
 
 /** Lado del círculo de cada luz — círculo real (size/2), no token de radio. */
 const LIGHT_SIZE = 22;
@@ -151,7 +152,9 @@ export default function TardinessTrafficLight({
     <>
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Ionicons name="time-outline" size={18} color={PRIMARY_COLOR} />
+          <SectionIcon tone="amber">
+            <Ionicons name="time-outline" size={18} color={SECTION_ICON_COLOR} />
+          </SectionIcon>
           <Text style={styles.title}>Tardanzas</Text>
         </View>
 
@@ -253,10 +256,7 @@ function createStyles(
 ) {
   return StyleSheet.create({
     card: {
-      backgroundColor: CARD_BACKGROUND,
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: CARD_BORDER,
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),
@@ -264,7 +264,7 @@ function createStyles(
     cardHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(8),
+      gap: scale(10),
       marginBottom: verticalScale(12),
     },
     title: {
@@ -320,12 +320,10 @@ function createStyles(
       padding: scale(24),
     },
     pickerCard: {
+      ...POPUP_CARD,
       width: "100%",
       maxWidth: 400,
-      backgroundColor: CARD_BACKGROUND,
-      borderRadius: RADIUS_2XL,
       overflow: "hidden",
-      elevation: 10,
     },
     pickerBar: {
       flexDirection: "row",

@@ -9,17 +9,18 @@ import {
   View,
 } from "react-native";
 import {
-  CARD_BACKGROUND,
-  CARD_BORDER,
   FOOTER_BORDER,
   PRIMARY_COLOR,
   PRIMARY_TINT_BACKGROUND,
   TEXT_PLACEHOLDER,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
+  SECTION_ICON_COLOR,
 } from "@/constants/colors";
-import { RADIUS_2XL, RADIUS_PILL, useResponsive } from "@/constants/responsive";
+import SectionIcon from "@/components/ui/SectionIcon";
+import { RADIUS_PILL, useResponsive } from "@/constants/responsive";
 import type { StudentParent } from "../../utils/tardinessRules";
+import { CARD_FORM } from "@/styles/surfaces";
 
 /**
  * Tarjeta "Padres / Tutores" del panel de Tardanzas — replica el bloque de
@@ -59,7 +60,9 @@ export default function TardinessParentsCard({
         onPress={toggle}
         activeOpacity={0.7}
       >
-        <Ionicons name="people-outline" size={18} color={PRIMARY_COLOR} />
+        <SectionIcon tone="violet">
+          <Ionicons name="people-outline" size={18} color={SECTION_ICON_COLOR} />
+        </SectionIcon>
         <Text style={styles.title}>Padres / Tutores</Text>
         {contacts.length > 0 && (
           <View style={styles.badge}>
@@ -178,10 +181,7 @@ function createStyles(
 ) {
   return StyleSheet.create({
     card: {
-      backgroundColor: CARD_BACKGROUND,
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: CARD_BORDER,
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),
@@ -189,7 +189,7 @@ function createStyles(
     cardHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(8),
+      gap: scale(10),
       marginBottom: verticalScale(12),
     },
     title: {

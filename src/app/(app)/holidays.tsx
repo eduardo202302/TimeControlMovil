@@ -16,7 +16,6 @@ import {
   RADIUS_MD,
   RADIUS_PILL,
   RADIUS_SM,
-  RADIUS_XL,
   useResponsive,
 } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
@@ -33,6 +32,13 @@ import {
   type HolidaysFilter,
 } from "../../utils/holidaysRules";
 import { formatDisplayDate } from "../../components/timeoff/RevisionFinalModal";
+import {
+  CARD_ROW,
+  DIALOG_BOX,
+  DIALOG_OVERLAY,
+  FAB_SURFACE,
+  SEGMENTED_SURFACE,
+} from "@/styles/surfaces";
 
 const FILTER_OPTIONS: HolidaysFilter[] = ["true", "false", "all"];
 
@@ -425,11 +431,8 @@ function createStyles(
       width: "100%",
     },
     segmented: {
+      ...SEGMENTED_SURFACE,
       flexDirection: "row",
-      backgroundColor: "#fff",
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
-      borderRadius: RADIUS_MD,
       padding: scale(3),
       gap: scale(3),
       marginBottom: verticalScale(12),
@@ -449,10 +452,7 @@ function createStyles(
     // valor que permissions.tsx.
     listContent: { gap: verticalScale(8), paddingBottom: verticalScale(96) },
     card: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_ROW,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
@@ -515,35 +515,27 @@ function createStyles(
     // Copia literal de permissions.tsx:967-982 — misma fuente que el resto
     // de los FABs de la app.
     fab: {
+      ...FAB_SURFACE,
       position: "absolute",
       right: scale(20),
       bottom: verticalScale(28),
       width: scale(56),
       height: scale(56),
-      borderRadius: RADIUS_PILL,
-      backgroundColor: "#2563EB",
       alignItems: "center",
       justifyContent: "center",
-      elevation: 6,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.2,
-      shadowRadius: 6,
     },
     /* ── Confirmar eliminar: mismo patrón que permissions.tsx (modalOverlay/modalBox) ── */
     confirmOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       justifyContent: "center",
       alignItems: "center",
     },
     confirmBox: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_XL,
+      ...DIALOG_BOX,
       padding: scale(24),
       width: "80%",
       maxWidth: 400,
-      elevation: 5,
     },
     confirmTitle: {
       fontSize: font(15),

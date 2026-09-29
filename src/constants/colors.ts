@@ -85,19 +85,22 @@ export const ACCENT_TEAL = "#0D9488";
 export const WARNING_ACCENT = "#D97706";
 
 /**
- * Chips de ícono de sección (fondo / ícono). Los FG referencian tokens
- * existentes en vez de repetir el hex, así un cambio de marca los arrastra.
+ * Chip de ícono de sección (título de card): cuadrito SÓLIDO del color del
+ * tono con el ícono en blanco encima. El tono se elige por tipo de contenido
+ * (info azul, detalles violeta, fechas teal, adjuntos ámbar, peligro rojo).
  */
-export const SECTION_CHIP_BLUE_BG = PRIMARY_TINT_BACKGROUND;
-export const SECTION_CHIP_BLUE_FG = PRIMARY_700;
-export const SECTION_CHIP_VIOLET_BG = "#EDE9FE";
-export const SECTION_CHIP_VIOLET_FG = ACCENT_VIOLET;
-export const SECTION_CHIP_TEAL_BG = "#CCFBF1";
-export const SECTION_CHIP_TEAL_FG = ACCENT_TEAL;
-export const SECTION_CHIP_AMBER_BG = "#FEF3C7";
-export const SECTION_CHIP_AMBER_FG = WARNING_ACCENT;
-export const SECTION_CHIP_RED_BG = "#FEE2E2";
-export const SECTION_CHIP_RED_FG = ERROR_COLOR;
+export type SectionTone = "blue" | "violet" | "teal" | "amber" | "red";
+export const SECTION_TONES: Record<SectionTone, string> = {
+  blue: PRIMARY_COLOR,
+  violet: ACCENT_VIOLET,
+  teal: ACCENT_TEAL,
+  amber: WARNING_ACCENT,
+  red: ERROR_COLOR,
+};
+export const SECTION_ICON_COLOR = "#FFFFFF";
+
+/** Fondo del overlay de diálogos/popups — el valor que ya usaban todos. */
+export const OVERLAY_BACKDROP = "rgba(0,0,0,0.5)";
 
 /**
  * Header navy del shell (fondo HEADER_NAVY): texto/íconos en blanco y el

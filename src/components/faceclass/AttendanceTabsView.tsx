@@ -25,8 +25,10 @@ import {
   TEXT_PRIMARY,
   TEXT_SECONDARY,
   WARNING_COLOR,
+  SECTION_ICON_COLOR,
 } from "@/constants/colors";
-import { RADIUS_2XL, RADIUS_LG, RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
+import SectionIcon from "@/components/ui/SectionIcon";
+import { RADIUS_LG, RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
 import { pickUserPhoto } from "../users/pickUserPhoto";
 import {
   applyListAction,
@@ -59,6 +61,8 @@ import {
 } from "../../utils/attendanceRules";
 import * as Storage from "../../utils/storage";
 import { useSchoolStore } from "../../../store/useSchoolStore";
+import { SHADOW_PRIMARY } from "@/constants/shadows";
+import { CARD_FORM, FOOTER_BAR, FOOTER_BTN_SAVE, POPUP_CARD } from "@/styles/surfaces";
 
 /**
  * Cuerpo compartido de la toma de asistencia: los 6 tabs (Asis./Pre/Aus/Tar/
@@ -371,7 +375,9 @@ export default function AttendanceTabsView({
   const renderPhotoCard = (data: AttendanceData) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Ionicons name="image-outline" size={18} color={PRIMARY_COLOR} />
+        <SectionIcon tone="violet">
+          <Ionicons name="image-outline" size={18} color={SECTION_ICON_COLOR} />
+        </SectionIcon>
         <Text style={styles.cardTitle}>Toma de foto</Text>
       </View>
 
@@ -478,7 +484,9 @@ export default function AttendanceTabsView({
   const renderResultsCard = (data: AttendanceData) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Ionicons name="bar-chart-outline" size={18} color={PRIMARY_COLOR} />
+        <SectionIcon tone="teal">
+          <Ionicons name="bar-chart-outline" size={18} color={SECTION_ICON_COLOR} />
+        </SectionIcon>
         <Text style={styles.cardTitle}>Resultados</Text>
       </View>
       {!cantAuto && renderResultRow("Reconocidos:", formatRecognizedCount(data.photos))}
@@ -920,10 +928,7 @@ export function createAttendanceStyles(
 
     /* ── Cards ── */
     card: {
-      backgroundColor: CARD_BACKGROUND,
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: CARD_BORDER,
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),
@@ -931,15 +936,12 @@ export function createAttendanceStyles(
     cardHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(8),
+      gap: scale(10),
       marginBottom: verticalScale(12),
     },
     cardTitle: { fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
     emptyCard: {
-      backgroundColor: CARD_BACKGROUND,
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: CARD_BORDER,
+      ...CARD_FORM,
       alignItems: "center",
       gap: verticalScale(8),
       paddingHorizontal: scale(16),
@@ -1039,6 +1041,7 @@ export function createAttendanceStyles(
     },
     radioText: { fontSize: font(14), fontWeight: "700" },
     cameraBtn: {
+      ...SHADOW_PRIMARY,
       width: 56,
       height: 56,
       borderRadius: RADIUS_PILL,
@@ -1150,12 +1153,10 @@ export function createAttendanceStyles(
       padding: scale(24),
     },
     pickerCard: {
+      ...POPUP_CARD,
       width: "100%",
       maxWidth: 400,
-      backgroundColor: CARD_BACKGROUND,
-      borderRadius: RADIUS_2XL,
       overflow: "hidden",
-      elevation: 10,
     },
     pickerBar: {
       flexDirection: "row",
@@ -1174,14 +1175,12 @@ export function createAttendanceStyles(
 
     /* ── Footer ── */
     footer: {
+      ...FOOTER_BAR,
       flexDirection: "row",
       gap: scale(10),
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(12),
       paddingBottom: verticalScale(28),
-      backgroundColor: CARD_BACKGROUND,
-      borderTopWidth: 1,
-      borderTopColor: FOOTER_BORDER,
     },
     // Mismo botón secundario que el "Cancelar" del footer de Tardanzas.
     backBtn: {
@@ -1194,12 +1193,11 @@ export function createAttendanceStyles(
     },
     backText: { fontSize: font(14), fontWeight: "700", color: TEXT_SECONDARY },
     saveBtn: {
+      ...FOOTER_BTN_SAVE,
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
       paddingVertical: verticalScale(13),
-      borderRadius: RADIUS_LG,
-      backgroundColor: PRIMARY_COLOR,
     },
     saveBtnDisabled: { opacity: 0.55 },
     saveText: { fontSize: font(14), fontWeight: "700", color: CARD_BACKGROUND },

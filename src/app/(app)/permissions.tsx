@@ -15,11 +15,9 @@ import {
 import { APP_BACKGROUND_V2 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
-  RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
   RADIUS_SM,
-  RADIUS_XL,
   useResponsive,
 } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
@@ -60,6 +58,13 @@ import {
 } from "../../utils/permissionRules";
 import { normalizePermissionName } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
+import {
+  CARD_ROW,
+  DIALOG_BOX,
+  DIALOG_OVERLAY,
+  FAB_SURFACE,
+  SEGMENTED_SURFACE,
+} from "@/styles/surfaces";
 
 const SOURCES: PermissionSource[] = ["local", "historico"];
 const SOURCE_STORAGE_KEY = "permissions.source";
@@ -846,11 +851,8 @@ function createStyles(
       gap: verticalScale(10),
     },
     segmented: {
+      ...SEGMENTED_SURFACE,
       flexDirection: "row",
-      backgroundColor: "#fff",
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
-      borderRadius: RADIUS_MD,
       padding: scale(3),
       gap: scale(3),
     },
@@ -889,10 +891,7 @@ function createStyles(
       flexGrow: 1,
     },
     card: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_ROW,
       paddingHorizontal: scale(14),
       paddingVertical: verticalScale(12),
     },
@@ -977,35 +976,27 @@ function createStyles(
     retryText: { fontSize: font(13), fontWeight: "700", color: "#2563EB" },
     footerLoader: { paddingVertical: verticalScale(16) },
     fab: {
+      ...FAB_SURFACE,
       position: "absolute",
       right: scale(20),
       bottom: verticalScale(28),
       width: scale(56),
       height: scale(56),
-      borderRadius: RADIUS_PILL,
-      backgroundColor: "#2563EB",
       alignItems: "center",
       justifyContent: "center",
-      elevation: 6,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: 0.2,
-      shadowRadius: 6,
     },
     modalOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       justifyContent: "center",
       alignItems: "center",
     },
     modalBox: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_LG,
+      ...DIALOG_BOX,
       padding: scale(24),
       width: "80%",
       // Mismo tope que el modal de logout de DrawerMenu.tsx.
       maxWidth: 400,
-      elevation: 5,
     },
     modalTitle: {
       fontSize: font(15),

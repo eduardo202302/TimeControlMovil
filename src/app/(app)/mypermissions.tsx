@@ -14,7 +14,6 @@ import {
   MAX_CONTENT_WIDTH,
   RADIUS_MD,
   RADIUS_PILL,
-  RADIUS_XL,
   useResponsive,
 } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
@@ -37,6 +36,7 @@ import {
 } from "../../utils/permissionRules";
 import { decodeJWT } from "../../utils/session";
 import * as Storage from "../../utils/storage";
+import { CARD_ROW, SEGMENTED_SURFACE } from "@/styles/surfaces";
 
 /** Colores por defecto de un chip cuando el tag no trae los suyos. */
 const CHIP_FALLBACK = { background: "#E5E7EB", text: "#374151" };
@@ -463,11 +463,8 @@ function createStyles(
       paddingBottom: verticalScale(2),
     },
     segmented: {
+      ...SEGMENTED_SURFACE,
       flexDirection: "row",
-      backgroundColor: "#fff",
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
-      borderRadius: RADIUS_MD,
       padding: scale(3),
       gap: scale(3),
     },
@@ -491,10 +488,7 @@ function createStyles(
     },
 
     card: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_ROW,
       paddingHorizontal: scale(14),
       paddingVertical: verticalScale(12),
     },

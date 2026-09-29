@@ -13,9 +13,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND, APP_BACKGROUND_V2 } from "@/constants/colors";
 import {
-  RADIUS_2XL,
+  APP_BACKGROUND,
+  APP_BACKGROUND_V2,
+  SECTION_ICON_COLOR,
+} from "@/constants/colors";
+import SectionIcon from "@/components/ui/SectionIcon";
+import {
   RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
@@ -33,6 +37,8 @@ import {
 import { permissionRequesterName, readOverTime } from "../../utils/adminPermissionRules";
 import { normalizePermissionName, toRD } from "../../utils/punchRules";
 import { formatDisplayDate, formatDisplayTime } from "../timeoff/RevisionFinalModal";
+import { SHADOW_PRIMARY } from "@/constants/shadows";
+import { CARD_FORM, FOOTER_BAR } from "@/styles/surfaces";
 
 const AUSENCIA_ACTION_NAME = "ausencia";
 const CHIP_FALLBACK = { background: "#E2E8F0", text: "#475569" };
@@ -239,7 +245,9 @@ export default function AdminPermissionDetailModal({
               {/* ── Información administrativa ── */}
               <View style={styles.card}>
                 <View style={styles.cardHeader}>
-                  <Ionicons name="information-circle-outline" size={18} color="#2563EB" />
+                  <SectionIcon tone="blue">
+                    <Ionicons name="information-circle-outline" size={18} color={SECTION_ICON_COLOR} />
+                  </SectionIcon>
                   <Text style={styles.cardTitle}>Información</Text>
                 </View>
                 <InfoRow label="Canal" value={text(permission.canal)} styles={styles} />
@@ -264,7 +272,9 @@ export default function AdminPermissionDetailModal({
               {/* ── Día/s ── */}
               <View style={styles.card}>
                 <View style={styles.cardHeader}>
-                  <Ionicons name="calendar-outline" size={18} color="#2563EB" />
+                  <SectionIcon tone="teal">
+                    <Ionicons name="calendar-outline" size={18} color={SECTION_ICON_COLOR} />
+                  </SectionIcon>
                   <Text style={styles.cardTitle}>Día/s de permiso</Text>
                 </View>
                 <InfoRow
@@ -301,7 +311,9 @@ export default function AdminPermissionDetailModal({
               {/* ── Detalle ── */}
               <View style={styles.card}>
                 <View style={styles.cardHeader}>
-                  <Ionicons name="document-text-outline" size={18} color="#2563EB" />
+                  <SectionIcon tone="violet">
+                    <Ionicons name="document-text-outline" size={18} color={SECTION_ICON_COLOR} />
+                  </SectionIcon>
                   <Text style={styles.cardTitle}>Detalle</Text>
                 </View>
                 <Text style={styles.label}>Asunto</Text>
@@ -320,7 +332,9 @@ export default function AdminPermissionDetailModal({
               {attachments.length > 0 && (
                 <View style={styles.card}>
                   <View style={styles.cardHeader}>
-                    <Ionicons name="attach-outline" size={18} color="#2563EB" />
+                    <SectionIcon tone="amber">
+                      <Ionicons name="attach-outline" size={18} color={SECTION_ICON_COLOR} />
+                    </SectionIcon>
                     <Text style={styles.cardTitle}>Adjuntos ({attachments.length})</Text>
                   </View>
                   {attachments.map((path, index) => (
@@ -438,10 +452,7 @@ function createStyles(
       textAlign: "center",
     },
     card: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),
@@ -449,7 +460,7 @@ function createStyles(
     cardHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(8),
+      gap: scale(10),
       marginBottom: verticalScale(10),
     },
     cardTitle: { fontSize: font(15), fontWeight: "700", color: "#111827" },
@@ -517,14 +528,12 @@ function createStyles(
       fontWeight: "500",
     },
     footer: {
+      ...FOOTER_BAR,
       flexDirection: "row",
       gap: scale(10),
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(12),
       paddingBottom: verticalScale(28),
-      backgroundColor: "#fff",
-      borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
     },
     footerBtn: {
       flex: 1,
@@ -537,7 +546,7 @@ function createStyles(
     },
     deleteBtn: { backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA" },
     deleteText: { fontSize: font(14), fontWeight: "700", color: "#B91C1C" },
-    editBtn: { backgroundColor: "#2563EB" },
+    editBtn: { ...SHADOW_PRIMARY, backgroundColor: "#2563EB" },
     editText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
     previewOverlay: {
       flex: 1,

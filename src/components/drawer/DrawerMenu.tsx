@@ -50,6 +50,7 @@ import {
   useResponsive,
 } from "@/constants/responsive";
 import { SHADOW_LG } from "@/constants/shadows";
+import { DIALOG_BOX, DIALOG_OVERLAY } from "@/styles/surfaces";
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -323,14 +324,13 @@ function createStyles(
       color: ERROR_COLOR,
     },
     modalOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       justifyContent: "center",
       alignItems: "center",
     },
     modalBox: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_SM,
+      ...DIALOG_BOX,
       padding: scale(24),
       width: "80%",
       // Único riesgo estructural real de este archivo (auditoría FASE A):
@@ -338,7 +338,6 @@ function createStyles(
       // llegar a 800-1000dp. Mismo valor/criterio que los modales de
       // SolicitarPermisoForm.tsx y punchinout.tsx.
       maxWidth: 400,
-      elevation: 5,
     },
     modalMessage: {
       fontSize: font(14),

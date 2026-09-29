@@ -12,12 +12,16 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND, APP_BACKGROUND_V2 } from "@/constants/colors";
+import {
+  APP_BACKGROUND,
+  APP_BACKGROUND_V2,
+  SECTION_ICON_COLOR,
+} from "@/constants/colors";
+import SectionIcon from "@/components/ui/SectionIcon";
 import {
   RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
-  RADIUS_2XL,
   useResponsive,
 } from "@/constants/responsive";
 import {
@@ -32,6 +36,7 @@ import {
 } from "../../utils/permissionRules";
 import { normalizePermissionName, toRD } from "../../utils/punchRules";
 import { formatDisplayDate, formatDisplayTime } from "./RevisionFinalModal";
+import { CARD_FORM } from "@/styles/surfaces";
 
 /** Nombre de la acción que el backend trata como día completo (00:00–23:59) —
  * mismo criterio que SolicitarPermisoForm al armar la solicitud. */
@@ -188,7 +193,9 @@ export default function PermissionDetailView({
             {/* ── Detalle ── */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Ionicons name="document-text-outline" size={18} color="#2563EB" />
+                <SectionIcon tone="violet">
+                  <Ionicons name="document-text-outline" size={18} color={SECTION_ICON_COLOR} />
+                </SectionIcon>
                 <Text style={styles.cardTitle}>Detalle</Text>
               </View>
               <Text style={styles.label}>Asunto</Text>
@@ -200,7 +207,9 @@ export default function PermissionDetailView({
             {/* ── Día/s de permiso ── */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Ionicons name="calendar-outline" size={18} color="#2563EB" />
+                <SectionIcon tone="teal">
+                  <Ionicons name="calendar-outline" size={18} color={SECTION_ICON_COLOR} />
+                </SectionIcon>
                 <Text style={styles.cardTitle}>Día/s de permiso</Text>
               </View>
 
@@ -248,7 +257,9 @@ export default function PermissionDetailView({
             {/* ── Quién Solicita ── */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Ionicons name="person-outline" size={18} color="#2563EB" />
+                <SectionIcon tone="blue">
+                  <Ionicons name="person-outline" size={18} color={SECTION_ICON_COLOR} />
+                </SectionIcon>
                 <Text style={styles.cardTitle}>Quién Solicita</Text>
               </View>
 
@@ -297,7 +308,9 @@ export default function PermissionDetailView({
             {attachments.length > 0 && (
               <View style={styles.card}>
                 <View style={styles.cardHeader}>
-                  <Ionicons name="attach-outline" size={18} color="#2563EB" />
+                  <SectionIcon tone="amber">
+                    <Ionicons name="attach-outline" size={18} color={SECTION_ICON_COLOR} />
+                  </SectionIcon>
                   <Text style={styles.cardTitle}>Adjuntos ({attachments.length})</Text>
                 </View>
                 {attachments.map((path, index) => (
@@ -400,10 +413,7 @@ function createStyles(
     },
 
     card: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),
@@ -411,7 +421,7 @@ function createStyles(
     cardHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(8),
+      gap: scale(10),
       marginBottom: verticalScale(12),
     },
     cardTitle: { fontSize: font(15), fontWeight: "700", color: "#111827" },

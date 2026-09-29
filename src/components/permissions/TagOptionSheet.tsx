@@ -10,8 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { RADIUS_2XL, RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
+import { RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
 import type { PermissionCatalogTag } from "../../utils/adminPermissionRules";
+import { POPUP_CARD } from "@/styles/surfaces";
 
 /**
  * Opción del sheet: un tag del catálogo, con `subtitle` opcional en gris
@@ -149,8 +150,7 @@ function createStyles(
       paddingHorizontal: scale(24),
     },
     sheet: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
+      ...POPUP_CARD,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(16),
       paddingBottom: verticalScale(10),

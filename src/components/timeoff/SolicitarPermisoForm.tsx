@@ -26,7 +26,12 @@ import type {
 } from "../../../types/typeStore/SchoolStoreType";
 import { normalizePermissionName, toRD, WEEK_DAYS } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
-import { APP_BACKGROUND, APP_BACKGROUND_V2 } from "@/constants/colors";
+import {
+  APP_BACKGROUND,
+  APP_BACKGROUND_V2,
+  SECTION_ICON_COLOR,
+} from "@/constants/colors";
+import SectionIcon from "@/components/ui/SectionIcon";
 import { MAX_CONTENT_WIDTH, useResponsive } from "@/constants/responsive";
 import RevisionFinalModal, {
   formatDisplayDate,
@@ -36,6 +41,8 @@ import RevisionFinalModal, {
   type PermissionAttachment,
   type PermissionReview,
 } from "./RevisionFinalModal";
+import { SHADOW_PRIMARY } from "@/constants/shadows";
+import { CARD_FORM, POPUP_CARD } from "@/styles/surfaces";
 
 /**
  * Tag del catálogo de la escuela. `/tags/all` devuelve todos los tags con sus
@@ -1073,7 +1080,9 @@ export default function SolicitarPermisoForm() {
         {/* ── 1. Información ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="people-outline" size={18} color="#2563EB" />
+            <SectionIcon tone="blue">
+              <Ionicons name="people-outline" size={18} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Información</Text>
           </View>
 
@@ -1169,7 +1178,9 @@ export default function SolicitarPermisoForm() {
         {/* ── 2. Detalles ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="document-text-outline" size={18} color="#2563EB" />
+            <SectionIcon tone="violet">
+              <Ionicons name="document-text-outline" size={18} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Detalles</Text>
           </View>
 
@@ -1229,7 +1240,9 @@ export default function SolicitarPermisoForm() {
         {/* ── 3. Fecha y Hora ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="calendar-outline" size={18} color="#2563EB" />
+            <SectionIcon tone="teal">
+              <Ionicons name="calendar-outline" size={18} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Fecha y Hora</Text>
           </View>
 
@@ -1390,7 +1403,9 @@ export default function SolicitarPermisoForm() {
         {/* ── 4. Adjuntar Archivos ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="attach-outline" size={18} color="#2563EB" />
+            <SectionIcon tone="amber">
+              <Ionicons name="attach-outline" size={18} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Adjuntar Archivos</Text>
           </View>
 
@@ -1777,10 +1792,7 @@ const styles = StyleSheet.create({
 
   /* ── Cards ── */
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    ...CARD_FORM,
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 16,
@@ -1788,7 +1800,7 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
     marginBottom: 14,
   },
   cardTitle: { fontSize: 15, fontWeight: "700", color: "#111827" },
@@ -1945,7 +1957,7 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
   },
   btnGhostText: { fontSize: 14, fontWeight: "700", color: "#374151" },
-  btnPrimary: { backgroundColor: "#2563EB", flex: 1.5 },
+  btnPrimary: { ...SHADOW_PRIMARY, backgroundColor: "#2563EB", flex: 1.5 },
   btnPrimaryText: { fontSize: 14, fontWeight: "700", color: "#fff" },
 
   /* ── Modales ── */
@@ -1957,13 +1969,11 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   selectorCard: {
+    ...POPUP_CARD,
     width: "100%",
     maxWidth: 400,
     maxHeight: "70%",
-    backgroundColor: "#fff",
-    borderRadius: 20,
     padding: 20,
-    elevation: 10,
   },
   selectorTitle: {
     fontSize: 16,
@@ -2005,12 +2015,10 @@ const styles = StyleSheet.create({
   },
   selectorDoneButton: { flex: 0, marginTop: 14 },
   pickerCard: {
+    ...POPUP_CARD,
     width: "100%",
     maxWidth: 400,
-    backgroundColor: "#fff",
-    borderRadius: 20,
     overflow: "hidden",
-    elevation: 10,
   },
   pickerBar: {
     flexDirection: "row",
@@ -2025,14 +2033,12 @@ const styles = StyleSheet.create({
 
   /* ── Resultado ── */
   outcomeCard: {
+    ...POPUP_CARD,
     width: "100%",
     maxWidth: 400,
     maxHeight: "80%",
-    backgroundColor: "#fff",
-    borderRadius: 20,
     padding: 24,
     alignItems: "center",
-    elevation: 10,
   },
   outcomeIconWrap: {
     width: 48,

@@ -30,6 +30,9 @@ import {
 import { displayPhone } from "../../utils/usersRules";
 import type { UserFormController } from "./useUserForm";
 import type { UserFormStyles } from "./userFormStyles";
+import { SECTION_ICON_COLOR } from "@/constants/colors";
+import SectionIcon from "@/components/ui/SectionIcon";
+import { SHADOW_PRIMARY } from "@/constants/shadows";
 
 interface UserAddressTabProps {
   ctl: UserFormController;
@@ -245,7 +248,9 @@ export default function UserAddressTab({ ctl, styles }: UserAddressTabProps) {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
-            <Ionicons name="location-outline" size={16} color="#2563EB" />
+            <SectionIcon tone="red" size={scale(28)}>
+              <Ionicons name="location-outline" size={16} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Seleccionar Ubicación</Text>
           </View>
           {!disabled && hasAnything && (
@@ -472,6 +477,7 @@ function createStyles(
     streetItem: { flex: 2 },
     textArea: { minHeight: verticalScale(72), textAlignVertical: "top" },
     saveBtn: {
+      ...SHADOW_PRIMARY,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",

@@ -11,9 +11,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { RADIUS_2XL, RADIUS_LG, RADIUS_MD, useResponsive } from "@/constants/responsive";
+import { RADIUS_LG, RADIUS_MD, useResponsive } from "@/constants/responsive";
 import type { UserCategory } from "../../utils/usersRules";
 import type { CreateTagResult } from "./useUserForm";
+import { FOOTER_BTN_CANCEL, FOOTER_BTN_SAVE, POPUP_CARD } from "@/styles/surfaces";
 
 interface TagCreateSheetProps {
   /** Categoría fija — la del multi-select donde se tocó el "+". null = cerrado. */
@@ -137,8 +138,7 @@ function createStyles(
       paddingHorizontal: scale(24),
     },
     sheet: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
+      ...POPUP_CARD,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(16),
       paddingBottom: verticalScale(16),
@@ -177,9 +177,9 @@ function createStyles(
       paddingVertical: verticalScale(12),
       borderRadius: RADIUS_LG,
     },
-    cancelBtn: { backgroundColor: "#F3F4F6" },
+    cancelBtn: { ...FOOTER_BTN_CANCEL },
     cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
-    saveBtn: { backgroundColor: "#2563EB" },
+    saveBtn: { ...FOOTER_BTN_SAVE },
     saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
     busy: { opacity: 0.7 },
   });

@@ -40,9 +40,10 @@ import {
   TEXT_PRIMARY,
   TEXT_SECONDARY,
   WARNING_COLOR,
+  SECTION_ICON_COLOR,
 } from "@/constants/colors";
+import SectionIcon from "@/components/ui/SectionIcon";
 import {
-  RADIUS_2XL,
   RADIUS_LG,
   RADIUS_MD,
   useResponsive,
@@ -67,6 +68,12 @@ import {
 } from "../../utils/companyWorkingDay";
 import { readCategoryDefaultId } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
+import {
+  CARD_FORM,
+  FOOTER_BAR,
+  FOOTER_BTN_CANCEL,
+  FOOTER_BTN_SAVE,
+} from "@/styles/surfaces";
 
 /**
  * Copia deliberada de PHOTO_HOST/photoUri() de AdminPermissionCreateModal.tsx
@@ -667,7 +674,9 @@ export default function ParentsExcusesScreen() {
           {/* ESTUDIANTE / TIPO */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <User size={18} color={PRIMARY_COLOR} />
+              <SectionIcon tone="blue">
+                <User size={18} color={SECTION_ICON_COLOR} />
+              </SectionIcon>
               <Text style={styles.cardTitle}>Estudiante / Tipo</Text>
             </View>
 
@@ -730,7 +739,9 @@ export default function ParentsExcusesScreen() {
           {/* DETALLES (ASUNTO + MOTIVO) */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <MessageSquare size={18} color={PRIMARY_COLOR} />
+              <SectionIcon tone="violet">
+                <MessageSquare size={18} color={SECTION_ICON_COLOR} />
+              </SectionIcon>
               <Text style={styles.cardTitle}>Detalles</Text>
             </View>
 
@@ -771,7 +782,9 @@ export default function ParentsExcusesScreen() {
           {/* DÍA/S AUSENCIA */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Calendar size={18} color={PRIMARY_COLOR} />
+              <SectionIcon tone="teal">
+                <Calendar size={18} color={SECTION_ICON_COLOR} />
+              </SectionIcon>
               <Text style={styles.cardTitle}>Día/s Ausencia</Text>
             </View>
             <AbsenceCalendar
@@ -787,7 +800,9 @@ export default function ParentsExcusesScreen() {
           {/* ADJUNTOS */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Paperclip size={18} color={PRIMARY_COLOR} />
+              <SectionIcon tone="amber">
+                <Paperclip size={18} color={SECTION_ICON_COLOR} />
+              </SectionIcon>
               <Text style={styles.cardTitle}>Adjuntos</Text>
             </View>
 
@@ -983,10 +998,7 @@ function createStyles(
 
     /* ── Cards ── */
     card: {
-      backgroundColor: CARD_BACKGROUND,
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: CARD_BORDER,
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),
@@ -994,7 +1006,7 @@ function createStyles(
     cardHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(8),
+      gap: scale(10),
       marginBottom: verticalScale(14),
     },
     cardTitle: { fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
@@ -1118,14 +1130,12 @@ function createStyles(
 
     /* ── Acciones (footer fijo) ── */
     footer: {
+      ...FOOTER_BAR,
       flexDirection: "row",
       gap: scale(10),
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(12),
       paddingBottom: verticalScale(28),
-      backgroundColor: CARD_BACKGROUND,
-      borderTopWidth: 1,
-      borderTopColor: FOOTER_BORDER,
     },
     footerBtn: {
       flex: 1,
@@ -1134,13 +1144,13 @@ function createStyles(
       paddingVertical: verticalScale(13),
       borderRadius: RADIUS_LG,
     },
-    cancelBtn: { backgroundColor: FOOTER_BORDER },
+    cancelBtn: { ...FOOTER_BTN_CANCEL },
     cancelText: {
       fontSize: font(14),
       fontWeight: "700",
       color: TEXT_SECONDARY,
     },
-    saveBtn: { backgroundColor: PRIMARY_COLOR },
+    saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
     // CARD_BACKGROUND ("#fff") reusado como color de texto: no hay un token
     // de "texto blanco" separado en colors.ts, y este botón es sólido

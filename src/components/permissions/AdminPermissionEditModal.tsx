@@ -14,10 +14,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND, APP_BACKGROUND_V2 } from "@/constants/colors";
+import {
+  APP_BACKGROUND,
+  APP_BACKGROUND_V2,
+  SECTION_ICON_COLOR,
+} from "@/constants/colors";
+import SectionIcon from "@/components/ui/SectionIcon";
 import {
   MAX_CONTENT_WIDTH,
-  RADIUS_2XL,
   RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
@@ -52,6 +56,12 @@ import {
 } from "../timeoff/RevisionFinalModal";
 import { MAX_PAYLOAD_BYTES, pickAttachments } from "./pickAttachments";
 import TagOptionSheet from "./TagOptionSheet";
+import {
+  CARD_FORM,
+  FOOTER_BAR,
+  FOOTER_BTN_CANCEL,
+  FOOTER_BTN_SAVE,
+} from "@/styles/surfaces";
 
 const AUSENCIA_ACTION_NAME = "ausencia";
 
@@ -314,7 +324,9 @@ function EditForm({
         {/* ── Estado ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="flag-outline" size={18} color="#2563EB" />
+            <SectionIcon tone="blue">
+              <Ionicons name="flag-outline" size={18} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Estado</Text>
           </View>
           <TouchableOpacity
@@ -341,7 +353,9 @@ function EditForm({
         {/* ── Detalle: siempre solo lectura (el PATCH no acepta subject/description) ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="document-text-outline" size={18} color="#2563EB" />
+            <SectionIcon tone="violet">
+              <Ionicons name="document-text-outline" size={18} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Detalle</Text>
           </View>
           <Text style={styles.label}>Asunto</Text>
@@ -367,7 +381,9 @@ function EditForm({
         {/* ── Día/s de permiso + Hr. Extras Pagas (misma tarjeta que el webapp) ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="calendar-outline" size={18} color="#2563EB" />
+            <SectionIcon tone="teal">
+              <Ionicons name="calendar-outline" size={18} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Día/s de permiso</Text>
           </View>
           <View style={styles.infoRow}>
@@ -403,7 +419,9 @@ function EditForm({
         {isRejection && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Ionicons name="chatbox-ellipses-outline" size={18} color="#2563EB" />
+              <SectionIcon tone="violet">
+                <Ionicons name="chatbox-ellipses-outline" size={18} color={SECTION_ICON_COLOR} />
+              </SectionIcon>
               <Text style={styles.cardTitle}>
                 Comentario <Text style={styles.required}>(Requerido)</Text>
               </Text>
@@ -432,7 +450,9 @@ function EditForm({
         {/* ── Adjuntos ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="attach-outline" size={18} color="#2563EB" />
+            <SectionIcon tone="amber">
+              <Ionicons name="attach-outline" size={18} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Adjuntos</Text>
           </View>
 
@@ -609,10 +629,7 @@ function createStyles(
       width: "100%",
     },
     card: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),
@@ -620,7 +637,7 @@ function createStyles(
     cardHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(8),
+      gap: scale(10),
       marginBottom: verticalScale(10),
     },
     cardTitle: { fontSize: font(15), fontWeight: "700", color: "#111827" },
@@ -725,14 +742,12 @@ function createStyles(
     },
     errorBannerText: { flex: 1, fontSize: font(13), color: "#B91C1C" },
     footer: {
+      ...FOOTER_BAR,
       flexDirection: "row",
       gap: scale(10),
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(12),
       paddingBottom: verticalScale(28),
-      backgroundColor: "#fff",
-      borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
     },
     footerBtn: {
       flex: 1,
@@ -741,9 +756,9 @@ function createStyles(
       paddingVertical: verticalScale(13),
       borderRadius: RADIUS_LG,
     },
-    cancelBtn: { backgroundColor: "#F3F4F6" },
+    cancelBtn: { ...FOOTER_BTN_CANCEL },
     cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
-    saveBtn: { backgroundColor: "#2563EB" },
+    saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
     saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
   });

@@ -20,7 +20,6 @@ import {
 import {
   APP_BACKGROUND_V2,
   CARD_BACKGROUND,
-  CARD_BORDER,
   FOOTER_BORDER,
   INPUT_BORDER,
   PRIMARY_COLOR,
@@ -28,7 +27,9 @@ import {
   TEXT_PLACEHOLDER,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
+  SECTION_ICON_COLOR,
 } from "@/constants/colors";
+import SectionIcon from "@/components/ui/SectionIcon";
 import {
   RADIUS_2XL,
   RADIUS_LG,
@@ -49,6 +50,13 @@ import {
   type StudentDetail,
   type StudentOption,
 } from "../../utils/tardinessRules";
+import {
+  CARD_FORM,
+  FOOTER_BAR,
+  FOOTER_BTN_CANCEL,
+  FOOTER_BTN_SAVE,
+  POPUP_CARD,
+} from "@/styles/surfaces";
 
 /**
  * Tardanzas (Face Class) — registra la entrada tardía de un estudiante.
@@ -319,7 +327,9 @@ export default function Tardanza() {
           {/* ── Card Estudiante: buscador + ficha del seleccionado ── */}
           <View style={styles.studentCard}>
             <View style={styles.cardHeader}>
-              <Ionicons name="person-outline" size={18} color={PRIMARY_COLOR} />
+              <SectionIcon tone="blue">
+                <Ionicons name="person-outline" size={18} color={SECTION_ICON_COLOR} />
+              </SectionIcon>
               <Text style={styles.cardTitle}>Estudiante</Text>
             </View>
 
@@ -694,18 +704,12 @@ function createStyles(
       color: PRIMARY_COLOR,
     },
     resultsCard: {
+      ...POPUP_CARD,
       width: "100%",
       maxWidth: 440,
       maxHeight: "60%",
       overflow: "hidden",
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
       padding: scale(12),
-      elevation: 10,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
     },
     emptyBlock: {
       alignItems: "center",
@@ -718,13 +722,10 @@ function createStyles(
       textAlign: "center",
     },
     resultRow: {
+      ...CARD_FORM,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(10),
-      backgroundColor: CARD_BACKGROUND,
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: CARD_BORDER,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       marginBottom: verticalScale(6),
@@ -761,10 +762,7 @@ function createStyles(
 
     /* ── Ficha del estudiante ── */
     studentCard: {
-      backgroundColor: CARD_BACKGROUND,
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: CARD_BORDER,
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),
@@ -772,15 +770,12 @@ function createStyles(
     cardHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(8),
+      gap: scale(10),
       marginBottom: verticalScale(12),
     },
     cardTitle: { fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
     emptyCard: {
-      backgroundColor: CARD_BACKGROUND,
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: CARD_BORDER,
+      ...CARD_FORM,
       alignItems: "center",
       gap: verticalScale(8),
       paddingHorizontal: scale(16),
@@ -854,14 +849,12 @@ function createStyles(
 
     /* ── Acciones (footer fijo) ── */
     footer: {
+      ...FOOTER_BAR,
       flexDirection: "row",
       gap: scale(10),
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(12),
       paddingBottom: verticalScale(28),
-      backgroundColor: CARD_BACKGROUND,
-      borderTopWidth: 1,
-      borderTopColor: FOOTER_BORDER,
     },
     footerBtn: {
       flex: 1,
@@ -870,14 +863,14 @@ function createStyles(
       paddingVertical: verticalScale(13),
       borderRadius: RADIUS_LG,
     },
-    cancelBtn: { backgroundColor: FOOTER_BORDER },
+    cancelBtn: { ...FOOTER_BTN_CANCEL },
     footerBtnDisabled: { opacity: 0.55 },
     cancelText: {
       fontSize: font(14),
       fontWeight: "700",
       color: TEXT_SECONDARY,
     },
-    saveBtn: { backgroundColor: PRIMARY_COLOR },
+    saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
     saveText: { fontSize: font(14), fontWeight: "700", color: CARD_BACKGROUND },
   });

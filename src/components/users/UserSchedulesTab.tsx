@@ -2,10 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import React, { useCallback, useMemo, useState } from "react";
 import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { RADIUS_2XL, RADIUS_LG, RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
+import { RADIUS_LG, RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
 import { formatTo12Hour, type ScheduleField } from "../../utils/userFormRules";
 import type { UserFormController } from "./useUserForm";
 import type { UserFormStyles } from "./userFormStyles";
+import { SECTION_ICON_COLOR } from "@/constants/colors";
+import SectionIcon from "@/components/ui/SectionIcon";
+import { BOTTOM_SHEET_CARD, CARD_FORM } from "@/styles/surfaces";
 
 interface UserSchedulesTabProps {
   ctl: UserFormController;
@@ -165,7 +168,9 @@ export default function UserSchedulesTab({ ctl, styles }: UserSchedulesTabProps)
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
-            <Ionicons name="time-outline" size={16} color="#2563EB" />
+            <SectionIcon tone="teal" size={scale(28)}>
+              <Ionicons name="time-outline" size={16} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>
               Horarios {ctl.capabilities.canApplyTimeControl && <Text style={styles.required}>*</Text>}
             </Text>
@@ -354,10 +359,7 @@ function createStyles(
     bulkClearBtn: { flex: 0, paddingHorizontal: scale(14), backgroundColor: "#FEF2F2" },
     bulkBtnText: { fontSize: font(12), fontWeight: "700", color: "#2563EB" },
     dayCard: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_FORM,
       paddingHorizontal: scale(14),
       paddingVertical: verticalScale(12),
       gap: verticalScale(8),
@@ -389,9 +391,7 @@ function createStyles(
       justifyContent: "flex-end",
     },
     pickerCard: {
-      backgroundColor: "#fff",
-      borderTopLeftRadius: RADIUS_2XL,
-      borderTopRightRadius: RADIUS_2XL,
+      ...BOTTOM_SHEET_CARD,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(8),
       paddingBottom: verticalScale(28),

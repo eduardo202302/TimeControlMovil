@@ -8,7 +8,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { PRIMARY_COLOR, TEXT_PLACEHOLDER } from "@/constants/colors";
+import { PRIMARY_COLOR, TEXT_PLACEHOLDER, SECTION_ICON_COLOR } from "@/constants/colors";
+import SectionIcon from "@/components/ui/SectionIcon";
 import { useResponsive } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { searchCourses } from "../../api/getCourses";
@@ -221,7 +222,9 @@ export default function AdminAttendanceTaking() {
   const courseSelector = (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Ionicons name="business-outline" size={18} color={PRIMARY_COLOR} />
+        <SectionIcon tone="blue">
+          <Ionicons name="business-outline" size={18} color={SECTION_ICON_COLOR} />
+        </SectionIcon>
         <Text style={styles.cardTitle}>Seleccionar Curso/Sección</Text>
       </View>
       <TouchableOpacity style={styles.selector} onPress={openCourseSheet} activeOpacity={0.8}>

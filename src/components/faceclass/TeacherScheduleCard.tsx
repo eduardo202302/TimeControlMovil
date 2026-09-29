@@ -2,15 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import {
-  CARD_BACKGROUND,
-  CARD_BORDER,
   FOOTER_BORDER,
   PRIMARY_COLOR,
   PRIMARY_TINT_BACKGROUND,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
 } from "@/constants/colors";
-import { RADIUS_2XL, RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
+import { RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
 import type { TeacherAttendanceToday } from "../../../types/typeStore/SchoolStoreType";
 import { formatDisplayTime } from "../timeoff/RevisionFinalModal";
 import {
@@ -18,6 +16,7 @@ import {
   formatDayMonthYear,
   hasAvailableClassesToday,
 } from "../../utils/attendanceRules";
+import { CARD_FORM } from "@/styles/surfaces";
 
 /**
  * Port de `TeacherSchedule` (face-class-web, SubComponents de
@@ -148,10 +147,7 @@ function createStyles(
 ) {
   return StyleSheet.create({
     card: {
-      backgroundColor: CARD_BACKGROUND,
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: CARD_BORDER,
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),

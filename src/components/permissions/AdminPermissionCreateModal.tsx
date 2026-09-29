@@ -17,10 +17,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND, APP_BACKGROUND_V2 } from "@/constants/colors";
+import {
+  APP_BACKGROUND,
+  APP_BACKGROUND_V2,
+  SECTION_ICON_COLOR,
+} from "@/constants/colors";
+import SectionIcon from "@/components/ui/SectionIcon";
 import {
   MAX_CONTENT_WIDTH,
-  RADIUS_2XL,
   RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
@@ -47,6 +51,14 @@ import {
 } from "../timeoff/RevisionFinalModal";
 import { MAX_PAYLOAD_BYTES, pickAttachments } from "./pickAttachments";
 import TagOptionSheet from "./TagOptionSheet";
+import {
+  BOTTOM_SHEET_CARD,
+  CARD_FORM,
+  FOOTER_BAR,
+  FOOTER_BTN_CANCEL,
+  FOOTER_BTN_SAVE,
+  POPUP_CARD,
+} from "@/styles/surfaces";
 
 /** Mismo debounce y mínimo que el selector de Ponche ADM. */
 const SEARCH_DEBOUNCE_MS = 400;
@@ -472,7 +484,9 @@ function CreateForm({
         {/* ── Información: usuario, acción y tipo ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="people-outline" size={18} color="#2563EB" />
+            <SectionIcon tone="blue">
+              <Ionicons name="people-outline" size={18} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Información</Text>
           </View>
           <Text style={styles.label}>
@@ -572,7 +586,9 @@ function CreateForm({
         {/* ── Detalles ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="document-text-outline" size={18} color="#2563EB" />
+            <SectionIcon tone="violet">
+              <Ionicons name="document-text-outline" size={18} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Detalles</Text>
           </View>
           <Text style={styles.label}>
@@ -608,7 +624,9 @@ function CreateForm({
         {/* ── Fecha y Hora ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="calendar-outline" size={18} color="#2563EB" />
+            <SectionIcon tone="teal">
+              <Ionicons name="calendar-outline" size={18} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Fecha y Hora</Text>
           </View>
           <View style={styles.row}>
@@ -721,7 +739,9 @@ function CreateForm({
         {/* ── Adjuntos ── */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Ionicons name="attach-outline" size={18} color="#2563EB" />
+            <SectionIcon tone="amber">
+              <Ionicons name="attach-outline" size={18} color={SECTION_ICON_COLOR} />
+            </SectionIcon>
             <Text style={styles.cardTitle}>Adjuntar Archivos</Text>
           </View>
           {files.map((file) => (
@@ -997,10 +1017,7 @@ function createStyles(
       width: "100%",
     },
     card: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),
@@ -1008,7 +1025,7 @@ function createStyles(
     cardHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(8),
+      gap: scale(10),
       marginBottom: verticalScale(10),
     },
     cardTitle: { fontSize: font(15), fontWeight: "700", color: "#111827" },
@@ -1126,14 +1143,12 @@ function createStyles(
     },
     errorBannerText: { flex: 1, fontSize: font(13), color: "#B91C1C" },
     footer: {
+      ...FOOTER_BAR,
       flexDirection: "row",
       gap: scale(10),
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(12),
       paddingBottom: verticalScale(28),
-      backgroundColor: "#fff",
-      borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
     },
     footerBtn: {
       flex: 1,
@@ -1142,9 +1157,9 @@ function createStyles(
       paddingVertical: verticalScale(13),
       borderRadius: RADIUS_LG,
     },
-    cancelBtn: { backgroundColor: "#F3F4F6" },
+    cancelBtn: { ...FOOTER_BTN_CANCEL },
     cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
-    saveBtn: { backgroundColor: "#2563EB" },
+    saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
     saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
     /* ── Picker de usuario: valores calcados de adminpunchinout.tsx ── */
@@ -1156,18 +1171,12 @@ function createStyles(
       padding: scale(20),
     },
     selectorCard: {
+      ...POPUP_CARD,
       width: "100%",
       // Mismo tope/criterio que el picker de Ponche ADM.
       maxWidth: 440,
       maxHeight: "88%",
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
       padding: scale(20),
-      elevation: 10,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
     },
     selectorHeader: {
       flexDirection: "row",
@@ -1277,9 +1286,7 @@ function createStyles(
       justifyContent: "flex-end",
     },
     pickerCard: {
-      backgroundColor: "#fff",
-      borderTopLeftRadius: RADIUS_2XL,
-      borderTopRightRadius: RADIUS_2XL,
+      ...BOTTOM_SHEET_CARD,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(8),
       paddingBottom: verticalScale(28),

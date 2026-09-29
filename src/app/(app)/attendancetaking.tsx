@@ -18,6 +18,7 @@ import {
   type AttendanceData,
 } from "../../utils/attendanceRules";
 import * as Storage from "../../utils/storage";
+import { SHADOW_PRIMARY } from "@/constants/shadows";
 
 /**
  * Asistencia (docente) — port de AttendanceTaking + AttendanceForm del webapp,
@@ -233,6 +234,7 @@ function createStyles(
     },
 
     cta: {
+      ...SHADOW_PRIMARY,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
@@ -243,7 +245,13 @@ function createStyles(
       paddingVertical: verticalScale(18),
     },
     // Apagado, no oculto: la acción sigue a la vista aunque no se pueda usar.
-    ctaDisabled: { backgroundColor: TEXT_SECONDARY, opacity: 0.55 },
+    // Sin la sombra primaria del cta: un botón gris no debe brillar en azul.
+    ctaDisabled: {
+      backgroundColor: TEXT_SECONDARY,
+      opacity: 0.55,
+      elevation: 0,
+      shadowOpacity: 0,
+    },
     // flexShrink para que el texto largo del estado deshabilitado envuelva en
     // vez de empujar el icono fuera del botón.
     ctaLabels: { flexShrink: 1 },

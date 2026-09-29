@@ -52,3 +52,32 @@ export const SHADOW_PRIMARY: ViewStyle = {
   shadowRadius: 8,
   elevation: 4,
 };
+
+/** FAB: sombra teñida del primario, más alta que la de cards para que flote. */
+export const SHADOW_FAB: ViewStyle = {
+  shadowColor: PRIMARY_COLOR,
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.35,
+  shadowRadius: 16,
+  elevation: 8,
+};
+
+/** Footer de formulario: sombra hacia ARRIBA (offset negativo) sobre el contenido. */
+export const SHADOW_FOOTER: ViewStyle = {
+  shadowColor: SHADOW_COLOR,
+  shadowOffset: { width: 0, height: -4 },
+  shadowOpacity: 0.08,
+  shadowRadius: 12,
+  elevation: 8,
+};
+
+/** Sombra corta teñida del color del elemento — la usa el chip de SectionIcon. */
+export function tintedShadow(color: string): ViewStyle {
+  return {
+    shadowColor: color,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 2,
+  };
+}

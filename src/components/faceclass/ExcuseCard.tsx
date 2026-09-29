@@ -4,7 +4,6 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import {
   RADIUS_PILL,
   RADIUS_SM,
-  RADIUS_XL,
   useResponsive,
 } from "@/constants/responsive";
 import { formatDisplayDate } from "../timeoff/RevisionFinalModal";
@@ -14,6 +13,7 @@ import {
   type ExcuseTag,
 } from "../../utils/excusesRules";
 import type { PermissionTagRef } from "../../utils/permissionRules";
+import { CARD_ROW } from "@/styles/surfaces";
 
 const CHIP_FALLBACK = { background: "#E2E8F0", text: "#475569" };
 
@@ -168,10 +168,7 @@ function createStyles(
 ) {
   return StyleSheet.create({
     card: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_ROW,
       paddingHorizontal: scale(14),
       paddingVertical: verticalScale(12),
     },

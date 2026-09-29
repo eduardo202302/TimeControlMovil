@@ -2,12 +2,19 @@ import { StyleSheet } from "react-native";
 import { APP_BACKGROUND_V2 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
-  RADIUS_2XL,
   RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
   RADIUS_SM,
 } from "@/constants/responsive";
+import {
+  CARD_FORM,
+  DIALOG_BOX,
+  DIALOG_OVERLAY,
+  FOOTER_BAR,
+  FOOTER_BTN_CANCEL,
+  FOOTER_BTN_SAVE,
+} from "@/styles/surfaces";
 
 /**
  * Estilos compartidos por UserFormModal y sus tabs. Mismos valores que
@@ -90,10 +97,7 @@ export function createUserFormStyles(
       width: "100%",
     },
     card: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),
@@ -105,7 +109,7 @@ export function createUserFormStyles(
       gap: scale(8),
       marginBottom: verticalScale(12),
     },
-    cardTitleRow: { flexDirection: "row", alignItems: "center", gap: scale(6), flexShrink: 1 },
+    cardTitleRow: { flexDirection: "row", alignItems: "center", gap: scale(10), flexShrink: 1 },
     cardTitle: { fontSize: font(14), fontWeight: "700", color: "#111827" },
     label: { fontSize: font(12), fontWeight: "600", color: "#374151", marginBottom: verticalScale(6) },
     labelSpaced: { marginTop: verticalScale(12) },
@@ -242,14 +246,12 @@ export function createUserFormStyles(
     retryText: { fontSize: font(13), fontWeight: "700", color: "#2563EB" },
     // ── Footer / confirmación: copia de HolidaysFormModal.tsx ──
     footer: {
+      ...FOOTER_BAR,
       flexDirection: "row",
       gap: scale(10),
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(12),
       paddingBottom: verticalScale(28),
-      backgroundColor: "#fff",
-      borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
     },
     footerBtn: {
       flex: 1,
@@ -258,9 +260,9 @@ export function createUserFormStyles(
       paddingVertical: verticalScale(13),
       borderRadius: RADIUS_LG,
     },
-    cancelBtn: { backgroundColor: "#F3F4F6" },
+    cancelBtn: { ...FOOTER_BTN_CANCEL },
     cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
-    saveBtn: { backgroundColor: "#2563EB" },
+    saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
     saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
     errorBanner: {
@@ -276,18 +278,16 @@ export function createUserFormStyles(
     },
     errorBannerText: { flex: 1, fontSize: font(13), color: "#B91C1C" },
     confirmOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       justifyContent: "center",
       alignItems: "center",
     },
     confirmBox: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_LG,
+      ...DIALOG_BOX,
       padding: scale(24),
       width: "80%",
       maxWidth: 400,
-      elevation: 5,
     },
     confirmTitle: {
       fontSize: font(15),

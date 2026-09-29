@@ -15,10 +15,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND, APP_BACKGROUND_V2 } from "@/constants/colors";
+import {
+  APP_BACKGROUND,
+  APP_BACKGROUND_V2,
+  SECTION_ICON_COLOR,
+  type SectionTone,
+} from "@/constants/colors";
+import SectionIcon from "@/components/ui/SectionIcon";
 import {
   MAX_CONTENT_WIDTH,
-  RADIUS_2XL,
   RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
@@ -55,6 +60,14 @@ import {
 import AbsenceCalendar, { type AbsenceRange } from "./AbsenceCalendar";
 import { MAX_PAYLOAD_BYTES, pickAttachments } from "../permissions/pickAttachments";
 import TagOptionSheet from "../permissions/TagOptionSheet";
+import {
+  CARD_FORM,
+  DIALOG_BOX,
+  DIALOG_OVERLAY,
+  FOOTER_BAR,
+  FOOTER_BTN_CANCEL,
+  FOOTER_BTN_SAVE,
+} from "@/styles/surfaces";
 
 /**
  * Modal unificado de una excusa admin, calcado de ExcusesCrud del webapp: un
@@ -180,12 +193,14 @@ function TopBar({
 /** Card colapsable, igual que CardContainer canCollapse del webapp. */
 function CollapsibleCard({
   icon,
+  tone,
   title,
   defaultOpen = true,
   styles,
   children,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
+  tone: SectionTone;
   title: React.ReactNode;
   defaultOpen?: boolean;
   styles: CrudStyles;
@@ -199,7 +214,9 @@ function CollapsibleCard({
         onPress={() => setOpen((value) => !value)}
         activeOpacity={0.7}
       >
-        <Ionicons name={icon} size={18} color="#2563EB" />
+        <SectionIcon tone={tone}>
+          <Ionicons name={icon} size={18} color={SECTION_ICON_COLOR} />
+        </SectionIcon>
         <Text style={styles.cardTitle}>{title}</Text>
         <Ionicons
           name={open ? "chevron-up" : "chevron-down"}
@@ -603,7 +620,7 @@ function CrudForm({
           </View>
 
           {/* ── 2. Detalles ── */}
-          <CollapsibleCard icon="information-circle-outline" title="Detalles" styles={styles}>
+          <CollapsibleCard icon="information-circle-outline" tone="violet" title="Detalles" styles={styles}>
             <Text style={styles.label}>Asunto</Text>
             {editing ? (
               <TextInput
@@ -640,7 +657,7 @@ function CrudForm({
           </CollapsibleCard>
 
           {/* ── 3. Quién Reporta ── */}
-          <CollapsibleCard icon="person-outline" title="Quién Reporta" styles={styles}>
+          <CollapsibleCard icon="person-outline" tone="blue" title="Quién Reporta" styles={styles}>
             <View style={styles.reporterBox}>
               <Text style={styles.personName}>{reporterLine}</Text>
               {!!requestedAt && <Text style={styles.muted}>Solicitado: {requestedAt}</Text>}
@@ -669,6 +686,7 @@ function CrudForm({
           {isRejection && (
             <CollapsibleCard
               icon="chatbox-ellipses-outline"
+              tone="violet"
               title={
                 editing ? (
                   <>
@@ -786,7 +804,9 @@ function CrudForm({
           {/* ── Día/s de ausencia ── */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Ionicons name="calendar-outline" size={18} color="#2563EB" />
+              <SectionIcon tone="teal">
+                <Ionicons name="calendar-outline" size={18} color={SECTION_ICON_COLOR} />
+              </SectionIcon>
               <Text style={styles.cardTitle}>Ausencia</Text>
             </View>
             {editing ? (
@@ -816,6 +836,7 @@ function CrudForm({
           {/* ── 6. Adjuntos del solicitante: cerrada si no hay archivos ── */}
           <CollapsibleCard
             icon="attach-outline"
+            tone="amber"
             title="Adjuntos"
             defaultOpen={studentAttachments.length > 0}
             styles={styles}
@@ -1026,10 +1047,7 @@ function createStyles(
       width: "100%",
     },
     card: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),
@@ -1037,7 +1055,7 @@ function createStyles(
     cardHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(8),
+      gap: scale(10),
       marginBottom: verticalScale(10),
     },
     cardTitle: { fontSize: font(15), fontWeight: "700", color: "#111827" },
@@ -1240,14 +1258,12 @@ function createStyles(
     },
     errorBannerText: { flex: 1, fontSize: font(13), color: "#B91C1C" },
     footer: {
+      ...FOOTER_BAR,
       flexDirection: "row",
       gap: scale(10),
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(12),
       paddingBottom: verticalScale(28),
-      backgroundColor: "#fff",
-      borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
     },
     footerBtn: {
       flex: 1,
@@ -1262,23 +1278,22 @@ function createStyles(
       justifyContent: "center",
       gap: scale(8),
     },
-    cancelBtn: { backgroundColor: "#F3F4F6" },
+    cancelBtn: { ...FOOTER_BTN_CANCEL },
     cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
-    saveBtn: { backgroundColor: "#2563EB" },
+    saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
     saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
     discardOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       alignItems: "center",
       justifyContent: "center",
       padding: scale(20),
     },
     discardBox: {
+      ...DIALOG_BOX,
       width: "100%",
       maxWidth: scale(360),
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
       padding: scale(20),
     },
     discardTitle: { fontSize: font(17), fontWeight: "700", color: "#142157" },

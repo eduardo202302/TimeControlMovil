@@ -20,7 +20,6 @@ import {
 import { APP_BACKGROUND_V2 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
-  RADIUS_2XL,
   RADIUS_LG,
   RADIUS_MD,
   useResponsive,
@@ -35,6 +34,15 @@ import {
 } from "../../utils/holidaysRules";
 import { toRD } from "../../utils/punchRules";
 import { formatDisplayDate, formatDisplayTime } from "../timeoff/RevisionFinalModal";
+import {
+  BOTTOM_SHEET_CARD,
+  CARD_FORM,
+  DIALOG_BOX,
+  DIALOG_OVERLAY,
+  FOOTER_BAR,
+  FOOTER_BTN_CANCEL,
+  FOOTER_BTN_SAVE,
+} from "@/styles/surfaces";
 
 type PickerTarget = "date" | "startTime" | "endTime";
 type FieldKey = "name" | "holidayDate" | "startTime" | "endTime";
@@ -652,10 +660,7 @@ function createStyles(
       width: "100%",
     },
     card: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),
@@ -716,14 +721,12 @@ function createStyles(
     },
     errorBannerText: { flex: 1, fontSize: font(13), color: "#B91C1C" },
     footer: {
+      ...FOOTER_BAR,
       flexDirection: "row",
       gap: scale(10),
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(12),
       paddingBottom: verticalScale(28),
-      backgroundColor: "#fff",
-      borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
     },
     footerBtn: {
       flex: 1,
@@ -732,9 +735,9 @@ function createStyles(
       paddingVertical: verticalScale(13),
       borderRadius: RADIUS_LG,
     },
-    cancelBtn: { backgroundColor: "#F3F4F6" },
+    cancelBtn: { ...FOOTER_BTN_CANCEL },
     cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
-    saveBtn: { backgroundColor: "#2563EB" },
+    saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
     saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
     pickerOverlay: {
@@ -743,9 +746,7 @@ function createStyles(
       justifyContent: "flex-end",
     },
     pickerCard: {
-      backgroundColor: "#fff",
-      borderTopLeftRadius: RADIUS_2XL,
-      borderTopRightRadius: RADIUS_2XL,
+      ...BOTTOM_SHEET_CARD,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(8),
       paddingBottom: verticalScale(28),
@@ -757,18 +758,16 @@ function createStyles(
       paddingTop: verticalScale(8),
     },
     confirmOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       justifyContent: "center",
       alignItems: "center",
     },
     confirmBox: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_LG,
+      ...DIALOG_BOX,
       padding: scale(24),
       width: "80%",
       maxWidth: 400,
-      elevation: 5,
     },
     confirmTitle: {
       fontSize: font(15),

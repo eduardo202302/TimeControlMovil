@@ -12,12 +12,13 @@ import {
 } from "react-native";
 import { FOOTER_BORDER, TEXT_PRIMARY } from "@/constants/colors";
 import {
-  RADIUS_2XL,
   RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
   useResponsive,
 } from "@/constants/responsive";
+import { SHADOW_PRIMARY } from "@/constants/shadows";
+import { POPUP_CARD } from "@/styles/surfaces";
 
 /** Lado del avatar de las filas — mismo AVATAR_SM_SIZE que las filas de
  * resultado de AdminPermissionCreateModal.tsx, un punto más chico porque acá
@@ -194,8 +195,7 @@ function createStyles(
       paddingHorizontal: scale(24),
     },
     sheet: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
+      ...POPUP_CARD,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(16),
       paddingBottom: verticalScale(12),
@@ -277,6 +277,7 @@ function createStyles(
       borderRadius: OPTION_AVATAR_SIZE / 2,
     },
     doneBtn: {
+      ...SHADOW_PRIMARY,
       marginTop: verticalScale(8),
       alignItems: "center",
       paddingVertical: verticalScale(12),
