@@ -14,8 +14,9 @@ import {
   View,
 } from "react-native";
 import {
-  APP_BACKGROUND,
   APP_BACKGROUND_V2,
+  HEADER_BUTTON_BACKGROUND,
+  HEADER_TEXT,
   SECTION_ICON_COLOR,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
@@ -38,7 +39,7 @@ import { permissionRequesterName, readOverTime } from "../../utils/adminPermissi
 import { normalizePermissionName, toRD } from "../../utils/punchRules";
 import { formatDisplayDate, formatDisplayTime } from "../timeoff/RevisionFinalModal";
 import { SHADOW_PRIMARY } from "@/constants/shadows";
-import { CARD_FORM, FOOTER_BAR } from "@/styles/surfaces";
+import { CARD_FORM, FILE_ROW, FOOTER_BAR, MODAL_TOPBAR, SWITCH_COLORS } from "@/styles/surfaces";
 
 const AUSENCIA_ACTION_NAME = "ausencia";
 const CHIP_FALLBACK = { background: "#E2E8F0", text: "#475569" };
@@ -173,12 +174,12 @@ export default function AdminPermissionDetailModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      {/* Topbar claro: íconos oscuros mientras está abierto; al desmontar vuelve el light-content del shell. */}
-      <StatusBar barStyle="dark-content" />
+      {/* TopBar navy: íconos claros mientras está abierto; al desmontar se desapila y queda el light-content del shell. */}
+      <StatusBar barStyle="light-content" />
       <View style={styles.screen}>
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={onClose} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={22} color="#111827" />
+            <Ionicons name="arrow-back" size={22} color={HEADER_TEXT} />
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>
             {permission ? `Permiso ID: ${permission.id}` : "Detalle del Permiso"}
@@ -304,7 +305,7 @@ export default function AdminPermissionDetailModal({
                 {/* Modo Ver: el toggle se muestra siempre bloqueado, como en el webapp. */}
                 <View style={[styles.infoRow, styles.switchRow]}>
                   <Text style={styles.infoLabel}>Hr. Extras Pagas</Text>
-                  <Switch value={readOverTime(permission.overTime)} disabled />
+                  <Switch {...SWITCH_COLORS} value={readOverTime(permission.overTime)} disabled />
                 </View>
               </View>
 
@@ -411,16 +412,14 @@ function createStyles(
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     topBar: {
+      ...MODAL_TOPBAR,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      backgroundColor: "#fff",
       paddingHorizontal: scale(16),
       // El Modal cubre la SafeAreaView del layout: reserva la status bar.
       paddingTop: verticalScale(48),
       paddingBottom: verticalScale(14),
-      borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
     },
     /** Tamaño fijo: botón de ícono, mismo criterio que PermissionDetailView. */
     backBtn: {
@@ -429,9 +428,10 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
       borderRadius: RADIUS_MD,
+      backgroundColor: HEADER_BUTTON_BACKGROUND,
     },
     topBarSpacer: { width: 40 },
-    topBarTitle: { fontSize: font(17), fontWeight: "700", color: "#142157" },
+    topBarTitle: { fontSize: font(17), fontWeight: "700", color: HEADER_TEXT },
     content: {
       padding: scale(16),
       gap: verticalScale(14),
@@ -510,13 +510,10 @@ function createStyles(
       lineHeight: font(20),
     },
     attachment: {
+      ...FILE_ROW,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      backgroundColor: APP_BACKGROUND,
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       marginBottom: verticalScale(8),

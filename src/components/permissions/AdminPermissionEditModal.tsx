@@ -15,9 +15,11 @@ import {
   View,
 } from "react-native";
 import {
-  APP_BACKGROUND,
   APP_BACKGROUND_V2,
+  HEADER_BUTTON_BACKGROUND,
+  HEADER_TEXT,
   SECTION_ICON_COLOR,
+  TEXT_MUTED,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
@@ -57,10 +59,16 @@ import {
 import { MAX_PAYLOAD_BYTES, pickAttachments } from "./pickAttachments";
 import TagOptionSheet from "./TagOptionSheet";
 import {
+  ADD_FILE_BTN,
   CARD_FORM,
+  FIELD_DISABLED,
+  FIELD_SURFACE,
+  FILE_ROW,
   FOOTER_BAR,
   FOOTER_BTN_CANCEL,
   FOOTER_BTN_SAVE,
+  MODAL_TOPBAR,
+  SWITCH_COLORS,
 } from "@/styles/surfaces";
 
 const AUSENCIA_ACTION_NAME = "ausencia";
@@ -103,12 +111,12 @@ export default function AdminPermissionEditModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      {/* Topbar claro: íconos oscuros mientras está abierto; al desmontar vuelve el light-content del shell. */}
-      <StatusBar barStyle="dark-content" />
+      {/* TopBar navy: íconos claros mientras está abierto; al desmontar se desapila y queda el light-content del shell. */}
+      <StatusBar barStyle="light-content" />
       <View style={styles.screen}>
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={onClose} activeOpacity={0.7}>
-            <Ionicons name="close" size={22} color="#111827" />
+            <Ionicons name="close" size={22} color={HEADER_TEXT} />
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>
             {permission ? `Editar Permiso #${permission.id}` : "Editar Permiso"}
@@ -408,6 +416,7 @@ function EditForm({
               )}
             </View>
             <Switch
+              {...SWITCH_COLORS}
               value={overTime}
               onValueChange={setOverTime}
               disabled={overTimeLocked || saving}
@@ -584,15 +593,13 @@ function createStyles(
     flex: { flex: 1 },
     screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     topBar: {
+      ...MODAL_TOPBAR,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      backgroundColor: "#fff",
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(48),
       paddingBottom: verticalScale(14),
-      borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
     },
     /** Tamaño fijo: botón de ícono, mismo criterio que PermissionDetailView. */
     backBtn: {
@@ -601,9 +608,10 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
       borderRadius: RADIUS_MD,
+      backgroundColor: HEADER_BUTTON_BACKGROUND,
     },
     topBarSpacer: { width: 40 },
-    topBarTitle: { fontSize: font(17), fontWeight: "700", color: "#142157" },
+    topBarTitle: { fontSize: font(17), fontWeight: "700", color: HEADER_TEXT },
     stateBox: {
       flex: 1,
       alignItems: "center",
@@ -653,15 +661,12 @@ function createStyles(
       marginBottom: verticalScale(4),
     },
     select: {
+      ...FIELD_SURFACE,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      borderWidth: 1,
-      borderColor: "#D1D5DB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
-      backgroundColor: "#fff",
     },
     stateChip: {
       borderRadius: RADIUS_PILL,
@@ -670,18 +675,15 @@ function createStyles(
     },
     stateChipText: { fontSize: font(12), fontWeight: "700" },
     input: {
-      borderWidth: 1,
-      borderColor: "#D1D5DB",
-      borderRadius: RADIUS_MD,
+      ...FIELD_SURFACE,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       fontSize: font(14),
       color: "#111827",
-      backgroundColor: "#fff",
       marginTop: verticalScale(6),
     },
     textarea: { minHeight: verticalScale(96) },
-    inputDisabled: { backgroundColor: "#F3F4F6", color: "#6B7280" },
+    inputDisabled: { ...FIELD_DISABLED, color: TEXT_MUTED },
     inputInvalid: { borderColor: "#DC2626" },
     fieldError: { fontSize: font(12), color: "#DC2626", marginTop: verticalScale(4) },
     infoRow: {
@@ -699,16 +701,13 @@ function createStyles(
     switchLabel: { fontSize: font(13), fontWeight: "700", color: "#111827" },
     switchHint: { fontSize: font(11), color: "#6B7280", marginTop: verticalScale(2) },
     fileRow: {
+      ...FILE_ROW,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(9),
       marginBottom: verticalScale(8),
-      backgroundColor: APP_BACKGROUND,
     },
     fileRowRemoved: { backgroundColor: "#FEF2F2", borderColor: "#FECACA" },
     fileRowNew: { backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" },
@@ -717,14 +716,11 @@ function createStyles(
     fileSize: { fontSize: font(11), color: "#6B7280" },
     undoText: { fontSize: font(12), fontWeight: "700", color: "#2563EB" },
     addFileBtn: {
+      ...ADD_FILE_BTN,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       gap: scale(8),
-      borderWidth: 1.5,
-      borderStyle: "dashed",
-      borderColor: "#93C5FD",
-      borderRadius: RADIUS_LG,
       paddingVertical: verticalScale(12),
       marginTop: verticalScale(4),
     },

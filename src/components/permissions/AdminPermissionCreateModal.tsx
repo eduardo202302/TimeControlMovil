@@ -18,8 +18,10 @@ import {
   View,
 } from "react-native";
 import {
-  APP_BACKGROUND,
   APP_BACKGROUND_V2,
+  HEADER_BUTTON_BACKGROUND,
+  HEADER_TEXT,
+  PRIMARY_COLOR,
   SECTION_ICON_COLOR,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
@@ -52,13 +54,19 @@ import {
 import { MAX_PAYLOAD_BYTES, pickAttachments } from "./pickAttachments";
 import TagOptionSheet from "./TagOptionSheet";
 import {
+  ADD_FILE_BTN,
   BOTTOM_SHEET_CARD,
   CARD_FORM,
+  FIELD_DISABLED,
+  FIELD_SURFACE,
+  FILE_ROW,
   FOOTER_BAR,
   FOOTER_BTN_CANCEL,
   FOOTER_BTN_SAVE,
+  MODAL_TOPBAR,
   POPUP_CARD,
 } from "@/styles/surfaces";
+import { SHADOW_PRIMARY, tintedShadow } from "@/constants/shadows";
 
 /** Mismo debounce y mínimo que el selector de Ponche ADM. */
 const SEARCH_DEBOUNCE_MS = 400;
@@ -206,12 +214,12 @@ export default function AdminPermissionCreateModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      {/* Topbar claro: íconos oscuros mientras está abierto; al desmontar vuelve el light-content del shell. */}
-      <StatusBar barStyle="dark-content" />
+      {/* TopBar navy: íconos claros mientras está abierto; al desmontar se desapila y queda el light-content del shell. */}
+      <StatusBar barStyle="light-content" />
       <View style={styles.screen}>
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={onClose} activeOpacity={0.7}>
-            <Ionicons name="close" size={22} color="#111827" />
+            <Ionicons name="close" size={22} color={HEADER_TEXT} />
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>Agregar Permiso</Text>
           <View style={styles.topBarSpacer} />
@@ -841,7 +849,7 @@ function CreateForm({
           <View style={styles.selectorCard}>
             <View style={styles.selectorHeader}>
               <View style={styles.selectorHeaderIcon}>
-                <Ionicons name="people-outline" size={22} color="#2563EB" />
+                <Ionicons name="people-outline" size={22} color={SECTION_ICON_COLOR} />
               </View>
               <Text style={styles.selectorTitle}>Seleccionar Usuario</Text>
               <TouchableOpacity
@@ -986,15 +994,13 @@ function createStyles(
     flex: { flex: 1 },
     screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     topBar: {
+      ...MODAL_TOPBAR,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      backgroundColor: "#fff",
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(48),
       paddingBottom: verticalScale(14),
-      borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
     },
     /** Tamaño fijo: botón de ícono, mismo criterio que PermissionDetailView. */
     backBtn: {
@@ -1003,9 +1009,10 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
       borderRadius: RADIUS_MD,
+      backgroundColor: HEADER_BUTTON_BACKGROUND,
     },
     topBarSpacer: { width: 40 },
-    topBarTitle: { fontSize: font(17), fontWeight: "700", color: "#142157" },
+    topBarTitle: { fontSize: font(17), fontWeight: "700", color: HEADER_TEXT },
     content: {
       padding: scale(16),
       gap: verticalScale(14),
@@ -1035,28 +1042,22 @@ function createStyles(
     helper: { fontSize: font(12), color: "#92400E", marginTop: verticalScale(6) },
     hint: { fontSize: font(11), color: "#6B7280", marginTop: verticalScale(6), textAlign: "center" },
     select: {
+      ...FIELD_SURFACE,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      borderWidth: 1,
-      borderColor: "#D1D5DB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(11),
-      backgroundColor: "#fff",
     },
-    selectDisabled: { backgroundColor: "#F3F4F6" },
+    selectDisabled: { ...FIELD_DISABLED },
     selectValue: { flex: 1, fontSize: font(14), color: "#111827" },
     selectPlaceholder: { flex: 1, fontSize: font(14), color: "#9CA3AF" },
     input: {
-      borderWidth: 1,
-      borderColor: "#D1D5DB",
-      borderRadius: RADIUS_MD,
+      ...FIELD_SURFACE,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       fontSize: font(14),
       color: "#111827",
-      backgroundColor: "#fff",
     },
     textarea: { minHeight: verticalScale(96) },
     inputInvalid: { borderColor: "#DC2626" },
@@ -1089,15 +1090,12 @@ function createStyles(
     dayChipTextActive: { color: "#fff" },
     /** Usuario elegido: misma caja que los selects del formulario. */
     employeeRow: {
+      ...FIELD_SURFACE,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(10),
-      borderWidth: 1,
-      borderColor: "#D1D5DB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(10),
       paddingVertical: verticalScale(8),
-      backgroundColor: "#fff",
     },
     employeeInfo: { flex: 1 },
     employeeName: { fontSize: font(14), fontWeight: "700", color: "#111827" },
@@ -1105,28 +1103,22 @@ function createStyles(
     employeeMeta: { fontSize: font(12), color: "#6B7280", marginTop: verticalScale(2) },
     linkText: { fontSize: font(14), fontWeight: "700", color: "#2563EB" },
     fileRow: {
+      ...FILE_ROW,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(9),
       marginBottom: verticalScale(8),
-      backgroundColor: APP_BACKGROUND,
     },
     fileName: { flex: 1, fontSize: font(13), color: "#374151" },
     fileSize: { fontSize: font(11), color: "#6B7280" },
     addFileBtn: {
+      ...ADD_FILE_BTN,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       gap: scale(8),
-      borderWidth: 1.5,
-      borderStyle: "dashed",
-      borderColor: "#93C5FD",
-      borderRadius: RADIUS_LG,
       paddingVertical: verticalScale(12),
     },
     addFileText: { fontSize: font(13), fontWeight: "700", color: "#2563EB" },
@@ -1188,12 +1180,13 @@ function createStyles(
     },
     /** Ícono de cabecera: tamaño fijo, mismo criterio que Ponche ADM. */
     selectorHeaderIcon: {
+      ...tintedShadow(PRIMARY_COLOR),
       width: 42,
       height: 42,
       borderRadius: RADIUS_LG,
-      backgroundColor: "#EFF6FF",
       alignItems: "center",
       justifyContent: "center",
+      backgroundColor: PRIMARY_COLOR,
     },
     selectorTitle: {
       flex: 1,
@@ -1209,6 +1202,7 @@ function createStyles(
     },
     /** Botón cuadrado de ícono — lado fijo, mismo criterio que los avatares. */
     iconBtnPrimary: {
+      ...SHADOW_PRIMARY,
       width: 44,
       height: 44,
       alignItems: "center",
@@ -1218,13 +1212,11 @@ function createStyles(
     },
     selectorList: { marginTop: verticalScale(6) },
     searchInputWrap: {
+      ...FIELD_SURFACE,
       flex: 1,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      backgroundColor: "#F9FAFB",
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
       borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),

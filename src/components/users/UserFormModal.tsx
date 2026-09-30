@@ -21,6 +21,7 @@ import UserSchedulesTab from "./UserSchedulesTab";
 import UserSettingsTab from "./UserSettingsTab";
 import { useUserForm } from "./useUserForm";
 import { createUserFormStyles, type UserFormStyles } from "./userFormStyles";
+import { HEADER_TEXT } from "@/constants/colors";
 
 type UserTabId = "info" | "config" | "address" | "schedules";
 
@@ -80,8 +81,8 @@ export default function UserFormModal({
       animationType="slide"
       onRequestClose={() => requestCloseRef.current()}
     >
-      {/* Topbar claro: íconos oscuros mientras está abierto; al desmontar vuelve el light-content del shell. */}
-      <StatusBar barStyle="dark-content" />
+      {/* TopBar navy: íconos claros mientras está abierto; al desmontar se desapila y queda el light-content del shell. */}
+      <StatusBar barStyle="light-content" />
       <View style={styles.screen}>
         {/* Montado solo mientras está visible: cada apertura arranca con su
             propio snapshot, igual que HolidaysFormModal. */}
@@ -204,7 +205,7 @@ function UserForm({
     >
       <View style={styles.topBar}>
         <TouchableOpacity style={styles.iconBtn} onPress={requestClose} activeOpacity={0.7}>
-          <Ionicons name="arrow-back" size={22} color="#111827" />
+          <Ionicons name="arrow-back" size={22} color={HEADER_TEXT} />
         </TouchableOpacity>
         <Text style={styles.topBarTitle} numberOfLines={2}>
           {title}
@@ -223,7 +224,7 @@ function UserForm({
             <Ionicons
               name={ctl.isWatch ? "pencil" : "eye-outline"}
               size={22}
-              color={ctl.isWatch ? "#2563EB" : "#6B7280"}
+              color={HEADER_TEXT}
             />
           </TouchableOpacity>
         ) : (

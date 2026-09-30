@@ -13,8 +13,9 @@ import {
   View,
 } from "react-native";
 import {
-  APP_BACKGROUND,
   APP_BACKGROUND_V2,
+  HEADER_BUTTON_BACKGROUND,
+  HEADER_TEXT,
   SECTION_ICON_COLOR,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
@@ -36,7 +37,7 @@ import {
 } from "../../utils/permissionRules";
 import { normalizePermissionName, toRD } from "../../utils/punchRules";
 import { formatDisplayDate, formatDisplayTime } from "./RevisionFinalModal";
-import { CARD_FORM } from "@/styles/surfaces";
+import { CARD_FORM, FILE_ROW, MODAL_TOPBAR } from "@/styles/surfaces";
 
 /** Nombre de la acción que el backend trata como día completo (00:00–23:59) —
  * mismo criterio que SolicitarPermisoForm al armar la solicitud. */
@@ -142,12 +143,12 @@ export default function PermissionDetailView({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      {/* Topbar claro: íconos oscuros mientras está abierto; al desmontar vuelve el light-content del shell. */}
-      <StatusBar barStyle="dark-content" />
+      {/* TopBar navy: íconos claros mientras está abierto; al desmontar se desapila y queda el light-content del shell. */}
+      <StatusBar barStyle="light-content" />
       <View style={styles.screen}>
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={onClose} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={22} color="#111827" />
+            <Ionicons name="arrow-back" size={22} color={HEADER_TEXT} />
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>Detalle del Permiso</Text>
           <View style={styles.topBarSpacer} />
@@ -367,17 +368,15 @@ function createStyles(
     screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
 
     topBar: {
+      ...MODAL_TOPBAR,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      backgroundColor: "#fff",
       paddingHorizontal: scale(16),
       // El Modal cubre la SafeAreaView del layout, así que el padding superior
       // tiene que reservar la status bar por su cuenta.
       paddingTop: verticalScale(48),
       paddingBottom: verticalScale(14),
-      borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
     },
     /** Tamaño fijo: botón de ícono, mismo criterio que menuBtn en (app)/_layout.tsx. */
     backBtn: {
@@ -386,10 +385,11 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
       borderRadius: RADIUS_MD,
+      backgroundColor: HEADER_BUTTON_BACKGROUND,
     },
     /** Spacer simétrico al backBtn — mantiene el título centrado. */
     topBarSpacer: { width: 40 },
-    topBarTitle: { fontSize: font(17), fontWeight: "700", color: "#142157" },
+    topBarTitle: { fontSize: font(17), fontWeight: "700", color: HEADER_TEXT },
 
     content: {
       padding: scale(16),
@@ -453,13 +453,10 @@ function createStyles(
     mutedSpaced: { marginTop: verticalScale(10) },
 
     attachment: {
+      ...FILE_ROW,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      backgroundColor: APP_BACKGROUND,
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       marginBottom: verticalScale(8),

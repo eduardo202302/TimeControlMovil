@@ -17,7 +17,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND_V2 } from "@/constants/colors";
+import {
+  APP_BACKGROUND_V2,
+  HEADER_BUTTON_BACKGROUND,
+  HEADER_TEXT,
+  TEXT_MUTED,
+} from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
   RADIUS_LG,
@@ -39,9 +44,13 @@ import {
   CARD_FORM,
   DIALOG_BOX,
   DIALOG_OVERLAY,
+  FIELD_DISABLED,
+  FIELD_SURFACE,
   FOOTER_BAR,
   FOOTER_BTN_CANCEL,
   FOOTER_BTN_SAVE,
+  MODAL_TOPBAR,
+  SWITCH_COLORS,
 } from "@/styles/surfaces";
 
 type PickerTarget = "date" | "startTime" | "endTime";
@@ -99,8 +108,8 @@ export default function HolidaysFormModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      {/* Topbar claro: íconos oscuros mientras está abierto; al desmontar vuelve el light-content del shell. */}
-      <StatusBar barStyle="dark-content" />
+      {/* TopBar navy: íconos claros mientras está abierto; al desmontar se desapila y queda el light-content del shell. */}
+      <StatusBar barStyle="light-content" />
       <View style={styles.screen}>
         <View style={styles.topBar}>
           {/* Mismo bypass del "¿Salir sin guardar?" que ya tiene onRequestClose
@@ -108,7 +117,7 @@ export default function HolidaysFormModal({
               no accesible desde acá — puramente visual, no se cambia ese
               comportamiento en este pase. */}
           <TouchableOpacity style={styles.backBtn} onPress={onClose} activeOpacity={0.7}>
-            <Ionicons name="arrow-back" size={22} color="#111827" />
+            <Ionicons name="arrow-back" size={22} color={HEADER_TEXT} />
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>
             {mode === "edit" ? "Editar Feriado" : mode === "view" ? "Ver Feriado" : "Agregar Feriado"}
@@ -425,6 +434,7 @@ function HolidayForm({
           <View style={[styles.switchRow]}>
             <Text style={styles.switchLabel}>Laborable</Text>
             <Switch
+              {...SWITCH_COLORS}
               value={working}
               onValueChange={handleWorkingChange}
               disabled={readOnly || submitting}
@@ -493,6 +503,7 @@ function HolidayForm({
               <View style={[styles.switchRow, styles.rowSpaced]}>
                 <Text style={styles.switchLabel}>Aplica Almuerzo</Text>
                 <Switch
+                  {...SWITCH_COLORS}
                   value={applyLunch}
                   onValueChange={setApplyLunch}
                   disabled={readOnly || submitting}
@@ -502,6 +513,7 @@ function HolidayForm({
               <View style={[styles.switchRow, styles.rowSpaced]}>
                 <Text style={styles.switchLabel}>Pago Doble</Text>
                 <Switch
+                  {...SWITCH_COLORS}
                   value={doublePayment}
                   onValueChange={setDoublePayment}
                   disabled={readOnly || submitting}
@@ -629,15 +641,13 @@ function createStyles(
     flex: { flex: 1 },
     screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     topBar: {
+      ...MODAL_TOPBAR,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      backgroundColor: "#fff",
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(48),
       paddingBottom: verticalScale(14),
-      borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
     },
     /** Tamaño fijo: botón de ícono, mismo criterio que AdminPermissionDetailModal.tsx. */
     backBtn: {
@@ -646,9 +656,10 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
       borderRadius: RADIUS_MD,
+      backgroundColor: HEADER_BUTTON_BACKGROUND,
     },
     topBarSpacer: { width: 40 },
-    topBarTitle: { fontSize: font(17), fontWeight: "700", color: "#142157" },
+    topBarTitle: { fontSize: font(17), fontWeight: "700", color: HEADER_TEXT },
     content: {
       padding: scale(16),
       gap: verticalScale(14),
@@ -669,29 +680,23 @@ function createStyles(
     labelSpaced: { marginTop: verticalScale(12) },
     required: { color: "#DC2626", fontWeight: "700" },
     input: {
-      borderWidth: 1,
-      borderColor: "#D1D5DB",
-      borderRadius: RADIUS_MD,
+      ...FIELD_SURFACE,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       fontSize: font(14),
       color: "#111827",
-      backgroundColor: "#fff",
     },
     // Copia literal de AdminPermissionEditModal.tsx:651 — mismo molde readOnly.
-    inputDisabled: { backgroundColor: "#F3F4F6", color: "#6B7280" },
+    inputDisabled: { ...FIELD_DISABLED, color: TEXT_MUTED },
     inputInvalid: { borderColor: "#DC2626" },
     fieldError: { fontSize: font(12), color: "#DC2626", marginTop: verticalScale(4) },
     select: {
+      ...FIELD_SURFACE,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      borderWidth: 1,
-      borderColor: "#D1D5DB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(11),
-      backgroundColor: "#fff",
     },
     // Alto idéntico entre "Creado por" (1 línea) y "Fecha de creación" (2
     // líneas) — sin esto el box de 1 línea se ve más chico que el de 2.

@@ -11,13 +11,7 @@ import {
   View,
 } from "react-native";
 import { APP_BACKGROUND_V2 } from "@/constants/colors";
-import {
-  MAX_CONTENT_WIDTH,
-  RADIUS_MD,
-  RADIUS_PILL,
-  RADIUS_SM,
-  useResponsive,
-} from "@/constants/responsive";
+import { MAX_CONTENT_WIDTH, RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import * as Storage from "../../utils/storage";
 import HolidaysFormModal from "../../components/holidays/HolidaysFormModal";
@@ -37,7 +31,9 @@ import {
   DIALOG_BOX,
   DIALOG_OVERLAY,
   FAB_SURFACE,
+  ROW_ACTION_BTN,
   SEGMENTED_SURFACE,
+  SEGMENT_ACTIVE,
 } from "@/styles/surfaces";
 
 const FILTER_OPTIONS: HolidaysFilter[] = ["true", "false", "all"];
@@ -444,7 +440,7 @@ function createStyles(
       borderRadius: RADIUS_MD,
       paddingVertical: verticalScale(7),
     },
-    segmentActive: { backgroundColor: "#2563EB" },
+    segmentActive: { ...SEGMENT_ACTIVE },
     segmentText: { fontSize: font(12), fontWeight: "600", color: "#6B7280" },
     segmentTextActive: { color: "#fff", fontWeight: "700" },
     list: { flex: 1 },
@@ -492,9 +488,8 @@ function createStyles(
       paddingTop: verticalScale(8),
     },
     iconBtn: {
+      ...ROW_ACTION_BTN,
       padding: scale(6),
-      borderRadius: RADIUS_SM,
-      backgroundColor: "#F9FAFB",
     },
     stateBox: {
       flex: 1,

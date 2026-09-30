@@ -16,6 +16,8 @@ import {
 import {
   APP_BACKGROUND,
   APP_BACKGROUND_V2,
+  HEADER_BUTTON_BACKGROUND,
+  HEADER_TEXT,
   SECTION_ICON_COLOR,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
@@ -52,6 +54,7 @@ import {
   FOOTER_BAR,
   FOOTER_BTN_CANCEL,
   FOOTER_BTN_SAVE,
+  MODAL_TOPBAR,
 } from "@/styles/surfaces";
 
 /**
@@ -109,12 +112,12 @@ export default function AdminExcuseCreateModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      {/* Topbar claro: íconos oscuros mientras está abierto; al desmontar vuelve el light-content del shell. */}
-      <StatusBar barStyle="dark-content" />
+      {/* TopBar navy: íconos claros mientras está abierto; al desmontar se desapila y queda el light-content del shell. */}
+      <StatusBar barStyle="light-content" />
       <View style={styles.screen}>
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.backBtn} onPress={onClose} activeOpacity={0.7}>
-            <Ionicons name="close" size={22} color="#111827" />
+            <Ionicons name="close" size={22} color={HEADER_TEXT} />
           </TouchableOpacity>
           <Text style={styles.topBarTitle}>Agregar Excusa</Text>
           <View style={styles.topBarSpacer} />
@@ -541,15 +544,13 @@ function createStyles(
     flex: { flex: 1 },
     screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     topBar: {
+      ...MODAL_TOPBAR,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      backgroundColor: "#fff",
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(48),
       paddingBottom: verticalScale(14),
-      borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
     },
     backBtn: {
       width: 40,
@@ -557,9 +558,10 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
       borderRadius: RADIUS_MD,
+      backgroundColor: HEADER_BUTTON_BACKGROUND,
     },
     topBarSpacer: { width: 40 },
-    topBarTitle: { fontSize: font(17), fontWeight: "700", color: "#142157" },
+    topBarTitle: { fontSize: font(17), fontWeight: "700", color: HEADER_TEXT },
     content: {
       padding: scale(16),
       gap: verticalScale(14),

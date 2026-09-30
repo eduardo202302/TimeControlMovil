@@ -63,7 +63,10 @@ import {
   DIALOG_BOX,
   DIALOG_OVERLAY,
   FAB_SURFACE,
+  ROW_ACTION_BTN,
+  SEARCH_SURFACE,
   SEGMENTED_SURFACE,
+  SEGMENT_ACTIVE,
 } from "@/styles/surfaces";
 
 const SOURCES: PermissionSource[] = ["local", "historico"];
@@ -863,17 +866,14 @@ function createStyles(
       borderRadius: RADIUS_MD,
       paddingVertical: verticalScale(8),
     },
-    segmentActive: { backgroundColor: "#2563EB" },
+    segmentActive: { ...SEGMENT_ACTIVE },
     segmentText: { fontSize: font(13), fontWeight: "600", color: "#6B7280" },
     segmentTextActive: { color: "#fff", fontWeight: "700" },
     searchBox: {
+      ...SEARCH_SURFACE,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      backgroundColor: "#fff",
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
     },
     searchInput: {
@@ -954,9 +954,8 @@ function createStyles(
     cardFooterText: { flex: 1, fontSize: font(12), color: "#6B7280" },
     rowActions: { flexDirection: "row", alignItems: "center", gap: scale(4) },
     iconBtn: {
+      ...ROW_ACTION_BTN,
       padding: scale(6),
-      borderRadius: RADIUS_SM,
-      backgroundColor: "#F9FAFB",
     },
     stateBox: {
       flex: 1,

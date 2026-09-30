@@ -1,22 +1,33 @@
-import type { ViewStyle } from "react-native";
+import type { SwitchProps, ViewStyle } from "react-native";
 import {
+  ADD_FILE_BORDER,
   CARD_BACKGROUND,
+  CARD_BORDER,
   CARD_BORDER_V2,
+  DROPZONE_BACKGROUND,
+  DROPZONE_BORDER,
+  FIELD_BACKGROUND,
+  FIELD_DISABLED_BACKGROUND,
   FOOTER_BORDER,
+  HEADER_NAVY,
   OVERLAY_BACKDROP,
   PRIMARY_COLOR,
+  SURFACE_SUBTLE,
+  SWITCH_TRACK_OFF,
 } from "@/constants/colors";
 import {
   RADIUS_2XL,
   RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
+  RADIUS_SM,
   RADIUS_XL,
 } from "@/constants/responsive";
 import {
   SHADOW_FAB,
   SHADOW_FOOTER,
   SHADOW_LG,
+  SHADOW_MD,
   SHADOW_PRIMARY,
   SHADOW_SM,
 } from "@/constants/shadows";
@@ -108,4 +119,87 @@ export const BOTTOM_SHEET_CARD: ViewStyle = {
   borderTopLeftRadius: RADIUS_2XL,
   borderTopRightRadius: RADIUS_2XL,
   ...SHADOW_LG,
+};
+
+/**
+ * TopBar de los modales a pantalla completa: mismo navy + sombra que el
+ * header del shell ((app)/_layout). zIndex para que la sombra caiga sobre el
+ * contenido que scrollea debajo.
+ */
+export const MODAL_TOPBAR: ViewStyle = {
+  backgroundColor: HEADER_NAVY,
+  ...SHADOW_MD,
+  shadowColor: HEADER_NAVY,
+  zIndex: 1,
+};
+
+/**
+ * Inputs, selects y textareas de formulario. Estados (inválido) pisan después.
+ * `satisfies` en vez de `: ViewStyle`: se esparce tanto en <View> como en
+ * <TextInput>, y el tipo completo arrastraría props (cursor/userSelect) que
+ * chocan entre ViewStyle y TextStyle.
+ */
+export const FIELD_SURFACE = {
+  backgroundColor: FIELD_BACKGROUND,
+  borderWidth: 1,
+  borderColor: CARD_BORDER,
+  borderRadius: RADIUS_LG,
+} satisfies ViewStyle;
+
+/** Campo deshabilitado / solo lectura: va DESPUÉS de FIELD_SURFACE. */
+export const FIELD_DISABLED = {
+  backgroundColor: FIELD_DISABLED_BACKGROUND,
+} satisfies ViewStyle;
+
+/** Buscador de listas (sobre el fondo de pantalla, por eso lleva sombra). */
+export const SEARCH_SURFACE: ViewStyle = {
+  backgroundColor: CARD_BACKGROUND,
+  borderWidth: 1,
+  borderColor: CARD_BORDER_V2,
+  borderRadius: RADIUS_MD,
+  ...SHADOW_SM,
+};
+
+/** Fila de archivo adjunto (lista de adjuntos en formularios y detalles). */
+export const FILE_ROW: ViewStyle = {
+  backgroundColor: FIELD_BACKGROUND,
+  borderWidth: 1,
+  borderColor: CARD_BORDER,
+  borderRadius: RADIUS_MD,
+};
+
+/** Botón punteado "agregar archivo". */
+export const ADD_FILE_BTN: ViewStyle = {
+  backgroundColor: CARD_BACKGROUND,
+  borderWidth: 1.5,
+  borderStyle: "dashed",
+  borderColor: ADD_FILE_BORDER,
+  borderRadius: RADIUS_LG,
+};
+
+/** Zona de soltar/seleccionar adjuntos. El estado bloqueado pisa después. */
+export const DROPZONE: ViewStyle = {
+  backgroundColor: DROPZONE_BACKGROUND,
+  borderWidth: 1.5,
+  borderStyle: "dashed",
+  borderColor: DROPZONE_BORDER,
+  borderRadius: RADIUS_LG,
+};
+
+/** Botón de ícono dentro de filas/cards (ver, editar, eliminar). */
+export const ROW_ACTION_BTN: ViewStyle = {
+  backgroundColor: SURFACE_SUBTLE,
+  borderRadius: RADIUS_SM,
+};
+
+/** Segmento activo del segmented de filtros. */
+export const SEGMENT_ACTIVE: ViewStyle = {
+  backgroundColor: PRIMARY_COLOR,
+  ...SHADOW_PRIMARY,
+};
+
+/** Colores del <Switch> (props, no ViewStyle): <Switch {...SWITCH_COLORS} />. */
+export const SWITCH_COLORS: Pick<SwitchProps, "trackColor" | "thumbColor"> = {
+  trackColor: { false: SWITCH_TRACK_OFF, true: PRIMARY_COLOR },
+  thumbColor: CARD_BACKGROUND,
 };

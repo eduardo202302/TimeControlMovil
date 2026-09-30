@@ -9,13 +9,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND } from "@/constants/colors";
-import {
-  RADIUS_LG,
-  RADIUS_MD,
-  RADIUS_2XL,
-  useResponsive,
-} from "@/constants/responsive";
+import { FIELD_BACKGROUND, PRIMARY_COLOR, SECTION_ICON_COLOR } from "@/constants/colors";
+import { RADIUS_LG, RADIUS_MD, useResponsive } from "@/constants/responsive";
+import { DIALOG_OVERLAY, FILE_ROW, POPUP_CARD } from "@/styles/surfaces";
+import { SHADOW_PRIMARY, tintedShadow } from "@/constants/shadows";
 
 /** Archivo ya convertido a data-URI base64, listo para el POST. */
 export interface PermissionAttachment {
@@ -126,7 +123,7 @@ export default function RevisionFinalModal({
           {/* ── Header ── */}
           <View style={styles.header}>
             <View style={styles.headerIconWrap}>
-              <Ionicons name="checkmark-circle" size={24} color="#2563EB" />
+              <Ionicons name="checkmark-circle" size={24} color={SECTION_ICON_COLOR} />
             </View>
             <View style={styles.headerTextWrap}>
               <Text style={styles.headerTitle}>Resumen</Text>
@@ -273,25 +270,19 @@ function createStyles(
 ) {
   return StyleSheet.create({
     overlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       justifyContent: "center",
       alignItems: "center",
       padding: scale(20),
     },
     card: {
+      ...POPUP_CARD,
       width: "100%",
       // maxWidth ya existente — se deja literal, no se tokeniza.
       maxWidth: 440,
       maxHeight: "88%",
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
       padding: scale(20),
-      elevation: 10,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
     },
     header: {
       flexDirection: "row",
@@ -303,12 +294,13 @@ function createStyles(
     },
     /** Ícono de cabecera: tamaño fijo, mismo criterio que avatarContainer en DrawerMenu.tsx. */
     headerIconWrap: {
+      ...tintedShadow(PRIMARY_COLOR),
       width: 42,
       height: 42,
       borderRadius: RADIUS_LG,
-      backgroundColor: "#EFF6FF",
       alignItems: "center",
       justifyContent: "center",
+      backgroundColor: PRIMARY_COLOR,
     },
     headerTextWrap: { flex: 1 },
     headerTitle: { fontSize: font(18), fontWeight: "700", color: "#111827" },
@@ -355,7 +347,7 @@ function createStyles(
       marginTop: verticalScale(8),
       borderLeftWidth: 3,
       borderLeftColor: "#3B82F6",
-      backgroundColor: APP_BACKGROUND,
+      backgroundColor: FIELD_BACKGROUND,
       borderTopRightRadius: RADIUS_MD,
       borderBottomRightRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
@@ -364,13 +356,10 @@ function createStyles(
     descriptionText: { fontSize: font(13), color: "#4B5563", lineHeight: 20 },
     chipList: { gap: verticalScale(8) },
     chip: {
+      ...FILE_ROW,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      backgroundColor: APP_BACKGROUND,
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
@@ -399,7 +388,7 @@ function createStyles(
       borderColor: "#E5E7EB",
     },
     btnGhostText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
-    btnPrimary: { backgroundColor: "#2563EB", flex: 1.4 },
+    btnPrimary: { ...SHADOW_PRIMARY, backgroundColor: PRIMARY_COLOR, flex: 1.4 },
     btnPrimaryText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
     btnDisabled: { opacity: 0.6 },
   });

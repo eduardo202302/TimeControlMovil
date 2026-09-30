@@ -26,11 +26,7 @@ import type {
 } from "../../../types/typeStore/SchoolStoreType";
 import { normalizePermissionName, toRD, WEEK_DAYS } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
-import {
-  APP_BACKGROUND,
-  APP_BACKGROUND_V2,
-  SECTION_ICON_COLOR,
-} from "@/constants/colors";
+import { APP_BACKGROUND_V2, SECTION_ICON_COLOR } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import { MAX_CONTENT_WIDTH, useResponsive } from "@/constants/responsive";
 import RevisionFinalModal, {
@@ -42,7 +38,7 @@ import RevisionFinalModal, {
   type PermissionReview,
 } from "./RevisionFinalModal";
 import { SHADOW_PRIMARY } from "@/constants/shadows";
-import { CARD_FORM, POPUP_CARD } from "@/styles/surfaces";
+import { CARD_FORM, DROPZONE, FIELD_SURFACE, FILE_ROW, POPUP_CARD } from "@/styles/surfaces";
 
 /**
  * Tag del catálogo de la escuela. `/tags/all` devuelve todos los tags con sus
@@ -1811,10 +1807,7 @@ const styles = StyleSheet.create({
   labelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   required: { color: "#DC2626" },
   input: {
-    backgroundColor: APP_BACKGROUND,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
+    ...FIELD_SURFACE,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
@@ -1844,13 +1837,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#00000040",
   },
   select: {
+    ...FIELD_SURFACE,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: APP_BACKGROUND,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
@@ -1894,14 +1884,10 @@ const styles = StyleSheet.create({
 
   /* ── Adjuntos ── */
   dropzone: {
+    ...DROPZONE,
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
-    borderWidth: 1.5,
-    borderStyle: "dashed",
-    borderColor: "#BFDBFE",
-    backgroundColor: "#F8FAFF",
-    borderRadius: 12,
     paddingVertical: 22,
   },
   dropzoneBlocked: { borderColor: "#FECACA", backgroundColor: "#FEF2F2" },
@@ -1927,13 +1913,10 @@ const styles = StyleSheet.create({
   usageTextOver: { color: "#DC2626" },
   chipList: { gap: 8, marginTop: 12 },
   chip: {
+    ...FILE_ROW,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: APP_BACKGROUND,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },

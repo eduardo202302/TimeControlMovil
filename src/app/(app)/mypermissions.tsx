@@ -36,7 +36,7 @@ import {
 } from "../../utils/permissionRules";
 import { decodeJWT } from "../../utils/session";
 import * as Storage from "../../utils/storage";
-import { CARD_ROW, SEGMENTED_SURFACE } from "@/styles/surfaces";
+import { CARD_ROW, SEGMENTED_SURFACE, SEGMENT_ACTIVE } from "@/styles/surfaces";
 
 /** Colores por defecto de un chip cuando el tag no trae los suyos. */
 const CHIP_FALLBACK = { background: "#E5E7EB", text: "#374151" };
@@ -475,7 +475,7 @@ function createStyles(
       borderRadius: RADIUS_MD,
       paddingVertical: verticalScale(8),
     },
-    segmentActive: { backgroundColor: "#2563EB" },
+    segmentActive: { ...SEGMENT_ACTIVE },
     segmentText: { fontSize: font(13), fontWeight: "600", color: "#6B7280" },
     segmentTextActive: { color: "#fff", fontWeight: "700" },
 

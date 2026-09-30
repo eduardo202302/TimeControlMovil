@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
 import type { PermissionCatalogTag } from "../../utils/adminPermissionRules";
-import { POPUP_CARD } from "@/styles/surfaces";
+import { FIELD_SURFACE, POPUP_CARD } from "@/styles/surfaces";
 
 /**
  * Opción del sheet: un tag del catálogo, con `subtitle` opcional en gris
@@ -192,11 +192,10 @@ function createStyles(
     optionText: { fontSize: font(14), color: "#374151" },
     optionSubtitle: { fontSize: font(12), color: "#6B7280", marginTop: verticalScale(2) },
     searchBox: {
+      ...FIELD_SURFACE,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
       borderRadius: RADIUS_MD,
       paddingHorizontal: scale(10),
       marginBottom: verticalScale(8),

@@ -1,5 +1,10 @@
 import { StyleSheet } from "react-native";
-import { APP_BACKGROUND_V2 } from "@/constants/colors";
+import {
+  APP_BACKGROUND_V2,
+  HEADER_BUTTON_ACTIVE_BACKGROUND,
+  HEADER_BUTTON_BACKGROUND,
+  HEADER_TEXT,
+} from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
   RADIUS_LG,
@@ -14,6 +19,7 @@ import {
   FOOTER_BAR,
   FOOTER_BTN_CANCEL,
   FOOTER_BTN_SAVE,
+  MODAL_TOPBAR,
 } from "@/styles/surfaces";
 
 /**
@@ -31,16 +37,14 @@ export function createUserFormStyles(
     flex: { flex: 1 },
     screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     topBar: {
+      ...MODAL_TOPBAR,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
       gap: scale(8),
-      backgroundColor: "#fff",
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(48),
       paddingBottom: verticalScale(14),
-      borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
     },
     iconBtn: {
       width: 40,
@@ -48,15 +52,16 @@ export function createUserFormStyles(
       alignItems: "center",
       justifyContent: "center",
       borderRadius: RADIUS_MD,
+      backgroundColor: HEADER_BUTTON_BACKGROUND,
     },
-    iconBtnActive: { backgroundColor: "#EFF6FF" },
+    iconBtnActive: { backgroundColor: HEADER_BUTTON_ACTIVE_BACKGROUND },
     topBarSpacer: { width: 40 },
     topBarTitle: {
       flex: 1,
       textAlign: "center",
       fontSize: font(16),
       fontWeight: "700",
-      color: "#142157",
+      color: HEADER_TEXT,
     },
     // ── Tab bar: copia de adminpunchinout.tsx (tabs/tabBtn/tabText) ──
     tabs: {

@@ -109,3 +109,25 @@ export const OVERLAY_BACKDROP = "rgba(0,0,0,0.5)";
  */
 export const HEADER_TEXT = "#FFFFFF";
 export const HEADER_BUTTON_BACKGROUND = "rgba(255,255,255,0.08)";
+/**
+ * Botón de ícono ACTIVO sobre el header navy (p. ej. toggle ver/editar del
+ * formulario de usuario): un escalón más opaco que HEADER_BUTTON_BACKGROUND.
+ */
+export const HEADER_BUTTON_ACTIVE_BACKGROUND = "rgba(255,255,255,0.2)";
+
+/**
+ * Campos de formulario — rediseño v2 (Fase 4). Fondo gris-azulado claro para
+ * inputs/selects/textarea y filas de archivo; gris neutro para solo lectura.
+ */
+export const FIELD_BACKGROUND = "#F5F7FB";
+export const FIELD_DISABLED_BACKGROUND = "#F3F4F6";
+/** Fondo sutil de botones de acción dentro de filas (ver/editar/eliminar). */
+export const SURFACE_SUBTLE = "#F9FAFB";
+
+/** Adjuntos: zona de soltar archivos y botón "agregar archivo" (punteados). */
+export const DROPZONE_BORDER = "#BFDBFE";
+export const DROPZONE_BACKGROUND = "#F8FAFF";
+export const ADD_FILE_BORDER = "#93C5FD";
+
+/** Pista del Switch apagado (encendido = PRIMARY_COLOR). */
+export const SWITCH_TRACK_OFF = "#E5E7EB";
