@@ -1,9 +1,14 @@
 import { StyleSheet } from "react-native";
 import {
   APP_BACKGROUND_V2,
+  CARD_BORDER,
+  FIELD_DISABLED_BACKGROUND,
+  FOOTER_BORDER,
   HEADER_BUTTON_ACTIVE_BACKGROUND,
   HEADER_BUTTON_BACKGROUND,
   HEADER_TEXT,
+  PRIMARY_TINT_50,
+  TEXT_MUTED,
 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
@@ -16,17 +21,21 @@ import {
   CARD_FORM,
   DIALOG_BOX,
   DIALOG_OVERLAY,
+  FIELD_DISABLED,
+  FIELD_SURFACE,
   FOOTER_BAR,
   FOOTER_BTN_CANCEL,
   FOOTER_BTN_SAVE,
   MODAL_TOPBAR,
+  SEGMENT_ACTIVE,
 } from "@/styles/surfaces";
 
 /**
- * Estilos compartidos por UserFormModal y sus tabs. Mismos valores que
- * HolidaysFormModal.tsx (card/label/input/select/footer/confirm) y el tab bar
- * de adminpunchinout.tsx (tabs/tabBtn/tabBtnActive), para que el modal se vea
- * igual al resto de formularios de la app.
+ * Estilos compartidos por UserFormModal y sus tabs. La capa visual sale de
+ * las superficies de styles/surfaces.ts (card/input/select/footer/confirm),
+ * igual que HolidaysFormModal.tsx; acá solo viven layout, tipografía y los
+ * estados. El tab bar conserva el layout de adminpunchinout.tsx
+ * (tabs/tabBtn), con el segmento activo de SEGMENT_ACTIVE.
  */
 export function createUserFormStyles(
   scale: (size: number) => number,
@@ -63,7 +72,7 @@ export function createUserFormStyles(
       fontWeight: "700",
       color: HEADER_TEXT,
     },
-    // ── Tab bar: copia de adminpunchinout.tsx (tabs/tabBtn/tabText) ──
+    // ── Tab bar: layout de adminpunchinout.tsx (tabs/tabBtn/tabText) ──
     tabs: {
       flexDirection: "row",
       gap: scale(6),
@@ -74,12 +83,12 @@ export function createUserFormStyles(
       flex: 1,
       alignItems: "center",
       gap: scale(4),
-      backgroundColor: "#EFF6FF",
+      backgroundColor: PRIMARY_TINT_50,
       borderRadius: RADIUS_LG,
       paddingVertical: verticalScale(10),
       paddingHorizontal: scale(2),
     },
-    tabBtnActive: { backgroundColor: "#2563EB" },
+    tabBtnActive: { ...SEGMENT_ACTIVE },
     tabText: { fontSize: font(11), fontWeight: "600", color: "#2563EB" },
     tabTextActive: { color: "#fff" },
     tabErrorDot: {
@@ -120,28 +129,24 @@ export function createUserFormStyles(
     labelSpaced: { marginTop: verticalScale(12) },
     required: { color: "#DC2626", fontWeight: "700" },
     input: {
-      borderWidth: 1,
-      borderColor: "#D1D5DB",
-      borderRadius: RADIUS_MD,
+      ...FIELD_SURFACE,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       fontSize: font(14),
       color: "#111827",
-      backgroundColor: "#fff",
     },
-    inputDisabled: { backgroundColor: "#F3F4F6", color: "#6B7280" },
+    // También pisa el fondo de select y de los campos locales de las tabs
+    // (buscador de dirección, timeBox): va DESPUÉS de la base en el array.
+    inputDisabled: { ...FIELD_DISABLED, color: TEXT_MUTED },
     inputInvalid: { borderColor: "#DC2626" },
     fieldError: { fontSize: font(12), color: "#DC2626", marginTop: verticalScale(4) },
     select: {
+      ...FIELD_SURFACE,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      borderWidth: 1,
-      borderColor: "#D1D5DB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(11),
-      backgroundColor: "#fff",
     },
     selectValue: { flex: 1, fontSize: font(14), color: "#111827" },
     selectPlaceholder: { flex: 1, fontSize: font(14), color: "#9CA3AF" },
@@ -154,7 +159,7 @@ export function createUserFormStyles(
       justifyContent: "center",
       gap: scale(4),
       borderRadius: RADIUS_MD,
-      backgroundColor: "#EFF6FF",
+      backgroundColor: PRIMARY_TINT_50,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
@@ -177,9 +182,9 @@ export function createUserFormStyles(
       width: scale(96),
       height: scale(96),
       borderRadius: RADIUS_LG,
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
       borderWidth: 1,
-      borderColor: "#E5E7EB",
+      borderColor: CARD_BORDER,
       alignItems: "center",
       justifyContent: "center",
       overflow: "hidden",
@@ -194,7 +199,7 @@ export function createUserFormStyles(
       marginTop: verticalScale(12),
       paddingTop: verticalScale(12),
       borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
+      borderTopColor: FOOTER_BORDER,
     },
     recordTitle: { fontSize: font(13), fontWeight: "700", color: "#111827" },
     recordEmpty: { fontWeight: "400", fontStyle: "italic", color: "#9CA3AF" },
@@ -205,7 +210,7 @@ export function createUserFormStyles(
       borderRadius: RADIUS_SM,
       paddingHorizontal: scale(8),
       paddingVertical: verticalScale(2),
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FOOTER_BORDER,
     },
     pillText: { fontSize: font(11), fontWeight: "700", color: "#374151" },
     pillYes: { backgroundColor: "#DCFCE7" },
@@ -237,7 +242,7 @@ export function createUserFormStyles(
       alignItems: "center",
       justifyContent: "center",
       borderRadius: RADIUS_MD,
-      backgroundColor: "#EFF6FF",
+      backgroundColor: PRIMARY_TINT_50,
     },
     notice: { fontSize: font(12), color: "#B45309", marginBottom: verticalScale(4) },
     stateBox: {
@@ -249,7 +254,7 @@ export function createUserFormStyles(
     },
     stateText: { fontSize: font(13), color: "#6B7280", textAlign: "center" },
     retryText: { fontSize: font(13), fontWeight: "700", color: "#2563EB" },
-    // ── Footer / confirmación: copia de HolidaysFormModal.tsx ──
+    // ── Footer / confirmación: mismas superficies que HolidaysFormModal.tsx ──
     footer: {
       ...FOOTER_BAR,
       flexDirection: "row",
@@ -268,7 +273,9 @@ export function createUserFormStyles(
     cancelBtn: { ...FOOTER_BTN_CANCEL },
     cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
     saveBtn: { ...FOOTER_BTN_SAVE },
-    saveBtnBusy: { opacity: 0.7 },
+    // Sin sombra mientras está translúcido: en Android la elevation se ve a
+    // través del botón.
+    saveBtnBusy: { opacity: 0.7, shadowColor: "transparent", elevation: 0 },
     saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
     errorBanner: {
       flexDirection: "row",

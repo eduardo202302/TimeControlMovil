@@ -12,12 +12,15 @@ import {
 } from "react-native";
 import {
   APP_BACKGROUND_V2,
+  CARD_BORDER,
+  FOOTER_BORDER,
+  PRIMARY_TINT_50,
   ROW_ALERT_TINT_BACKGROUND,
   ROW_ALERT_TINT_BORDER,
+  SURFACE_SUBTLE,
 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
-  RADIUS_MD,
   RADIUS_PILL,
   RADIUS_SM,
   useResponsive,
@@ -40,7 +43,7 @@ import {
   type UserCategory,
   type UsersStatusFilter,
 } from "../../utils/usersRules";
-import { CARD_ROW, FAB_SURFACE } from "@/styles/surfaces";
+import { CARD_ROW, FAB_SURFACE, SEARCH_SURFACE } from "@/styles/surfaces";
 
 type Styles = ReturnType<typeof createStyles>;
 
@@ -490,26 +493,20 @@ function createStyles(
       gap: verticalScale(10),
     },
     dropdown: {
+      ...SEARCH_SURFACE,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      backgroundColor: "#fff",
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
     dropdownLabel: { fontSize: font(12), fontWeight: "600", color: "#6B7280" },
     dropdownValue: { flex: 1, fontSize: font(14), fontWeight: "700", color: "#111827" },
     searchBox: {
+      ...SEARCH_SURFACE,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      backgroundColor: "#fff",
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
     },
     searchInput: {
@@ -566,14 +563,14 @@ function createStyles(
       marginTop: verticalScale(6),
     },
     idBadge: {
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FOOTER_BORDER,
       borderRadius: RADIUS_SM,
       paddingHorizontal: scale(8),
       paddingVertical: verticalScale(2),
     },
     idBadgeText: { fontSize: font(11), fontWeight: "600", color: "#374151" },
     roleBadge: {
-      backgroundColor: "#EFF6FF",
+      backgroundColor: PRIMARY_TINT_50,
       borderRadius: RADIUS_SM,
       paddingHorizontal: scale(8),
       paddingVertical: verticalScale(2),
@@ -584,7 +581,7 @@ function createStyles(
       marginTop: verticalScale(8),
       paddingTop: verticalScale(8),
       borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
+      borderTopColor: FOOTER_BORDER,
       gap: verticalScale(5),
     },
     metaRow: { flexDirection: "row", alignItems: "center", gap: scale(6) },
@@ -607,15 +604,15 @@ function createStyles(
       marginTop: verticalScale(8),
       paddingTop: verticalScale(8),
       borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
+      borderTopColor: FOOTER_BORDER,
     },
     prefChip: {
       flexDirection: "row",
       alignItems: "center",
       gap: scale(4),
-      backgroundColor: "#F9FAFB",
+      backgroundColor: SURFACE_SUBTLE,
       borderWidth: 1,
-      borderColor: "#E5E7EB",
+      borderColor: CARD_BORDER,
       borderRadius: RADIUS_PILL,
       paddingHorizontal: scale(8),
       paddingVertical: verticalScale(3),

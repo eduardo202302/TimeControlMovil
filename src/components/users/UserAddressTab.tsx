@@ -30,9 +30,15 @@ import {
 import { displayPhone } from "../../utils/usersRules";
 import type { UserFormController } from "./useUserForm";
 import type { UserFormStyles } from "./userFormStyles";
-import { SECTION_ICON_COLOR } from "@/constants/colors";
+import {
+  CARD_BACKGROUND,
+  CARD_BORDER,
+  FIELD_DISABLED_BACKGROUND,
+  FOOTER_BORDER,
+  SECTION_ICON_COLOR,
+} from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
-import { SHADOW_PRIMARY } from "@/constants/shadows";
+import { FIELD_SURFACE, FOOTER_BTN_SAVE } from "@/styles/surfaces";
 
 interface UserAddressTabProps {
   ctl: UserFormController;
@@ -248,7 +254,7 @@ export default function UserAddressTab({ ctl, styles }: UserAddressTabProps) {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
-            <SectionIcon tone="red" size={scale(28)}>
+            <SectionIcon tone="red">
               <Ionicons name="location-outline" size={16} color={SECTION_ICON_COLOR} />
             </SectionIcon>
             <Text style={styles.cardTitle}>Seleccionar Ubicación</Text>
@@ -422,14 +428,11 @@ function createStyles(
 ) {
   return StyleSheet.create({
     searchBox: {
+      ...FIELD_SURFACE,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      borderWidth: 1,
-      borderColor: "#D1D5DB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
-      backgroundColor: "#fff",
     },
     searchInput: {
       flex: 1,
@@ -440,9 +443,9 @@ function createStyles(
     predictions: {
       marginTop: verticalScale(4),
       borderWidth: 1,
-      borderColor: "#E5E7EB",
+      borderColor: CARD_BORDER,
       borderRadius: RADIUS_MD,
-      backgroundColor: "#fff",
+      backgroundColor: CARD_BACKGROUND,
       overflow: "hidden",
     },
     prediction: {
@@ -452,7 +455,7 @@ function createStyles(
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
+      borderBottomColor: FOOTER_BORDER,
     },
     predictionText: { flex: 1, fontSize: font(13), color: "#374151" },
     mapWrapper: {
@@ -461,7 +464,7 @@ function createStyles(
       borderRadius: RADIUS_LG,
       overflow: "hidden",
       borderWidth: 1,
-      borderColor: "#E5E7EB",
+      borderColor: CARD_BORDER,
     },
     map: { flex: 1 },
     mapFallback: {
@@ -470,24 +473,24 @@ function createStyles(
       justifyContent: "center",
       gap: verticalScale(6),
       paddingHorizontal: scale(16),
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
     },
     mapFallbackText: { fontSize: font(12), color: "#6B7280", textAlign: "center" },
     mapHint: { fontSize: font(12), color: "#6B7280", marginTop: verticalScale(6) },
     streetItem: { flex: 2 },
     textArea: { minHeight: verticalScale(72), textAlignVertical: "top" },
     saveBtn: {
-      ...SHADOW_PRIMARY,
+      ...FOOTER_BTN_SAVE,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       gap: scale(6),
       marginTop: verticalScale(16),
       paddingVertical: verticalScale(12),
-      borderRadius: RADIUS_LG,
-      backgroundColor: "#2563EB",
     },
-    saveBtnDisabled: { opacity: 0.5 },
+    // Sin sombra mientras está translúcido: en Android la elevation se ve a
+    // través del botón.
+    saveBtnDisabled: { opacity: 0.5, shadowColor: "transparent", elevation: 0 },
     saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
   });
 }

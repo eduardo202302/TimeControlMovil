@@ -6,9 +6,14 @@ import { RADIUS_LG, RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/re
 import { formatTo12Hour, type ScheduleField } from "../../utils/userFormRules";
 import type { UserFormController } from "./useUserForm";
 import type { UserFormStyles } from "./userFormStyles";
-import { SECTION_ICON_COLOR } from "@/constants/colors";
+import {
+  CARD_BORDER,
+  PRIMARY_TINT_50,
+  SECTION_ICON_COLOR,
+  SURFACE_SUBTLE,
+} from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
-import { BOTTOM_SHEET_CARD, CARD_FORM } from "@/styles/surfaces";
+import { BOTTOM_SHEET_CARD, CARD_FORM, FIELD_SURFACE } from "@/styles/surfaces";
 
 interface UserSchedulesTabProps {
   ctl: UserFormController;
@@ -168,7 +173,7 @@ export default function UserSchedulesTab({ ctl, styles }: UserSchedulesTabProps)
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
-            <SectionIcon tone="teal" size={scale(28)}>
+            <SectionIcon tone="teal">
               <Ionicons name="time-outline" size={16} color={SECTION_ICON_COLOR} />
             </SectionIcon>
             <Text style={styles.cardTitle}>
@@ -335,17 +340,17 @@ function createStyles(
     errorText: { flex: 1, fontSize: font(12), color: "#B91C1C" },
     bulkPanel: {
       borderWidth: 1,
-      borderColor: "#E5E7EB",
+      borderColor: CARD_BORDER,
       borderRadius: RADIUS_LG,
       padding: scale(10),
-      backgroundColor: "#F9FAFB",
+      backgroundColor: SURFACE_SUBTLE,
     },
     bulkGroup: {},
     bulkGroupSpaced: {
       marginTop: verticalScale(10),
       paddingTop: verticalScale(10),
       borderTopWidth: 1,
-      borderTopColor: "#E5E7EB",
+      borderTopColor: CARD_BORDER,
     },
     bulkActions: { flexDirection: "row", gap: scale(6), marginTop: verticalScale(8) },
     bulkBtn: {
@@ -353,7 +358,7 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
       borderRadius: RADIUS_MD,
-      backgroundColor: "#EFF6FF",
+      backgroundColor: PRIMARY_TINT_50,
       paddingVertical: verticalScale(8),
     },
     bulkClearBtn: { flex: 0, paddingHorizontal: scale(14), backgroundColor: "#FEF2F2" },
@@ -373,15 +378,13 @@ function createStyles(
     arrow: { marginBottom: verticalScale(10) },
     timeLabel: { fontSize: font(11), color: "#6B7280" },
     timeBox: {
+      ...FIELD_SURFACE,
+      borderRadius: RADIUS_PILL,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(6),
-      borderWidth: 1,
-      borderColor: "#D1D5DB",
-      borderRadius: RADIUS_PILL,
       paddingHorizontal: scale(10),
       paddingVertical: verticalScale(8),
-      backgroundColor: "#fff",
     },
     timeText: { flex: 1, fontSize: font(13), fontWeight: "600", color: "#111827" },
     timePlaceholder: { flex: 1, fontSize: font(13), color: "#9CA3AF" },

@@ -11,10 +11,16 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { RADIUS_LG, RADIUS_MD, useResponsive } from "@/constants/responsive";
+import { RADIUS_LG, useResponsive } from "@/constants/responsive";
 import type { UserCategory } from "../../utils/usersRules";
 import type { CreateTagResult } from "./useUserForm";
-import { FOOTER_BTN_CANCEL, FOOTER_BTN_SAVE, POPUP_CARD } from "@/styles/surfaces";
+import {
+  FIELD_DISABLED,
+  FIELD_SURFACE,
+  FOOTER_BTN_CANCEL,
+  FOOTER_BTN_SAVE,
+  POPUP_CARD,
+} from "@/styles/surfaces";
 
 interface TagCreateSheetProps {
   /** Categoría fija — la del multi-select donde se tocó el "+". null = cerrado. */
@@ -157,15 +163,12 @@ function createStyles(
     labelSpaced: { marginTop: verticalScale(12) },
     required: { color: "#DC2626", fontWeight: "700" },
     input: {
-      borderWidth: 1,
-      borderColor: "#D1D5DB",
-      borderRadius: RADIUS_MD,
+      ...FIELD_SURFACE,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
-      backgroundColor: "#fff",
     },
     inputText: { fontSize: font(14), color: "#111827" },
-    inputDisabled: { backgroundColor: "#F3F4F6" },
+    inputDisabled: { ...FIELD_DISABLED },
     inputInvalid: { borderColor: "#DC2626" },
     disabledText: { fontSize: font(14), color: "#6B7280" },
     error: { fontSize: font(12), color: "#DC2626", marginTop: verticalScale(4) },
@@ -181,6 +184,8 @@ function createStyles(
     cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
     saveBtn: { ...FOOTER_BTN_SAVE },
     saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
-    busy: { opacity: 0.7 },
+    // Sin sombra mientras está translúcido: en Android la elevation se ve a
+    // través del botón.
+    busy: { opacity: 0.7, shadowColor: "transparent", elevation: 0 },
   });
 }

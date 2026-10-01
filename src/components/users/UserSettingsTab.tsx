@@ -14,8 +14,8 @@ import TagMultiSelectSheet from "./TagMultiSelectSheet";
 import type { UserFormController } from "./useUserForm";
 import type { UserFormStyles } from "./userFormStyles";
 import { SECTION_ICON_COLOR } from "@/constants/colors";
-import { useResponsive } from "@/constants/responsive";
 import SectionIcon from "@/components/ui/SectionIcon";
+import { SWITCH_COLORS } from "@/styles/surfaces";
 
 interface UserSettingsTabProps {
   ctl: UserFormController;
@@ -26,8 +26,6 @@ type DefField = "branchTagId" | "departmentTagId";
 
 /** Tab "Configuración" — port de SubComponents/UserSettings. */
 export default function UserSettingsTab({ ctl, styles }: UserSettingsTabProps) {
-  // Solo para el lado del chip de SectionIcon; el resto de estilos llega por props.
-  const { scale } = useResponsive();
   const { form, isWatch, company, capabilities, categories, allTags } = ctl;
   const [multiCategory, setMultiCategory] = useState<UserCategory | null>(null);
   const [defTarget, setDefTarget] = useState<DefField | null>(null);
@@ -128,7 +126,7 @@ export default function UserSettingsTab({ ctl, styles }: UserSettingsTabProps) {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <SectionIcon tone="violet" size={scale(28)}>
+              <SectionIcon tone="violet">
                 <Ionicons name="settings-outline" size={16} color={SECTION_ICON_COLOR} />
               </SectionIcon>
               <Text style={styles.cardTitle}>Permisos</Text>
@@ -146,6 +144,7 @@ export default function UserSettingsTab({ ctl, styles }: UserSettingsTabProps) {
                   {checked ? "Sí" : "No"}
                 </Text>
                 <Switch
+                  {...SWITCH_COLORS}
                   value={checked}
                   onValueChange={(value) => ctl.toggleSetting(permission.key, value)}
                   disabled={permission.disabled}
@@ -159,7 +158,7 @@ export default function UserSettingsTab({ ctl, styles }: UserSettingsTabProps) {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
-            <SectionIcon tone="blue" size={scale(28)}>
+            <SectionIcon tone="blue">
               <Ionicons name="business-outline" size={16} color={SECTION_ICON_COLOR} />
             </SectionIcon>
             <Text style={styles.cardTitle}>Sucursal y Departamento</Text>

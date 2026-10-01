@@ -10,15 +10,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { FOOTER_BORDER, TEXT_PRIMARY } from "@/constants/colors";
-import {
-  RADIUS_LG,
-  RADIUS_MD,
-  RADIUS_PILL,
-  useResponsive,
-} from "@/constants/responsive";
-import { SHADOW_PRIMARY } from "@/constants/shadows";
-import { FIELD_SURFACE, POPUP_CARD } from "@/styles/surfaces";
+import { FOOTER_BORDER, PRIMARY_TINT_50, TEXT_PRIMARY } from "@/constants/colors";
+import { RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
+import { FIELD_SURFACE, FOOTER_BTN_SAVE, POPUP_CARD } from "@/styles/surfaces";
 
 /** Lado del avatar de las filas — mismo AVATAR_SM_SIZE que las filas de
  * resultado de AdminPermissionCreateModal.tsx, un punto más chico porque acá
@@ -250,7 +244,7 @@ function createStyles(
       borderRadius: RADIUS_MD,
       marginBottom: verticalScale(4),
     },
-    optionSelected: { backgroundColor: "#EFF6FF" },
+    optionSelected: { backgroundColor: PRIMARY_TINT_50 },
     optionTextGroup: { flex: 1 },
     optionText: { fontSize: font(14), color: "#374151" },
     optionTextSelected: { color: "#1D4ED8", fontWeight: "700" },
@@ -264,7 +258,7 @@ function createStyles(
       height: OPTION_AVATAR_SIZE,
       // Círculo: mitad del lado fijo, no un radio de diseño.
       borderRadius: OPTION_AVATAR_SIZE / 2,
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FOOTER_BORDER,
       alignItems: "center",
       justifyContent: "center",
       overflow: "hidden",
@@ -276,12 +270,10 @@ function createStyles(
       borderRadius: OPTION_AVATAR_SIZE / 2,
     },
     doneBtn: {
-      ...SHADOW_PRIMARY,
+      ...FOOTER_BTN_SAVE,
       marginTop: verticalScale(8),
       alignItems: "center",
       paddingVertical: verticalScale(12),
-      borderRadius: RADIUS_LG,
-      backgroundColor: "#2563EB",
     },
     doneText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
   });

@@ -25,8 +25,8 @@ import { pickUserPhoto, type UserPhotoSource } from "./pickUserPhoto";
 import type { UserFormController, UserTextField } from "./useUserForm";
 import type { UserFormStyles } from "./userFormStyles";
 import { SECTION_ICON_COLOR } from "@/constants/colors";
-import { useResponsive } from "@/constants/responsive";
 import SectionIcon from "@/components/ui/SectionIcon";
+import { SWITCH_COLORS } from "@/styles/surfaces";
 
 /**
  * Copia deliberada de PHOTO_HOST/photoUri() de adminpunchinout.tsx (mismo
@@ -49,8 +49,6 @@ interface UserBasicInfoTabProps {
 
 /** Tab "Info. básica" — port de SubComponents/UserBasicInfo + LastAbcencesAndTardiness. */
 export default function UserBasicInfoTab({ ctl, styles }: UserBasicInfoTabProps) {
-  // Solo para el lado del chip de SectionIcon; el resto de estilos llega por props.
-  const { scale } = useResponsive();
   const { form, errors, isWatch, mode, company, roles } = ctl;
   const [rolesVisible, setRolesVisible] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -175,14 +173,19 @@ export default function UserBasicInfoTab({ ctl, styles }: UserBasicInfoTabProps)
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
-            <SectionIcon tone="blue" size={scale(28)}>
+            <SectionIcon tone="blue">
               <Ionicons name="person-outline" size={16} color={SECTION_ICON_COLOR} />
             </SectionIcon>
             <Text style={styles.cardTitle}>Info. básica</Text>
           </View>
           <View style={styles.inlineRow}>
             <Text style={styles.switchValue}>{form.isActive ? "Activo: Sí" : "Activo: No"}</Text>
-            <Switch value={form.isActive} onValueChange={ctl.setActive} disabled={isWatch} />
+            <Switch
+              {...SWITCH_COLORS}
+              value={form.isActive}
+              onValueChange={ctl.setActive}
+              disabled={isWatch}
+            />
           </View>
         </View>
 
@@ -323,7 +326,6 @@ export default function UserBasicInfoTab({ ctl, styles }: UserBasicInfoTabProps)
  * "ver todas" (allAbsences/allLateness no existen en el backend).
  */
 function LastRecordsCard({ ctl, styles }: UserBasicInfoTabProps) {
-  const { scale } = useResponsive();
   const absence = ctl.detail?.userAbsence;
   const lateness = ctl.detail?.userLateness;
   const absenceDate = recordDate(absence);
@@ -334,7 +336,7 @@ function LastRecordsCard({ ctl, styles }: UserBasicInfoTabProps) {
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <View style={styles.cardTitleRow}>
-          <SectionIcon tone="teal" size={scale(28)}>
+          <SectionIcon tone="teal">
             <Ionicons name="time-outline" size={16} color={SECTION_ICON_COLOR} />
           </SectionIcon>
           <Text style={styles.cardTitle}>Ult. Registros</Text>
