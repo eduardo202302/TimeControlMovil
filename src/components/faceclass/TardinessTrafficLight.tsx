@@ -30,7 +30,7 @@ import {
   type StudentTardiness,
 } from "../../utils/tardinessRules";
 import { formatDisplayTime } from "../timeoff/RevisionFinalModal";
-import { CARD_FORM, POPUP_CARD } from "@/styles/surfaces";
+import { CARD_FORM, DIALOG_OVERLAY, POPUP_CARD } from "@/styles/surfaces";
 
 /** Lado del círculo de cada luz — círculo real (size/2), no token de radio. */
 const LIGHT_SIZE = 22;
@@ -313,8 +313,8 @@ function createStyles(
 
     /* ── Modal del picker en iOS ── */
     modalOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       justifyContent: "center",
       alignItems: "center",
       padding: scale(24),

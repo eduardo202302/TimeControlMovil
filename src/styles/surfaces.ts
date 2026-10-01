@@ -12,6 +12,7 @@ import {
   HEADER_NAVY,
   OVERLAY_BACKDROP,
   PRIMARY_COLOR,
+  RIBBON_BACKGROUND,
   SURFACE_SUBTLE,
   SWITCH_TRACK_OFF,
 } from "@/constants/colors";
@@ -29,6 +30,7 @@ import {
   SHADOW_LG,
   SHADOW_MD,
   SHADOW_PRIMARY,
+  SHADOW_RIBBON,
   SHADOW_SM,
 } from "@/constants/shadows";
 
@@ -184,6 +186,28 @@ export const DROPZONE: ViewStyle = {
   borderStyle: "dashed",
   borderColor: DROPZONE_BORDER,
   borderRadius: RADIUS_LG,
+};
+
+/** Miniatura de adjunto (grilla de adjuntos del solicitante). */
+export const THUMB_TILE: ViewStyle = {
+  backgroundColor: FIELD_BACKGROUND,
+  borderWidth: 1,
+  borderColor: CARD_BORDER,
+  borderRadius: RADIUS_MD,
+};
+
+/** Contenedor del calendario de rango (AbsenceCalendar). */
+export const CALENDAR_SURFACE: ViewStyle = {
+  backgroundColor: CARD_BACKGROUND,
+  borderWidth: 1,
+  borderColor: CARD_BORDER_V2,
+  borderRadius: RADIUS_LG,
+};
+
+/** Cinta oscura de Asistencia (docente). Sin radio — lo pone el componente. */
+export const RIBBON_SURFACE: ViewStyle = {
+  backgroundColor: RIBBON_BACKGROUND,
+  ...SHADOW_RIBBON,
 };
 
 /** Botón de ícono dentro de filas/cards (ver, editar, eliminar). */

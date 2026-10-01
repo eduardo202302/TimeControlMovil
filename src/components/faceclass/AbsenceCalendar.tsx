@@ -9,12 +9,14 @@ import {
 import {
   CARD_BACKGROUND,
   FOOTER_BORDER,
-  INPUT_BORDER,
+  PRIMARY_700,
   PRIMARY_COLOR,
+  PRIMARY_TINT_BACKGROUND,
   TEXT_PLACEHOLDER,
   TEXT_PRIMARY,
 } from "@/constants/colors";
-import { RADIUS_MD, useResponsive } from "@/constants/responsive";
+import { useResponsive } from "@/constants/responsive";
+import { CALENDAR_SURFACE } from "@/styles/surfaces";
 
 /** Header y días de la semana en español (la librería lee el locale global
  * del módulo — se configura una sola vez, es el reemplazo de los
@@ -243,12 +245,14 @@ export default function AbsenceCalendar({
 
       // Rango en modo "period" — mismo patrón de la doc oficial: startingDay
       // en un extremo, endingDay en el otro, color para los días del medio.
+      // Extremos en azul sólido; los del medio en el tinte claro.
       if (hasRange && rangeStartKey && rangeEndKey) {
         if (key >= rangeStartKey && key <= rangeEndKey) {
           mark.startingDay = key === rangeStartKey;
           mark.endingDay = key === rangeEndKey;
-          mark.color = PRIMARY_COLOR;
-          mark.textColor = CARD_BACKGROUND;
+          const isEdge = mark.startingDay || mark.endingDay;
+          mark.color = isEdge ? PRIMARY_COLOR : PRIMARY_TINT_BACKGROUND;
+          mark.textColor = isEdge ? CARD_BACKGROUND : PRIMARY_700;
         }
       }
 
@@ -346,11 +350,8 @@ function createStyles(
 ) {
   return StyleSheet.create({
     calendar: {
-      backgroundColor: CARD_BACKGROUND,
-      borderRadius: RADIUS_MD,
+      ...CALENDAR_SURFACE,
       padding: scale(10),
-      borderWidth: 1,
-      borderColor: INPUT_BORDER,
     },
     selectedInfo: {
       marginTop: verticalScale(10),

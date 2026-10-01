@@ -1,7 +1,8 @@
 import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { RIBBON_BACKGROUND, RIBBON_TEXT, RIBBON_TEXT_MUTED } from "@/constants/colors";
+import { RIBBON_TEXT, RIBBON_TEXT_MUTED } from "@/constants/colors";
 import { RADIUS_MD, RADIUS_SM, useResponsive } from "@/constants/responsive";
+import { RIBBON_SURFACE } from "@/styles/surfaces";
 import {
   formatDayMonthYear,
   formatHourLabel,
@@ -117,7 +118,7 @@ function createStyles(
     // --fonstRibbon. El radio inferior es propio de mobile (acá la cinta es
     // una tarjeta dentro de la pantalla, no una banda a ancho completo).
     ribbon: {
-      backgroundColor: RIBBON_BACKGROUND,
+      ...RIBBON_SURFACE,
       borderRadius: RADIUS_MD,
       paddingHorizontal: scale(16),
       paddingVertical: verticalScale(10),

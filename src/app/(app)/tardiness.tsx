@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
-import { ArrowLeft, Camera, Search, User, X } from "lucide-react-native";
+import { Camera, Search, User, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -50,8 +50,10 @@ import {
   type StudentDetail,
   type StudentOption,
 } from "../../utils/tardinessRules";
+import { SHADOW_PRIMARY } from "@/constants/shadows";
 import {
   CARD_FORM,
+  DIALOG_OVERLAY,
   FOOTER_BAR,
   FOOTER_BTN_CANCEL,
   FOOTER_BTN_SAVE,
@@ -124,6 +126,9 @@ export default function Tardanza() {
   // `searchSeq` descarta las respuestas de una búsqueda ya superada por otra
   // más nueva — mismatch de requests en vuelo con resultados en vivo.
   const searchSeq = useRef(0);
+  // `selectSeq` hace lo mismo con el historial: si se elige otro estudiante (o
+  // se cancela) mientras el anterior carga, su respuesta llega tarde y se tira.
+  const selectSeq = useRef(0);
   const searchInputRef = useRef<TextInput>(null);
 
   const runSearch = useCallback(
@@ -149,15 +154,18 @@ export default function Tardanza() {
     [urlColegio, getToken],
   );
 
+  // Con la ficha a la vista no se busca, salvo que el modal esté abierto: desde
+  // ahí también se puede elegir otro estudiante.
   useEffect(() => {
-    if (student) return;
+    if (student && !searchModalVisible) return;
     const timer = setTimeout(() => runSearch(query), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [query, student, runSearch]);
+  }, [query, student, searchModalVisible, runSearch]);
 
-  /** Acceso rápido dentro de la card Estudiante: limpia la selección y muestra
-   * de nuevo los resultados de la última búsqueda (sin resetear el buscador). */
+  /** "Cancelar" del footer y cierre tras guardar: limpia la selección sin
+   * resetear el buscador (texto y resultados de la última búsqueda quedan). */
   const clearStudent = useCallback(() => {
+    selectSeq.current += 1;
     setStudent(null);
     setLoadingPanel(false);
     setSubmitting(false);
@@ -166,6 +174,7 @@ export default function Tardanza() {
   // ── Selección ──
   /** Paso "panel": ajusta la hora pendiente a "ahora" y pinta la ficha. */
   const openPanel = useCallback((detail: StudentDetail) => {
+    selectSeq.current += 1;
     setStudent(detail);
     setLoadingPanel(false);
     setTime(nowHHMM(new Date()));
@@ -179,6 +188,7 @@ export default function Tardanza() {
         Alert.alert("Error", "No hay conexión activa.");
         return;
       }
+      const seq = ++selectSeq.current;
       setSearchModalVisible(false);
       // Ficha inmediata con historial vacío; el fetch completo lo reemplaza.
       setStudent({
@@ -192,6 +202,7 @@ export default function Tardanza() {
         token,
         urlColegio,
       });
+      if (seq !== selectSeq.current) return;
       if (detail) {
         setStudent(detail);
       } else {
@@ -360,15 +371,6 @@ export default function Tardanza() {
 
             {student ? (
               <>
-                <TouchableOpacity
-                  style={styles.backRow}
-                  onPress={clearStudent}
-                  activeOpacity={0.7}
-                >
-                  <ArrowLeft size={18} color={PRIMARY_COLOR} />
-                  <Text style={styles.backText}>Cambiar estudiante</Text>
-                </TouchableOpacity>
-
                 <View style={styles.employeeHeader}>
                   <View style={styles.avatarContainer}>
                     {photo ? (
@@ -418,7 +420,7 @@ export default function Tardanza() {
           </View>
 
           <Modal
-            visible={searchModalVisible && !student}
+            visible={searchModalVisible}
             transparent
             animationType="fade"
             onRequestClose={() => setSearchModalVisible(false)}
@@ -655,6 +657,7 @@ function createStyles(
       marginBottom: verticalScale(8),
     },
     iconBtn: {
+      ...SHADOW_PRIMARY,
       width: scale(44),
       height: verticalScale(44),
       alignItems: "center",
@@ -667,8 +670,8 @@ function createStyles(
     /* ── Resultados ── */
     results: { gap: verticalScale(2) },
     resultsOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       justifyContent: "flex-start",
       alignItems: "center",
       paddingTop: verticalScale(140),
@@ -781,18 +784,13 @@ function createStyles(
       paddingHorizontal: scale(16),
       paddingVertical: verticalScale(28),
     },
-    backRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: scale(6),
-      paddingVertical: verticalScale(6),
-      marginBottom: verticalScale(6),
-    },
-    backText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_COLOR },
+    // marginTop: separa la ficha de la fila del buscador (antes lo hacía la
+    // fila "Cambiar estudiante", que ya no existe).
     employeeHeader: {
       flexDirection: "row",
       alignItems: "center",
       gap: scale(12),
+      marginTop: verticalScale(12),
     },
     avatarContainer: {
       width: scale(56),

@@ -18,7 +18,7 @@ import {
   useResponsive,
 } from "@/constants/responsive";
 import { SHADOW_PRIMARY } from "@/constants/shadows";
-import { POPUP_CARD } from "@/styles/surfaces";
+import { FIELD_SURFACE, POPUP_CARD } from "@/styles/surfaces";
 
 /** Lado del avatar de las filas — mismo AVATAR_SM_SIZE que las filas de
  * resultado de AdminPermissionCreateModal.tsx, un punto más chico porque acá
@@ -220,11 +220,10 @@ function createStyles(
     },
     countBadgeText: { fontSize: font(12), fontWeight: "700", color: TEXT_PRIMARY },
     searchBox: {
+      ...FIELD_SURFACE,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
       borderRadius: RADIUS_MD,
       paddingHorizontal: scale(10),
       marginBottom: verticalScale(8),

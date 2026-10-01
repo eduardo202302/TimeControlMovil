@@ -28,7 +28,6 @@ import {
 } from "lucide-react-native";
 
 import {
-  APP_BACKGROUND,
   APP_BACKGROUND_V2,
   CARD_BACKGROUND,
   CARD_BORDER,
@@ -70,6 +69,9 @@ import { readCategoryDefaultId } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
 import {
   CARD_FORM,
+  DROPZONE,
+  FIELD_SURFACE,
+  FILE_ROW,
   FOOTER_BAR,
   FOOTER_BTN_CANCEL,
   FOOTER_BTN_SAVE,
@@ -1021,10 +1023,9 @@ function createStyles(
     labelSpaced: { marginTop: verticalScale(14) },
     required: { color: ERROR_COLOR, fontWeight: "700" },
 
+    // FIELD_SURFACE por borde y radio; el fondo se queda blanco (pisa después).
     input: {
-      borderWidth: 1,
-      borderColor: INPUT_BORDER,
-      borderRadius: RADIUS_MD,
+      ...FIELD_SURFACE,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       fontSize: font(14),
@@ -1056,14 +1057,10 @@ function createStyles(
 
     /* ── Adjuntos (dropzone + chips, igual que SolicitarPermisoForm) ── */
     dropzone: {
+      ...DROPZONE,
       alignItems: "center",
       justifyContent: "center",
       gap: scale(4),
-      borderWidth: 1.5,
-      borderStyle: "dashed",
-      borderColor: INPUT_BORDER,
-      backgroundColor: APP_BACKGROUND,
-      borderRadius: RADIUS_MD,
       paddingVertical: verticalScale(22),
     },
     dropzoneBlocked: { borderColor: ERROR_COLOR, backgroundColor: CARD_BORDER },
@@ -1110,13 +1107,10 @@ function createStyles(
 
     chipList: { gap: scale(8), marginTop: verticalScale(12) },
     chip: {
+      ...FILE_ROW,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      backgroundColor: APP_BACKGROUND,
-      borderWidth: 1,
-      borderColor: CARD_BORDER,
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },

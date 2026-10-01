@@ -13,7 +13,7 @@ import {
   type ExcuseTag,
 } from "../../utils/excusesRules";
 import type { PermissionTagRef } from "../../utils/permissionRules";
-import { CARD_ROW } from "@/styles/surfaces";
+import { CARD_ROW, ROW_ACTION_BTN } from "@/styles/surfaces";
 
 const CHIP_FALLBACK = { background: "#E2E8F0", text: "#475569" };
 
@@ -238,9 +238,8 @@ function createStyles(
     cardFooterText: { flex: 1, fontSize: font(12), color: "#6B7280" },
     rowActions: { flexDirection: "row", alignItems: "center", gap: scale(4) },
     iconBtn: {
+      ...ROW_ACTION_BTN,
       padding: scale(6),
-      borderRadius: RADIUS_SM,
-      backgroundColor: "#F9FAFB",
     },
   });
 }

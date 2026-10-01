@@ -1,5 +1,5 @@
 import type { ViewStyle } from "react-native";
-import { PRIMARY_COLOR } from "./colors";
+import { PRIMARY_COLOR, RIBBON_BACKGROUND } from "./colors";
 
 /**
  * Escala de sombras — rediseño v2.
@@ -60,6 +60,15 @@ export const SHADOW_FAB: ViewStyle = {
   shadowOpacity: 0.35,
   shadowRadius: 16,
   elevation: 8,
+};
+
+/** Cinta de Asistencia (docente): sombra teñida del navy de la propia cinta. */
+export const SHADOW_RIBBON: ViewStyle = {
+  shadowColor: RIBBON_BACKGROUND,
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.35,
+  shadowRadius: 9,
+  elevation: 5,
 };
 
 /** Footer de formulario: sombra hacia ARRIBA (offset negativo) sobre el contenido. */

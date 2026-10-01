@@ -258,6 +258,12 @@ function createStyles(
     ctaText: { fontSize: font(16), fontWeight: "700", color: "#fff" },
     ctaSub: { fontSize: font(12), color: "#E5E7EB" },
 
-    headerWrap: { paddingHorizontal: scale(16), paddingTop: verticalScale(12) },
+    // paddingBottom: aire para la sombra de la cinta — sin él la tabsBar
+    // blanca, que va pegada debajo, la tapa.
+    headerWrap: {
+      paddingHorizontal: scale(16),
+      paddingTop: verticalScale(12),
+      paddingBottom: verticalScale(8),
+    },
   });
 }

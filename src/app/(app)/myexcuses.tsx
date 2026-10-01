@@ -13,7 +13,6 @@ import {
 import { APP_BACKGROUND_V2 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
-  RADIUS_MD,
   useResponsive,
 } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
@@ -34,6 +33,7 @@ import {
 import { readSchoolUsersId } from "../../utils/permissionRules";
 import { decodeJWT } from "../../utils/session";
 import * as Storage from "../../utils/storage";
+import { SEARCH_SURFACE } from "@/styles/surfaces";
 
 const SEARCH_DEBOUNCE_MS = 400;
 
@@ -362,13 +362,10 @@ function createStyles(
       paddingBottom: verticalScale(2),
     },
     searchBox: {
+      ...SEARCH_SURFACE,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      backgroundColor: "#fff",
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
     },
     searchInput: {

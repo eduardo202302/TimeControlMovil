@@ -28,7 +28,7 @@ import {
   SECTION_ICON_COLOR,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
-import { RADIUS_LG, RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
+import { RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
 import { pickUserPhoto } from "../users/pickUserPhoto";
 import {
   applyListAction,
@@ -62,7 +62,14 @@ import {
 import * as Storage from "../../utils/storage";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { SHADOW_PRIMARY } from "@/constants/shadows";
-import { CARD_FORM, FOOTER_BAR, FOOTER_BTN_SAVE, POPUP_CARD } from "@/styles/surfaces";
+import {
+  CARD_FORM,
+  DIALOG_OVERLAY,
+  FOOTER_BAR,
+  FOOTER_BTN_CANCEL,
+  FOOTER_BTN_SAVE,
+  POPUP_CARD,
+} from "@/styles/surfaces";
 
 /**
  * Cuerpo compartido de la toma de asistencia: los 6 tabs (Asis./Pre/Aus/Tar/
@@ -1146,8 +1153,8 @@ export function createAttendanceStyles(
 
     /* ── Modal del picker en iOS ── */
     modalOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       justifyContent: "center",
       alignItems: "center",
       padding: scale(24),
@@ -1184,12 +1191,11 @@ export function createAttendanceStyles(
     },
     // Mismo botón secundario que el "Cancelar" del footer de Tardanzas.
     backBtn: {
+      ...FOOTER_BTN_CANCEL,
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
       paddingVertical: verticalScale(13),
-      borderRadius: RADIUS_LG,
-      backgroundColor: FOOTER_BORDER,
     },
     backText: { fontSize: font(14), fontWeight: "700", color: TEXT_SECONDARY },
     saveBtn: {
