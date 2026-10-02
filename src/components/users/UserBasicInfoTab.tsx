@@ -24,7 +24,13 @@ import {
 import { pickUserPhoto, type UserPhotoSource } from "./pickUserPhoto";
 import type { UserFormController, UserTextField } from "./useUserForm";
 import type { UserFormStyles } from "./userFormStyles";
-import { SECTION_ICON_COLOR } from "@/constants/colors";
+import {
+  DANGER_ICON,
+  PRIMARY_COLOR,
+  SECTION_ICON_COLOR,
+  TEXT_PLACEHOLDER,
+  TEXT_SECONDARY,
+} from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import { SWITCH_COLORS } from "@/styles/surfaces";
 
@@ -104,7 +110,7 @@ export default function UserBasicInfoTab({ ctl, styles }: UserBasicInfoTabProps)
             ctl.setField(field, options.transform ? options.transform(text) : text)
           }
           editable={!isWatch}
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={TEXT_PLACEHOLDER}
           autoCorrect={false}
           {...options.inputProps}
         />
@@ -149,11 +155,11 @@ export default function UserBasicInfoTab({ ctl, styles }: UserBasicInfoTabProps)
         disabled={isWatch}
         activeOpacity={0.75}
       >
-        <Ionicons name="shield-checkmark-outline" size={16} color="#2563EB" />
+        <Ionicons name="shield-checkmark-outline" size={16} color={PRIMARY_COLOR} />
         <Text style={roleName ? styles.selectValue : styles.selectPlaceholder} numberOfLines={1}>
           {roleName ?? "Selecciona un rol"}
         </Text>
-        <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+        <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
       </TouchableOpacity>
       {!!errors.role && <Text style={styles.fieldError}>{errors.role}</Text>}
     </View>
@@ -195,14 +201,14 @@ export default function UserBasicInfoTab({ ctl, styles }: UserBasicInfoTabProps)
             {photo ? (
               <Image source={{ uri: photo }} style={styles.photoImage} resizeMode="cover" />
             ) : (
-              <Ionicons name="person" size={44} color="#9CA3AF" />
+              <Ionicons name="person" size={44} color={TEXT_PLACEHOLDER} />
             )}
           </View>
           <View style={styles.photoActions}>
             {photoMissing && <Text style={styles.photoRequired}>Foto (Requerida)</Text>}
             {!isWatch &&
               (photoBusy ? (
-                <ActivityIndicator size="small" color="#2563EB" />
+                <ActivityIndicator size="small" color={PRIMARY_COLOR} />
               ) : (
                 <>
                   <View style={styles.inlineRow}>
@@ -211,7 +217,7 @@ export default function UserBasicInfoTab({ ctl, styles }: UserBasicInfoTabProps)
                       onPress={() => takePhoto("camera")}
                       activeOpacity={0.8}
                     >
-                      <Ionicons name="camera-outline" size={16} color="#2563EB" />
+                      <Ionicons name="camera-outline" size={16} color={PRIMARY_COLOR} />
                       <Text style={styles.smallBtnText}>Foto</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -219,7 +225,7 @@ export default function UserBasicInfoTab({ ctl, styles }: UserBasicInfoTabProps)
                       onPress={() => takePhoto("gallery")}
                       activeOpacity={0.8}
                     >
-                      <Ionicons name="image-outline" size={16} color="#2563EB" />
+                      <Ionicons name="image-outline" size={16} color={PRIMARY_COLOR} />
                       <Text style={styles.smallBtnText}>Adjun.</Text>
                     </TouchableOpacity>
                   </View>
@@ -229,7 +235,7 @@ export default function UserBasicInfoTab({ ctl, styles }: UserBasicInfoTabProps)
                       onPress={() => ctl.setPhoto(null)}
                       activeOpacity={0.8}
                     >
-                      <Ionicons name="trash-outline" size={16} color="#B43333" />
+                      <Ionicons name="trash-outline" size={16} color={DANGER_ICON} />
                       <Text style={[styles.smallBtnText, styles.smallBtnDangerText]}>Quitar</Text>
                     </TouchableOpacity>
                   )}
@@ -253,7 +259,7 @@ export default function UserBasicInfoTab({ ctl, styles }: UserBasicInfoTabProps)
                   onChangeText={(text) => ctl.setField("pin", text)}
                   editable={!isWatch}
                   keyboardType="number-pad"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={TEXT_PLACEHOLDER}
                 />
                 {!isWatch && (
                   <TouchableOpacity
@@ -264,7 +270,7 @@ export default function UserBasicInfoTab({ ctl, styles }: UserBasicInfoTabProps)
                     accessibilityLabel="Generar pin"
                   >
                     {ctl.pinLoading ? (
-                      <ActivityIndicator size="small" color="#2563EB" />
+                      <ActivityIndicator size="small" color={PRIMARY_COLOR} />
                     ) : (
                       <Text style={styles.smallBtnText}>Generar</Text>
                     )}
@@ -357,7 +363,7 @@ function LastRecordsCard({ ctl, styles }: UserBasicInfoTabProps) {
               </Text>
             </View>
             {absence?.justified && !!absence.absence?.state?.name && (
-              <Text style={[styles.pillText, { color: absence.absence.state.color || "#374151" }]}>
+              <Text style={[styles.pillText, { color: absence.absence.state.color || TEXT_SECONDARY }]}>
                 {absence.absence.state.name}
               </Text>
             )}

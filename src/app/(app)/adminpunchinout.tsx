@@ -1,16 +1,27 @@
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
+  ACCENT_VIOLET,
   APP_BACKGROUND_V2,
   DANGER_TINT_BACKGROUND,
+  ERROR_COLOR,
   FIELD_DISABLED_BACKGROUND,
   FOOTER_BORDER,
+  HEADER_NAVY,
+  ICON_SUBTLE,
+  ON_PRIMARY,
+  PRIMARY_700,
   PRIMARY_COLOR,
   PRIMARY_TINT_50,
   SECTION_ICON_COLOR,
   SUCCESS_ACCENT,
   SUCCESS_TINT_BACKGROUND,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
   VIOLET_TINT_BACKGROUND,
   WARNING_ACCENT,
+  WARNING_TEXT_STRONG,
   WARNING_TINT_BACKGROUND,
 } from "@/constants/colors";
 import {
@@ -159,21 +170,21 @@ const METRICS: {
     key: "entradas",
     label: "Entradas",
     icon: "enter-outline",
-    color: "#16A34A",
+    color: SUCCESS_ACCENT,
     circleStyle: "metricIconEntry",
   },
   {
     key: "salidas",
     label: "Salidas",
     icon: "exit-outline",
-    color: "#DC2626",
+    color: ERROR_COLOR,
     circleStyle: "metricIconExit",
   },
   {
     key: "diasTrans",
     label: "Días Trans.",
     icon: "calendar-outline",
-    color: "#7C3AED",
+    color: ACCENT_VIOLET,
     circleStyle: "metricIconDays",
   },
 ];
@@ -763,7 +774,7 @@ export default function AdminPunchInOutScreen() {
                     onPress={closeSelector}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Ionicons name="close" size={22} color="#9CA3AF" />
+                    <Ionicons name="close" size={22} color={TEXT_PLACEHOLDER} />
                   </TouchableOpacity>
                 </View>
 
@@ -780,7 +791,7 @@ export default function AdminPunchInOutScreen() {
                       onPress={backToSearch}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="arrow-back" size={18} color="#2563EB" />
+                      <Ionicons name="arrow-back" size={18} color={PRIMARY_COLOR} />
                       <Text style={styles.backText}>Cambiar usuario</Text>
                     </TouchableOpacity>
 
@@ -795,7 +806,7 @@ export default function AdminPunchInOutScreen() {
                             resizeMode="cover"
                           />
                         ) : (
-                          <Ionicons name="person" size={30} color="#9CA3AF" />
+                          <Ionicons name="person" size={30} color={TEXT_PLACEHOLDER} />
                         )}
                       </View>
                       <View style={styles.employeeInfo}>
@@ -818,7 +829,7 @@ export default function AdminPunchInOutScreen() {
 
                     {loadingPanel ? (
                       <ActivityIndicator
-                        color="#2563EB"
+                        color={PRIMARY_COLOR}
                         style={styles.inlineLoader}
                       />
                     ) : todaySchedule ? (
@@ -830,7 +841,7 @@ export default function AdminPunchInOutScreen() {
                             <Ionicons
                               name="time-outline"
                               size={14}
-                              color="#2563EB"
+                              color={PRIMARY_COLOR}
                             />
                             <Text
                               style={[
@@ -857,7 +868,7 @@ export default function AdminPunchInOutScreen() {
                               <Ionicons
                                 name="restaurant-outline"
                                 size={14}
-                                color="#D97706"
+                                color={WARNING_ACCENT}
                               />
                               <Text
                                 style={[
@@ -879,7 +890,7 @@ export default function AdminPunchInOutScreen() {
                             <Ionicons
                               name="warning-outline"
                               size={14}
-                              color="#D97706"
+                              color={WARNING_ACCENT}
                             />
                             <Text style={styles.warnText}>
                               Almuerzo: No configurado
@@ -892,7 +903,7 @@ export default function AdminPunchInOutScreen() {
                         <Ionicons
                           name="warning-outline"
                           size={14}
-                          color="#D97706"
+                          color={WARNING_ACCENT}
                         />
                         <Text style={styles.warnText}>
                           Sin horario configurado
@@ -923,14 +934,14 @@ export default function AdminPunchInOutScreen() {
                       onPress={() => setShowTimePicker(true)}
                       activeOpacity={0.8}
                     >
-                      <Ionicons name="time-outline" size={20} color="#2563EB" />
+                      <Ionicons name="time-outline" size={20} color={PRIMARY_COLOR} />
                       <Text style={styles.timeSelectorText}>
                         {formatRDTimeShort(pickedTime)}
                       </Text>
                       <Text style={styles.timeSelectorDate}>
                         {formatRDDateShort(today)}
                       </Text>
-                      <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                      <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
                     </TouchableOpacity>
 
                     <View style={styles.tabs}>
@@ -949,7 +960,7 @@ export default function AdminPunchInOutScreen() {
                             <Ionicons
                               name={CATEGORY_ICONS[cat]}
                               size={20}
-                              color={active ? "#fff" : "#2563EB"}
+                              color={active ? ON_PRIMARY : PRIMARY_COLOR}
                             />
                             <Text
                               style={[
@@ -976,7 +987,7 @@ export default function AdminPunchInOutScreen() {
                           <Ionicons
                             name="cafe-outline"
                             size={20}
-                            color="#D97706"
+                            color={WARNING_ACCENT}
                           />
                           <Text
                             style={[
@@ -990,7 +1001,7 @@ export default function AdminPunchInOutScreen() {
                           <Ionicons
                             name="chevron-down"
                             size={16}
-                            color="#9CA3AF"
+                            color={TEXT_PLACEHOLDER}
                           />
                         </TouchableOpacity>
                       </>
@@ -1014,7 +1025,7 @@ export default function AdminPunchInOutScreen() {
                             : "log-out-outline"
                         }
                         size={24}
-                        color="#fff"
+                        color={ON_PRIMARY}
                       />
                       <View style={styles.registerTextWrap}>
                         <Text style={styles.registerBtnText}>
@@ -1049,7 +1060,7 @@ export default function AdminPunchInOutScreen() {
                       <Ionicons
                         name={historyExpanded ? "chevron-up" : "chevron-down"}
                         size={16}
-                        color="#2563EB"
+                        color={PRIMARY_COLOR}
                       />
                     </TouchableOpacity>
 
@@ -1057,7 +1068,7 @@ export default function AdminPunchInOutScreen() {
                       <>
                         {loadingPanel ? (
                           <ActivityIndicator
-                            color="#2563EB"
+                            color={PRIMARY_COLOR}
                             style={styles.inlineLoader}
                           />
                         ) : historyEvents.length === 0 ? (
@@ -1065,7 +1076,7 @@ export default function AdminPunchInOutScreen() {
                             <Ionicons
                               name="time-outline"
                               size={30}
-                              color="#D1D5DB"
+                              color={ICON_SUBTLE}
                             />
                             <Text style={styles.emptyText}>Sin registros</Text>
                           </View>
@@ -1173,7 +1184,7 @@ export default function AdminPunchInOutScreen() {
                     onPress={closeSelector}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Ionicons name="close" size={22} color="#9CA3AF" />
+                    <Ionicons name="close" size={22} color={TEXT_PLACEHOLDER} />
                   </TouchableOpacity>
                 </View>
 
@@ -1183,7 +1194,7 @@ export default function AdminPunchInOutScreen() {
                     <TextInput
                       style={styles.searchInput}
                       placeholder="Nombre, cédula, email o código"
-                      placeholderTextColor="#9CA3AF"
+                      placeholderTextColor={TEXT_PLACEHOLDER}
                       value={query}
                       onChangeText={setQuery}
                       autoCorrect={false}
@@ -1199,7 +1210,7 @@ export default function AdminPunchInOutScreen() {
                         <Ionicons
                           name="close-circle"
                           size={18}
-                          color="#9CA3AF"
+                          color={TEXT_PLACEHOLDER}
                         />
                       </TouchableOpacity>
                     )}
@@ -1210,7 +1221,7 @@ export default function AdminPunchInOutScreen() {
                     onPress={() => runSearch(query)}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="search" size={20} color="#fff" />
+                    <Ionicons name="search" size={20} color={ON_PRIMARY} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.iconBtnAccent}
@@ -1219,9 +1230,9 @@ export default function AdminPunchInOutScreen() {
                     activeOpacity={0.8}
                   >
                     {identifying ? (
-                      <ActivityIndicator color="#fff" size="small" />
+                      <ActivityIndicator color={ON_PRIMARY} size="small" />
                     ) : (
-                      <Ionicons name="camera-outline" size={20} color="#fff" />
+                      <Ionicons name="camera-outline" size={20} color={ON_PRIMARY} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -1234,7 +1245,7 @@ export default function AdminPunchInOutScreen() {
                 >
                   {searching ? (
                     <ActivityIndicator
-                      color="#2563EB"
+                      color={PRIMARY_COLOR}
                       style={styles.inlineLoader}
                     />
                   ) : query.trim().length < SEARCH_MIN_CHARS ? (
@@ -1242,7 +1253,7 @@ export default function AdminPunchInOutScreen() {
                       <Ionicons
                         name="search-outline"
                         size={28}
-                        color="#D1D5DB"
+                        color={ICON_SUBTLE}
                       />
                       <Text style={styles.emptyText}>
                         Escribe al menos {SEARCH_MIN_CHARS} caracteres
@@ -1253,7 +1264,7 @@ export default function AdminPunchInOutScreen() {
                       <Ionicons
                         name="person-outline"
                         size={28}
-                        color="#D1D5DB"
+                        color={ICON_SUBTLE}
                       />
                       <Text style={styles.emptyText}>Sin resultados</Text>
                     </View>
@@ -1275,7 +1286,7 @@ export default function AdminPunchInOutScreen() {
                               resizeMode="cover"
                             />
                           ) : (
-                            <Ionicons name="person" size={18} color="#9CA3AF" />
+                            <Ionicons name="person" size={18} color={TEXT_PLACEHOLDER} />
                           )}
                         </View>
                         <View style={styles.resultInfo}>
@@ -1292,7 +1303,7 @@ export default function AdminPunchInOutScreen() {
                         <Ionicons
                           name="chevron-forward"
                           size={16}
-                          color="#9CA3AF"
+                          color={TEXT_PLACEHOLDER}
                         />
                       </TouchableOpacity>
                     ))
@@ -1318,7 +1329,7 @@ export default function AdminPunchInOutScreen() {
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
                 <View style={styles.modalIconWrap}>
-                  <Ionicons name="cafe-outline" size={22} color="#D97706" />
+                  <Ionicons name="cafe-outline" size={22} color={WARNING_ACCENT} />
                 </View>
                 <Text style={styles.modalTitle}>Motivo del Break</Text>
               </View>
@@ -1335,7 +1346,7 @@ export default function AdminPunchInOutScreen() {
                   >
                     <Text style={styles.tagOptionText}>{tag.name}</Text>
                     {selectedTagId === tag.id && (
-                      <Ionicons name="checkmark" size={18} color="#2563EB" />
+                      <Ionicons name="checkmark" size={18} color={PRIMARY_COLOR} />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -1362,7 +1373,7 @@ export default function AdminPunchInOutScreen() {
                         : "log-out-outline"
                     }
                     size={22}
-                    color="#2563EB"
+                    color={PRIMARY_COLOR}
                   />
                 </View>
                 <Text style={styles.modalTitle}>¿Está seguro?</Text>
@@ -1406,7 +1417,7 @@ export default function AdminPunchInOutScreen() {
                   activeOpacity={0.85}
                 >
                   {submitting ? (
-                    <ActivityIndicator color="#fff" size="small" />
+                    <ActivityIndicator color={ON_PRIMARY} size="small" />
                   ) : (
                     <Text style={styles.modalBtnPrimaryText}>Sí</Text>
                   )}
@@ -1441,7 +1452,7 @@ export default function AdminPunchInOutScreen() {
               loadOpenRows();
               if (employee) loadPanel(employee.schoolUserId);
             }}
-            colors={["#2563EB"]}
+            colors={[PRIMARY_COLOR]}
           />
         }
       >
@@ -1452,7 +1463,7 @@ export default function AdminPunchInOutScreen() {
           activeOpacity={0.85}
         >
           <View style={styles.primaryBtnIcon}>
-            <Ionicons name="finger-print" size={20} color="#fff" />
+            <Ionicons name="finger-print" size={20} color={ON_PRIMARY} />
           </View>
           <Text style={styles.primaryBtnText}>Registrar Acceso - ADM TC</Text>
         </TouchableOpacity>
@@ -1472,7 +1483,7 @@ export default function AdminPunchInOutScreen() {
                 un "0" mientras carga sería un dato falso. */}
             {openRows.length > 0 && (
               <View style={styles.pendingPill}>
-                <Ionicons name="alert-circle" size={14} color="#D97706" />
+                <Ionicons name="alert-circle" size={14} color={WARNING_ACCENT} />
                 <Text style={styles.pendingPillText}>
                   {openRows.length}{" "}
                   {openRows.length === 1 ? "pendiente" : "pendientes"}
@@ -1483,7 +1494,7 @@ export default function AdminPunchInOutScreen() {
 
           {loadingOpenRows ? (
             <View style={styles.floatCard}>
-              <ActivityIndicator color="#2563EB" style={styles.inlineLoader} />
+              <ActivityIndicator color={PRIMARY_COLOR} style={styles.inlineLoader} />
             </View>
           ) : openRows.length === 0 ? (
             <View style={styles.floatCard}>
@@ -1491,7 +1502,7 @@ export default function AdminPunchInOutScreen() {
                 <Ionicons
                   name="checkmark-circle-outline"
                   size={30}
-                  color="#D1D5DB"
+                  color={ICON_SUBTLE}
                 />
                 <Text style={styles.emptyText}>Todos cerraron su jornada</Text>
               </View>
@@ -1524,7 +1535,7 @@ export default function AdminPunchInOutScreen() {
                         resizeMode="cover"
                       />
                     ) : (
-                      <Ionicons name="person" size={18} color="#9CA3AF" />
+                      <Ionicons name="person" size={18} color={TEXT_PLACEHOLDER} />
                     )}
                   </View>
                   <View style={styles.resultInfo}>
@@ -1535,7 +1546,7 @@ export default function AdminPunchInOutScreen() {
                       <Ionicons
                         name="calendar-outline"
                         size={12}
-                        color="#6B7280"
+                        color={TEXT_MUTED}
                       />
                       <Text style={styles.lastPunchText}>
                         Últ. Registro:{" "}
@@ -1548,7 +1559,7 @@ export default function AdminPunchInOutScreen() {
                       ID: {row.schoolUserId}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                  <Ionicons name="chevron-forward" size={16} color={TEXT_PLACEHOLDER} />
                 </View>
 
                 {/* Métricas: 3 columnas a lo ancho de la card */}
@@ -1630,12 +1641,12 @@ function createStyles(
     sectionHeaderText: {
       fontSize: font(15),
       fontWeight: "700",
-      color: "#142157",
+      color: TEXT_PRIMARY,
     },
     historyTitleText: {
       fontSize: font(14),
       fontWeight: "700",
-      color: "#142157",
+      color: TEXT_PRIMARY,
     },
     inlineLoader: { marginVertical: verticalScale(16) },
 
@@ -1664,7 +1675,7 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
     },
-    primaryBtnText: { fontSize: font(16), fontWeight: "700", color: "#fff" },
+    primaryBtnText: { fontSize: font(16), fontWeight: "700", color: ON_PRIMARY },
     /**
      * Pill de pendientes, al final del header de la sección.
      *
@@ -1686,7 +1697,7 @@ function createStyles(
     pendingPillText: {
       fontSize: font(12),
       fontWeight: "700",
-      color: "#D97706",
+      color: WARNING_ACCENT,
     },
 
     /* ── Modal selector de usuario ── */
@@ -1731,7 +1742,7 @@ function createStyles(
       flex: 1,
       fontSize: font(17),
       fontWeight: "700",
-      color: "#111827",
+      color: TEXT_PRIMARY,
     },
     countBadge: {
       backgroundColor: PRIMARY_TINT_50,
@@ -1742,7 +1753,7 @@ function createStyles(
     countBadgeText: {
       fontSize: font(12),
       fontWeight: "700",
-      color: "#1D4ED8",
+      color: PRIMARY_700,
     },
 
     selectorSearchRow: {
@@ -1793,7 +1804,7 @@ function createStyles(
     searchInput: {
       flex: 1,
       fontSize: font(12),
-      color: "#111827",
+      color: TEXT_PRIMARY,
       // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- 0 resetea el padding por defecto del TextInput en Android, no es un valor de diseño
       padding: 0,
     },
@@ -1809,15 +1820,15 @@ function createStyles(
     resultName: {
       fontSize: font(14),
       fontWeight: "700",
-      color: "#111827",
+      color: TEXT_PRIMARY,
       // El nombre puede compartir fila con el badge de ID y el chevron —
       // sin esto, un nombre largo empuja el layout en vez de truncarse.
       flexShrink: 1,
     },
-    resultId: { fontWeight: "700", color: "#2563EB" },
+    resultId: { fontWeight: "700", color: PRIMARY_COLOR },
     resultMeta: {
       fontSize: font(12),
-      color: "#6B7280",
+      color: TEXT_MUTED,
       marginTop: verticalScale(1),
     },
 
@@ -1856,7 +1867,7 @@ function createStyles(
     /** Mismo tamaño/color que resultMeta (texto secundario gris de la card) —
      *  sin su marginTop propio, que ya lo aporta lastPunchRow y desalinearía
      *  el texto respecto al ícono de calendario si se duplicara. */
-    lastPunchText: { fontSize: font(12), color: "#6B7280" },
+    lastPunchText: { fontSize: font(12), color: TEXT_MUTED },
     metricRow: {
       flexDirection: "row",
       marginTop: verticalScale(8),
@@ -1878,12 +1889,12 @@ function createStyles(
     metricIconDays: { backgroundColor: VIOLET_TINT_BACKGROUND },
     metricLabel: {
       fontSize: font(11),
-      color: "#6B7280",
+      color: TEXT_MUTED,
     },
     metricValue: {
       fontSize: font(16),
       fontWeight: "700",
-      color: "#142157",
+      color: HEADER_NAVY,
       marginTop: verticalScale(1),
     },
 
@@ -1931,7 +1942,7 @@ function createStyles(
     backText: {
       fontSize: font(13),
       fontWeight: "600",
-      color: "#2563EB",
+      color: PRIMARY_COLOR,
     },
     employeeHeader: {
       flexDirection: "row",
@@ -1942,7 +1953,7 @@ function createStyles(
     employeeName: {
       fontSize: font(17),
       fontWeight: "700",
-      color: "#111827",
+      color: TEXT_PRIMARY,
     },
     rolePill: {
       alignSelf: "flex-start",
@@ -1955,11 +1966,11 @@ function createStyles(
     rolePillText: {
       fontSize: font(11),
       fontWeight: "600",
-      color: "#1D4ED8",
+      color: PRIMARY_700,
     },
     employeeMeta: {
       fontSize: font(12),
-      color: "#6B7280",
+      color: TEXT_MUTED,
       marginTop: verticalScale(4),
     },
 
@@ -1983,12 +1994,12 @@ function createStyles(
       gap: scale(6),
     },
     scheduleLabel: { fontSize: font(12), fontWeight: "700" },
-    scheduleLabelWork: { color: "#1D4ED8" },
-    scheduleLabelLunch: { color: "#92400E" },
+    scheduleLabelWork: { color: PRIMARY_700 },
+    scheduleLabelLunch: { color: WARNING_TEXT_STRONG },
     scheduleValue: {
       fontSize: font(13),
       fontWeight: "600",
-      color: "#111827",
+      color: TEXT_PRIMARY,
       marginTop: verticalScale(4),
     },
     warnRow: {
@@ -1997,7 +2008,7 @@ function createStyles(
       gap: scale(6),
       marginTop: verticalScale(12),
     },
-    warnText: { fontSize: font(12), color: "#D97706" },
+    warnText: { fontSize: font(12), color: WARNING_ACCENT },
 
     /* ── Tabs + acción ── */
     tabs: {
@@ -2015,12 +2026,12 @@ function createStyles(
       paddingVertical: verticalScale(12),
     },
     tabBtnActive: { ...SEGMENT_ACTIVE },
-    tabText: { fontSize: font(13), fontWeight: "600", color: "#2563EB" },
-    tabTextActive: { color: "#fff" },
+    tabText: { fontSize: font(13), fontWeight: "600", color: PRIMARY_COLOR },
+    tabTextActive: { color: ON_PRIMARY },
     fieldLabel: {
       fontSize: font(12),
       fontWeight: "600",
-      color: "#6B7280",
+      color: TEXT_MUTED,
       marginTop: verticalScale(14),
       marginBottom: verticalScale(6),
     },
@@ -2035,17 +2046,17 @@ function createStyles(
     timeSelectorText: {
       fontSize: font(15),
       fontWeight: "700",
-      color: "#111827",
+      color: TEXT_PRIMARY,
     },
     timeSelectorDate: {
       flex: 1,
       fontSize: font(11),
-      color: "#6B7280",
+      color: TEXT_MUTED,
       textAlign: "right",
       marginRight: scale(6),
     },
-    tagSelectorText: { flex: 1, fontSize: font(14), color: "#9CA3AF" },
-    tagSelectorTextValue: { color: "#111827", fontWeight: "600" },
+    tagSelectorText: { flex: 1, fontSize: font(14), color: TEXT_PLACEHOLDER },
+    tagSelectorTextValue: { color: TEXT_PRIMARY, fontWeight: "600" },
     registerBtn: {
       ...tintedShadow(SUCCESS_ACCENT),
       flexDirection: "row",
@@ -2073,7 +2084,7 @@ function createStyles(
       alignItems: "baseline",
       gap: scale(6),
     },
-    registerBtnText: { fontSize: font(16), fontWeight: "700", color: "#fff" },
+    registerBtnText: { fontSize: font(16), fontWeight: "700", color: ON_PRIMARY },
     registerBtnSub: { fontSize: font(12), color: "rgba(255,255,255,0.85)" },
 
     /* ── Historial ── */
@@ -2095,7 +2106,7 @@ function createStyles(
       justifyContent: "center",
     },
     punchInfo: { flex: 1 },
-    punchType: { fontSize: font(11), fontWeight: "600", color: "#111827" },
+    punchType: { fontSize: font(11), fontWeight: "600", color: TEXT_PRIMARY },
     punchPillRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -2117,9 +2128,9 @@ function createStyles(
     breakTagPillText: {
       fontSize: font(11),
       fontWeight: "600",
-      color: "#6B7280",
+      color: TEXT_MUTED,
     },
-    punchTime: { fontSize: font(11), fontWeight: "700", color: "#142157" },
+    punchTime: { fontSize: font(11), fontWeight: "700", color: HEADER_NAVY },
     historyToggleBtn: {
       alignItems: "center",
       paddingVertical: verticalScale(10),
@@ -2127,14 +2138,14 @@ function createStyles(
     historyToggleText: {
       fontSize: font(13),
       fontWeight: "600",
-      color: "#2563EB",
+      color: PRIMARY_COLOR,
     },
     emptyBlock: {
       alignItems: "center",
       gap: scale(6),
       paddingVertical: verticalScale(20),
     },
-    emptyText: { fontSize: font(13), color: "#9CA3AF" },
+    emptyText: { fontSize: font(13), color: TEXT_PLACEHOLDER },
 
     /* ── Modales ── */
     modalOverlay: {
@@ -2169,13 +2180,13 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
     },
-    modalTitle: { fontSize: font(16), fontWeight: "700", color: "#111827" },
+    modalTitle: { fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
     modalMessage: {
       fontSize: font(14),
-      color: "#374151",
+      color: TEXT_SECONDARY,
       lineHeight: font(21),
     },
-    modalMessageStrong: { fontWeight: "700", color: "#111827" },
+    modalMessageStrong: { fontWeight: "700", color: TEXT_PRIMARY },
     modalActions: {
       flexDirection: "row",
       gap: scale(10),
@@ -2192,13 +2203,13 @@ function createStyles(
     modalBtnGhostText: {
       fontSize: font(15),
       fontWeight: "700",
-      color: "#6B7280",
+      color: TEXT_MUTED,
     },
     modalBtnPrimary: { ...FOOTER_BTN_SAVE },
     modalBtnPrimaryText: {
       fontSize: font(15),
       fontWeight: "700",
-      color: "#fff",
+      color: ON_PRIMARY,
     },
     /** Tope de alto del listado de motivos — evita un modal a pantalla completa. */
     tagList: { maxHeight: 280 },
@@ -2212,6 +2223,6 @@ function createStyles(
       borderTopWidth: 1,
       borderTopColor: FOOTER_BORDER,
     },
-    tagOptionText: { fontSize: font(14), color: "#111827" },
+    tagOptionText: { fontSize: font(14), color: TEXT_PRIMARY },
   });
 }

@@ -1,5 +1,3 @@
-export const APP_BACKGROUND = "#e2e2e2";
-
 /**
  * Tinte de fila "en alerta" (inactiva / vencida) — equivalente mobile del
  * `#ffcdd2` de setRowStyle del webapp. Mismos valores que `cardExpired` de
@@ -20,6 +18,8 @@ export const INPUT_BORDER = "#D1D5DB";
 export const TEXT_PRIMARY = "#111827";
 export const TEXT_SECONDARY = "#374151";
 export const TEXT_PLACEHOLDER = "#9CA3AF";
+/** Íconos tenues: estados vacíos y elementos apagados. Mismo gris que INPUT_BORDER. */
+export const ICON_SUBTLE = INPUT_BORDER;
 export const PRIMARY_COLOR = "#2563EB";
 /**
  * Tint suave de PRIMARY_COLOR para avatares/badges/íconos de fondo — el
@@ -56,9 +56,8 @@ export const RIBBON_TEXT = "#FFFFFF";
 export const RIBBON_TEXT_MUTED = "#C9CBE4";
 
 /**
- * Rediseño v2 — reemplazos futuros de APP_BACKGROUND y CARD_BORDER. Se
- * aplican en Fase 1/2; hoy no los usa nadie. Los originales se mantienen
- * intactos hasta que la migración termine.
+ * Rediseño v2 — fondo de pantalla y borde de cards/buscadores. CARD_BORDER
+ * (el original) sigue vivo en inputs, filas de archivo y divisores.
  */
 export const APP_BACKGROUND_V2 = "#E9EDF7";
 export const CARD_BORDER_V2 = "#E6EAF0";
@@ -71,9 +70,15 @@ export const CARD_BORDER_V2 = "#E6EAF0";
  */
 export const HEADER_NAVY = "#142157";
 export const PRIMARY_700 = "#1D4ED8";
+/** Un escalón más claro que PRIMARY_COLOR — acento de borde (bloque de descripción). */
+export const PRIMARY_500 = "#3B82F6";
 export const PRIMARY_TINT_50 = "#EFF6FF";
+/** El tinte más claro del primario: celdas y zonas apenas resaltadas. */
+export const PRIMARY_TINT_25 = "#F8FAFF";
 /** Gris intermedio: entre TEXT_SECONDARY (#374151) y TEXT_PLACEHOLDER (#9CA3AF). */
 export const TEXT_MUTED = "#6B7280";
+/** Texto de párrafo (descripciones largas): entre TEXT_SECONDARY y TEXT_MUTED. */
+export const TEXT_BODY = "#4B5563";
 export const SUCCESS_COLOR = "#15803D";
 export const ACCENT_VIOLET = "#7C3AED";
 export const ACCENT_TEAL = "#0D9488";
@@ -107,6 +112,34 @@ export const WARNING_TEXT_STRONG = "#92400E";
 export const VIOLET_TINT_BACKGROUND = "#EDE9FE";
 /** Borde de los chips sobre PRIMARY_TINT_50. */
 export const PRIMARY_TINT_BORDER = "#BFDBFE";
+/** Tintes más claros que los *_TINT_BACKGROUND: filas de archivo nuevo, avisos. */
+export const SUCCESS_TINT_50 = "#F0FDF4";
+export const WARNING_TINT_50 = "#FFFBEB";
+/** Círculo del ícono de resultado exitoso (Solicitar Permiso). */
+export const OUTCOME_OK_BACKGROUND = "#ECFDF5";
+/** Punto "en línea" / jornada iniciada y badge de conteo — verde más vivo que SUCCESS_ACCENT. */
+export const ONLINE_DOT = "#22C55E";
+/** Chip índigo (categorías y "+N" de Usuarios). */
+export const INDIGO_TINT_BACKGROUND = "#E0E7FF";
+export const INDIGO_TEXT = "#3730A3";
+
+/**
+ * Banner de error y superficies de peligro suave (cerrar sesión, eliminar,
+ * archivo quitado). ERROR_TEXT es el rojo oscuro que va encima del tinte —
+ * ERROR_COLOR (#DC2626) queda para errores de campo y acciones.
+ */
+export const ERROR_TINT_BACKGROUND = "#FEF2F2";
+export const ERROR_TINT_BORDER = DANGER_TINT_BORDER;
+export const ERROR_TEXT = "#B91C1C";
+
+/** Íconos de acción de las filas (ver / editar) y rojo de eliminar. */
+export const ICON_VIEW = "#2185D0";
+export const ICON_EDIT = "#3F7EA3";
+export const DANGER_ICON = "#B43333";
+/** Ícono de limpiar dentro de un input. */
+export const CLEAR_ICON = "#9AA4B4";
+/** Punto de color de un tag que no trae color del backend. */
+export const TAG_DOT_FALLBACK = "#CBD5E1";
 
 /**
  * Chip de ícono de sección (título de card): cuadrito SÓLIDO del color del
@@ -123,8 +156,18 @@ export const SECTION_TONES: Record<SectionTone, string> = {
 };
 export const SECTION_ICON_COLOR = "#FFFFFF";
 
-/** Fondo del overlay de diálogos/popups — el valor que ya usaban todos. */
+/** Fondo del overlay de diálogos, popups, sheets y drawer. */
 export const OVERLAY_BACKDROP = "rgba(0,0,0,0.5)";
+/** Fondo del visor de imagen a pantalla completa — casi opaco, no es un overlay de modal. */
+export const OVERLAY_VIEWER = "rgba(0,0,0,0.92)";
+
+/**
+ * Texto, íconos y spinners sobre un fondo de color (botón primario, FAB,
+ * segmento activo). Sobre el header navy se usa HEADER_TEXT.
+ */
+export const ON_PRIMARY = "#FFFFFF";
+/** Texto secundario sobre un fondo de color. */
+export const ON_PRIMARY_MUTED = "#E5E7EB";
 
 /**
  * Header navy del shell (fondo HEADER_NAVY): texto/íconos en blanco y el
@@ -149,8 +192,8 @@ export const FIELD_DISABLED_BACKGROUND = "#F3F4F6";
 export const SURFACE_SUBTLE = "#F9FAFB";
 
 /** Adjuntos: zona de soltar archivos y botón "agregar archivo" (punteados). */
-export const DROPZONE_BORDER = "#BFDBFE";
-export const DROPZONE_BACKGROUND = "#F8FAFF";
+export const DROPZONE_BORDER = PRIMARY_TINT_BORDER;
+export const DROPZONE_BACKGROUND = PRIMARY_TINT_25;
 export const ADD_FILE_BORDER = "#93C5FD";
 
 /** Pista del Switch apagado (encendido = PRIMARY_COLOR). */

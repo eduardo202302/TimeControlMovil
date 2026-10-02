@@ -9,7 +9,17 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND_V2 } from "@/constants/colors";
+import {
+  APP_BACKGROUND_V2,
+  CARD_BORDER,
+  FOOTER_BORDER,
+  ON_PRIMARY,
+  PRIMARY_COLOR,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+} from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
   RADIUS_MD,
@@ -39,7 +49,7 @@ import * as Storage from "../../utils/storage";
 import { CARD_ROW, SEGMENTED_SURFACE, SEGMENT_ACTIVE } from "@/styles/surfaces";
 
 /** Colores por defecto de un chip cuando el tag no trae los suyos. */
-const CHIP_FALLBACK = { background: "#E5E7EB", text: "#374151" };
+const CHIP_FALLBACK = { background: CARD_BORDER, text: TEXT_SECONDARY };
 
 function chipColors(tag: PermissionTagRef | null | undefined) {
   return {
@@ -302,7 +312,7 @@ export default function MyPermissionsScreen() {
                   de distinguir un permiso archivado de uno vigente. */}
               {item.source === "historico" && (
                 <View style={styles.historyMark}>
-                  <Ionicons name="archive-outline" size={11} color="#6B7280" />
+                  <Ionicons name="archive-outline" size={11} color={TEXT_MUTED} />
                   <Text style={styles.historyMarkText}>Histórico</Text>
                 </View>
               )}
@@ -338,11 +348,11 @@ export default function MyPermissionsScreen() {
           </View>
 
           <View style={styles.cardFooter}>
-            <Ionicons name="time-outline" size={13} color="#6B7280" />
+            <Ionicons name="time-outline" size={13} color={TEXT_MUTED} />
             <Text style={styles.cardFooterText} numberOfLines={1}>
               {scheduleLabel(item)}
             </Text>
-            <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+            <Ionicons name="chevron-forward" size={16} color={TEXT_PLACEHOLDER} />
           </View>
         </TouchableOpacity>
       );
@@ -377,7 +387,7 @@ export default function MyPermissionsScreen() {
 
       {loading ? (
         <View style={styles.stateBox}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={PRIMARY_COLOR} />
           <Text style={styles.stateText}>Cargando permisos…</Text>
         </View>
       ) : (
@@ -400,7 +410,7 @@ export default function MyPermissionsScreen() {
               <Ionicons
                 name={listError ? "alert-circle-outline" : "document-outline"}
                 size={34}
-                color="#9CA3AF"
+                color={TEXT_PLACEHOLDER}
               />
               <Text style={styles.stateTitle}>
                 {listError ?? "No hay permisos que mostrar"}
@@ -418,7 +428,7 @@ export default function MyPermissionsScreen() {
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color="#2563EB" />
+                <ActivityIndicator size="small" color={PRIMARY_COLOR} />
               </View>
             ) : null
           }
@@ -476,8 +486,8 @@ function createStyles(
       paddingVertical: verticalScale(8),
     },
     segmentActive: { ...SEGMENT_ACTIVE },
-    segmentText: { fontSize: font(13), fontWeight: "600", color: "#6B7280" },
-    segmentTextActive: { color: "#fff", fontWeight: "700" },
+    segmentText: { fontSize: font(13), fontWeight: "600", color: TEXT_MUTED },
+    segmentTextActive: { color: ON_PRIMARY, fontWeight: "700" },
 
     listContent: {
       padding: scale(16),
@@ -500,8 +510,8 @@ function createStyles(
     },
     cardTopRight: { alignItems: "flex-end", gap: verticalScale(3) },
     historyMark: { flexDirection: "row", alignItems: "center", gap: scale(3) },
-    historyMarkText: { fontSize: font(10), color: "#6B7280", fontWeight: "600" },
-    cardDate: { fontSize: font(12), color: "#374151", fontWeight: "700" },
+    historyMarkText: { fontSize: font(10), color: TEXT_MUTED, fontWeight: "600" },
+    cardDate: { fontSize: font(12), color: TEXT_SECONDARY, fontWeight: "700" },
 
     chip: {
       borderRadius: RADIUS_PILL,
@@ -519,7 +529,7 @@ function createStyles(
     cardSubject: {
       fontSize: font(14),
       fontWeight: "700",
-      color: "#111827",
+      color: TEXT_PRIMARY,
       marginTop: verticalScale(9),
     },
     cardTags: {
@@ -534,10 +544,10 @@ function createStyles(
       gap: scale(6),
       marginTop: verticalScale(9),
       borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
+      borderTopColor: FOOTER_BORDER,
       paddingTop: verticalScale(9),
     },
-    cardFooterText: { flex: 1, fontSize: font(12), color: "#6B7280" },
+    cardFooterText: { flex: 1, fontSize: font(12), color: TEXT_MUTED },
 
     stateBox: {
       flex: 1,
@@ -547,14 +557,14 @@ function createStyles(
       paddingVertical: verticalScale(60),
       paddingHorizontal: scale(24),
     },
-    stateText: { fontSize: font(13), color: "#6B7280" },
+    stateText: { fontSize: font(13), color: TEXT_MUTED },
     stateTitle: {
       fontSize: font(14),
       fontWeight: "700",
-      color: "#374151",
+      color: TEXT_SECONDARY,
       textAlign: "center",
     },
-    retryText: { fontSize: font(13), fontWeight: "700", color: "#2563EB" },
+    retryText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_COLOR },
     footerLoader: { paddingVertical: verticalScale(16) },
   });
 }

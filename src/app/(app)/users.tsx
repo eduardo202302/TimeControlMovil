@@ -13,11 +13,25 @@ import {
 import {
   APP_BACKGROUND_V2,
   CARD_BORDER,
+  DANGER_TINT_BACKGROUND,
+  ERROR_TEXT,
   FOOTER_BORDER,
+  INDIGO_TEXT,
+  INDIGO_TINT_BACKGROUND,
+  ON_PRIMARY,
+  PRIMARY_700,
+  PRIMARY_COLOR,
   PRIMARY_TINT_50,
   ROW_ALERT_TINT_BACKGROUND,
   ROW_ALERT_TINT_BORDER,
+  SUCCESS_ACCENT,
+  SUCCESS_COLOR,
+  SUCCESS_TINT_BACKGROUND,
   SURFACE_SUBTLE,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
@@ -54,9 +68,9 @@ type Styles = ReturnType<typeof createStyles>;
  */
 const STATUS_SHEET_IDS: Record<UsersStatusFilter, number> = { all: -1, "1": 1, "0": 0 };
 const STATUS_SHEET_COLORS: Record<UsersStatusFilter, string> = {
-  all: "#9CA3AF",
-  "1": "#15803D",
-  "0": "#B91C1C",
+  all: TEXT_PLACEHOLDER,
+  "1": SUCCESS_COLOR,
+  "0": ERROR_TEXT,
 };
 const STATUS_SHEET_OPTIONS: PermissionCatalogTag[] = USERS_STATUS_OPTIONS.map((option) => ({
   id: STATUS_SHEET_IDS[option.value],
@@ -121,11 +135,11 @@ function UserCard({ item, categories, styles, onOpen }: UserCardProps) {
 
       <View style={styles.section}>
         <View style={styles.metaRow}>
-          <Ionicons name="logo-whatsapp" size={14} color="#16A34A" />
+          <Ionicons name="logo-whatsapp" size={14} color={SUCCESS_ACCENT} />
           <Text style={styles.metaText}>{phone || "—"}</Text>
         </View>
         <View style={styles.metaRow}>
-          <Ionicons name="mail-outline" size={14} color="#2563EB" />
+          <Ionicons name="mail-outline" size={14} color={PRIMARY_COLOR} />
           <Text style={styles.metaText} numberOfLines={1}>
             {item.user?.email || "—"}
           </Text>
@@ -377,23 +391,23 @@ export default function UsersScreen() {
         >
           <Text style={styles.dropdownLabel}>Estado</Text>
           <Text style={styles.dropdownValue}>{statusLabel}</Text>
-          <Ionicons name="chevron-down" size={16} color="#6B7280" />
+          <Ionicons name="chevron-down" size={16} color={TEXT_MUTED} />
         </TouchableOpacity>
         <View style={styles.searchBox}>
-          <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+          <Ionicons name="search-outline" size={18} color={TEXT_PLACEHOLDER} />
           <TextInput
             style={styles.searchInput}
             value={searchInput}
             onChangeText={setSearchInput}
             placeholder="Buscar usuarios…"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={TEXT_PLACEHOLDER}
             autoCorrect={false}
             autoCapitalize="none"
             returnKeyType="search"
           />
           {!!searchInput && (
             <TouchableOpacity onPress={() => setSearchInput("")} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={18} color={TEXT_PLACEHOLDER} />
             </TouchableOpacity>
           )}
         </View>
@@ -401,7 +415,7 @@ export default function UsersScreen() {
 
       {loading || !canLoad ? (
         <View style={styles.stateBox}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={PRIMARY_COLOR} />
           <Text style={styles.stateText}>Cargando usuarios…</Text>
         </View>
       ) : (
@@ -420,7 +434,7 @@ export default function UsersScreen() {
               <Ionicons
                 name={listError ? "alert-circle-outline" : "people-outline"}
                 size={34}
-                color="#9CA3AF"
+                color={TEXT_PLACEHOLDER}
               />
               <Text style={styles.stateTitle}>
                 {listError ?? (search ? "Sin resultados para la búsqueda" : "No hay usuarios que mostrar")}
@@ -435,7 +449,7 @@ export default function UsersScreen() {
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color="#2563EB" />
+                <ActivityIndicator size="small" color={PRIMARY_COLOR} />
               </View>
             ) : null
           }
@@ -449,7 +463,7 @@ export default function UsersScreen() {
         activeOpacity={0.85}
         accessibilityLabel="Agregar usuario"
       >
-        <Ionicons name="add" size={26} color="#fff" />
+        <Ionicons name="add" size={26} color={ON_PRIMARY} />
       </TouchableOpacity>
 
       <UserFormModal
@@ -500,8 +514,8 @@ function createStyles(
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
-    dropdownLabel: { fontSize: font(12), fontWeight: "600", color: "#6B7280" },
-    dropdownValue: { flex: 1, fontSize: font(14), fontWeight: "700", color: "#111827" },
+    dropdownLabel: { fontSize: font(12), fontWeight: "600", color: TEXT_MUTED },
+    dropdownValue: { flex: 1, fontSize: font(14), fontWeight: "700", color: TEXT_PRIMARY },
     searchBox: {
       ...SEARCH_SURFACE,
       flexDirection: "row",
@@ -512,7 +526,7 @@ function createStyles(
     searchInput: {
       flex: 1,
       fontSize: font(14),
-      color: "#111827",
+      color: TEXT_PRIMARY,
       paddingVertical: verticalScale(10),
     },
     listContent: {
@@ -539,7 +553,7 @@ function createStyles(
       justifyContent: "space-between",
       gap: scale(8),
     },
-    cardName: { flex: 1, fontSize: font(15), fontWeight: "700", color: "#111827" },
+    cardName: { flex: 1, fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
     statusBadge: {
       flexDirection: "row",
       alignItems: "center",
@@ -548,14 +562,14 @@ function createStyles(
       paddingHorizontal: scale(8),
       paddingVertical: verticalScale(3),
     },
-    statusBadgeOn: { backgroundColor: "#DCFCE7" },
-    statusBadgeOff: { backgroundColor: "#FEE2E2" },
+    statusBadgeOn: { backgroundColor: SUCCESS_TINT_BACKGROUND },
+    statusBadgeOff: { backgroundColor: DANGER_TINT_BACKGROUND },
     statusDot: { width: scale(6), height: scale(6), borderRadius: RADIUS_PILL },
-    statusDotOn: { backgroundColor: "#15803D" },
-    statusDotOff: { backgroundColor: "#B91C1C" },
+    statusDotOn: { backgroundColor: SUCCESS_COLOR },
+    statusDotOff: { backgroundColor: ERROR_TEXT },
     statusText: { fontSize: font(10), fontWeight: "700" },
-    statusTextOn: { color: "#15803D" },
-    statusTextOff: { color: "#B91C1C" },
+    statusTextOn: { color: SUCCESS_COLOR },
+    statusTextOff: { color: ERROR_TEXT },
     badgesRow: {
       flexDirection: "row",
       flexWrap: "wrap",
@@ -568,7 +582,7 @@ function createStyles(
       paddingHorizontal: scale(8),
       paddingVertical: verticalScale(2),
     },
-    idBadgeText: { fontSize: font(11), fontWeight: "600", color: "#374151" },
+    idBadgeText: { fontSize: font(11), fontWeight: "600", color: TEXT_SECONDARY },
     roleBadge: {
       backgroundColor: PRIMARY_TINT_50,
       borderRadius: RADIUS_SM,
@@ -576,7 +590,7 @@ function createStyles(
       paddingVertical: verticalScale(2),
       maxWidth: "70%",
     },
-    roleBadgeText: { fontSize: font(11), fontWeight: "700", color: "#1D4ED8" },
+    roleBadgeText: { fontSize: font(11), fontWeight: "700", color: PRIMARY_700 },
     section: {
       marginTop: verticalScale(8),
       paddingTop: verticalScale(8),
@@ -585,18 +599,18 @@ function createStyles(
       gap: verticalScale(5),
     },
     metaRow: { flexDirection: "row", alignItems: "center", gap: scale(6) },
-    metaText: { flex: 1, fontSize: font(12), color: "#374151" },
+    metaText: { flex: 1, fontSize: font(12), color: TEXT_SECONDARY },
     dataRow: { flexDirection: "row", alignItems: "center", gap: scale(8) },
-    dataLabel: { width: "38%", fontSize: font(12), color: "#6B7280" },
+    dataLabel: { width: "38%", fontSize: font(12), color: TEXT_MUTED },
     dataValueBox: { flex: 1, flexDirection: "row", alignItems: "center", gap: scale(6) },
-    dataValue: { flexShrink: 1, fontSize: font(12), fontWeight: "600", color: "#111827" },
+    dataValue: { flexShrink: 1, fontSize: font(12), fontWeight: "600", color: TEXT_PRIMARY },
     moreBubble: {
-      backgroundColor: "#E0E7FF",
+      backgroundColor: INDIGO_TINT_BACKGROUND,
       borderRadius: RADIUS_PILL,
       paddingHorizontal: scale(6),
       paddingVertical: verticalScale(1),
     },
-    moreBubbleText: { fontSize: font(10), fontWeight: "700", color: "#3730A3" },
+    moreBubbleText: { fontSize: font(10), fontWeight: "700", color: INDIGO_TEXT },
     prefRow: {
       flexDirection: "row",
       flexWrap: "wrap",
@@ -617,9 +631,9 @@ function createStyles(
       paddingHorizontal: scale(8),
       paddingVertical: verticalScale(3),
     },
-    prefLabel: { fontSize: font(11), color: "#6B7280" },
-    prefValueOn: { fontSize: font(11), fontWeight: "700", color: "#15803D" },
-    prefValueOff: { fontSize: font(11), fontWeight: "700", color: "#B91C1C" },
+    prefLabel: { fontSize: font(11), color: TEXT_MUTED },
+    prefValueOn: { fontSize: font(11), fontWeight: "700", color: SUCCESS_COLOR },
+    prefValueOff: { fontSize: font(11), fontWeight: "700", color: ERROR_TEXT },
     stateBox: {
       flex: 1,
       alignItems: "center",
@@ -627,14 +641,14 @@ function createStyles(
       gap: verticalScale(8),
       paddingVertical: verticalScale(36),
     },
-    stateText: { fontSize: font(13), color: "#6B7280" },
+    stateText: { fontSize: font(13), color: TEXT_MUTED },
     stateTitle: {
       fontSize: font(13),
       fontWeight: "600",
-      color: "#374151",
+      color: TEXT_SECONDARY,
       textAlign: "center",
     },
-    retryText: { fontSize: font(13), fontWeight: "700", color: "#2563EB", marginTop: verticalScale(4) },
+    retryText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_COLOR, marginTop: verticalScale(4) },
     footerLoader: { paddingVertical: verticalScale(14) },
     // Mismo FAB que holidays.tsx / permissions.tsx.
     fab: {

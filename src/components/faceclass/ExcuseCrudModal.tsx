@@ -17,10 +17,29 @@ import {
 } from "react-native";
 import {
   APP_BACKGROUND_V2,
+  CARD_BACKGROUND,
+  CARD_BORDER,
+  ERROR_COLOR,
+  ERROR_TEXT,
+  FOOTER_BORDER,
   HEADER_BUTTON_BACKGROUND,
+  HEADER_NAVY,
   HEADER_TEXT,
+  ONLINE_DOT,
+  ON_PRIMARY,
+  OVERLAY_VIEWER,
+  PRIMARY_COLOR,
   SECTION_ICON_COLOR,
+  SUCCESS_COLOR,
+  SUCCESS_TINT_50,
+  SUCCESS_TINT_BORDER,
   type SectionTone,
+  TEXT_BODY,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+  WARNING_TEXT_STRONG,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
@@ -63,6 +82,7 @@ import { MAX_PAYLOAD_BYTES, pickAttachments } from "../permissions/pickAttachmen
 import TagOptionSheet from "../permissions/TagOptionSheet";
 import {
   ADD_FILE_BTN,
+  ALERT_BANNER,
   CARD_FORM,
   DIALOG_BOX,
   DIALOG_OVERLAY,
@@ -110,7 +130,7 @@ interface ExcuseCrudModalProps {
 
 type CrudStyles = ReturnType<typeof createStyles>;
 
-const CHIP_FALLBACK = { background: "#E2E8F0", text: "#475569" };
+const CHIP_FALLBACK = { background: CARD_BORDER, text: TEXT_SECONDARY };
 
 const PHOTO_HOST = "https://timecontrol.wsmax.net:8600";
 
@@ -228,7 +248,7 @@ function CollapsibleCard({
         <Ionicons
           name={open ? "chevron-up" : "chevron-down"}
           size={16}
-          color="#9CA3AF"
+          color={TEXT_PLACEHOLDER}
           style={styles.chevron}
         />
       </TouchableOpacity>
@@ -273,7 +293,7 @@ export default function ExcuseCrudModal({
           <>
             <TopBar title="Excusa" onClose={onClose} styles={styles} />
             <View style={styles.stateBox}>
-              <ActivityIndicator size="large" color="#2563EB" />
+              <ActivityIndicator size="large" color={PRIMARY_COLOR} />
               <Text style={styles.stateText}>Cargando excusa…</Text>
             </View>
           </>
@@ -281,7 +301,7 @@ export default function ExcuseCrudModal({
           <>
             <TopBar title="Excusa" onClose={onClose} styles={styles} />
             <View style={styles.stateBox}>
-              <Ionicons name="alert-circle-outline" size={34} color="#9CA3AF" />
+              <Ionicons name="alert-circle-outline" size={34} color={TEXT_PLACEHOLDER} />
               <Text style={styles.stateTitle}>{loadError ?? "Excusa no encontrada"}</Text>
             </View>
           </>
@@ -569,7 +589,7 @@ function CrudForm({
                   <Image source={{ uri: studentPhoto }} style={styles.avatar} />
                 ) : (
                   <View style={[styles.avatar, styles.avatarFallback]}>
-                    <Ionicons name="person" size={26} color="#9CA3AF" />
+                    <Ionicons name="person" size={26} color={TEXT_PLACEHOLDER} />
                   </View>
                 )}
                 {!!listNumber && (
@@ -609,7 +629,7 @@ function CrudForm({
                   >
                     <TagDot color={stateDotColor} styles={styles} />
                     <Text style={styles.selectText} numberOfLines={1}>{stateName}</Text>
-                    <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                    <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
                   </TouchableOpacity>
                 ) : (
                   <View style={[styles.select, styles.selectDisabled]}>
@@ -637,7 +657,7 @@ function CrudForm({
                 maxLength={255}
                 editable={!saving}
                 placeholder="—"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={TEXT_PLACEHOLDER}
               />
             ) : (
               <View style={[styles.input, styles.inputReadonly]}>
@@ -654,7 +674,7 @@ function CrudForm({
                 textAlignVertical="top"
                 editable={!saving}
                 placeholder="—"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={TEXT_PLACEHOLDER}
               />
             ) : (
               <View style={[styles.input, styles.textarea, styles.inputReadonly]}>
@@ -720,7 +740,7 @@ function CrudForm({
                   multiline
                   textAlignVertical="top"
                   placeholder="Describe el motivo"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={TEXT_PLACEHOLDER}
                 />
               ) : (
                 <View style={[styles.input, styles.textarea, styles.inputReadonly]}>
@@ -736,7 +756,7 @@ function CrudForm({
                 {snapshot.attachmentsAdm.map((path, index) =>
                   editing ? (
                     <View key={`adm-${path}-${index}`} style={styles.fileRow}>
-                      <Ionicons name="document-attach-outline" size={16} color="#2563EB" />
+                      <Ionicons name="document-attach-outline" size={16} color={PRIMARY_COLOR} />
                       <Text style={styles.fileName} numberOfLines={1}>
                         {attachmentFileName(path)}
                       </Text>
@@ -748,18 +768,18 @@ function CrudForm({
                       onPress={() => openAttachment(path)}
                       activeOpacity={0.75}
                     >
-                      <Ionicons name={attachmentIcon(path)} size={18} color="#6B7280" />
+                      <Ionicons name={attachmentIcon(path)} size={18} color={TEXT_MUTED} />
                       <Text style={styles.attachmentName} numberOfLines={1}>
                         {attachmentFileName(path)}
                       </Text>
-                      <Ionicons name="open-outline" size={16} color="#9CA3AF" />
+                      <Ionicons name="open-outline" size={16} color={TEXT_PLACEHOLDER} />
                     </TouchableOpacity>
                   ),
                 )}
 
                 {newFiles.map((file) => (
                   <View key={file.id} style={[styles.fileRow, styles.fileRowNew]}>
-                    <Ionicons name={getFileIcon(file.mimeType)} size={16} color="#15803D" />
+                    <Ionicons name={getFileIcon(file.mimeType)} size={16} color={SUCCESS_COLOR} />
                     <Text style={styles.fileName} numberOfLines={1}>
                       {file.name}
                     </Text>
@@ -773,7 +793,7 @@ function CrudForm({
                         }
                         hitSlop={8}
                       >
-                        <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                        <Ionicons name="close-circle" size={18} color={TEXT_PLACEHOLDER} />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -788,9 +808,9 @@ function CrudForm({
                       activeOpacity={0.75}
                     >
                       {pickingFiles ? (
-                        <ActivityIndicator size="small" color="#2563EB" />
+                        <ActivityIndicator size="small" color={PRIMARY_COLOR} />
                       ) : (
-                        <Ionicons name="cloud-upload-outline" size={18} color="#2563EB" />
+                        <Ionicons name="cloud-upload-outline" size={18} color={PRIMARY_COLOR} />
                       )}
                       <Text style={styles.addFileText}>
                         {pickingFiles ? "Procesando archivos…" : "Agregar archivos"}
@@ -865,7 +885,7 @@ function CrudForm({
                         <Image source={{ uri }} style={styles.thumbImage} resizeMode="cover" />
                       ) : (
                         <View style={styles.thumbIconBox}>
-                          <Ionicons name={attachmentIcon(path)} size={26} color="#6B7280" />
+                          <Ionicons name={attachmentIcon(path)} size={26} color={TEXT_MUTED} />
                           <Text style={styles.thumbName} numberOfLines={1}>
                             {attachmentFileName(path)}
                           </Text>
@@ -880,7 +900,7 @@ function CrudForm({
 
           {!!submitError && (
             <View style={styles.errorBanner}>
-              <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
+              <Ionicons name="alert-circle-outline" size={18} color={ERROR_TEXT} />
               <Text style={styles.errorBannerText}>{submitError}</Text>
             </View>
           )}
@@ -904,7 +924,7 @@ function CrudForm({
                   accessibilityLabel="Editar excusa"
                 >
                   <View style={styles.footerBtnContent}>
-                    <Ionicons name="create-outline" size={18} color="#fff" />
+                    <Ionicons name="create-outline" size={18} color={ON_PRIMARY} />
                     <Text style={styles.saveText}>Editar</Text>
                   </View>
                 </TouchableOpacity>
@@ -927,7 +947,7 @@ function CrudForm({
                 activeOpacity={0.8}
               >
                 {saving ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={ON_PRIMARY} />
                 ) : (
                   <Text style={styles.saveText}>Modificar</Text>
                 )}
@@ -1035,11 +1055,11 @@ function createStyles(
       gap: verticalScale(10),
       padding: scale(24),
     },
-    stateText: { fontSize: font(13), color: "#6B7280" },
+    stateText: { fontSize: font(13), color: TEXT_MUTED },
     stateTitle: {
       fontSize: font(15),
       fontWeight: "700",
-      color: "#374151",
+      color: TEXT_SECONDARY,
       textAlign: "center",
     },
     content: {
@@ -1064,7 +1084,7 @@ function createStyles(
       gap: scale(10),
       marginBottom: verticalScale(10),
     },
-    cardTitle: { fontSize: font(15), fontWeight: "700", color: "#111827" },
+    cardTitle: { fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
     cardHeaderCollapsed: { marginBottom: verticalScale(0) },
     chevron: { marginLeft: "auto" },
     studentRow: { flexDirection: "row", alignItems: "center", gap: scale(14) },
@@ -1073,7 +1093,7 @@ function createStyles(
       width: scale(64),
       height: scale(64),
       borderRadius: scale(32),
-      backgroundColor: "#E5E7EB",
+      backgroundColor: CARD_BORDER,
     },
     avatarFallback: { alignItems: "center", justifyContent: "center" },
     listBadge: {
@@ -1084,13 +1104,13 @@ function createStyles(
       height: scale(22),
       borderRadius: scale(11),
       paddingHorizontal: scale(4),
-      backgroundColor: "#22C55E",
+      backgroundColor: ONLINE_DOT,
       borderWidth: 2,
-      borderColor: "#fff",
+      borderColor: CARD_BACKGROUND,
       alignItems: "center",
       justifyContent: "center",
     },
-    listBadgeText: { fontSize: font(11), fontWeight: "700", color: "#fff" },
+    listBadgeText: { fontSize: font(11), fontWeight: "700", color: ON_PRIMARY },
     tagFields: {
       flexDirection: "row",
       gap: scale(10),
@@ -1100,13 +1120,13 @@ function createStyles(
     tagFieldLabel: {
       fontSize: font(11),
       fontWeight: "600",
-      color: "#374151",
+      color: TEXT_SECONDARY,
       textTransform: "uppercase",
       letterSpacing: 0.5,
       marginBottom: verticalScale(6),
     },
     selectDisabled: { opacity: 0.8 },
-    selectText: { flex: 1, fontSize: font(14), fontWeight: "500", color: "#111827" },
+    selectText: { flex: 1, fontSize: font(14), fontWeight: "500", color: TEXT_PRIMARY },
     tagDot: {
       width: 12,
       height: 12,
@@ -1115,23 +1135,23 @@ function createStyles(
       borderColor: "rgba(0,0,0,0.1)",
     },
     inputReadonly: { ...FIELD_DISABLED },
-    inputReadonlyText: { fontSize: font(14), color: "#111827", lineHeight: font(20) },
+    inputReadonlyText: { fontSize: font(14), color: TEXT_PRIMARY, lineHeight: font(20) },
     reporterBox: {
       borderWidth: 1,
-      borderColor: "#F3F4F6",
+      borderColor: FOOTER_BORDER,
       borderRadius: RADIUS_LG,
       padding: scale(14),
-      backgroundColor: "#fff",
+      backgroundColor: CARD_BACKGROUND,
     },
     reporterChip: { marginTop: verticalScale(10) },
     auditLine: {
       fontSize: font(12),
-      color: "#6B7280",
+      color: TEXT_MUTED,
       marginTop: verticalScale(8),
       textAlign: "right",
     },
-    auditName: { fontWeight: "700", color: "#111827" },
-    emptyHint: { fontSize: font(13), color: "#9CA3AF", fontStyle: "italic" },
+    auditName: { fontWeight: "700", color: TEXT_PRIMARY },
+    emptyHint: { fontSize: font(13), color: TEXT_PLACEHOLDER, fontStyle: "italic" },
     thumbGrid: { flexDirection: "row", flexWrap: "wrap", gap: scale(8) },
     thumbTile: {
       ...THUMB_TILE,
@@ -1147,16 +1167,16 @@ function createStyles(
       padding: scale(6),
       gap: verticalScale(4),
     },
-    thumbName: { fontSize: font(10), color: "#374151", textAlign: "center" },
+    thumbName: { fontSize: font(10), color: TEXT_SECONDARY, textAlign: "center" },
     adminFiles: { marginTop: verticalScale(6) },
-    personName: { fontSize: font(16), fontWeight: "700", color: "#111827" },
-    muted: { fontSize: font(12), color: "#6B7280", marginTop: verticalScale(4) },
-    label: { fontSize: font(12), fontWeight: "600", color: "#374151" },
+    personName: { fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
+    muted: { fontSize: font(12), color: TEXT_MUTED, marginTop: verticalScale(4) },
+    label: { fontSize: font(12), fontWeight: "600", color: TEXT_SECONDARY },
     labelSpaced: { marginTop: verticalScale(12) },
-    required: { color: "#DC2626", fontWeight: "700" },
+    required: { color: ERROR_COLOR, fontWeight: "700" },
     helper: {
       fontSize: font(12),
-      color: "#92400E",
+      color: WARNING_TEXT_STRONG,
       marginTop: verticalScale(8),
       marginBottom: verticalScale(4),
     },
@@ -1180,22 +1200,22 @@ function createStyles(
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       fontSize: font(14),
-      color: "#111827",
+      color: TEXT_PRIMARY,
       marginTop: verticalScale(6),
     },
     textarea: { minHeight: verticalScale(96) },
-    inputInvalid: { borderColor: "#DC2626" },
-    fieldError: { fontSize: font(12), color: "#DC2626", marginTop: verticalScale(4) },
+    inputInvalid: { borderColor: ERROR_COLOR },
+    fieldError: { fontSize: font(12), color: ERROR_COLOR, marginTop: verticalScale(4) },
     infoRow: {
       flexDirection: "row",
       justifyContent: "space-between",
       gap: scale(12),
       paddingVertical: verticalScale(7),
       borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
+      borderBottomColor: FOOTER_BORDER,
     },
-    infoLabel: { fontSize: font(12), color: "#6B7280", fontWeight: "600" },
-    infoValue: { flex: 1, fontSize: font(13), color: "#111827", textAlign: "right" },
+    infoLabel: { fontSize: font(12), color: TEXT_MUTED, fontWeight: "600" },
+    infoValue: { flex: 1, fontSize: font(13), color: TEXT_PRIMARY, textAlign: "right" },
     attachment: {
       ...FILE_ROW,
       flexDirection: "row",
@@ -1208,7 +1228,7 @@ function createStyles(
     attachmentName: {
       flex: 1,
       fontSize: font(13),
-      color: "#374151",
+      color: TEXT_SECONDARY,
       fontWeight: "500",
     },
     fileRow: {
@@ -1220,9 +1240,9 @@ function createStyles(
       paddingVertical: verticalScale(9),
       marginBottom: verticalScale(8),
     },
-    fileRowNew: { backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" },
-    fileName: { flex: 1, fontSize: font(13), color: "#374151" },
-    fileSize: { fontSize: font(11), color: "#6B7280" },
+    fileRowNew: { backgroundColor: SUCCESS_TINT_50, borderColor: SUCCESS_TINT_BORDER },
+    fileName: { flex: 1, fontSize: font(13), color: TEXT_SECONDARY },
+    fileSize: { fontSize: font(11), color: TEXT_MUTED },
     addFileBtn: {
       ...ADD_FILE_BTN,
       flexDirection: "row",
@@ -1232,19 +1252,16 @@ function createStyles(
       paddingVertical: verticalScale(12),
       marginTop: verticalScale(4),
     },
-    addFileText: { fontSize: font(13), fontWeight: "700", color: "#2563EB" },
+    addFileText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_COLOR },
     errorBanner: {
+      ...ALERT_BANNER,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      backgroundColor: "#FEF2F2",
-      borderWidth: 1,
-      borderColor: "#FECACA",
-      borderRadius: RADIUS_LG,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
-    errorBannerText: { flex: 1, fontSize: font(13), color: "#B91C1C" },
+    errorBannerText: { flex: 1, fontSize: font(13), color: ERROR_TEXT },
     footer: {
       ...FOOTER_BAR,
       flexDirection: "row",
@@ -1267,10 +1284,10 @@ function createStyles(
       gap: scale(8),
     },
     cancelBtn: { ...FOOTER_BTN_CANCEL },
-    cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
+    cancelText: { fontSize: font(14), fontWeight: "700", color: TEXT_SECONDARY },
     saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
-    saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
+    saveText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
     discardOverlay: {
       ...DIALOG_OVERLAY,
       flex: 1,
@@ -1284,10 +1301,10 @@ function createStyles(
       maxWidth: scale(360),
       padding: scale(20),
     },
-    discardTitle: { fontSize: font(17), fontWeight: "700", color: "#142157" },
+    discardTitle: { fontSize: font(17), fontWeight: "700", color: HEADER_NAVY },
     discardMessage: {
       fontSize: font(14),
-      color: "#4B5563",
+      color: TEXT_BODY,
       lineHeight: font(20),
       marginTop: verticalScale(8),
     },
@@ -1297,11 +1314,11 @@ function createStyles(
       gap: scale(18),
       marginTop: verticalScale(16),
     },
-    discardCancel: { fontSize: font(14), fontWeight: "700", color: "#374151" },
-    discardConfirm: { fontSize: font(14), fontWeight: "700", color: "#DC2626" },
+    discardCancel: { fontSize: font(14), fontWeight: "700", color: TEXT_SECONDARY },
+    discardConfirm: { fontSize: font(14), fontWeight: "700", color: ERROR_COLOR },
     previewOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.92)",
+      backgroundColor: OVERLAY_VIEWER,
       alignItems: "center",
       justifyContent: "center",
       padding: scale(12),

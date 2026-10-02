@@ -12,7 +12,17 @@ import {
 } from "react-native";
 import { RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
 import type { PermissionCatalogTag } from "../../utils/adminPermissionRules";
-import { FIELD_SURFACE, POPUP_CARD } from "@/styles/surfaces";
+import { DIALOG_OVERLAY, FIELD_SURFACE, POPUP_CARD } from "@/styles/surfaces";
+import {
+  PRIMARY_700,
+  PRIMARY_COLOR,
+  PRIMARY_TINT_50,
+  TAG_DOT_FALLBACK,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+} from "@/constants/colors";
 
 /**
  * Opción del sheet: un tag del catálogo, con `subtitle` opcional en gris
@@ -71,18 +81,18 @@ export default function TagOptionSheet({
           <View style={styles.header}>
             <Text style={styles.title}>{title}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={8}>
-              <Ionicons name="close" size={20} color="#6B7280" />
+              <Ionicons name="close" size={20} color={TEXT_MUTED} />
             </TouchableOpacity>
           </View>
           {search && (
             <View style={styles.searchBox}>
-              <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+              <Ionicons name="search-outline" size={16} color={TEXT_PLACEHOLDER} />
               <TextInput
                 style={styles.searchInput}
                 value={search.value}
                 onChangeText={search.onChangeText}
                 placeholder={search.placeholder ?? "Buscar…"}
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={TEXT_PLACEHOLDER}
                 autoCorrect={false}
               />
             </View>
@@ -93,7 +103,7 @@ export default function TagOptionSheet({
             keyboardShouldPersistTaps="handled"
           >
             {loading ? (
-              <ActivityIndicator color="#2563EB" style={styles.loading} />
+              <ActivityIndicator color={PRIMARY_COLOR} style={styles.loading} />
             ) : options.length === 0 ? (
               <Text style={styles.empty}>{emptyText}</Text>
             ) : (
@@ -108,7 +118,7 @@ export default function TagOptionSheet({
                   >
                     {!hideColorDot && (
                       <View
-                        style={[styles.dot, { backgroundColor: tag.color || "#CBD5E1" }]}
+                        style={[styles.dot, { backgroundColor: tag.color || TAG_DOT_FALLBACK }]}
                       />
                     )}
                     <View style={styles.optionBody}>
@@ -124,7 +134,7 @@ export default function TagOptionSheet({
                         </Text>
                       )}
                     </View>
-                    {selected && <Ionicons name="checkmark" size={18} color="#2563EB" />}
+                    {selected && <Ionicons name="checkmark" size={18} color={PRIMARY_COLOR} />}
                   </TouchableOpacity>
                 );
               })
@@ -144,8 +154,8 @@ function createStyles(
 ) {
   return StyleSheet.create({
     overlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.45)",
       justifyContent: "center",
       paddingHorizontal: scale(24),
     },
@@ -165,11 +175,11 @@ function createStyles(
       justifyContent: "space-between",
       marginBottom: verticalScale(10),
     },
-    title: { fontSize: font(16), fontWeight: "700", color: "#111827" },
+    title: { fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
     list: { flexGrow: 0 },
     empty: {
       fontSize: font(13),
-      color: "#6B7280",
+      color: TEXT_MUTED,
       textAlign: "center",
       paddingVertical: verticalScale(20),
     },
@@ -182,15 +192,15 @@ function createStyles(
       borderRadius: RADIUS_MD,
       marginBottom: verticalScale(4),
     },
-    optionSelected: { backgroundColor: "#EFF6FF" },
+    optionSelected: { backgroundColor: PRIMARY_TINT_50 },
     dot: {
       width: scale(12),
       height: scale(12),
       borderRadius: RADIUS_PILL,
     },
     optionBody: { flex: 1 },
-    optionText: { fontSize: font(14), color: "#374151" },
-    optionSubtitle: { fontSize: font(12), color: "#6B7280", marginTop: verticalScale(2) },
+    optionText: { fontSize: font(14), color: TEXT_SECONDARY },
+    optionSubtitle: { fontSize: font(12), color: TEXT_MUTED, marginTop: verticalScale(2) },
     searchBox: {
       ...FIELD_SURFACE,
       flexDirection: "row",
@@ -203,10 +213,10 @@ function createStyles(
     searchInput: {
       flex: 1,
       fontSize: font(14),
-      color: "#111827",
+      color: TEXT_PRIMARY,
       paddingVertical: verticalScale(8),
     },
     loading: { paddingVertical: verticalScale(20) },
-    optionTextSelected: { color: "#1D4ED8", fontWeight: "700" },
+    optionTextSelected: { color: PRIMARY_700, fontWeight: "700" },
   });
 }

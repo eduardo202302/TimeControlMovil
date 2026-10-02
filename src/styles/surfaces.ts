@@ -6,6 +6,8 @@ import {
   CARD_BORDER_V2,
   DROPZONE_BACKGROUND,
   DROPZONE_BORDER,
+  ERROR_TINT_BACKGROUND,
+  ERROR_TINT_BORDER,
   FIELD_BACKGROUND,
   FIELD_DISABLED_BACKGROUND,
   FOOTER_BORDER,
@@ -100,7 +102,10 @@ export const SEGMENTED_SURFACE: ViewStyle = {
   ...SHADOW_SM,
 };
 
-/** Diálogos de confirmación (eliminar, salir sin guardar, cerrar sesión). */
+/**
+ * Fondo de todo lo que se abre encima de la pantalla: diálogos de
+ * confirmación, popups, sheets, pickers y el drawer.
+ */
 export const DIALOG_OVERLAY: ViewStyle = { backgroundColor: OVERLAY_BACKDROP };
 
 export const DIALOG_BOX: ViewStyle = {
@@ -209,6 +214,17 @@ export const CALENDAR_SURFACE: ViewStyle = {
 export const RIBBON_SURFACE: ViewStyle = {
   backgroundColor: RIBBON_BACKGROUND,
   ...SHADOW_RIBBON,
+};
+
+/**
+ * Banner de error de formulario. Solo la superficie: el layout (fila, gap,
+ * padding) vive en cada archivo, y el texto y el ícono van en ERROR_TEXT.
+ */
+export const ALERT_BANNER: ViewStyle = {
+  backgroundColor: ERROR_TINT_BACKGROUND,
+  borderWidth: 1,
+  borderColor: ERROR_TINT_BORDER,
+  borderRadius: RADIUS_LG,
 };
 
 /** Botón de ícono dentro de filas/cards (ver, editar, eliminar). */

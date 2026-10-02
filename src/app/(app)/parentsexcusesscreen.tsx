@@ -40,6 +40,7 @@ import {
   TEXT_SECONDARY,
   WARNING_COLOR,
   SECTION_ICON_COLOR,
+  ON_PRIMARY,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
@@ -938,7 +939,7 @@ export default function ParentsExcusesScreen() {
             activeOpacity={0.8}
           >
             {submitting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={ON_PRIMARY} />
             ) : (
               <Text style={styles.saveText}>Enviar</Text>
             )}
@@ -1146,9 +1147,6 @@ function createStyles(
     },
     saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
-    // CARD_BACKGROUND ("#fff") reusado como color de texto: no hay un token
-    // de "texto blanco" separado en colors.ts, y este botón es sólido
-    // PRIMARY_COLOR de fondo.
-    saveText: { fontSize: font(14), fontWeight: "700", color: CARD_BACKGROUND },
+    saveText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
   });
 }

@@ -1,7 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { APP_BACKGROUND_V2, PRIMARY_COLOR, TEXT_SECONDARY } from "@/constants/colors";
+import {
+  APP_BACKGROUND_V2,
+  ON_PRIMARY,
+  ON_PRIMARY_MUTED,
+  PRIMARY_COLOR,
+  TEXT_SECONDARY,
+} from "@/constants/colors";
 import { RADIUS_2XL, useResponsive } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import AttendanceTabsView, {
@@ -171,7 +177,7 @@ export default function AttendanceTaking() {
         <Ionicons
           name={currentClass ? "clipboard-outline" : "time-outline"}
           size={22}
-          color="#fff"
+          color={ON_PRIMARY}
         />
         <View style={styles.ctaLabels}>
           <Text style={styles.ctaText}>Asistencia</Text>
@@ -255,8 +261,8 @@ function createStyles(
     // flexShrink para que el texto largo del estado deshabilitado envuelva en
     // vez de empujar el icono fuera del botón.
     ctaLabels: { flexShrink: 1 },
-    ctaText: { fontSize: font(16), fontWeight: "700", color: "#fff" },
-    ctaSub: { fontSize: font(12), color: "#E5E7EB" },
+    ctaText: { fontSize: font(16), fontWeight: "700", color: ON_PRIMARY },
+    ctaSub: { fontSize: font(12), color: ON_PRIMARY_MUTED },
 
     // paddingBottom: aire para la sombra de la cinta — sin él la tabsBar
     // blanca, que va pegada debajo, la tapa.

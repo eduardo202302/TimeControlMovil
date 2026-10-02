@@ -19,10 +19,25 @@ import {
 } from "react-native";
 import {
   APP_BACKGROUND_V2,
+  CARD_BACKGROUND,
+  ERROR_COLOR,
+  ERROR_TEXT,
+  FIELD_DISABLED_BACKGROUND,
+  FOOTER_BORDER,
   HEADER_BUTTON_BACKGROUND,
   HEADER_TEXT,
+  ICON_SUBTLE,
+  INPUT_BORDER,
+  ON_PRIMARY,
+  PRIMARY_700,
   PRIMARY_COLOR,
+  PRIMARY_TINT_50,
   SECTION_ICON_COLOR,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+  WARNING_TEXT_STRONG,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
@@ -55,8 +70,10 @@ import { MAX_PAYLOAD_BYTES, pickAttachments } from "./pickAttachments";
 import TagOptionSheet from "./TagOptionSheet";
 import {
   ADD_FILE_BTN,
+  ALERT_BANNER,
   BOTTOM_SHEET_CARD,
   CARD_FORM,
+  DIALOG_OVERLAY,
   FIELD_DISABLED,
   FIELD_SURFACE,
   FILE_ROW,
@@ -190,7 +207,7 @@ function UserAvatar({
       {uri ? (
         <Image source={{ uri }} style={styles.avatarSmallImage} resizeMode="cover" />
       ) : (
-        <Ionicons name="person" size={18} color="#9CA3AF" />
+        <Ionicons name="person" size={18} color={TEXT_PLACEHOLDER} />
       )}
     </View>
   );
@@ -523,7 +540,7 @@ function CreateForm({
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessibilityLabel="Quitar usuario"
               >
-                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                <Ionicons name="close-circle" size={20} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
             </View>
           ) : (
@@ -532,7 +549,7 @@ function CreateForm({
               onPress={() => setSelectorOpen(true)}
               activeOpacity={0.75}
             >
-              <Ionicons name="search-outline" size={16} color="#2563EB" />
+              <Ionicons name="search-outline" size={16} color={PRIMARY_COLOR} />
               <Text style={styles.selectPlaceholder}>Buscar usuario</Text>
             </TouchableOpacity>
           )}
@@ -556,7 +573,7 @@ function CreateForm({
                 >
                   {action?.name ?? "Selecciona una acción"}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
               {!!errorFor("action") && <Text style={styles.fieldError}>{errorFor("action")}</Text>}
 
@@ -579,7 +596,7 @@ function CreateForm({
                 >
                   {type?.name ?? (action ? "Selecciona un tipo" : "Elige primero una acción")}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
               {!!errorFor("type") && <Text style={styles.fieldError}>{errorFor("type")}</Text>}
               {!!action && typeOptions.length === 0 && (
@@ -608,7 +625,7 @@ function CreateForm({
             onChangeText={setSubject}
             maxLength={255}
             placeholder="Ej. Cita médica"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={TEXT_PLACEHOLDER}
           />
           {!!errorFor("subject") && <Text style={styles.fieldError}>{errorFor("subject")}</Text>}
 
@@ -622,7 +639,7 @@ function CreateForm({
             multiline
             textAlignVertical="top"
             placeholder="Describe el motivo de la solicitud"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={TEXT_PLACEHOLDER}
           />
           {!!errorFor("description") && (
             <Text style={styles.fieldError}>{errorFor("description")}</Text>
@@ -647,7 +664,7 @@ function CreateForm({
                 onPress={() => openPicker("fromDate")}
                 activeOpacity={0.75}
               >
-                <Ionicons name="calendar-outline" size={16} color="#2563EB" />
+                <Ionicons name="calendar-outline" size={16} color={PRIMARY_COLOR} />
                 <Text style={fromDate ? styles.selectValue : styles.selectPlaceholder}>
                   {fromDate ? formatDisplayDate(toDateKey(fromDate)) : "DD/MM/AAAA"}
                 </Text>
@@ -663,7 +680,7 @@ function CreateForm({
                 onPress={() => openPicker("toDate")}
                 activeOpacity={0.75}
               >
-                <Ionicons name="calendar-outline" size={16} color="#2563EB" />
+                <Ionicons name="calendar-outline" size={16} color={PRIMARY_COLOR} />
                 <Text style={toDate ? styles.selectValue : styles.selectPlaceholder}>
                   {toDate ? formatDisplayDate(toDateKey(toDate)) : "DD/MM/AAAA"}
                 </Text>
@@ -674,7 +691,7 @@ function CreateForm({
 
           {isFullDay ? (
             <View style={styles.note}>
-              <Ionicons name="information-circle-outline" size={16} color="#1D4ED8" />
+              <Ionicons name="information-circle-outline" size={16} color={PRIMARY_700} />
               <Text style={styles.noteText}>
                 Se registrará todo el día — no hace falta indicar horas.
               </Text>
@@ -690,7 +707,7 @@ function CreateForm({
                   onPress={() => openPicker("fromTime")}
                   activeOpacity={0.75}
                 >
-                  <Ionicons name="time-outline" size={16} color="#2563EB" />
+                  <Ionicons name="time-outline" size={16} color={PRIMARY_COLOR} />
                   <Text style={fromTime ? styles.selectValue : styles.selectPlaceholder}>
                     {fromTime ? formatDisplayTime(toTimeKey(fromTime)) : "--:--"}
                   </Text>
@@ -708,7 +725,7 @@ function CreateForm({
                   onPress={() => openPicker("toTime")}
                   activeOpacity={0.75}
                 >
-                  <Ionicons name="time-outline" size={16} color="#2563EB" />
+                  <Ionicons name="time-outline" size={16} color={PRIMARY_COLOR} />
                   <Text style={toTime ? styles.selectValue : styles.selectPlaceholder}>
                     {toTime ? formatDisplayTime(toTimeKey(toTime)) : "--:--"}
                   </Text>
@@ -754,7 +771,7 @@ function CreateForm({
           </View>
           {files.map((file) => (
             <View key={file.id} style={styles.fileRow}>
-              <Ionicons name={getFileIcon(file.mimeType)} size={16} color="#2563EB" />
+              <Ionicons name={getFileIcon(file.mimeType)} size={16} color={PRIMARY_COLOR} />
               <Text style={styles.fileName} numberOfLines={1}>
                 {file.name}
               </Text>
@@ -765,7 +782,7 @@ function CreateForm({
                 onPress={() => setFiles((previous) => previous.filter((f) => f.id !== file.id))}
                 hitSlop={8}
               >
-                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                <Ionicons name="close-circle" size={18} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
             </View>
           ))}
@@ -776,9 +793,9 @@ function CreateForm({
             activeOpacity={0.75}
           >
             {pickingFiles ? (
-              <ActivityIndicator size="small" color="#2563EB" />
+              <ActivityIndicator size="small" color={PRIMARY_COLOR} />
             ) : (
-              <Ionicons name="cloud-upload-outline" size={18} color="#2563EB" />
+              <Ionicons name="cloud-upload-outline" size={18} color={PRIMARY_COLOR} />
             )}
             <Text style={styles.addFileText}>
               {pickingFiles ? "Procesando archivos…" : "Seleccionar archivos"}
@@ -790,7 +807,7 @@ function CreateForm({
 
         {!!submitError && (
           <View style={styles.errorBanner}>
-            <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
+            <Ionicons name="alert-circle-outline" size={18} color={ERROR_TEXT} />
             <Text style={styles.errorBannerText}>{submitError}</Text>
           </View>
         )}
@@ -812,7 +829,7 @@ function CreateForm({
           activeOpacity={0.8}
         >
           {submitting ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={ON_PRIMARY} />
           ) : (
             <Text style={styles.saveText}>Guardar</Text>
           )}
@@ -857,7 +874,7 @@ function CreateForm({
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 accessibilityLabel="Cerrar"
               >
-                <Ionicons name="close" size={22} color="#9CA3AF" />
+                <Ionicons name="close" size={22} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
             </View>
 
@@ -866,7 +883,7 @@ function CreateForm({
                 <TextInput
                   style={styles.searchInput}
                   placeholder="Nombre, cédula, email o código"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={TEXT_PLACEHOLDER}
                   value={query}
                   onChangeText={setQuery}
                   autoCorrect={false}
@@ -879,7 +896,7 @@ function CreateForm({
                     onPress={() => setQuery("")}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                    <Ionicons name="close-circle" size={18} color={TEXT_PLACEHOLDER} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -891,7 +908,7 @@ function CreateForm({
                 activeOpacity={0.8}
                 accessibilityLabel="Buscar"
               >
-                <Ionicons name="search" size={20} color="#fff" />
+                <Ionicons name="search" size={20} color={ON_PRIMARY} />
               </TouchableOpacity>
             </View>
 
@@ -901,17 +918,17 @@ function CreateForm({
               showsVerticalScrollIndicator={false}
             >
               {searching ? (
-                <ActivityIndicator color="#2563EB" style={styles.inlineLoader} />
+                <ActivityIndicator color={PRIMARY_COLOR} style={styles.inlineLoader} />
               ) : query.trim().length < SEARCH_MIN_CHARS ? (
                 <View style={styles.emptyBlock}>
-                  <Ionicons name="search-outline" size={28} color="#D1D5DB" />
+                  <Ionicons name="search-outline" size={28} color={ICON_SUBTLE} />
                   <Text style={styles.emptyText}>
                     Escribe al menos {SEARCH_MIN_CHARS} caracteres
                   </Text>
                 </View>
               ) : results.length === 0 ? (
                 <View style={styles.emptyBlock}>
-                  <Ionicons name="person-outline" size={28} color="#D1D5DB" />
+                  <Ionicons name="person-outline" size={28} color={ICON_SUBTLE} />
                   <Text style={styles.emptyText}>Sin resultados</Text>
                 </View>
               ) : (
@@ -935,7 +952,7 @@ function CreateForm({
                         {formatEmployeeContact(option)}
                       </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={16} color="#9CA3AF" />
+                    <Ionicons name="chevron-forward" size={16} color={TEXT_PLACEHOLDER} />
                   </TouchableOpacity>
                 ))
               )}
@@ -1035,12 +1052,12 @@ function createStyles(
       gap: scale(10),
       marginBottom: verticalScale(10),
     },
-    cardTitle: { fontSize: font(15), fontWeight: "700", color: "#111827" },
-    label: { fontSize: font(12), fontWeight: "600", color: "#374151", marginBottom: verticalScale(6) },
+    cardTitle: { fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
+    label: { fontSize: font(12), fontWeight: "600", color: TEXT_SECONDARY, marginBottom: verticalScale(6) },
     labelSpaced: { marginTop: verticalScale(12) },
-    required: { color: "#DC2626", fontWeight: "700" },
-    helper: { fontSize: font(12), color: "#92400E", marginTop: verticalScale(6) },
-    hint: { fontSize: font(11), color: "#6B7280", marginTop: verticalScale(6), textAlign: "center" },
+    required: { color: ERROR_COLOR, fontWeight: "700" },
+    helper: { fontSize: font(12), color: WARNING_TEXT_STRONG, marginTop: verticalScale(6) },
+    hint: { fontSize: font(11), color: TEXT_MUTED, marginTop: verticalScale(6), textAlign: "center" },
     select: {
       ...FIELD_SURFACE,
       flexDirection: "row",
@@ -1050,18 +1067,18 @@ function createStyles(
       paddingVertical: verticalScale(11),
     },
     selectDisabled: { ...FIELD_DISABLED },
-    selectValue: { flex: 1, fontSize: font(14), color: "#111827" },
-    selectPlaceholder: { flex: 1, fontSize: font(14), color: "#9CA3AF" },
+    selectValue: { flex: 1, fontSize: font(14), color: TEXT_PRIMARY },
+    selectPlaceholder: { flex: 1, fontSize: font(14), color: TEXT_PLACEHOLDER },
     input: {
       ...FIELD_SURFACE,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       fontSize: font(14),
-      color: "#111827",
+      color: TEXT_PRIMARY,
     },
     textarea: { minHeight: verticalScale(96) },
-    inputInvalid: { borderColor: "#DC2626" },
-    fieldError: { fontSize: font(12), color: "#DC2626", marginTop: verticalScale(4) },
+    inputInvalid: { borderColor: ERROR_COLOR },
+    fieldError: { fontSize: font(12), color: ERROR_COLOR, marginTop: verticalScale(4) },
     row: { flexDirection: "row", gap: scale(10) },
     rowSpaced: { marginTop: verticalScale(12) },
     rowItem: { flex: 1 },
@@ -1069,25 +1086,25 @@ function createStyles(
       flexDirection: "row",
       alignItems: "center",
       gap: scale(6),
-      backgroundColor: "#EFF6FF",
+      backgroundColor: PRIMARY_TINT_50,
       borderRadius: RADIUS_MD,
       paddingHorizontal: scale(10),
       paddingVertical: verticalScale(8),
       marginTop: verticalScale(12),
     },
-    noteText: { flex: 1, fontSize: font(12), color: "#1D4ED8" },
+    noteText: { flex: 1, fontSize: font(12), color: PRIMARY_700 },
     dayChips: { flexDirection: "row", flexWrap: "wrap", gap: scale(6) },
     dayChip: {
       borderWidth: 1,
-      borderColor: "#D1D5DB",
+      borderColor: INPUT_BORDER,
       borderRadius: RADIUS_PILL,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(6),
-      backgroundColor: "#fff",
+      backgroundColor: CARD_BACKGROUND,
     },
-    dayChipActive: { backgroundColor: "#2563EB", borderColor: "#2563EB" },
-    dayChipText: { fontSize: font(12), fontWeight: "600", color: "#374151" },
-    dayChipTextActive: { color: "#fff" },
+    dayChipActive: { backgroundColor: PRIMARY_COLOR, borderColor: PRIMARY_COLOR },
+    dayChipText: { fontSize: font(12), fontWeight: "600", color: TEXT_SECONDARY },
+    dayChipTextActive: { color: ON_PRIMARY },
     /** Usuario elegido: misma caja que los selects del formulario. */
     employeeRow: {
       ...FIELD_SURFACE,
@@ -1098,10 +1115,10 @@ function createStyles(
       paddingVertical: verticalScale(8),
     },
     employeeInfo: { flex: 1 },
-    employeeName: { fontSize: font(14), fontWeight: "700", color: "#111827" },
-    employeeId: { fontSize: font(12), fontWeight: "500", color: "#6B7280" },
-    employeeMeta: { fontSize: font(12), color: "#6B7280", marginTop: verticalScale(2) },
-    linkText: { fontSize: font(14), fontWeight: "700", color: "#2563EB" },
+    employeeName: { fontSize: font(14), fontWeight: "700", color: TEXT_PRIMARY },
+    employeeId: { fontSize: font(12), fontWeight: "500", color: TEXT_MUTED },
+    employeeMeta: { fontSize: font(12), color: TEXT_MUTED, marginTop: verticalScale(2) },
+    linkText: { fontSize: font(14), fontWeight: "700", color: PRIMARY_COLOR },
     fileRow: {
       ...FILE_ROW,
       flexDirection: "row",
@@ -1111,8 +1128,8 @@ function createStyles(
       paddingVertical: verticalScale(9),
       marginBottom: verticalScale(8),
     },
-    fileName: { flex: 1, fontSize: font(13), color: "#374151" },
-    fileSize: { fontSize: font(11), color: "#6B7280" },
+    fileName: { flex: 1, fontSize: font(13), color: TEXT_SECONDARY },
+    fileSize: { fontSize: font(11), color: TEXT_MUTED },
     addFileBtn: {
       ...ADD_FILE_BTN,
       flexDirection: "row",
@@ -1121,19 +1138,16 @@ function createStyles(
       gap: scale(8),
       paddingVertical: verticalScale(12),
     },
-    addFileText: { fontSize: font(13), fontWeight: "700", color: "#2563EB" },
+    addFileText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_COLOR },
     errorBanner: {
+      ...ALERT_BANNER,
       flexDirection: "row",
       alignItems: "flex-start",
       gap: scale(8),
-      backgroundColor: "#FEF2F2",
-      borderWidth: 1,
-      borderColor: "#FECACA",
-      borderRadius: RADIUS_LG,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
-    errorBannerText: { flex: 1, fontSize: font(13), color: "#B91C1C" },
+    errorBannerText: { flex: 1, fontSize: font(13), color: ERROR_TEXT },
     footer: {
       ...FOOTER_BAR,
       flexDirection: "row",
@@ -1150,14 +1164,14 @@ function createStyles(
       borderRadius: RADIUS_LG,
     },
     cancelBtn: { ...FOOTER_BTN_CANCEL },
-    cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
+    cancelText: { fontSize: font(14), fontWeight: "700", color: TEXT_SECONDARY },
     saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
-    saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
+    saveText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
     /* ── Picker de usuario: valores calcados de adminpunchinout.tsx ── */
     selectorOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       justifyContent: "center",
       alignItems: "center",
       padding: scale(20),
@@ -1176,7 +1190,7 @@ function createStyles(
       gap: scale(10),
       paddingBottom: verticalScale(14),
       borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
+      borderBottomColor: FOOTER_BORDER,
     },
     /** Ícono de cabecera: tamaño fijo, mismo criterio que Ponche ADM. */
     selectorHeaderIcon: {
@@ -1192,7 +1206,7 @@ function createStyles(
       flex: 1,
       fontSize: font(17),
       fontWeight: "700",
-      color: "#111827",
+      color: TEXT_PRIMARY,
     },
     selectorSearchRow: {
       flexDirection: "row",
@@ -1207,7 +1221,7 @@ function createStyles(
       height: 44,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "#2563EB",
+      backgroundColor: PRIMARY_COLOR,
       borderRadius: RADIUS_MD,
     },
     selectorList: { marginTop: verticalScale(6) },
@@ -1224,7 +1238,7 @@ function createStyles(
     searchInput: {
       flex: 1,
       fontSize: font(12),
-      color: "#111827",
+      color: TEXT_PRIMARY,
       // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- 0 resetea el padding por defecto del TextInput en Android, no es un valor de diseño
       padding: 0,
     },
@@ -1234,19 +1248,19 @@ function createStyles(
       gap: scale(10),
       paddingVertical: verticalScale(10),
       borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
+      borderTopColor: FOOTER_BORDER,
     },
     resultInfo: { flex: 1 },
     resultName: {
       fontSize: font(14),
       fontWeight: "700",
-      color: "#111827",
+      color: TEXT_PRIMARY,
       flexShrink: 1,
     },
-    resultId: { fontWeight: "700", color: "#2563EB" },
+    resultId: { fontWeight: "700", color: PRIMARY_COLOR },
     resultMeta: {
       fontSize: font(12),
-      color: "#6B7280",
+      color: TEXT_MUTED,
       marginTop: verticalScale(1),
     },
     avatarSmall: {
@@ -1254,7 +1268,7 @@ function createStyles(
       height: AVATAR_SM_SIZE,
       // Círculo: mitad del lado fijo, no un radio de diseño.
       borderRadius: AVATAR_SM_SIZE / 2,
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
       alignItems: "center",
       justifyContent: "center",
       overflow: "hidden",
@@ -1271,10 +1285,10 @@ function createStyles(
       gap: scale(6),
       paddingVertical: verticalScale(20),
     },
-    emptyText: { fontSize: font(13), color: "#9CA3AF" },
+    emptyText: { fontSize: font(13), color: TEXT_PLACEHOLDER },
     pickerOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.45)",
       justifyContent: "flex-end",
     },
     pickerCard: {

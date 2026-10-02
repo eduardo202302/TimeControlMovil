@@ -10,9 +10,24 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { FOOTER_BORDER, PRIMARY_TINT_50, TEXT_PRIMARY } from "@/constants/colors";
+import {
+  FOOTER_BORDER,
+  ON_PRIMARY,
+  PRIMARY_700,
+  PRIMARY_COLOR,
+  PRIMARY_TINT_50,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+} from "@/constants/colors";
 import { RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
-import { FIELD_SURFACE, FOOTER_BTN_SAVE, POPUP_CARD } from "@/styles/surfaces";
+import {
+  DIALOG_OVERLAY,
+  FIELD_SURFACE,
+  FOOTER_BTN_SAVE,
+  POPUP_CARD,
+} from "@/styles/surfaces";
 
 /** Lado del avatar de las filas — mismo AVATAR_SM_SIZE que las filas de
  * resultado de AdminPermissionCreateModal.tsx, un punto más chico porque acá
@@ -99,17 +114,17 @@ export default function TagMultiSelectSheet({
               </View>
             )}
             <TouchableOpacity onPress={onClose} hitSlop={8}>
-              <Ionicons name="close" size={20} color="#6B7280" />
+              <Ionicons name="close" size={20} color={TEXT_MUTED} />
             </TouchableOpacity>
           </View>
           <View style={styles.searchBox}>
-            <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+            <Ionicons name="search-outline" size={16} color={TEXT_PLACEHOLDER} />
             <TextInput
               style={styles.searchInput}
               value={query}
               onChangeText={setQuery}
               placeholder="Buscar…"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={TEXT_PLACEHOLDER}
               autoCorrect={false}
             />
           </View>
@@ -140,14 +155,14 @@ export default function TagMultiSelectSheet({
                             resizeMode="cover"
                           />
                         ) : (
-                          <Ionicons name="person" size={16} color="#9CA3AF" />
+                          <Ionicons name="person" size={16} color={TEXT_PLACEHOLDER} />
                         )}
                       </View>
                     )}
                     <Ionicons
                       name={selected ? "checkbox" : "square-outline"}
                       size={20}
-                      color={selected ? "#2563EB" : "#9CA3AF"}
+                      color={selected ? PRIMARY_COLOR : TEXT_PLACEHOLDER}
                     />
                     <View style={styles.optionTextGroup}>
                       <Text
@@ -183,8 +198,8 @@ function createStyles(
 ) {
   return StyleSheet.create({
     overlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.45)",
       justifyContent: "center",
       paddingHorizontal: scale(24),
     },
@@ -204,7 +219,7 @@ function createStyles(
       justifyContent: "space-between",
       marginBottom: verticalScale(10),
     },
-    title: { flex: 1, fontSize: font(16), fontWeight: "700", color: "#111827" },
+    title: { flex: 1, fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
     countBadge: {
       backgroundColor: FOOTER_BORDER,
       borderRadius: RADIUS_PILL,
@@ -225,13 +240,13 @@ function createStyles(
     searchInput: {
       flex: 1,
       fontSize: font(14),
-      color: "#111827",
+      color: TEXT_PRIMARY,
       paddingVertical: verticalScale(8),
     },
     list: { flexGrow: 0 },
     empty: {
       fontSize: font(13),
-      color: "#6B7280",
+      color: TEXT_MUTED,
       textAlign: "center",
       paddingVertical: verticalScale(20),
     },
@@ -246,11 +261,11 @@ function createStyles(
     },
     optionSelected: { backgroundColor: PRIMARY_TINT_50 },
     optionTextGroup: { flex: 1 },
-    optionText: { fontSize: font(14), color: "#374151" },
-    optionTextSelected: { color: "#1D4ED8", fontWeight: "700" },
+    optionText: { fontSize: font(14), color: TEXT_SECONDARY },
+    optionTextSelected: { color: PRIMARY_700, fontWeight: "700" },
     optionSubtitle: {
       fontSize: font(12),
-      color: "#6B7280",
+      color: TEXT_MUTED,
       marginTop: verticalScale(1),
     },
     avatar: {
@@ -275,6 +290,6 @@ function createStyles(
       alignItems: "center",
       paddingVertical: verticalScale(12),
     },
-    doneText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
+    doneText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
   });
 }

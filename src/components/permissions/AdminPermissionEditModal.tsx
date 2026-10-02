@@ -16,10 +16,25 @@ import {
 } from "react-native";
 import {
   APP_BACKGROUND_V2,
+  CARD_BORDER,
+  ERROR_COLOR,
+  ERROR_TEXT,
+  ERROR_TINT_BACKGROUND,
+  ERROR_TINT_BORDER,
+  FOOTER_BORDER,
   HEADER_BUTTON_BACKGROUND,
   HEADER_TEXT,
+  ON_PRIMARY,
+  PRIMARY_COLOR,
   SECTION_ICON_COLOR,
+  SUCCESS_COLOR,
+  SUCCESS_TINT_50,
+  SUCCESS_TINT_BORDER,
   TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+  WARNING_TEXT_STRONG,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
@@ -60,6 +75,7 @@ import { MAX_PAYLOAD_BYTES, pickAttachments } from "./pickAttachments";
 import TagOptionSheet from "./TagOptionSheet";
 import {
   ADD_FILE_BTN,
+  ALERT_BANNER,
   CARD_FORM,
   FIELD_DISABLED,
   FIELD_SURFACE,
@@ -126,12 +142,12 @@ export default function AdminPermissionEditModal({
 
         {loading ? (
           <View style={styles.stateBox}>
-            <ActivityIndicator size="large" color="#2563EB" />
+            <ActivityIndicator size="large" color={PRIMARY_COLOR} />
             <Text style={styles.stateText}>Cargando permiso…</Text>
           </View>
         ) : loadError || !permission ? (
           <View style={styles.stateBox}>
-            <Ionicons name="alert-circle-outline" size={34} color="#9CA3AF" />
+            <Ionicons name="alert-circle-outline" size={34} color={TEXT_PLACEHOLDER} />
             <Text style={styles.stateTitle}>{loadError ?? "Permiso no encontrado"}</Text>
           </View>
         ) : (
@@ -303,8 +319,8 @@ function EditForm({
   }, [justificationError, snapshot, draft, onClose, onSubmit]);
 
   const stateColors = {
-    backgroundColor: targetTag?.color || "#E2E8F0",
-    color: targetTag?.fontColor || "#475569",
+    backgroundColor: targetTag?.color || CARD_BORDER,
+    color: targetTag?.fontColor || TEXT_SECONDARY,
   };
 
   return (
@@ -349,7 +365,7 @@ function EditForm({
               </Text>
             </View>
             <View style={styles.flex} />
-            <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+            <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
           </TouchableOpacity>
           {isRejection && (
             <Text style={styles.helper}>
@@ -372,7 +388,7 @@ function EditForm({
             value={permission.subject ?? ""}
             editable={false}
             placeholder="—"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={TEXT_PLACEHOLDER}
           />
           <Text style={[styles.label, styles.labelSpaced]}>Motivo</Text>
           <TextInput
@@ -382,7 +398,7 @@ function EditForm({
             multiline
             textAlignVertical="top"
             placeholder="—"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={TEXT_PLACEHOLDER}
           />
         </View>
 
@@ -448,7 +464,7 @@ function EditForm({
               multiline
               textAlignVertical="top"
               placeholder="Describe el motivo"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={TEXT_PLACEHOLDER}
             />
             {showErrors && !!justificationError && (
               <Text style={styles.fieldError}>{justificationError}</Text>
@@ -475,7 +491,7 @@ function EditForm({
                 <Ionicons
                   name="document-attach-outline"
                   size={16}
-                  color={removed ? "#9CA3AF" : "#2563EB"}
+                  color={removed ? TEXT_PLACEHOLDER : PRIMARY_COLOR}
                 />
                 <Text
                   style={[styles.fileName, removed && styles.fileNameRemoved]}
@@ -488,7 +504,7 @@ function EditForm({
                     {removed ? (
                       <Text style={styles.undoText}>Deshacer</Text>
                     ) : (
-                      <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                      <Ionicons name="trash-outline" size={18} color={ERROR_COLOR} />
                     )}
                   </TouchableOpacity>
                 )}
@@ -498,7 +514,7 @@ function EditForm({
 
           {newFiles.map((file) => (
             <View key={file.id} style={[styles.fileRow, styles.fileRowNew]}>
-              <Ionicons name={getFileIcon(file.mimeType)} size={16} color="#15803D" />
+              <Ionicons name={getFileIcon(file.mimeType)} size={16} color={SUCCESS_COLOR} />
               <Text style={styles.fileName} numberOfLines={1}>
                 {file.name}
               </Text>
@@ -511,7 +527,7 @@ function EditForm({
                 }
                 hitSlop={8}
               >
-                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                <Ionicons name="close-circle" size={18} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
             </View>
           ))}
@@ -524,9 +540,9 @@ function EditForm({
               activeOpacity={0.75}
             >
               {pickingFiles ? (
-                <ActivityIndicator size="small" color="#2563EB" />
+                <ActivityIndicator size="small" color={PRIMARY_COLOR} />
               ) : (
-                <Ionicons name="cloud-upload-outline" size={18} color="#2563EB" />
+                <Ionicons name="cloud-upload-outline" size={18} color={PRIMARY_COLOR} />
               )}
               <Text style={styles.addFileText}>
                 {pickingFiles ? "Procesando archivos…" : "Agregar archivos"}
@@ -538,7 +554,7 @@ function EditForm({
 
         {!!submitError && (
           <View style={styles.errorBanner}>
-            <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
+            <Ionicons name="alert-circle-outline" size={18} color={ERROR_TEXT} />
             <Text style={styles.errorBannerText}>{submitError}</Text>
           </View>
         )}
@@ -561,7 +577,7 @@ function EditForm({
             activeOpacity={0.8}
           >
             {saving ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={ON_PRIMARY} />
             ) : (
               <Text style={styles.saveText}>Guardar</Text>
             )}
@@ -619,11 +635,11 @@ function createStyles(
       gap: verticalScale(10),
       padding: scale(24),
     },
-    stateText: { fontSize: font(13), color: "#6B7280" },
+    stateText: { fontSize: font(13), color: TEXT_MUTED },
     stateTitle: {
       fontSize: font(15),
       fontWeight: "700",
-      color: "#374151",
+      color: TEXT_SECONDARY,
       textAlign: "center",
     },
     content: {
@@ -648,15 +664,15 @@ function createStyles(
       gap: scale(10),
       marginBottom: verticalScale(10),
     },
-    cardTitle: { fontSize: font(15), fontWeight: "700", color: "#111827" },
-    personName: { fontSize: font(16), fontWeight: "700", color: "#111827" },
-    muted: { fontSize: font(12), color: "#6B7280", marginTop: verticalScale(4) },
-    label: { fontSize: font(12), fontWeight: "600", color: "#374151" },
+    cardTitle: { fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
+    personName: { fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
+    muted: { fontSize: font(12), color: TEXT_MUTED, marginTop: verticalScale(4) },
+    label: { fontSize: font(12), fontWeight: "600", color: TEXT_SECONDARY },
     labelSpaced: { marginTop: verticalScale(12) },
-    required: { color: "#DC2626", fontWeight: "700" },
+    required: { color: ERROR_COLOR, fontWeight: "700" },
     helper: {
       fontSize: font(12),
-      color: "#92400E",
+      color: WARNING_TEXT_STRONG,
       marginTop: verticalScale(8),
       marginBottom: verticalScale(4),
     },
@@ -679,27 +695,27 @@ function createStyles(
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       fontSize: font(14),
-      color: "#111827",
+      color: TEXT_PRIMARY,
       marginTop: verticalScale(6),
     },
     textarea: { minHeight: verticalScale(96) },
     inputDisabled: { ...FIELD_DISABLED, color: TEXT_MUTED },
-    inputInvalid: { borderColor: "#DC2626" },
-    fieldError: { fontSize: font(12), color: "#DC2626", marginTop: verticalScale(4) },
+    inputInvalid: { borderColor: ERROR_COLOR },
+    fieldError: { fontSize: font(12), color: ERROR_COLOR, marginTop: verticalScale(4) },
     infoRow: {
       flexDirection: "row",
       justifyContent: "space-between",
       gap: scale(12),
       paddingVertical: verticalScale(8),
       borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
+      borderBottomColor: FOOTER_BORDER,
     },
     infoRowLast: { borderBottomWidth: 0 },
-    infoLabel: { fontSize: font(12), color: "#6B7280", fontWeight: "600" },
-    infoValue: { flex: 1, fontSize: font(13), color: "#111827", textAlign: "right" },
+    infoLabel: { fontSize: font(12), color: TEXT_MUTED, fontWeight: "600" },
+    infoValue: { flex: 1, fontSize: font(13), color: TEXT_PRIMARY, textAlign: "right" },
     switchRow: { alignItems: "center" },
-    switchLabel: { fontSize: font(13), fontWeight: "700", color: "#111827" },
-    switchHint: { fontSize: font(11), color: "#6B7280", marginTop: verticalScale(2) },
+    switchLabel: { fontSize: font(13), fontWeight: "700", color: TEXT_PRIMARY },
+    switchHint: { fontSize: font(11), color: TEXT_MUTED, marginTop: verticalScale(2) },
     fileRow: {
       ...FILE_ROW,
       flexDirection: "row",
@@ -709,12 +725,12 @@ function createStyles(
       paddingVertical: verticalScale(9),
       marginBottom: verticalScale(8),
     },
-    fileRowRemoved: { backgroundColor: "#FEF2F2", borderColor: "#FECACA" },
-    fileRowNew: { backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" },
-    fileName: { flex: 1, fontSize: font(13), color: "#374151" },
-    fileNameRemoved: { color: "#9CA3AF", textDecorationLine: "line-through" },
-    fileSize: { fontSize: font(11), color: "#6B7280" },
-    undoText: { fontSize: font(12), fontWeight: "700", color: "#2563EB" },
+    fileRowRemoved: { backgroundColor: ERROR_TINT_BACKGROUND, borderColor: ERROR_TINT_BORDER },
+    fileRowNew: { backgroundColor: SUCCESS_TINT_50, borderColor: SUCCESS_TINT_BORDER },
+    fileName: { flex: 1, fontSize: font(13), color: TEXT_SECONDARY },
+    fileNameRemoved: { color: TEXT_PLACEHOLDER, textDecorationLine: "line-through" },
+    fileSize: { fontSize: font(11), color: TEXT_MUTED },
+    undoText: { fontSize: font(12), fontWeight: "700", color: PRIMARY_COLOR },
     addFileBtn: {
       ...ADD_FILE_BTN,
       flexDirection: "row",
@@ -724,19 +740,16 @@ function createStyles(
       paddingVertical: verticalScale(12),
       marginTop: verticalScale(4),
     },
-    addFileText: { fontSize: font(13), fontWeight: "700", color: "#2563EB" },
+    addFileText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_COLOR },
     errorBanner: {
+      ...ALERT_BANNER,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      backgroundColor: "#FEF2F2",
-      borderWidth: 1,
-      borderColor: "#FECACA",
-      borderRadius: RADIUS_LG,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
-    errorBannerText: { flex: 1, fontSize: font(13), color: "#B91C1C" },
+    errorBannerText: { flex: 1, fontSize: font(13), color: ERROR_TEXT },
     footer: {
       ...FOOTER_BAR,
       flexDirection: "row",
@@ -753,9 +766,9 @@ function createStyles(
       borderRadius: RADIUS_LG,
     },
     cancelBtn: { ...FOOTER_BTN_CANCEL },
-    cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
+    cancelText: { fontSize: font(14), fontWeight: "700", color: TEXT_SECONDARY },
     saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
-    saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
+    saveText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
   });
 }

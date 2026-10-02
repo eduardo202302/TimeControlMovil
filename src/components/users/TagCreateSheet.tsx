@@ -15,12 +15,21 @@ import { RADIUS_LG, useResponsive } from "@/constants/responsive";
 import type { UserCategory } from "../../utils/usersRules";
 import type { CreateTagResult } from "./useUserForm";
 import {
+  DIALOG_OVERLAY,
   FIELD_DISABLED,
   FIELD_SURFACE,
   FOOTER_BTN_CANCEL,
   FOOTER_BTN_SAVE,
   POPUP_CARD,
 } from "@/styles/surfaces";
+import {
+  ERROR_COLOR,
+  ON_PRIMARY,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+} from "@/constants/colors";
 
 interface TagCreateSheetProps {
   /** Categoría fija — la del multi-select donde se tocó el "+". null = cerrado. */
@@ -76,7 +85,7 @@ export default function TagCreateSheet({ category, onCreate, onClose }: TagCreat
           <View style={styles.header}>
             <Text style={styles.title}>Agregar Etiqueta</Text>
             <TouchableOpacity onPress={close} hitSlop={8} disabled={saving}>
-              <Ionicons name="close" size={20} color="#6B7280" />
+              <Ionicons name="close" size={20} color={TEXT_MUTED} />
             </TouchableOpacity>
           </View>
 
@@ -96,7 +105,7 @@ export default function TagCreateSheet({ category, onCreate, onClose }: TagCreat
               setError(null);
             }}
             placeholder="Ej. Importante"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={TEXT_PLACEHOLDER}
             maxLength={100}
             editable={!saving}
             autoFocus
@@ -119,7 +128,7 @@ export default function TagCreateSheet({ category, onCreate, onClose }: TagCreat
               activeOpacity={0.8}
             >
               {saving ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={ON_PRIMARY} />
               ) : (
                 <Text style={styles.saveText}>Guardar</Text>
               )}
@@ -138,8 +147,8 @@ function createStyles(
 ) {
   return StyleSheet.create({
     overlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.45)",
       justifyContent: "center",
       paddingHorizontal: scale(24),
     },
@@ -158,20 +167,20 @@ function createStyles(
       justifyContent: "space-between",
       marginBottom: verticalScale(12),
     },
-    title: { fontSize: font(16), fontWeight: "700", color: "#111827" },
-    label: { fontSize: font(12), fontWeight: "600", color: "#374151", marginBottom: verticalScale(6) },
+    title: { fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
+    label: { fontSize: font(12), fontWeight: "600", color: TEXT_SECONDARY, marginBottom: verticalScale(6) },
     labelSpaced: { marginTop: verticalScale(12) },
-    required: { color: "#DC2626", fontWeight: "700" },
+    required: { color: ERROR_COLOR, fontWeight: "700" },
     input: {
       ...FIELD_SURFACE,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
-    inputText: { fontSize: font(14), color: "#111827" },
+    inputText: { fontSize: font(14), color: TEXT_PRIMARY },
     inputDisabled: { ...FIELD_DISABLED },
-    inputInvalid: { borderColor: "#DC2626" },
-    disabledText: { fontSize: font(14), color: "#6B7280" },
-    error: { fontSize: font(12), color: "#DC2626", marginTop: verticalScale(4) },
+    inputInvalid: { borderColor: ERROR_COLOR },
+    disabledText: { fontSize: font(14), color: TEXT_MUTED },
+    error: { fontSize: font(12), color: ERROR_COLOR, marginTop: verticalScale(4) },
     buttons: { flexDirection: "row", gap: scale(10), marginTop: verticalScale(18) },
     btn: {
       flex: 1,
@@ -181,9 +190,9 @@ function createStyles(
       borderRadius: RADIUS_LG,
     },
     cancelBtn: { ...FOOTER_BTN_CANCEL },
-    cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
+    cancelText: { fontSize: font(14), fontWeight: "700", color: TEXT_SECONDARY },
     saveBtn: { ...FOOTER_BTN_SAVE },
-    saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
+    saveText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
     // Sin sombra mientras está translúcido: en Android la elevation se ve a
     // través del botón.
     busy: { opacity: 0.7, shadowColor: "transparent", elevation: 0 },

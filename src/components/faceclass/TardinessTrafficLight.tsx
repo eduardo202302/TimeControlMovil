@@ -18,6 +18,8 @@ import {
   PRIMARY_COLOR,
   TEXT_PRIMARY,
   SECTION_ICON_COLOR,
+  ON_PRIMARY,
+  TEXT_MUTED,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
@@ -174,7 +176,7 @@ export default function TardinessTrafficLight({
                 <Ionicons
                   name="time-outline"
                   size={LIGHT_ICON_SIZE}
-                  color="#fff"
+                  color={ON_PRIMARY}
                 />
               </View>
               <Text style={styles.rowDate} numberOfLines={1}>
@@ -192,7 +194,7 @@ export default function TardinessTrafficLight({
         {/* Fila NUEVA: la tardanza que se está creando */}
         <View style={styles.row}>
           <View style={[styles.light, { backgroundColor: pendingColor }]}>
-            <Ionicons name="time-outline" size={LIGHT_ICON_SIZE} color="#fff" />
+            <Ionicons name="time-outline" size={LIGHT_ICON_SIZE} color={ON_PRIMARY} />
           </View>
           <Text style={styles.rowDate} numberOfLines={1}>
             {pendingDate}
@@ -292,7 +294,7 @@ function createStyles(
       fontWeight: "700",
       color: TEXT_PRIMARY,
     },
-    rowTime: { fontSize: font(13), color: "#6B7280" },
+    rowTime: { fontSize: font(13), color: TEXT_MUTED },
     timeSelect: {
       flexDirection: "row",
       alignItems: "center",
@@ -333,7 +335,7 @@ function createStyles(
       borderBottomWidth: 1,
       borderBottomColor: FOOTER_BORDER,
     },
-    pickerCancel: { fontSize: font(14), fontWeight: "600", color: "#6B7280" },
+    pickerCancel: { fontSize: font(14), fontWeight: "600", color: TEXT_MUTED },
     pickerDone: { fontSize: font(14), fontWeight: "700", color: PRIMARY_COLOR },
   });
 }

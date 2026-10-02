@@ -21,7 +21,13 @@ import UserSchedulesTab from "./UserSchedulesTab";
 import UserSettingsTab from "./UserSettingsTab";
 import { useUserForm } from "./useUserForm";
 import { createUserFormStyles, type UserFormStyles } from "./userFormStyles";
-import { HEADER_TEXT } from "@/constants/colors";
+import {
+  ERROR_TEXT,
+  HEADER_TEXT,
+  ON_PRIMARY,
+  PRIMARY_COLOR,
+  TEXT_PLACEHOLDER,
+} from "@/constants/colors";
 
 type UserTabId = "info" | "config" | "address" | "schedules";
 
@@ -243,7 +249,7 @@ function UserForm({
               onPress={() => setActiveTab(tab.id)}
               activeOpacity={0.75}
             >
-              <Ionicons name={TAB_ICONS[tab.id]} size={18} color={active ? "#fff" : "#2563EB"} />
+              <Ionicons name={TAB_ICONS[tab.id]} size={18} color={active ? ON_PRIMARY : PRIMARY_COLOR} />
               <Text
                 style={[styles.tabText, active && styles.tabTextActive]}
                 numberOfLines={1}
@@ -260,12 +266,12 @@ function UserForm({
 
       {ctl.detailLoading ? (
         <View style={styles.stateBox}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={PRIMARY_COLOR} />
           <Text style={styles.stateText}>Cargando usuario…</Text>
         </View>
       ) : ctl.detailError ? (
         <View style={styles.stateBox}>
-          <Ionicons name="alert-circle-outline" size={30} color="#9CA3AF" />
+          <Ionicons name="alert-circle-outline" size={30} color={TEXT_PLACEHOLDER} />
           <Text style={styles.stateText}>{ctl.detailError}</Text>
           <TouchableOpacity onPress={ctl.reloadDetail} activeOpacity={0.75}>
             <Text style={styles.retryText}>Reintentar</Text>
@@ -279,7 +285,7 @@ function UserForm({
         >
           {!!ctl.submitError && (
             <View style={styles.errorBanner}>
-              <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
+              <Ionicons name="alert-circle-outline" size={18} color={ERROR_TEXT} />
               <Text style={styles.errorBannerText}>{ctl.submitError}</Text>
             </View>
           )}
@@ -313,7 +319,7 @@ function UserForm({
               activeOpacity={0.8}
             >
               {ctl.submitting ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={ON_PRIMARY} />
               ) : (
                 <Text style={styles.saveText}>{ctl.mode === "add" ? "Guardar" : "Modificar"}</Text>
               )}

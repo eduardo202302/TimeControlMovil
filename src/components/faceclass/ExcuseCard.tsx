@@ -14,8 +14,17 @@ import {
 } from "../../utils/excusesRules";
 import type { PermissionTagRef } from "../../utils/permissionRules";
 import { CARD_ROW, ROW_ACTION_BTN } from "@/styles/surfaces";
+import {
+  CARD_BORDER,
+  DANGER_ICON,
+  FOOTER_BORDER,
+  PRIMARY_COLOR,
+  TEXT_MUTED,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+} from "@/constants/colors";
 
-const CHIP_FALLBACK = { background: "#E2E8F0", text: "#475569" };
+const CHIP_FALLBACK = { background: CARD_BORDER, text: TEXT_SECONDARY };
 
 function chipColors(tag: PermissionTagRef | null | undefined) {
   return {
@@ -117,7 +126,7 @@ export default function ExcuseCard({
       <View style={styles.cardFooter}>
         <View style={styles.cardFooterInfo}>
           <View style={styles.footerLine}>
-            <Ionicons name="calendar-outline" size={13} color="#6B7280" />
+            <Ionicons name="calendar-outline" size={13} color={TEXT_MUTED} />
             <Text style={styles.cardFooterText} numberOfLines={1}>
               {range.totalDays > 0
                 ? `${range.totalDays} ${range.totalDays === 1 ? "día" : "días"}`
@@ -126,7 +135,7 @@ export default function ExcuseCard({
           </View>
           {attachments + attachmentsAdm > 0 && (
             <View style={styles.footerLine}>
-              <Ionicons name="attach-outline" size={13} color="#6B7280" />
+              <Ionicons name="attach-outline" size={13} color={TEXT_MUTED} />
               <Text style={styles.cardFooterText} numberOfLines={1}>
                 {`${attachments + attachmentsAdm} adjunto${attachments + attachmentsAdm === 1 ? "" : "s"}`}
               </Text>
@@ -142,7 +151,7 @@ export default function ExcuseCard({
               hitSlop={6}
               accessibilityLabel="Editar"
             >
-              <Ionicons name="create-outline" size={18} color="#2563EB" />
+              <Ionicons name="create-outline" size={18} color={PRIMARY_COLOR} />
             </TouchableOpacity>
           )}
           {canDelete && (
@@ -152,7 +161,7 @@ export default function ExcuseCard({
               hitSlop={6}
               accessibilityLabel="Eliminar"
             >
-              <Ionicons name="trash-outline" size={18} color="#B43333" />
+              <Ionicons name="trash-outline" size={18} color={DANGER_ICON} />
             </TouchableOpacity>
           )}
         </View>
@@ -189,21 +198,21 @@ function createStyles(
     stateChipText: { fontSize: font(12), fontWeight: "700" },
     cardDate: {
       fontSize: font(12),
-      color: "#374151",
+      color: TEXT_SECONDARY,
       fontWeight: "700",
       flexShrink: 1,
       textAlign: "right",
     },
     studentLabel: {
       fontSize: font(11),
-      color: "#6B7280",
+      color: TEXT_MUTED,
       fontWeight: "600",
       marginTop: verticalScale(10),
     },
     studentName: {
       fontSize: font(14),
       fontWeight: "700",
-      color: "#111827",
+      color: TEXT_PRIMARY,
       marginTop: verticalScale(2),
     },
     cardTags: {
@@ -215,7 +224,7 @@ function createStyles(
     courseText: {
       flexShrink: 1,
       fontSize: font(12),
-      color: "#374151",
+      color: TEXT_SECONDARY,
       fontWeight: "600",
     },
     chipSm: {
@@ -230,12 +239,12 @@ function createStyles(
       gap: scale(8),
       marginTop: verticalScale(9),
       borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
+      borderTopColor: FOOTER_BORDER,
       paddingTop: verticalScale(9),
     },
     cardFooterInfo: { flex: 1, gap: verticalScale(3) },
     footerLine: { flexDirection: "row", alignItems: "center", gap: scale(6) },
-    cardFooterText: { flex: 1, fontSize: font(12), color: "#6B7280" },
+    cardFooterText: { flex: 1, fontSize: font(12), color: TEXT_MUTED },
     rowActions: { flexDirection: "row", alignItems: "center", gap: scale(4) },
     iconBtn: {
       ...ROW_ACTION_BTN,

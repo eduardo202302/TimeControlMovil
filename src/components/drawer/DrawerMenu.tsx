@@ -32,10 +32,16 @@ import Animated, {
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { MenuTree } from "../../../utils/resolveRoute";
 import {
+  CARD_BACKGROUND,
   ERROR_COLOR,
+  ERROR_TINT_BACKGROUND,
+  ERROR_TINT_BORDER,
+  FIELD_DISABLED_BACKGROUND,
   FOOTER_BORDER,
   HEADER_NAVY,
   HEADER_TEXT,
+  ONLINE_DOT,
+  OVERLAY_BACKDROP,
   PRIMARY_COLOR,
   PRIMARY_TINT_50,
   TEXT_MUTED,
@@ -109,7 +115,7 @@ function createStyles(
     },
     backdrop: {
       ...StyleSheet.absoluteFill,
-      backgroundColor: "rgba(0,0,0,0.45)",
+      backgroundColor: OVERLAY_BACKDROP,
     },
     drawer: {
       // `width` se aplica inline (ver drawerWidth) — depende de
@@ -120,7 +126,7 @@ function createStyles(
       left: 0,
       height: "100%",
       zIndex: 1,
-      backgroundColor: "#FFFFFF",
+      backgroundColor: CARD_BACKGROUND,
       // Offset positivo: la sombra cae hacia la derecha, sobre el backdrop.
       ...SHADOW_LG,
       shadowOffset: { width: 4, height: 0 },
@@ -164,7 +170,7 @@ function createStyles(
       width: 32,
       height: 32,
       borderRadius: scale(6),
-      backgroundColor: "#FFFFFF",
+      backgroundColor: CARD_BACKGROUND,
     },
     companyLogoFallback: {
       width: 32,
@@ -210,7 +216,7 @@ function createStyles(
       height: 12,
       // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- círculo (mitad de width/height fijos), no un radio de diseño
       borderRadius: 6,
-      backgroundColor: "#22C55E",
+      backgroundColor: ONLINE_DOT,
       borderWidth: 2,
       borderColor: HEADER_NAVY,
     },
@@ -260,7 +266,7 @@ function createStyles(
       paddingVertical: verticalScale(12),
       borderRadius: RADIUS_MD,
       gap: scale(10),
-      backgroundColor: FOOTER_BORDER,
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
     },
     sectionTitle: {
       flex: 1,
@@ -291,6 +297,14 @@ function createStyles(
       backgroundColor: PRIMARY_TINT_50,
       borderLeftColor: PRIMARY_COLOR,
     },
+    /**
+     * Margen vertical negativo: el ícono (scale(18)) queda siempre más bajo
+     * que la línea de texto para el layout, así el alto de la fila lo sigue
+     * decidiendo el texto y no crece al agrandar el ícono.
+     */
+    childIcon: {
+      marginVertical: -scale(3),
+    },
     childText: {
       fontSize: font(14),
       color: TEXT_MUTED,
@@ -315,8 +329,8 @@ function createStyles(
       borderRadius: RADIUS_SM,
       marginBottom: verticalScale(2),
       borderLeftWidth: 2,
-      borderLeftColor: "#FECACA",
-      backgroundColor: "#FEF2F2",
+      borderLeftColor: ERROR_TINT_BORDER,
+      backgroundColor: ERROR_TINT_BACKGROUND,
     },
     logoutBtnText: {
       fontSize: font(12),
@@ -341,7 +355,7 @@ function createStyles(
     },
     modalMessage: {
       fontSize: font(14),
-      color: "#444",
+      color: TEXT_SECONDARY,
       marginBottom: verticalScale(24),
     },
     modalButtons: {
@@ -350,12 +364,12 @@ function createStyles(
       gap: scale(20),
     },
     modalCancel: {
-      color: "#6B7280",
+      color: TEXT_MUTED,
       fontWeight: "600",
       fontSize: font(14),
     },
     modalConfirm: {
-      color: "#DC2626",
+      color: ERROR_COLOR,
       fontWeight: "600",
       fontSize: font(14),
     },
@@ -373,6 +387,7 @@ interface SectionProps {
 
 function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
   const [expanded, setExpanded] = useState(false);
+  const { scale } = useResponsive();
   const sectionIcon = getIcon(section.parent.icon);
   const hasChildren = section.children.length > 0;
   const chevronRotation = useSharedValue(0);
@@ -438,8 +453,9 @@ function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
               >
                 <Ionicons
                   name={childIcon}
-                  size={16}
-                  color={isActive ? PRIMARY_COLOR : TEXT_PLACEHOLDER}
+                  size={scale(18)}
+                  color={isActive ? PRIMARY_COLOR : TEXT_MUTED}
+                  style={styles.childIcon}
                 />
                 <Text
                   style={[styles.childText, isActive && styles.activeChildText]}

@@ -6,10 +6,17 @@ import {
   DANGER_TINT_BACKGROUND,
   DANGER_TINT_BORDER,
   ERROR_COLOR,
+  ERROR_TEXT,
   FIELD_BACKGROUND,
   FIELD_DISABLED_BACKGROUND,
   FOOTER_BORDER,
+  HEADER_NAVY,
+  ICON_SUBTLE,
+  ONLINE_DOT,
+  ON_PRIMARY,
+  PRIMARY_700,
   PRIMARY_COLOR,
+  PRIMARY_TINT_25,
   PRIMARY_TINT_50,
   PRIMARY_TINT_BACKGROUND,
   PRIMARY_TINT_BORDER,
@@ -18,8 +25,12 @@ import {
   SUCCESS_TINT_BACKGROUND,
   SUCCESS_TINT_BORDER,
   TEXT_MUTED,
+  TEXT_PLACEHOLDER,
   TEXT_PRIMARY,
+  TEXT_SECONDARY,
   VIOLET_TINT_BACKGROUND,
+  WARNING_ACCENT,
+  WARNING_TEXT_STRONG,
   WARNING_TINT_BACKGROUND,
   WARNING_TINT_BORDER,
 } from "@/constants/colors";
@@ -32,6 +43,7 @@ import {
 } from "@/constants/responsive";
 import { tintedShadow } from "@/constants/shadows";
 import {
+  ALERT_BANNER,
   CARD_FORM,
   DIALOG_OVERLAY,
   FIELD_SURFACE,
@@ -165,14 +177,6 @@ function to12h(timeStr: string): string {
   return `${h12}:${pad(m)} ${ampm}`;
 }
 
-/** "08:45:32 a. m." — reloj principal */
-function formatRDTime(date: Date): string {
-  const { hours, minutes, seconds } = toRD(date);
-  const h12 = hours % 12 === 0 ? 12 : hours % 12;
-  const ampm = hours < 12 ? "a. m." : "p. m.";
-  return `${pad(h12)}:${pad(minutes)}:${pad(seconds)} ${ampm}`;
-}
-
 /** "08:45 a. m." — modal / registros */
 function formatRDTimeShort(date: Date): string {
   const { hours, minutes } = toRD(date);
@@ -256,13 +260,6 @@ function getDisplayStatus(
               : punch.earlyExit
                 ? "Anticipada"
                 : punch.status || "A Tiempo";
-}
-
-function getStatusLabel(status: string): string {
-  if (status === "Tardanza") return "Tardanza";
-  if (status === "Anticipada") return "Salida anticipada";
-  if (status === "A Tiempo") return "A tiempo";
-  return status;
 }
 
 function isJornadaActiva(punches: PunchEvent[]): boolean {
@@ -637,38 +634,11 @@ export default function PunchInOut() {
     };
   };
 
-  // Datos del usuario autenticado
-  const userName: string = (user as any)?.name
-    ? `${(user as any).name}${(user as any)?.lastName ? " " + (user as any).lastName : ""}`
-    : ((user as any)?.username ?? "Usuario");
-  const userCode: string =
-    (user as any)?.code ?? (user as any)?.employeeCode ?? "";
-
   const getToken = useCallback(async (): Promise<string | null> => {
     const storeToken = useSchoolStore.getState().token;
     if (storeToken) return storeToken;
     return await Storage.getItemAsync("token");
   }, []);
-
-  const handleLogout = useCallback(() => {
-    Alert.alert("Cerrar sesión", "¿Estás seguro de que deseas cerrar sesión?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Cerrar sesión",
-        style: "destructive",
-        onPress: async () => {
-          await Promise.all([
-            Storage.deleteItemAsync("token"),
-            Storage.deleteItemAsync("user"),
-            Storage.deleteItemAsync("menuItems"),
-            // isAuthorized NO se borra — es la autorización del dispositivo físico
-          ]);
-          logout();
-          router.replace("/login");
-        },
-      },
-    ]);
-  }, [logout]);
 
   const forceLogout = useCallback(async () => {
     // Limpiar SecureStore y store, luego navegar a login directamente
@@ -1524,7 +1494,7 @@ export default function PunchInOut() {
             <View style={styles.ndModalHeaderRow}>
               <View style={styles.ndModalHeaderLeft}>
                 <View style={styles.ndModalIconWrap}>
-                  <Ionicons name="time-outline" size={22} color="#D97706" />
+                  <Ionicons name="time-outline" size={22} color={WARNING_ACCENT} />
                 </View>
                 <Text style={styles.ndModalTitle}>Jornada Incompleta</Text>
               </View>
@@ -1532,7 +1502,7 @@ export default function PunchInOut() {
                 onPress={() => setNextDayExitModal(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="close" size={22} color="#9CA3AF" />
+                <Ionicons name="close" size={22} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
             </View>
             <View style={styles.ndModalBody}>
@@ -1550,7 +1520,7 @@ export default function PunchInOut() {
                     onPress={() => setShowTimePicker(true)}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="time-outline" size={20} color="#D97706" />
+                    <Ionicons name="time-outline" size={20} color={WARNING_ACCENT} />
                     <Text
                       style={[
                         styles.ndTimeBtnText,
@@ -1561,7 +1531,7 @@ export default function PunchInOut() {
                         ? to12h(nextDayExitTime)
                         : "Seleccionar hora de salida"}
                     </Text>
-                    <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                    <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
                   </TouchableOpacity>
 
                   {suggestedExitTime && (
@@ -1570,7 +1540,7 @@ export default function PunchInOut() {
                       onPress={handleUseSuggestedExitTime}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="bulb-outline" size={16} color="#2563EB" />
+                      <Ionicons name="bulb-outline" size={16} color={PRIMARY_COLOR} />
                       <Text style={styles.ndSuggestionText}>
                         Hora sugerida según tu horario:{" "}
                         <Text style={styles.ndSuggestionTextValue}>
@@ -1588,7 +1558,7 @@ export default function PunchInOut() {
                   <Ionicons
                     name="alert-circle-outline"
                     size={20}
-                    color="#B91C1C"
+                    color={ERROR_TEXT}
                   />
                   <Text style={styles.ndErrorText}>
                     No se pudo determinar la jornada pendiente, contacta a
@@ -1608,7 +1578,7 @@ export default function PunchInOut() {
               activeOpacity={0.85}
             >
               {submittingExit ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={ON_PRIMARY} size="small" />
               ) : (
                 <Text style={styles.ndModalBtnText}>Cerrar Jornada</Text>
               )}
@@ -1630,7 +1600,7 @@ export default function PunchInOut() {
           <View style={styles.ndModalCard}>
             <View style={styles.ndModalHeader}>
               <View style={styles.ndModalIconWrap}>
-                <Ionicons name="cafe-outline" size={22} color="#D97706" />
+                <Ionicons name="cafe-outline" size={22} color={WARNING_ACCENT} />
               </View>
               <Text style={styles.ndModalTitle}>Motivo del Break</Text>
             </View>
@@ -1646,7 +1616,7 @@ export default function PunchInOut() {
               >
                 <Text style={styles.breakTagOptionText}>{tag.name}</Text>
                 {selectedBreakTagId === tag.id && (
-                  <Ionicons name="checkmark" size={18} color="#2563EB" />
+                  <Ionicons name="checkmark" size={18} color={PRIMARY_COLOR} />
                 )}
               </TouchableOpacity>
             ))}
@@ -1667,7 +1637,7 @@ export default function PunchInOut() {
                   <MaterialCommunityIcons
                     name="alpha-p"
                     size={40}
-                    color="#2563EB"
+                    color={PRIMARY_COLOR}
                   />
                 </View>
                 <Text style={styles.ndModalTitle}>Permiso programado</Text>
@@ -1676,7 +1646,7 @@ export default function PunchInOut() {
                 onPress={() => setPermissionInfoModal(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="close" size={22} color="#9CA3AF" />
+                <Ionicons name="close" size={22} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
             </View>
             <View style={styles.ndModalBody}>
@@ -1729,7 +1699,7 @@ export default function PunchInOut() {
               fetchTodayPunches();
               loadTodayPermissions();
             }}
-            colors={["#2563EB"]}
+            colors={[PRIMARY_COLOR]}
           />
         }
       >
@@ -1787,7 +1757,7 @@ export default function PunchInOut() {
                   <MaterialCommunityIcons
                     name="alpha-p"
                     size={20}
-                    color="#2563EB"
+                    color={PRIMARY_COLOR}
                   />
                 </View>
               </TouchableOpacity>
@@ -1810,13 +1780,13 @@ export default function PunchInOut() {
                     onLoad={() => console.log("Imagen cargó OK")}
                   />
                 ) : (
-                  <Ionicons name="person" size={34} color="#9CA3AF" />
+                  <Ionicons name="person" size={34} color={TEXT_PLACEHOLDER} />
                 )}
               </View>
               <View
                 style={[
                   styles.avatarStatusDot,
-                  { backgroundColor: jornadaIniciada ? "#22C55E" : "#9CA3AF" },
+                  { backgroundColor: jornadaIniciada ? ONLINE_DOT : TEXT_PLACEHOLDER },
                 ]}
               />
             </View>
@@ -1859,17 +1829,17 @@ export default function PunchInOut() {
                   size={isTablet ? 14 : 12}
                   color={
                     !lastPunch
-                      ? "#6B7280"
+                      ? TEXT_MUTED
                       : lastPunchDisplayStatus === "Error de Imagen" ||
                           lastPunchDisplayStatus === "Fuera de área"
-                        ? "#DC2626"
+                        ? ERROR_COLOR
                         : lastPunchDisplayStatus === "Tardanza"
-                          ? "#DC2626"
+                          ? ERROR_COLOR
                           : lastPunchDisplayStatus === "Anticipada"
-                            ? "#D97706"
+                            ? WARNING_ACCENT
                             : lastPunch.type.startsWith("Inicio")
-                              ? "#16A34A"
-                              : "#2563EB"
+                              ? SUCCESS_ACCENT
+                              : PRIMARY_COLOR
                   }
                 />
                 <Text
@@ -1878,17 +1848,17 @@ export default function PunchInOut() {
                     {
                       fontSize: font(isTablet ? 14 : 12),
                       color: !lastPunch
-                        ? "#6B7280"
+                        ? TEXT_MUTED
                         : lastPunchDisplayStatus === "Error de Imagen" ||
                             lastPunchDisplayStatus === "Fuera de área"
-                          ? "#DC2626"
+                          ? ERROR_COLOR
                           : lastPunchDisplayStatus === "Tardanza"
-                            ? "#DC2626"
+                            ? ERROR_COLOR
                             : lastPunchDisplayStatus === "Anticipada"
-                              ? "#D97706"
+                              ? WARNING_ACCENT
                               : lastPunch.type.startsWith("Inicio")
-                                ? "#16A34A"
-                                : "#2563EB",
+                                ? SUCCESS_ACCENT
+                                : PRIMARY_COLOR,
                     },
                   ]}
                   numberOfLines={1}
@@ -1911,7 +1881,7 @@ export default function PunchInOut() {
               ]}
             >
               <View style={styles.locationHeaderRow}>
-                <Ionicons name="location-outline" size={13} color="#6B7280" />
+                <Ionicons name="location-outline" size={13} color={TEXT_MUTED} />
                 <Text style={styles.locationHeaderText}>Ubicación</Text>
               </View>
               <Text style={styles.locationAddressText} numberOfLines={2}>
@@ -1921,15 +1891,15 @@ export default function PunchInOut() {
                 <Ionicons
                   name="location-outline"
                   size={13}
-                  color={currentLocationInfo.withinArea ? "#16A34A" : "#DC2626"}
+                  color={currentLocationInfo.withinArea ? SUCCESS_ACCENT : ERROR_COLOR}
                 />
                 <Text
                   style={[
                     styles.locationStatusText,
                     {
                       color: currentLocationInfo.withinArea
-                        ? "#16A34A"
-                        : "#DC2626",
+                        ? SUCCESS_ACCENT
+                        : ERROR_COLOR,
                     },
                   ]}
                 >
@@ -1951,9 +1921,9 @@ export default function PunchInOut() {
                 ]}
               >
                 <View style={styles.scheduleTableRow}>
-                  <Ionicons name="time-outline" size={14} color="#2563EB" />
+                  <Ionicons name="time-outline" size={14} color={PRIMARY_COLOR} />
                   <Text
-                    style={[styles.scheduleTableHeader, { color: "#1D4ED8" }]}
+                    style={[styles.scheduleTableHeader, { color: PRIMARY_700 }]}
                   >
                     Horario
                   </Text>
@@ -1981,10 +1951,10 @@ export default function PunchInOut() {
                     <Ionicons
                       name="restaurant-outline"
                       size={14}
-                      color="#D97706"
+                      color={WARNING_ACCENT}
                     />
                     <Text
-                      style={[styles.scheduleTableHeader, { color: "#92400E" }]}
+                      style={[styles.scheduleTableHeader, { color: WARNING_TEXT_STRONG }]}
                     >
                       Almuerzo
                     </Text>
@@ -2004,8 +1974,8 @@ export default function PunchInOut() {
             </View>
           ) : (
             <View style={styles.profileScheduleRow}>
-              <Ionicons name="warning-outline" size={13} color="#D97706" />
-              <Text style={[styles.profileScheduleText, { color: "#D97706" }]}>
+              <Ionicons name="warning-outline" size={13} color={WARNING_ACCENT} />
+              <Text style={[styles.profileScheduleText, { color: WARNING_ACCENT }]}>
                 Sin horario configurado
               </Text>
             </View>
@@ -2040,7 +2010,7 @@ export default function PunchInOut() {
                   <Ionicons
                     name={CATEGORY_ICONS[cat]}
                     size={22}
-                    color={selectedCategory === cat ? "#fff" : "#2563EB"}
+                    color={selectedCategory === cat ? ON_PRIMARY : PRIMARY_COLOR}
                   />
                   <Text
                     style={[
@@ -2075,7 +2045,7 @@ export default function PunchInOut() {
                     ? breakTags.find((t) => t.id === selectedBreakTagId)?.name
                     : "Selecciona un motivo"}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
             </View>
           )}
@@ -2112,13 +2082,13 @@ export default function PunchInOut() {
               activeOpacity={0.85}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={ON_PRIMARY} size="small" />
               ) : (
                 <>
                   <Ionicons
                     name={isInicio ? "log-in-outline" : "log-out-outline"}
                     size={26}
-                    color="#fff"
+                    color={ON_PRIMARY}
                   />
                   <View style={styles.registerTextWrap}>
                     <Text style={styles.registerBtnText}>
@@ -2157,7 +2127,7 @@ export default function PunchInOut() {
               <Ionicons
                 name={tolerancesExpanded ? "chevron-up" : "chevron-down"}
                 size={16}
-                color="#2563EB"
+                color={PRIMARY_COLOR}
               />
             </View>
           </TouchableOpacity>
@@ -2232,7 +2202,7 @@ export default function PunchInOut() {
               <Ionicons
                 name={historyExpanded ? "chevron-up" : "chevron-down"}
                 size={16}
-                color="#2563EB"
+                color={PRIMARY_COLOR}
               />
             </View>
           </TouchableOpacity>
@@ -2240,12 +2210,12 @@ export default function PunchInOut() {
             <>
               {loadingPunches ? (
                 <ActivityIndicator
-                  color="#2563EB"
+                  color={PRIMARY_COLOR}
                   style={{ marginVertical: 16 }}
                 />
               ) : punches.length === 0 ? (
                 <View style={styles.emptyPunches}>
-                  <Ionicons name="time-outline" size={32} color="#D1D5DB" />
+                  <Ionicons name="time-outline" size={32} color={ICON_SUBTLE} />
                   <Text style={styles.emptyText}>Sin registros hoy</Text>
                 </View>
               ) : (
@@ -2295,14 +2265,14 @@ export default function PunchInOut() {
                             size={16}
                             color={
                               isLateBadge
-                                ? "#DC2626"
+                                ? ERROR_COLOR
                                 : isEarlyBadge
-                                  ? "#D97706"
+                                  ? WARNING_ACCENT
                                   : punch.type.startsWith("Inicio")
-                                    ? "#16A34A"
+                                    ? SUCCESS_ACCENT
                                     : isJornadaOvertime
-                                      ? "#2563EB"
-                                      : "#16A34A"
+                                      ? PRIMARY_COLOR
+                                      : SUCCESS_ACCENT
                             }
                           />
                         </View>
@@ -2347,7 +2317,7 @@ export default function PunchInOut() {
                                 <Text
                                   style={[
                                     styles.punchBadgeText,
-                                    { color: "#6B7280" },
+                                    { color: TEXT_MUTED },
                                   ]}
                                 >
                                   {breakTagName}
@@ -2359,7 +2329,7 @@ export default function PunchInOut() {
                                 <MaterialCommunityIcons
                                   name="alpha-p"
                                   size={16}
-                                  color="#2563EB"
+                                  color={PRIMARY_COLOR}
                                 />
                               </View>
                             )}
@@ -2369,7 +2339,7 @@ export default function PunchInOut() {
                                 <Ionicons
                                   name="lock-open-outline"
                                   size={16}
-                                  color="#7C3AED"
+                                  color={ACCENT_VIOLET}
                                 />
                               </View>
                             )}
@@ -2442,7 +2412,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   clockTime: {
-    color: "#1D4ED8",
+    color: PRIMARY_700,
     fontSize: 24,
     fontWeight: "800",
     letterSpacing: 0.5,
@@ -2452,7 +2422,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     marginLeft: 4,
-    color: "#142157",
+    color: HEADER_NAVY,
   },
   clockDateCompact: {
     color: PRIMARY_COLOR,
@@ -2496,11 +2466,11 @@ const styles = StyleSheet.create({
   profileName: {
     fontSize: 25,
     fontWeight: "800",
-    color: "#111827",
+    color: TEXT_PRIMARY,
     letterSpacing: 0.1,
   },
   profileScheduleRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-  profileScheduleText: { fontSize: 12, color: "#6B7280" },
+  profileScheduleText: { fontSize: 12, color: TEXT_MUTED },
   lastPunchPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -2534,8 +2504,8 @@ const styles = StyleSheet.create({
     borderColor: DANGER_TINT_BORDER,
   },
   locationHeaderRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  locationHeaderText: { fontSize: 12, fontWeight: "700", color: "#6B7280" },
-  locationAddressText: { fontSize: 13, color: "#374151" },
+  locationHeaderText: { fontSize: 12, fontWeight: "700", color: TEXT_MUTED },
+  locationAddressText: { fontSize: 13, color: TEXT_SECONDARY },
   locationStatusRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   locationStatusText: { fontSize: 12, fontWeight: "700" },
   scheduleTable: { flexDirection: "row", gap: 8 },
@@ -2563,11 +2533,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
   },
-  scheduleTableHeader: { fontSize: 12, fontWeight: "700", color: "#6B7280" },
+  scheduleTableHeader: { fontSize: 12, fontWeight: "700", color: TEXT_MUTED },
   scheduleTableValue: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#111827",
+    color: TEXT_PRIMARY,
     textAlign: "center",
   },
 
@@ -2592,7 +2562,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 14,
   },
-  sectionHeaderText: { fontSize: 15, fontWeight: "700", color: "#111827" },
+  sectionHeaderText: { fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY },
   sectionHeaderToggle: {
     flexDirection: "row",
     alignItems: "center",
@@ -2621,7 +2591,7 @@ const styles = StyleSheet.create({
   historyToggleText: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#2563EB",
+    color: PRIMARY_COLOR,
   },
   toleranceGrid: {
     flexDirection: "row",
@@ -2631,7 +2601,7 @@ const styles = StyleSheet.create({
   toleranceCell: {
     flexBasis: "47%",
     flexGrow: 1,
-    backgroundColor: "#F8FAFF",
+    backgroundColor: PRIMARY_TINT_25,
     borderRadius: RADIUS_MD,
     paddingVertical: 7,
     paddingHorizontal: 10,
@@ -2652,13 +2622,13 @@ const styles = StyleSheet.create({
   toleranceCellLabel: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#6B7280",
+    color: TEXT_MUTED,
     marginBottom: 1,
   },
   toleranceCellValue: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#2563EB",
+    color: PRIMARY_COLOR,
   },
   categories: { flexDirection: "row", gap: 10 },
   categoryBtn: {
@@ -2677,8 +2647,8 @@ const styles = StyleSheet.create({
     backgroundColor: PRIMARY_COLOR,
     borderColor: PRIMARY_COLOR,
   },
-  categoryText: { fontSize: 12, fontWeight: "600", color: "#6B7280" },
-  categoryTextActive: { color: "#fff" },
+  categoryText: { fontSize: 12, fontWeight: "600", color: TEXT_MUTED },
+  categoryTextActive: { color: ON_PRIMARY },
   activeDot: {
     position: "absolute",
     top: 7,
@@ -2715,7 +2685,7 @@ const styles = StyleSheet.create({
   },
   registerTextWrap: { alignItems: "center" },
   registerBtnText: {
-    color: "#fff",
+    color: ON_PRIMARY,
     fontSize: 17,
     fontWeight: "800",
     letterSpacing: 0.2,
@@ -2726,7 +2696,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   emptyPunches: { alignItems: "center", paddingVertical: 24, gap: 8 },
-  emptyText: { fontSize: 14, color: "#9CA3AF" },
+  emptyText: { fontSize: 14, color: TEXT_PLACEHOLDER },
   punchRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2748,7 +2718,7 @@ const styles = StyleSheet.create({
   punchIconEarly: { backgroundColor: WARNING_TINT_BACKGROUND },
   punchIconError: { backgroundColor: DANGER_TINT_BACKGROUND },
   punchInfo: { flex: 1, gap: 4 },
-  punchType: { fontSize: 13, fontWeight: "700", color: "#111827" },
+  punchType: { fontSize: 13, fontWeight: "700", color: TEXT_PRIMARY },
   punchBadgeRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
   punchBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS_PILL },
   badgeOnTime: { backgroundColor: SUCCESS_TINT_BACKGROUND },
@@ -2764,8 +2734,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: RADIUS_PILL,
   },
-  badgeOvertimeText: { fontSize: 11, fontWeight: "700", color: "#2563EB" },
-  punchTime: { fontSize: 12, fontWeight: "600", color: "#6B7280" },
+  badgeOvertimeText: { fontSize: 11, fontWeight: "700", color: PRIMARY_COLOR },
+  punchTime: { fontSize: 12, fontWeight: "600", color: TEXT_MUTED },
   /* Indicador de permiso */
   permissionBadge: {
     width: 20,
@@ -2811,16 +2781,16 @@ const styles = StyleSheet.create({
     backgroundColor: CARD_BORDER,
     marginBottom: 16,
   },
-  permissionItemAction: { fontSize: 15, fontWeight: "700", color: "#111827" },
+  permissionItemAction: { fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY },
   permissionItemTime: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#2563EB",
+    color: PRIMARY_COLOR,
     marginTop: 2,
   },
   permissionItemText: {
     fontSize: 13,
-    color: "#6B7280",
+    color: TEXT_MUTED,
     fontStyle: "italic",
     lineHeight: 20,
     marginTop: 6,
@@ -2879,9 +2849,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: "600",
-    color: "#9CA3AF",
+    color: TEXT_PLACEHOLDER,
   },
-  ndTimeBtnTextValue: { color: "#111827" },
+  ndTimeBtnTextValue: { color: TEXT_PRIMARY },
   ndSuggestionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2894,7 +2864,7 @@ const styles = StyleSheet.create({
   ndSuggestionText: {
     flex: 1,
     fontSize: 12,
-    color: "#1D4ED8",
+    color: PRIMARY_700,
   },
   ndSuggestionTextValue: {
     fontWeight: "700",
@@ -2902,7 +2872,7 @@ const styles = StyleSheet.create({
   ndSuggestionAction: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#2563EB",
+    color: PRIMARY_COLOR,
     textDecorationLine: "underline",
   },
   ndModalBtn: {
@@ -2919,25 +2889,22 @@ const styles = StyleSheet.create({
     shadowColor: "transparent",
     elevation: 0,
   },
-  ndModalBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
+  ndModalBtnText: { fontSize: 16, fontWeight: "700", color: ON_PRIMARY },
   ndErrorRow: {
+    ...ALERT_BANNER,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#FEF2F2",
-    borderWidth: 1,
-    borderColor: "#FECACA",
-    borderRadius: RADIUS_MD,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  ndErrorText: { flex: 1, fontSize: 13, color: "#B91C1C", lineHeight: 20 },
+  ndErrorText: { flex: 1, fontSize: 13, color: ERROR_TEXT, lineHeight: 20 },
   /* Break tag selector */
   breakTagWrap: { marginTop: 12 },
   breakTagLabel: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#6B7280",
+    color: TEXT_MUTED,
     marginBottom: 6,
   },
   breakTagSelector: {
@@ -2948,8 +2915,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  breakTagSelectorText: { fontSize: 15, fontWeight: "600", color: "#9CA3AF" },
-  breakTagSelectorTextValue: { color: "#111827" },
+  breakTagSelectorText: { fontSize: 15, fontWeight: "600", color: TEXT_PLACEHOLDER },
+  breakTagSelectorTextValue: { color: TEXT_PRIMARY },
   breakTagOption: {
     flexDirection: "row",
     alignItems: "center",
@@ -2958,5 +2925,5 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: FOOTER_BORDER,
   },
-  breakTagOptionText: { fontSize: 15, fontWeight: "600", color: "#111827" },
+  breakTagOptionText: { fontSize: 15, fontWeight: "600", color: TEXT_PRIMARY },
 });

@@ -26,6 +26,9 @@ import {
   TEXT_SECONDARY,
   WARNING_COLOR,
   SECTION_ICON_COLOR,
+  FIELD_DISABLED_BACKGROUND,
+  ON_PRIMARY,
+  TEXT_MUTED,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import { RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
@@ -424,7 +427,7 @@ export default function AttendanceTabsView({
                 onPress={() => removeNewPhoto(index)}
                 hitSlop={8}
               >
-                <Ionicons name="close" size={14} color="#fff" />
+                <Ionicons name="close" size={14} color={ON_PRIMARY} />
               </TouchableOpacity>
             </View>
           ))}
@@ -468,9 +471,9 @@ export default function AttendanceTabsView({
             activeOpacity={0.8}
           >
             {capturing ? (
-              <ActivityIndicator color="#fff" size="small" />
+              <ActivityIndicator color={ON_PRIMARY} size="small" />
             ) : (
-              <Ionicons name="camera" size={22} color="#fff" />
+              <Ionicons name="camera" size={22} color={ON_PRIMARY} />
             )}
           </TouchableOpacity>
         </View>
@@ -828,7 +831,7 @@ export default function AttendanceTabsView({
           activeOpacity={0.85}
         >
           {saving ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={ON_PRIMARY} />
           ) : (
             <Text style={styles.saveText}>Guardar</Text>
           )}
@@ -957,7 +960,7 @@ export function createAttendanceStyles(
     emptyTitle: { fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
     emptyText: {
       fontSize: font(13),
-      color: "#6B7280",
+      color: TEXT_MUTED,
       textAlign: "center",
     },
 
@@ -1007,7 +1010,7 @@ export function createAttendanceStyles(
       width: THUMB_SIZE,
       height: THUMB_SIZE,
       borderRadius: RADIUS_MD,
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
       alignItems: "center",
       justifyContent: "center",
       overflow: "hidden",
@@ -1098,7 +1101,7 @@ export function createAttendanceStyles(
       height: scale(38),
       // Círculo: mitad del lado fijo, no un radio de diseño.
       borderRadius: scale(19),
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
       alignItems: "center",
       justifyContent: "center",
       overflow: "hidden",
@@ -1106,7 +1109,7 @@ export function createAttendanceStyles(
     avatarImage: { width: scale(38), height: scale(38) },
     studentInfo: { flex: 1 },
     studentName: { fontSize: font(14), fontWeight: "700", color: TEXT_PRIMARY },
-    studentMeta: { fontSize: font(12), color: "#6B7280", marginTop: verticalScale(1) },
+    studentMeta: { fontSize: font(12), color: TEXT_MUTED, marginTop: verticalScale(1) },
 
     /* ── Lista manual ── */
     listRow: {
@@ -1173,7 +1176,7 @@ export function createAttendanceStyles(
       borderBottomWidth: 1,
       borderBottomColor: FOOTER_BORDER,
     },
-    pickerCancel: { fontSize: font(14), fontWeight: "600", color: "#6B7280" },
+    pickerCancel: { fontSize: font(14), fontWeight: "600", color: TEXT_MUTED },
     pickerDone: { fontSize: font(14), fontWeight: "700", color: PRIMARY_COLOR },
 
     /* ── Sheet de cursos ── */
@@ -1206,6 +1209,6 @@ export function createAttendanceStyles(
       paddingVertical: verticalScale(13),
     },
     saveBtnDisabled: { opacity: 0.55 },
-    saveText: { fontSize: font(14), fontWeight: "700", color: CARD_BACKGROUND },
+    saveText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
   });
 }

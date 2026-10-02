@@ -9,7 +9,23 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { FIELD_BACKGROUND, PRIMARY_COLOR, SECTION_ICON_COLOR } from "@/constants/colors";
+import {
+  CARD_BORDER,
+  FIELD_BACKGROUND,
+  FIELD_DISABLED_BACKGROUND,
+  FOOTER_BORDER,
+  ON_PRIMARY,
+  PRIMARY_500,
+  PRIMARY_700,
+  PRIMARY_COLOR,
+  PRIMARY_TINT_50,
+  SECTION_ICON_COLOR,
+  TEXT_BODY,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+} from "@/constants/colors";
 import { RADIUS_LG, RADIUS_MD, useResponsive } from "@/constants/responsive";
 import { DIALOG_OVERLAY, FILE_ROW, POPUP_CARD } from "@/styles/surfaces";
 import { SHADOW_PRIMARY, tintedShadow } from "@/constants/shadows";
@@ -180,7 +196,7 @@ export default function RevisionFinalModal({
             </View>
             {review.isFullDay && (
               <View style={styles.fullDayNote}>
-                <Ionicons name="moon-outline" size={14} color="#1D4ED8" />
+                <Ionicons name="moon-outline" size={14} color={PRIMARY_700} />
                 <Text style={styles.fullDayNoteText}>
                   Ausencia: se registrará el día completo.
                 </Text>
@@ -209,7 +225,7 @@ export default function RevisionFinalModal({
                       <Ionicons
                         name={getFileIcon(file.mimeType)}
                         size={16}
-                        color="#2563EB"
+                        color={PRIMARY_COLOR}
                       />
                       <Text style={styles.chipName} numberOfLines={1}>
                         {file.name}
@@ -234,7 +250,7 @@ export default function RevisionFinalModal({
               disabled={submitting}
               activeOpacity={0.75}
             >
-              <Ionicons name="create-outline" size={17} color="#374151" />
+              <Ionicons name="create-outline" size={17} color={TEXT_SECONDARY} />
               <Text style={styles.btnGhostText}>Editar</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -248,10 +264,10 @@ export default function RevisionFinalModal({
               activeOpacity={0.85}
             >
               {submitting ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={ON_PRIMARY} size="small" />
               ) : (
                 <>
-                  <Ionicons name="send-outline" size={17} color="#fff" />
+                  <Ionicons name="send-outline" size={17} color={ON_PRIMARY} />
                   <Text style={styles.btnPrimaryText}>Confirmar y Enviar</Text>
                 </>
               )}
@@ -290,7 +306,7 @@ function createStyles(
       gap: scale(12),
       paddingBottom: verticalScale(14),
       borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
+      borderBottomColor: FOOTER_BORDER,
     },
     /** Ícono de cabecera: tamaño fijo, mismo criterio que avatarContainer en DrawerMenu.tsx. */
     headerIconWrap: {
@@ -303,10 +319,10 @@ function createStyles(
       backgroundColor: PRIMARY_COLOR,
     },
     headerTextWrap: { flex: 1 },
-    headerTitle: { fontSize: font(18), fontWeight: "700", color: "#111827" },
+    headerTitle: { fontSize: font(18), fontWeight: "700", color: TEXT_PRIMARY },
     headerSubtitle: {
       fontSize: font(12),
-      color: "#6B7280",
+      color: TEXT_MUTED,
       marginTop: verticalScale(2),
     },
     scroll: { flexGrow: 0 },
@@ -317,43 +333,43 @@ function createStyles(
     sectionTitle: {
       fontSize: font(11),
       fontWeight: "700",
-      color: "#2563EB",
+      color: PRIMARY_COLOR,
       letterSpacing: 0.4,
       textTransform: "uppercase",
       marginBottom: verticalScale(10),
     },
     twoCols: { flexDirection: "row", gap: scale(12) },
     col: { flex: 1, gap: verticalScale(3) },
-    fieldLabel: { fontSize: font(11), color: "#9CA3AF", fontWeight: "600" },
-    fieldValue: { fontSize: font(14), color: "#111827", fontWeight: "600" },
+    fieldLabel: { fontSize: font(11), color: TEXT_PLACEHOLDER, fontWeight: "600" },
+    fieldValue: { fontSize: font(14), color: TEXT_PRIMARY, fontWeight: "600" },
     divider: {
       height: 1,
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
       marginVertical: verticalScale(16),
     },
     fullDayNote: {
       flexDirection: "row",
       alignItems: "center",
       gap: scale(6),
-      backgroundColor: "#EFF6FF",
+      backgroundColor: PRIMARY_TINT_50,
       borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(9),
       marginTop: verticalScale(10),
     },
-    fullDayNoteText: { flex: 1, fontSize: font(12), color: "#1D4ED8" },
-    subject: { fontSize: font(15), fontWeight: "700", color: "#111827" },
+    fullDayNoteText: { flex: 1, fontSize: font(12), color: PRIMARY_700 },
+    subject: { fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
     descriptionBlock: {
       marginTop: verticalScale(8),
       borderLeftWidth: 3,
-      borderLeftColor: "#3B82F6",
+      borderLeftColor: PRIMARY_500,
       backgroundColor: FIELD_BACKGROUND,
       borderTopRightRadius: RADIUS_MD,
       borderBottomRightRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
-    descriptionText: { fontSize: font(13), color: "#4B5563", lineHeight: 20 },
+    descriptionText: { fontSize: font(13), color: TEXT_BODY, lineHeight: 20 },
     chipList: { gap: verticalScale(8) },
     chip: {
       ...FILE_ROW,
@@ -363,15 +379,15 @@ function createStyles(
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
-    chipName: { flex: 1, fontSize: font(13), color: "#374151", fontWeight: "500" },
-    chipSize: { fontSize: font(11), color: "#9CA3AF" },
+    chipName: { flex: 1, fontSize: font(13), color: TEXT_SECONDARY, fontWeight: "500" },
+    chipSize: { fontSize: font(11), color: TEXT_PLACEHOLDER },
     actions: {
       flexDirection: "row",
       gap: scale(10),
       marginTop: verticalScale(16),
       paddingTop: verticalScale(14),
       borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
+      borderTopColor: FOOTER_BORDER,
     },
     btn: {
       flex: 1,
@@ -383,13 +399,13 @@ function createStyles(
       paddingVertical: verticalScale(14),
     },
     btnGhost: {
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
       borderWidth: 1,
-      borderColor: "#E5E7EB",
+      borderColor: CARD_BORDER,
     },
-    btnGhostText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
+    btnGhostText: { fontSize: font(14), fontWeight: "700", color: TEXT_SECONDARY },
     btnPrimary: { ...SHADOW_PRIMARY, backgroundColor: PRIMARY_COLOR, flex: 1.4 },
-    btnPrimaryText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
+    btnPrimaryText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
     btnDisabled: { opacity: 0.6 },
   });
 }

@@ -10,7 +10,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND_V2 } from "@/constants/colors";
+import {
+  APP_BACKGROUND_V2,
+  PRIMARY_COLOR,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+} from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
   useResponsive,
@@ -260,19 +267,19 @@ export default function MyExcusesScreen() {
       {/* ── Búsqueda ── */}
       <View style={[styles.toolbar, isTablet && styles.contentTablet]}>
         <View style={styles.searchBox}>
-          <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+          <Ionicons name="search-outline" size={18} color={TEXT_PLACEHOLDER} />
           <TextInput
             style={styles.searchInput}
             value={searchInput}
             onChangeText={setSearchInput}
             placeholder="Buscar excusas…"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={TEXT_PLACEHOLDER}
             autoCorrect={false}
             returnKeyType="search"
           />
           {!!searchInput && (
             <TouchableOpacity onPress={() => setSearchInput("")} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={18} color={TEXT_PLACEHOLDER} />
             </TouchableOpacity>
           )}
         </View>
@@ -280,7 +287,7 @@ export default function MyExcusesScreen() {
 
       {loading ? (
         <View style={styles.stateBox}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={PRIMARY_COLOR} />
           <Text style={styles.stateText}>Cargando excusas…</Text>
         </View>
       ) : (
@@ -301,7 +308,7 @@ export default function MyExcusesScreen() {
               <Ionicons
                 name={listError ? "alert-circle-outline" : "document-outline"}
                 size={34}
-                color="#9CA3AF"
+                color={TEXT_PLACEHOLDER}
               />
               <Text style={styles.stateTitle}>
                 {listError ??
@@ -317,7 +324,7 @@ export default function MyExcusesScreen() {
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color="#2563EB" />
+                <ActivityIndicator size="small" color={PRIMARY_COLOR} />
               </View>
             ) : null
           }
@@ -371,7 +378,7 @@ function createStyles(
     searchInput: {
       flex: 1,
       fontSize: font(14),
-      color: "#111827",
+      color: TEXT_PRIMARY,
       paddingVertical: verticalScale(10),
     },
     listContent: {
@@ -388,14 +395,14 @@ function createStyles(
       paddingVertical: verticalScale(60),
       paddingHorizontal: scale(24),
     },
-    stateText: { fontSize: font(13), color: "#6B7280" },
+    stateText: { fontSize: font(13), color: TEXT_MUTED },
     stateTitle: {
       fontSize: font(14),
       fontWeight: "700",
-      color: "#374151",
+      color: TEXT_SECONDARY,
       textAlign: "center",
     },
-    retryText: { fontSize: font(13), fontWeight: "700", color: "#2563EB" },
+    retryText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_COLOR },
     footerLoader: { paddingVertical: verticalScale(16) },
   });
 }

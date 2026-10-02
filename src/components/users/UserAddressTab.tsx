@@ -33,9 +33,16 @@ import type { UserFormStyles } from "./userFormStyles";
 import {
   CARD_BACKGROUND,
   CARD_BORDER,
+  DANGER_ICON,
   FIELD_DISABLED_BACKGROUND,
   FOOTER_BORDER,
+  ON_PRIMARY,
+  PRIMARY_COLOR,
   SECTION_ICON_COLOR,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import { FIELD_SURFACE, FOOTER_BTN_SAVE } from "@/styles/surfaces";
@@ -239,7 +246,7 @@ export default function UserAddressTab({ ctl, styles }: UserAddressTabProps) {
         value={options.display ? options.display(draft[field]) : draft[field]}
         onChangeText={(text) => ctl.setAddressField(field, text)}
         editable={!disabled}
-        placeholderTextColor="#9CA3AF"
+        placeholderTextColor={TEXT_PLACEHOLDER}
         autoCorrect={false}
         {...options.inputProps}
       />
@@ -261,31 +268,31 @@ export default function UserAddressTab({ ctl, styles }: UserAddressTabProps) {
           </View>
           {!disabled && hasAnything && (
             <TouchableOpacity onPress={confirmDelete} hitSlop={8} accessibilityLabel="Eliminar dirección">
-              <Ionicons name="trash-outline" size={18} color="#B43333" />
+              <Ionicons name="trash-outline" size={18} color={DANGER_ICON} />
             </TouchableOpacity>
           )}
         </View>
 
         {/* ── Buscador (Places Autocomplete, RD) ── */}
         <View style={[local.searchBox, disabled && styles.inputDisabled]}>
-          <Ionicons name="search-outline" size={16} color="#9CA3AF" />
+          <Ionicons name="search-outline" size={16} color={TEXT_PLACEHOLDER} />
           <TextInput
             style={local.searchInput}
             value={query}
             onChangeText={onQueryChange}
             placeholder="Buscar dirección…"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={TEXT_PLACEHOLDER}
             editable={!disabled}
             autoCorrect={false}
             multiline
           />
           {searching || geocoding ? (
-            <ActivityIndicator size="small" color="#2563EB" />
+            <ActivityIndicator size="small" color={PRIMARY_COLOR} />
           ) : (
             !!query &&
             !disabled && (
               <TouchableOpacity onPress={() => setQueryFromCode("")} hitSlop={8}>
-                <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+                <Ionicons name="close-circle" size={16} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
             )
           )}
@@ -299,7 +306,7 @@ export default function UserAddressTab({ ctl, styles }: UserAddressTabProps) {
                 onPress={() => choosePrediction(prediction)}
                 activeOpacity={0.75}
               >
-                <Ionicons name="location-outline" size={14} color="#6B7280" />
+                <Ionicons name="location-outline" size={14} color={TEXT_MUTED} />
                 <Text style={local.predictionText} numberOfLines={2}>
                   {prediction.description}
                 </Text>
@@ -333,7 +340,7 @@ export default function UserAddressTab({ ctl, styles }: UserAddressTabProps) {
             </MapView>
           ) : (
             <View style={local.mapFallback}>
-              <Ionicons name="map-outline" size={28} color="#9CA3AF" />
+              <Ionicons name="map-outline" size={28} color={TEXT_PLACEHOLDER} />
               <Text style={local.mapFallbackText}>
                 El mapa no está disponible en esta versión de la app. Puedes buscar la dirección o completar los campos.
               </Text>
@@ -398,7 +405,7 @@ export default function UserAddressTab({ ctl, styles }: UserAddressTabProps) {
             disabled={!complete}
             activeOpacity={0.8}
           >
-            <Ionicons name="checkmark" size={16} color="#fff" />
+            <Ionicons name="checkmark" size={16} color={ON_PRIMARY} />
             <Text style={local.saveText}>Guardar dirección</Text>
           </TouchableOpacity>
         )}
@@ -414,7 +421,7 @@ export default function UserAddressTab({ ctl, styles }: UserAddressTabProps) {
           editable={!disabled}
           multiline
           placeholder="Ej. Calle Duarte #45, La Vega, República Dominicana"
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={TEXT_PLACEHOLDER}
         />
       </View>
     </>
@@ -437,7 +444,7 @@ function createStyles(
     searchInput: {
       flex: 1,
       fontSize: font(14),
-      color: "#111827",
+      color: TEXT_PRIMARY,
       paddingVertical: verticalScale(10),
     },
     predictions: {
@@ -457,7 +464,7 @@ function createStyles(
       borderBottomWidth: 1,
       borderBottomColor: FOOTER_BORDER,
     },
-    predictionText: { flex: 1, fontSize: font(13), color: "#374151" },
+    predictionText: { flex: 1, fontSize: font(13), color: TEXT_SECONDARY },
     mapWrapper: {
       marginTop: verticalScale(10),
       height: verticalScale(260),
@@ -475,8 +482,8 @@ function createStyles(
       paddingHorizontal: scale(16),
       backgroundColor: FIELD_DISABLED_BACKGROUND,
     },
-    mapFallbackText: { fontSize: font(12), color: "#6B7280", textAlign: "center" },
-    mapHint: { fontSize: font(12), color: "#6B7280", marginTop: verticalScale(6) },
+    mapFallbackText: { fontSize: font(12), color: TEXT_MUTED, textAlign: "center" },
+    mapHint: { fontSize: font(12), color: TEXT_MUTED, marginTop: verticalScale(6) },
     streetItem: { flex: 2 },
     textArea: { minHeight: verticalScale(72), textAlignVertical: "top" },
     saveBtn: {
@@ -491,6 +498,6 @@ function createStyles(
     // Sin sombra mientras está translúcido: en Android la elevation se ve a
     // través del botón.
     saveBtnDisabled: { opacity: 0.5, shadowColor: "transparent", elevation: 0 },
-    saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
+    saveText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
   });
 }

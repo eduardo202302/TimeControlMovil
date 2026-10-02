@@ -10,7 +10,24 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND_V2 } from "@/constants/colors";
+import {
+  APP_BACKGROUND_V2,
+  DANGER_ICON,
+  DANGER_TINT_BACKGROUND,
+  ERROR_COLOR,
+  ERROR_TEXT,
+  FOOTER_BORDER,
+  ICON_EDIT,
+  ON_PRIMARY,
+  PRIMARY_COLOR,
+  SUCCESS_COLOR,
+  SUCCESS_TINT_BACKGROUND,
+  SURFACE_SUBTLE,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+} from "@/constants/colors";
 import { MAX_CONTENT_WIDTH, RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import * as Storage from "../../utils/storage";
@@ -81,7 +98,7 @@ function HolidayCard({ item, styles, onView, onEdit, onDelete }: HolidayCardProp
       </View>
 
       <View style={styles.cardMetaRow}>
-        <Ionicons name="calendar-outline" size={13} color="#6B7280" />
+        <Ionicons name="calendar-outline" size={13} color={TEXT_MUTED} />
         <Text style={styles.cardMetaText}>
           {date} {day ? `· ${day}` : ""}
         </Text>
@@ -89,14 +106,14 @@ function HolidayCard({ item, styles, onView, onEdit, onDelete }: HolidayCardProp
 
       {item.working && !!item.rangeHours && (
         <View style={styles.cardMetaRow}>
-          <Ionicons name="time-outline" size={13} color="#6B7280" />
+          <Ionicons name="time-outline" size={13} color={TEXT_MUTED} />
           <Text style={styles.cardMetaText}>{item.rangeHours}</Text>
         </View>
       )}
 
       {!item.isActive && (
         <View style={styles.cardMetaRow}>
-          <Ionicons name="alert-circle-outline" size={13} color="#B91C1C" />
+          <Ionicons name="alert-circle-outline" size={13} color={ERROR_TEXT} />
           <Text style={styles.inactiveText}>Inactivo</Text>
         </View>
       )}
@@ -109,7 +126,7 @@ function HolidayCard({ item, styles, onView, onEdit, onDelete }: HolidayCardProp
             hitSlop={6}
             accessibilityLabel="Eliminar"
           >
-            <Ionicons name="trash-outline" size={18} color="#B43333" />
+            <Ionicons name="trash-outline" size={18} color={DANGER_ICON} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.iconBtn}
@@ -117,7 +134,7 @@ function HolidayCard({ item, styles, onView, onEdit, onDelete }: HolidayCardProp
             hitSlop={6}
             accessibilityLabel="Editar"
           >
-            <Ionicons name="create-outline" size={18} color="#3F7EA3" />
+            <Ionicons name="create-outline" size={18} color={ICON_EDIT} />
           </TouchableOpacity>
         </View>
       )}
@@ -311,7 +328,7 @@ export default function HolidaysScreen() {
       {/* ── Listado ── */}
       {loading ? (
         <View style={styles.stateBox}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={PRIMARY_COLOR} />
           <Text style={styles.stateText}>Cargando feriados…</Text>
         </View>
       ) : (
@@ -330,7 +347,7 @@ export default function HolidaysScreen() {
               <Ionicons
                 name={listError ? "alert-circle-outline" : "calendar-outline"}
                 size={30}
-                color="#9CA3AF"
+                color={TEXT_PLACEHOLDER}
               />
               <Text style={styles.stateTitle}>
                 {listError ?? "No hay feriados registrados"}
@@ -345,7 +362,7 @@ export default function HolidaysScreen() {
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color="#2563EB" />
+                <ActivityIndicator size="small" color={PRIMARY_COLOR} />
               </View>
             ) : null
           }
@@ -359,7 +376,7 @@ export default function HolidaysScreen() {
         activeOpacity={0.85}
         accessibilityLabel="Agregar feriado"
       >
-        <Ionicons name="add" size={26} color="#fff" />
+        <Ionicons name="add" size={26} color={ON_PRIMARY} />
       </TouchableOpacity>
 
       <HolidaysFormModal
@@ -396,7 +413,7 @@ export default function HolidaysScreen() {
               </TouchableOpacity>
               <TouchableOpacity onPress={confirmDelete} disabled={deleting}>
                 {deleting ? (
-                  <ActivityIndicator size="small" color="#DC2626" />
+                  <ActivityIndicator size="small" color={ERROR_COLOR} />
                 ) : (
                   <Text style={styles.confirmConfirm}>Eliminar</Text>
                 )}
@@ -441,8 +458,8 @@ function createStyles(
       paddingVertical: verticalScale(7),
     },
     segmentActive: { ...SEGMENT_ACTIVE },
-    segmentText: { fontSize: font(12), fontWeight: "600", color: "#6B7280" },
-    segmentTextActive: { color: "#fff", fontWeight: "700" },
+    segmentText: { fontSize: font(12), fontWeight: "600", color: TEXT_MUTED },
+    segmentTextActive: { color: ON_PRIMARY, fontWeight: "700" },
     list: { flex: 1 },
     // paddingBottom deja aire para que el FAB no tape la última card — mismo
     // valor que permissions.tsx.
@@ -452,39 +469,39 @@ function createStyles(
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
-    cardInactive: { backgroundColor: "#F9FAFB" },
+    cardInactive: { backgroundColor: SURFACE_SUBTLE },
     cardTop: {
       flexDirection: "row",
       alignItems: "flex-start",
       justifyContent: "space-between",
       gap: scale(8),
     },
-    cardName: { flex: 1, fontSize: font(14), fontWeight: "700", color: "#111827" },
+    cardName: { flex: 1, fontSize: font(14), fontWeight: "700", color: TEXT_PRIMARY },
     workingBadge: {
       borderRadius: RADIUS_PILL,
       paddingHorizontal: scale(8),
       paddingVertical: verticalScale(3),
     },
-    workingBadgeOn: { backgroundColor: "#DCFCE7" },
-    workingBadgeOff: { backgroundColor: "#FEE2E2" },
+    workingBadgeOn: { backgroundColor: SUCCESS_TINT_BACKGROUND },
+    workingBadgeOff: { backgroundColor: DANGER_TINT_BACKGROUND },
     workingBadgeText: { fontSize: font(10), fontWeight: "700" },
-    workingBadgeTextOn: { color: "#15803D" },
-    workingBadgeTextOff: { color: "#B91C1C" },
+    workingBadgeTextOn: { color: SUCCESS_COLOR },
+    workingBadgeTextOff: { color: ERROR_TEXT },
     cardMetaRow: {
       flexDirection: "row",
       alignItems: "center",
       gap: scale(6),
       marginTop: verticalScale(6),
     },
-    cardMetaText: { fontSize: font(12), color: "#6B7280" },
-    inactiveText: { fontSize: font(12), color: "#B91C1C", fontWeight: "600" },
+    cardMetaText: { fontSize: font(12), color: TEXT_MUTED },
+    inactiveText: { fontSize: font(12), color: ERROR_TEXT, fontWeight: "600" },
     cardActions: {
       flexDirection: "row",
       justifyContent: "flex-end",
       gap: scale(4),
       marginTop: verticalScale(8),
       borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
+      borderTopColor: FOOTER_BORDER,
       paddingTop: verticalScale(8),
     },
     iconBtn: {
@@ -498,14 +515,14 @@ function createStyles(
       gap: verticalScale(8),
       paddingVertical: verticalScale(36),
     },
-    stateText: { fontSize: font(13), color: "#6B7280" },
+    stateText: { fontSize: font(13), color: TEXT_MUTED },
     stateTitle: {
       fontSize: font(13),
       fontWeight: "600",
-      color: "#374151",
+      color: TEXT_SECONDARY,
       textAlign: "center",
     },
-    retryText: { fontSize: font(13), fontWeight: "700", color: "#2563EB", marginTop: verticalScale(4) },
+    retryText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_COLOR, marginTop: verticalScale(4) },
     footerLoader: { paddingVertical: verticalScale(14) },
     // Copia literal de permissions.tsx:967-982 — misma fuente que el resto
     // de los FABs de la app.
@@ -535,14 +552,14 @@ function createStyles(
     confirmTitle: {
       fontSize: font(15),
       fontWeight: "700",
-      color: "#DC2626",
+      color: ERROR_COLOR,
       marginBottom: verticalScale(8),
     },
-    confirmMessage: { fontSize: font(14), color: "#444" },
+    confirmMessage: { fontSize: font(14), color: TEXT_SECONDARY },
     confirmFocus: {
       fontSize: font(13),
       fontWeight: "700",
-      color: "#111827",
+      color: TEXT_PRIMARY,
       marginTop: verticalScale(8),
     },
     confirmButtons: {
@@ -551,7 +568,7 @@ function createStyles(
       gap: scale(20),
       marginTop: verticalScale(24),
     },
-    confirmCancel: { color: "#6B7280", fontWeight: "600", fontSize: font(14) },
-    confirmConfirm: { color: "#DC2626", fontWeight: "600", fontSize: font(14) },
+    confirmCancel: { color: TEXT_MUTED, fontWeight: "600", fontSize: font(14) },
+    confirmConfirm: { color: ERROR_COLOR, fontWeight: "600", fontSize: font(14) },
   });
 }

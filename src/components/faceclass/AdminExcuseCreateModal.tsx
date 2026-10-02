@@ -15,9 +15,18 @@ import {
 } from "react-native";
 import {
   APP_BACKGROUND_V2,
+  ERROR_COLOR,
+  ERROR_TEXT,
   HEADER_BUTTON_BACKGROUND,
   HEADER_TEXT,
+  ON_PRIMARY,
+  PRIMARY_COLOR,
   SECTION_ICON_COLOR,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+  WARNING_TEXT_STRONG,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
@@ -50,6 +59,7 @@ import TagMultiSelectSheet, {
 import AbsenceCalendar, { type AbsenceRange } from "./AbsenceCalendar";
 import {
   ADD_FILE_BTN,
+  ALERT_BANNER,
   CARD_FORM,
   FIELD_SURFACE,
   FILE_ROW,
@@ -337,17 +347,20 @@ function CreateForm({
             onPress={() => setStudentsSheetOpen(true)}
             activeOpacity={0.75}
           >
-            <Ionicons name="people-outline" size={16} color="#2563EB" />
-            <Text style={styles.selectPlaceholder} numberOfLines={2}>
+            <Ionicons name="people-outline" size={16} color={PRIMARY_COLOR} />
+            <Text
+              style={selectedStudentIds.length === 0 ? styles.selectPlaceholder : styles.selectValue}
+              numberOfLines={2}
+            >
               {selectedStudentIds.length === 0
                 ? "Seleccionar estudiantes"
                 : `${selectedStudentIds.length} estudiante${selectedStudentIds.length === 1 ? "" : "s"} seleccionado${selectedStudentIds.length === 1 ? "" : "s"}`}
             </Text>
-            <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+            <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
           </TouchableOpacity>
           {!!errorFor("students") && <Text style={styles.fieldError}>{errorFor("students")}</Text>}
           {studentsLoading && (
-            <ActivityIndicator size="small" color="#2563EB" style={styles.inlineLoader} />
+            <ActivityIndicator size="small" color={PRIMARY_COLOR} style={styles.inlineLoader} />
           )}
           {!studentsLoading && !!studentsError && (
             <Text style={styles.fieldError}>{studentsError}</Text>
@@ -368,7 +381,7 @@ function CreateForm({
                 <Text style={type ? styles.selectValue : styles.selectPlaceholder} numberOfLines={1}>
                   {type?.name ?? "Selecciona un tipo"}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
               {!!errorFor("type") && <Text style={styles.fieldError}>{errorFor("type")}</Text>}
               {typeTags.length === 0 && !catalogError && (
@@ -397,7 +410,7 @@ function CreateForm({
             onChangeText={setSubject}
             maxLength={255}
             placeholder="Ej. Cita médica"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={TEXT_PLACEHOLDER}
           />
           {!!errorFor("subject") && <Text style={styles.fieldError}>{errorFor("subject")}</Text>}
 
@@ -411,7 +424,7 @@ function CreateForm({
             multiline
             textAlignVertical="top"
             placeholder="Describe el motivo de la ausencia"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={TEXT_PLACEHOLDER}
           />
           {!!errorFor("description") && (
             <Text style={styles.fieldError}>{errorFor("description")}</Text>
@@ -443,7 +456,7 @@ function CreateForm({
           </View>
           {files.map((file) => (
             <View key={file.id} style={styles.fileRow}>
-              <Ionicons name={getFileIcon(file.mimeType)} size={16} color="#2563EB" />
+              <Ionicons name={getFileIcon(file.mimeType)} size={16} color={PRIMARY_COLOR} />
               <Text style={styles.fileName} numberOfLines={1}>
                 {file.name}
               </Text>
@@ -454,7 +467,7 @@ function CreateForm({
                 onPress={() => setFiles((previous) => previous.filter((f) => f.id !== file.id))}
                 hitSlop={8}
               >
-                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                <Ionicons name="close-circle" size={18} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
             </View>
           ))}
@@ -465,9 +478,9 @@ function CreateForm({
             activeOpacity={0.75}
           >
             {pickingFiles ? (
-              <ActivityIndicator size="small" color="#2563EB" />
+              <ActivityIndicator size="small" color={PRIMARY_COLOR} />
             ) : (
-              <Ionicons name="cloud-upload-outline" size={18} color="#2563EB" />
+              <Ionicons name="cloud-upload-outline" size={18} color={PRIMARY_COLOR} />
             )}
             <Text style={styles.addFileText}>
               {pickingFiles ? "Procesando archivos…" : "Seleccionar archivos"}
@@ -479,7 +492,7 @@ function CreateForm({
 
         {!!submitError && (
           <View style={styles.errorBanner}>
-            <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
+            <Ionicons name="alert-circle-outline" size={18} color={ERROR_TEXT} />
             <Text style={styles.errorBannerText}>{submitError}</Text>
           </View>
         )}
@@ -501,7 +514,7 @@ function CreateForm({
           activeOpacity={0.8}
         >
           {submitting ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={ON_PRIMARY} />
           ) : (
             <Text style={styles.saveText}>Guardar</Text>
           )}
@@ -586,12 +599,12 @@ function createStyles(
       gap: scale(10),
       marginBottom: verticalScale(10),
     },
-    cardTitle: { fontSize: font(15), fontWeight: "700", color: "#111827" },
-    label: { fontSize: font(12), fontWeight: "600", color: "#374151", marginBottom: verticalScale(6) },
+    cardTitle: { fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
+    label: { fontSize: font(12), fontWeight: "600", color: TEXT_SECONDARY, marginBottom: verticalScale(6) },
     labelSpaced: { marginTop: verticalScale(12) },
-    required: { color: "#DC2626", fontWeight: "700" },
-    helper: { fontSize: font(12), color: "#92400E", marginTop: verticalScale(6) },
-    hint: { fontSize: font(11), color: "#6B7280", marginTop: verticalScale(6), textAlign: "center" },
+    required: { color: ERROR_COLOR, fontWeight: "700" },
+    helper: { fontSize: font(12), color: WARNING_TEXT_STRONG, marginTop: verticalScale(6) },
+    hint: { fontSize: font(11), color: TEXT_MUTED, marginTop: verticalScale(6), textAlign: "center" },
     select: {
       ...FIELD_SURFACE,
       flexDirection: "row",
@@ -600,18 +613,18 @@ function createStyles(
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(11),
     },
-    selectValue: { flex: 1, fontSize: font(14), color: "#111827" },
-    selectPlaceholder: { flex: 1, fontSize: font(14), color: "#9CA3AF" },
+    selectValue: { flex: 1, fontSize: font(14), color: TEXT_PRIMARY },
+    selectPlaceholder: { flex: 1, fontSize: font(14), color: TEXT_PLACEHOLDER },
     input: {
       ...FIELD_SURFACE,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       fontSize: font(14),
-      color: "#111827",
+      color: TEXT_PRIMARY,
     },
     textarea: { minHeight: verticalScale(96) },
-    inputInvalid: { borderColor: "#DC2626" },
-    fieldError: { fontSize: font(12), color: "#DC2626", marginTop: verticalScale(4) },
+    inputInvalid: { borderColor: ERROR_COLOR },
+    fieldError: { fontSize: font(12), color: ERROR_COLOR, marginTop: verticalScale(4) },
     inlineLoader: { marginTop: verticalScale(8) },
     fileRow: {
       ...FILE_ROW,
@@ -622,8 +635,8 @@ function createStyles(
       paddingVertical: verticalScale(9),
       marginBottom: verticalScale(8),
     },
-    fileName: { flex: 1, fontSize: font(13), color: "#374151" },
-    fileSize: { fontSize: font(11), color: "#6B7280" },
+    fileName: { flex: 1, fontSize: font(13), color: TEXT_SECONDARY },
+    fileSize: { fontSize: font(11), color: TEXT_MUTED },
     addFileBtn: {
       ...ADD_FILE_BTN,
       flexDirection: "row",
@@ -632,19 +645,16 @@ function createStyles(
       gap: scale(8),
       paddingVertical: verticalScale(12),
     },
-    addFileText: { fontSize: font(13), fontWeight: "700", color: "#2563EB" },
+    addFileText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_COLOR },
     errorBanner: {
+      ...ALERT_BANNER,
       flexDirection: "row",
       alignItems: "flex-start",
       gap: scale(8),
-      backgroundColor: "#FEF2F2",
-      borderWidth: 1,
-      borderColor: "#FECACA",
-      borderRadius: RADIUS_LG,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
-    errorBannerText: { flex: 1, fontSize: font(13), color: "#B91C1C" },
+    errorBannerText: { flex: 1, fontSize: font(13), color: ERROR_TEXT },
     footer: {
       ...FOOTER_BAR,
       flexDirection: "row",
@@ -661,9 +671,9 @@ function createStyles(
       borderRadius: RADIUS_LG,
     },
     cancelBtn: { ...FOOTER_BTN_CANCEL },
-    cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
+    cancelText: { fontSize: font(14), fontWeight: "700", color: TEXT_SECONDARY },
     saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
-    saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
+    saveText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
   });
 }

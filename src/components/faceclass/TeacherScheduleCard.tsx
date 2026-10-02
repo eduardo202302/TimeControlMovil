@@ -5,6 +5,7 @@ import {
   FOOTER_BORDER,
   PRIMARY_COLOR,
   PRIMARY_TINT_BACKGROUND,
+  TEXT_MUTED,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
 } from "@/constants/colors";
@@ -159,7 +160,7 @@ function createStyles(
       marginBottom: verticalScale(12),
       textTransform: "capitalize",
     },
-    empty: { fontSize: font(13), color: "#6B7280" },
+    empty: { fontSize: font(13), color: TEXT_MUTED },
 
     // El padding horizontal lo llevan TODAS las filas, no solo la resaltada:
     // así el fondo de la clase en curso no desplaza su texto respecto al resto.

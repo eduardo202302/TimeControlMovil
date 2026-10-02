@@ -15,9 +15,21 @@ import {
 } from "react-native";
 import {
   APP_BACKGROUND_V2,
+  CARD_BORDER,
+  ERROR_TEXT,
+  ERROR_TINT_BACKGROUND,
+  ERROR_TINT_BORDER,
+  FOOTER_BORDER,
   HEADER_BUTTON_BACKGROUND,
   HEADER_TEXT,
+  ON_PRIMARY,
+  OVERLAY_VIEWER,
+  PRIMARY_COLOR,
   SECTION_ICON_COLOR,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
@@ -42,7 +54,7 @@ import { SHADOW_PRIMARY } from "@/constants/shadows";
 import { CARD_FORM, FILE_ROW, FOOTER_BAR, MODAL_TOPBAR, SWITCH_COLORS } from "@/styles/surfaces";
 
 const AUSENCIA_ACTION_NAME = "ausencia";
-const CHIP_FALLBACK = { background: "#E2E8F0", text: "#475569" };
+const CHIP_FALLBACK = { background: CARD_BORDER, text: TEXT_SECONDARY };
 
 function chipColors(tag: PermissionTagRef | null | undefined) {
   return {
@@ -189,12 +201,12 @@ export default function AdminPermissionDetailModal({
 
         {loading ? (
           <View style={styles.stateBox}>
-            <ActivityIndicator size="large" color="#2563EB" />
+            <ActivityIndicator size="large" color={PRIMARY_COLOR} />
             <Text style={styles.stateText}>Cargando permiso…</Text>
           </View>
         ) : error || !permission || !range ? (
           <View style={styles.stateBox}>
-            <Ionicons name="alert-circle-outline" size={34} color="#9CA3AF" />
+            <Ionicons name="alert-circle-outline" size={34} color={TEXT_PLACEHOLDER} />
             <Text style={styles.stateTitle}>{error ?? "Permiso no encontrado"}</Text>
           </View>
         ) : (
@@ -230,7 +242,7 @@ export default function AdminPermissionDetailModal({
                     <Ionicons
                       name={isHistorical ? "archive-outline" : "alert-circle-outline"}
                       size={14}
-                      color={isHistorical ? "#6B7280" : "#B91C1C"}
+                      color={isHistorical ? TEXT_MUTED : ERROR_TEXT}
                     />
                     <Text style={[styles.noticeText, expired && !isHistorical && styles.noticeExpired]}>
                       {isHistorical
@@ -345,11 +357,11 @@ export default function AdminPermissionDetailModal({
                       onPress={() => openAttachment(path)}
                       activeOpacity={0.75}
                     >
-                      <Ionicons name={attachmentIcon(path)} size={18} color="#6B7280" />
+                      <Ionicons name={attachmentIcon(path)} size={18} color={TEXT_MUTED} />
                       <Text style={styles.attachmentName} numberOfLines={1}>
                         {attachmentFileName(path)}
                       </Text>
-                      <Ionicons name="open-outline" size={16} color="#9CA3AF" />
+                      <Ionicons name="open-outline" size={16} color={TEXT_PLACEHOLDER} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -364,7 +376,7 @@ export default function AdminPermissionDetailModal({
                     onPress={onDelete}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="trash-outline" size={18} color="#B91C1C" />
+                    <Ionicons name="trash-outline" size={18} color={ERROR_TEXT} />
                     <Text style={styles.deleteText}>Eliminar</Text>
                   </TouchableOpacity>
                 )}
@@ -374,7 +386,7 @@ export default function AdminPermissionDetailModal({
                     onPress={onEdit}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="create-outline" size={18} color="#fff" />
+                    <Ionicons name="create-outline" size={18} color={ON_PRIMARY} />
                     <Text style={styles.editText}>Editar</Text>
                   </TouchableOpacity>
                 )}
@@ -444,11 +456,11 @@ function createStyles(
       gap: verticalScale(10),
       padding: scale(24),
     },
-    stateText: { fontSize: font(13), color: "#6B7280" },
+    stateText: { fontSize: font(13), color: TEXT_MUTED },
     stateTitle: {
       fontSize: font(15),
       fontWeight: "700",
-      color: "#374151",
+      color: TEXT_SECONDARY,
       textAlign: "center",
     },
     card: {
@@ -463,8 +475,8 @@ function createStyles(
       gap: scale(10),
       marginBottom: verticalScale(10),
     },
-    cardTitle: { fontSize: font(15), fontWeight: "700", color: "#111827" },
-    personName: { fontSize: font(17), fontWeight: "700", color: "#111827" },
+    cardTitle: { fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
+    personName: { fontSize: font(17), fontWeight: "700", color: TEXT_PRIMARY },
     chipRow: {
       flexDirection: "row",
       flexWrap: "wrap",
@@ -483,29 +495,29 @@ function createStyles(
       gap: scale(5),
       marginTop: verticalScale(10),
     },
-    noticeText: { fontSize: font(12), color: "#6B7280", fontWeight: "600" },
-    noticeExpired: { color: "#B91C1C" },
+    noticeText: { fontSize: font(12), color: TEXT_MUTED, fontWeight: "600" },
+    noticeExpired: { color: ERROR_TEXT },
     infoRow: {
       flexDirection: "row",
       justifyContent: "space-between",
       gap: scale(12),
       paddingVertical: verticalScale(7),
       borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
+      borderBottomColor: FOOTER_BORDER,
     },
-    infoLabel: { fontSize: font(12), color: "#6B7280", fontWeight: "600" },
+    infoLabel: { fontSize: font(12), color: TEXT_MUTED, fontWeight: "600" },
     switchRow: { alignItems: "center" },
     infoValue: {
       flex: 1,
       fontSize: font(13),
-      color: "#111827",
+      color: TEXT_PRIMARY,
       textAlign: "right",
     },
-    label: { fontSize: font(11), fontWeight: "600", color: "#6B7280" },
+    label: { fontSize: font(11), fontWeight: "600", color: TEXT_MUTED },
     labelSpaced: { marginTop: verticalScale(12) },
     value: {
       fontSize: font(14),
-      color: "#111827",
+      color: TEXT_PRIMARY,
       marginTop: verticalScale(3),
       lineHeight: font(20),
     },
@@ -521,7 +533,7 @@ function createStyles(
     attachmentName: {
       flex: 1,
       fontSize: font(13),
-      color: "#374151",
+      color: TEXT_SECONDARY,
       fontWeight: "500",
     },
     footer: {
@@ -541,13 +553,13 @@ function createStyles(
       paddingVertical: verticalScale(13),
       borderRadius: RADIUS_LG,
     },
-    deleteBtn: { backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA" },
-    deleteText: { fontSize: font(14), fontWeight: "700", color: "#B91C1C" },
-    editBtn: { ...SHADOW_PRIMARY, backgroundColor: "#2563EB" },
-    editText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
+    deleteBtn: { backgroundColor: ERROR_TINT_BACKGROUND, borderWidth: 1, borderColor: ERROR_TINT_BORDER },
+    deleteText: { fontSize: font(14), fontWeight: "700", color: ERROR_TEXT },
+    editBtn: { ...SHADOW_PRIMARY, backgroundColor: PRIMARY_COLOR },
+    editText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
     previewOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.92)",
+      backgroundColor: OVERLAY_VIEWER,
       alignItems: "center",
       justifyContent: "center",
       padding: scale(12),

@@ -26,7 +26,31 @@ import type {
 } from "../../../types/typeStore/SchoolStoreType";
 import { normalizePermissionName, toRD, WEEK_DAYS } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
-import { APP_BACKGROUND_V2, SECTION_ICON_COLOR } from "@/constants/colors";
+import {
+  APP_BACKGROUND_V2,
+  CARD_BACKGROUND,
+  CARD_BORDER,
+  CLEAR_ICON,
+  ERROR_COLOR,
+  ERROR_TINT_BACKGROUND,
+  ERROR_TINT_BORDER,
+  FIELD_DISABLED_BACKGROUND,
+  FOOTER_BORDER,
+  ON_PRIMARY,
+  OUTCOME_OK_BACKGROUND,
+  PRIMARY_700,
+  PRIMARY_COLOR,
+  PRIMARY_TINT_50,
+  SECTION_ICON_COLOR,
+  SUCCESS_ACCENT,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+  WARNING_COLOR,
+  WARNING_TEXT_STRONG,
+  WARNING_TINT_50,
+} from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import { MAX_CONTENT_WIDTH, useResponsive } from "@/constants/responsive";
 import RevisionFinalModal, {
@@ -38,7 +62,14 @@ import RevisionFinalModal, {
   type PermissionReview,
 } from "./RevisionFinalModal";
 import { SHADOW_PRIMARY } from "@/constants/shadows";
-import { CARD_FORM, DROPZONE, FIELD_SURFACE, FILE_ROW, POPUP_CARD } from "@/styles/surfaces";
+import {
+  CARD_FORM,
+  DIALOG_OVERLAY,
+  DROPZONE,
+  FIELD_SURFACE,
+  FILE_ROW,
+  POPUP_CARD,
+} from "@/styles/surfaces";
 
 /**
  * Tag del catálogo de la escuela. `/tags/all` devuelve todos los tags con sus
@@ -1103,7 +1134,7 @@ export default function SolicitarPermisoForm() {
             </>
           ) : catalogError ? (
             <View style={styles.catalogState}>
-              <Ionicons name="alert-circle-outline" size={18} color="#DC2626" />
+              <Ionicons name="alert-circle-outline" size={18} color={ERROR_COLOR} />
               <Text style={styles.catalogErrorText}>{catalogError}</Text>
               <TouchableOpacity onPress={loadCatalog} activeOpacity={0.75}>
                 <Text style={styles.retryText}>Reintentar</Text>
@@ -1128,7 +1159,7 @@ export default function SolicitarPermisoForm() {
                 >
                   {selectedAction?.name ?? "Selecciona una acción"}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
               {!!actionError && (
                 <Text style={styles.fieldError}>{actionError}</Text>
@@ -1159,7 +1190,7 @@ export default function SolicitarPermisoForm() {
                       ? "Selecciona un tipo"
                       : "Elige primero una acción")}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
               {!!typeError && <Text style={styles.fieldError}>{typeError}</Text>}
               {selectedAction && typeOptions.length === 0 && (
@@ -1188,7 +1219,7 @@ export default function SolicitarPermisoForm() {
             value={subject}
             onChangeText={setSubject}
             placeholder="Ej. Cita médica"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={TEXT_PLACEHOLDER}
             maxLength={255}
           />
           {!!subjectError && (
@@ -1208,7 +1239,7 @@ export default function SolicitarPermisoForm() {
               value={description}
               onChangeText={setDescription}
               placeholder="Describe el motivo de tu solicitud"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={TEXT_PLACEHOLDER}
               multiline
               numberOfLines={4}
               textAlignVertical="top"
@@ -1252,7 +1283,7 @@ export default function SolicitarPermisoForm() {
                 onPress={() => openPicker("fromDate")}
                 activeOpacity={0.75}
               >
-                <Ionicons name="calendar-outline" size={16} color="#2563EB" />
+                <Ionicons name="calendar-outline" size={16} color={PRIMARY_COLOR} />
                 <Text
                   style={[
                     styles.selectText,
@@ -1275,7 +1306,7 @@ export default function SolicitarPermisoForm() {
                 onPress={() => openPicker("toDate")}
                 activeOpacity={0.75}
               >
-                <Ionicons name="calendar-outline" size={16} color="#2563EB" />
+                <Ionicons name="calendar-outline" size={16} color={PRIMARY_COLOR} />
                 <Text
                   style={[styles.selectText, toDate && styles.selectTextFilled]}
                 >
@@ -1290,7 +1321,7 @@ export default function SolicitarPermisoForm() {
 
           {isFullDay ? (
             <View style={styles.fullDayNote}>
-              <Ionicons name="information-circle-outline" size={16} color="#1D4ED8" />
+              <Ionicons name="information-circle-outline" size={16} color={PRIMARY_700} />
               <Text style={styles.fullDayNoteText}>
                 Se registrará todo el día — no hace falta indicar horas.
               </Text>
@@ -1306,7 +1337,7 @@ export default function SolicitarPermisoForm() {
                   onPress={() => openPicker("fromTime")}
                   activeOpacity={0.75}
                 >
-                  <Ionicons name="time-outline" size={16} color="#2563EB" />
+                  <Ionicons name="time-outline" size={16} color={PRIMARY_COLOR} />
                   <Text
                     style={[
                       styles.selectText,
@@ -1320,7 +1351,7 @@ export default function SolicitarPermisoForm() {
                       onPress={() => setFromTime(null)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Ionicons name="close-circle" size={16} color="#9AA4B4" />
+                      <Ionicons name="close-circle" size={16} color={CLEAR_ICON} />
                     </TouchableOpacity>
                   )}
                 </TouchableOpacity>
@@ -1337,7 +1368,7 @@ export default function SolicitarPermisoForm() {
                   onPress={() => openPicker("toTime")}
                   activeOpacity={0.75}
                 >
-                  <Ionicons name="time-outline" size={16} color="#2563EB" />
+                  <Ionicons name="time-outline" size={16} color={PRIMARY_COLOR} />
                   <Text
                     style={[
                       styles.selectText,
@@ -1351,7 +1382,7 @@ export default function SolicitarPermisoForm() {
                       onPress={() => setToTime(null)}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Ionicons name="close-circle" size={16} color="#9AA4B4" />
+                      <Ionicons name="close-circle" size={16} color={CLEAR_ICON} />
                     </TouchableOpacity>
                   )}
                 </TouchableOpacity>
@@ -1371,7 +1402,7 @@ export default function SolicitarPermisoForm() {
               <Ionicons
                 name="information-circle-outline"
                 size={16}
-                color="#1D4ED8"
+                color={PRIMARY_700}
               />
             </TouchableOpacity>
           </View>
@@ -1380,7 +1411,7 @@ export default function SolicitarPermisoForm() {
             onPress={() => setWeekDaysModalVisible(true)}
             activeOpacity={0.75}
           >
-            <Ionicons name="calendar-outline" size={16} color="#2563EB" />
+            <Ionicons name="calendar-outline" size={16} color={PRIMARY_COLOR} />
             <Text
               style={[
                 styles.selectText,
@@ -1392,7 +1423,7 @@ export default function SolicitarPermisoForm() {
                 ? selectedWeekDays.join(", ")
                 : "Seleccione días (opcional)"}
             </Text>
-            <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+            <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
           </TouchableOpacity>
         </View>
 
@@ -1412,14 +1443,14 @@ export default function SolicitarPermisoForm() {
             activeOpacity={0.75}
           >
             {loadingFiles ? (
-              <ActivityIndicator size="small" color="#2563EB" />
+              <ActivityIndicator size="small" color={PRIMARY_COLOR} />
             ) : (
               <Ionicons
                 name={
                   payloadOverLimit ? "alert-circle-outline" : "cloud-upload-outline"
                 }
                 size={24}
-                color={payloadOverLimit ? "#DC2626" : "#2563EB"}
+                color={payloadOverLimit ? ERROR_COLOR : PRIMARY_COLOR}
               />
             )}
             <Text
@@ -1488,7 +1519,7 @@ export default function SolicitarPermisoForm() {
                   <Ionicons
                     name={getFileIcon(file.mimeType)}
                     size={16}
-                    color="#2563EB"
+                    color={PRIMARY_COLOR}
                   />
                   <Text style={styles.chipName} numberOfLines={1}>
                     {file.name}
@@ -1502,7 +1533,7 @@ export default function SolicitarPermisoForm() {
                     onPress={() => removeAttachment(file.id)}
                     hitSlop={8}
                   >
-                    <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                    <Ionicons name="close-circle" size={18} color={TEXT_PLACEHOLDER} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -1524,7 +1555,7 @@ export default function SolicitarPermisoForm() {
             onPress={handleSaveRequest}
             activeOpacity={0.85}
           >
-            <Ionicons name="save-outline" size={17} color="#fff" />
+            <Ionicons name="save-outline" size={17} color={ON_PRIMARY} />
             <Text style={styles.btnPrimaryText}>Guardar Solicitud</Text>
           </TouchableOpacity>
         </View>
@@ -1598,12 +1629,12 @@ export default function SolicitarPermisoForm() {
                             isExpanded ? "chevron-up-outline" : "chevron-down-outline"
                           }
                           size={18}
-                          color="#6B7280"
+                          color={TEXT_MUTED}
                         />
                       </TouchableOpacity>
                     )}
                     {selectorSelectedId === tag.id && (
-                      <Ionicons name="checkmark" size={18} color="#2563EB" />
+                      <Ionicons name="checkmark" size={18} color={PRIMARY_COLOR} />
                     )}
                   </TouchableOpacity>
                 );
@@ -1651,7 +1682,7 @@ export default function SolicitarPermisoForm() {
                     <Ionicons
                       name={checked ? "checkbox" : "square-outline"}
                       size={20}
-                      color={checked ? "#2563EB" : "#9CA3AF"}
+                      color={checked ? PRIMARY_COLOR : TEXT_PLACEHOLDER}
                     />
                   </TouchableOpacity>
                 );
@@ -1731,7 +1762,7 @@ export default function SolicitarPermisoForm() {
               <Ionicons
                 name={outcome?.ok ? "checkmark-circle" : "alert-circle"}
                 size={26}
-                color={outcome?.ok ? "#059669" : "#DC2626"}
+                color={outcome?.ok ? SUCCESS_ACCENT : ERROR_COLOR}
               />
             </View>
             <Text style={styles.outcomeTitle}>{outcome?.title}</Text>
@@ -1744,7 +1775,7 @@ export default function SolicitarPermisoForm() {
                     <Ionicons
                       name="remove-circle-outline"
                       size={14}
-                      color="#B45309"
+                      color={WARNING_COLOR}
                     />
                     <Text style={styles.outcomeDetailText}>{line}</Text>
                   </View>
@@ -1799,19 +1830,19 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 14,
   },
-  cardTitle: { fontSize: 15, fontWeight: "700", color: "#111827" },
+  cardTitle: { fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY },
 
   /* ── Campos ── */
-  label: { fontSize: 12, fontWeight: "600", color: "#374151", marginBottom: 6 },
+  label: { fontSize: 12, fontWeight: "600", color: TEXT_SECONDARY, marginBottom: 6 },
   labelSpaced: { marginTop: 14 },
   labelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  required: { color: "#DC2626" },
+  required: { color: ERROR_COLOR },
   input: {
     ...FIELD_SURFACE,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 14,
-    color: "#111827",
+    color: TEXT_PRIMARY,
   },
   textarea: {
     minHeight: MOTIVO_TEXTAREA_HEIGHT,
@@ -1848,28 +1879,28 @@ const styles = StyleSheet.create({
   /** Alto ~= line-height de selectText (fontSize 14, sin lineHeight
    * explícito) — mismo contenedor `select`, así que el alto del box no
    * cambia entre catalogLoading y el estado cargado. */
-  skeletonBar: { width: 120, height: 17, borderRadius: 4, backgroundColor: "#E5E7EB" },
-  selectText: { flex: 1, fontSize: 14, color: "#9CA3AF" },
-  selectTextFilled: { color: "#111827", fontWeight: "600" },
+  skeletonBar: { width: 120, height: 17, borderRadius: 4, backgroundColor: CARD_BORDER },
+  selectText: { flex: 1, fontSize: 14, color: TEXT_PLACEHOLDER },
+  selectTextFilled: { color: TEXT_PRIMARY, fontWeight: "600" },
   row: { flexDirection: "row", gap: 12 },
   rowSpaced: { marginTop: 14 },
   rowItem: { flex: 1 },
-  helperWarning: { fontSize: 11, color: "#B45309", marginTop: 8 },
-  helperError: { color: "#DC2626" },
+  helperWarning: { fontSize: 11, color: WARNING_COLOR, marginTop: 8 },
+  helperError: { color: ERROR_COLOR },
   /* Recuadro con error: mismo borde rojo para select, input y textarea. */
-  fieldInvalid: { borderColor: "#DC2626" },
-  fieldError: { fontSize: 12, color: "#DC2626", marginTop: 6 },
+  fieldInvalid: { borderColor: ERROR_COLOR },
+  fieldError: { fontSize: 12, color: ERROR_COLOR, marginTop: 6 },
   fullDayNote: {
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: PRIMARY_TINT_50,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginTop: 14,
   },
-  fullDayNoteText: { flex: 1, fontSize: 12, color: "#1D4ED8" },
+  fullDayNoteText: { flex: 1, fontSize: 12, color: PRIMARY_700 },
 
   /* ── Catálogo ── */
   catalogState: {
@@ -1878,9 +1909,9 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 8,
   },
-  catalogStateText: { fontSize: 13, color: "#6B7280" },
-  catalogErrorText: { flex: 1, fontSize: 12, color: "#DC2626" },
-  retryText: { fontSize: 12, fontWeight: "700", color: "#2563EB" },
+  catalogStateText: { fontSize: 13, color: TEXT_MUTED },
+  catalogErrorText: { flex: 1, fontSize: 12, color: ERROR_COLOR },
+  retryText: { fontSize: 12, fontWeight: "700", color: PRIMARY_COLOR },
 
   /* ── Adjuntos ── */
   dropzone: {
@@ -1890,10 +1921,10 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingVertical: 22,
   },
-  dropzoneBlocked: { borderColor: "#FECACA", backgroundColor: "#FEF2F2" },
-  dropzoneText: { fontSize: 13, fontWeight: "700", color: "#2563EB" },
-  dropzoneTextBlocked: { color: "#DC2626" },
-  dropzoneHint: { fontSize: 11, color: "#9CA3AF" },
+  dropzoneBlocked: { borderColor: ERROR_TINT_BORDER, backgroundColor: ERROR_TINT_BACKGROUND },
+  dropzoneText: { fontSize: 13, fontWeight: "700", color: PRIMARY_COLOR },
+  dropzoneTextBlocked: { color: ERROR_COLOR },
+  dropzoneHint: { fontSize: 11, color: TEXT_PLACEHOLDER },
   usageRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -1904,13 +1935,13 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 5,
     borderRadius: 3,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: FIELD_DISABLED_BACKGROUND,
     overflow: "hidden",
   },
-  usageFill: { height: "100%", borderRadius: 3, backgroundColor: "#2563EB" },
-  usageFillOver: { backgroundColor: "#DC2626" },
-  usageText: { fontSize: 11, fontWeight: "600", color: "#6B7280" },
-  usageTextOver: { color: "#DC2626" },
+  usageFill: { height: "100%", borderRadius: 3, backgroundColor: PRIMARY_COLOR },
+  usageFillOver: { backgroundColor: ERROR_COLOR },
+  usageText: { fontSize: 11, fontWeight: "600", color: TEXT_MUTED },
+  usageTextOver: { color: ERROR_COLOR },
   chipList: { gap: 8, marginTop: 12 },
   chip: {
     ...FILE_ROW,
@@ -1920,8 +1951,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
-  chipName: { flex: 1, fontSize: 13, color: "#374151", fontWeight: "500" },
-  chipSize: { fontSize: 11, color: "#9CA3AF" },
+  chipName: { flex: 1, fontSize: 13, color: TEXT_SECONDARY, fontWeight: "500" },
+  chipSize: { fontSize: 11, color: TEXT_PLACEHOLDER },
 
   /* ── Acciones ── */
   footerActions: { flexDirection: "row", gap: 10 },
@@ -1935,18 +1966,18 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   btnGhost: {
-    backgroundColor: "#fff",
+    backgroundColor: CARD_BACKGROUND,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: CARD_BORDER,
   },
-  btnGhostText: { fontSize: 14, fontWeight: "700", color: "#374151" },
-  btnPrimary: { ...SHADOW_PRIMARY, backgroundColor: "#2563EB", flex: 1.5 },
-  btnPrimaryText: { fontSize: 14, fontWeight: "700", color: "#fff" },
+  btnGhostText: { fontSize: 14, fontWeight: "700", color: TEXT_SECONDARY },
+  btnPrimary: { ...SHADOW_PRIMARY, backgroundColor: PRIMARY_COLOR, flex: 1.5 },
+  btnPrimaryText: { fontSize: 14, fontWeight: "700", color: ON_PRIMARY },
 
   /* ── Modales ── */
   modalOverlay: {
+    ...DIALOG_OVERLAY,
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
@@ -1961,7 +1992,7 @@ const styles = StyleSheet.create({
   selectorTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#111827",
+    color: TEXT_PRIMARY,
     marginBottom: 10,
   },
   selectorList: { flexGrow: 0 },
@@ -1971,7 +2002,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 13,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: FOOTER_BORDER,
   },
   selectorOptionMain: {
     flex: 1,
@@ -1979,11 +2010,11 @@ const styles = StyleSheet.create({
   selectorOptionText: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#111827",
+    color: TEXT_PRIMARY,
   },
   selectorOptionDescription: {
     fontSize: 12,
-    color: "#6B7280",
+    color: TEXT_MUTED,
     marginTop: 2,
   },
   selectorOptionChevron: {
@@ -1992,7 +2023,7 @@ const styles = StyleSheet.create({
   },
   selectorEmpty: {
     fontSize: 13,
-    color: "#9CA3AF",
+    color: TEXT_PLACEHOLDER,
     paddingVertical: 16,
     textAlign: "center",
   },
@@ -2009,10 +2040,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: FOOTER_BORDER,
   },
-  pickerCancel: { fontSize: 14, fontWeight: "600", color: "#6B7280" },
-  pickerDone: { fontSize: 14, fontWeight: "700", color: "#2563EB" },
+  pickerCancel: { fontSize: 14, fontWeight: "600", color: TEXT_MUTED },
+  pickerDone: { fontSize: 14, fontWeight: "700", color: PRIMARY_COLOR },
 
   /* ── Resultado ── */
   outcomeCard: {
@@ -2031,17 +2062,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 12,
   },
-  outcomeIconOk: { backgroundColor: "#ECFDF5" },
-  outcomeIconError: { backgroundColor: "#FEF2F2" },
+  outcomeIconOk: { backgroundColor: OUTCOME_OK_BACKGROUND },
+  outcomeIconError: { backgroundColor: ERROR_TINT_BACKGROUND },
   outcomeTitle: {
     fontSize: 17,
     fontWeight: "700",
-    color: "#111827",
+    color: TEXT_PRIMARY,
     textAlign: "center",
   },
   outcomeMessage: {
     fontSize: 13,
-    color: "#6B7280",
+    color: TEXT_MUTED,
     textAlign: "center",
     lineHeight: 20,
     marginTop: 6,
@@ -2049,7 +2080,7 @@ const styles = StyleSheet.create({
   outcomeDetails: {
     alignSelf: "stretch",
     marginTop: 14,
-    backgroundColor: "#FFFBEB",
+    backgroundColor: WARNING_TINT_50,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -2060,6 +2091,6 @@ const styles = StyleSheet.create({
     gap: 7,
     paddingVertical: 4,
   },
-  outcomeDetailText: { flex: 1, fontSize: 12, color: "#92400E", lineHeight: 18 },
+  outcomeDetailText: { flex: 1, fontSize: 12, color: WARNING_TEXT_STRONG, lineHeight: 18 },
   outcomeBtn: { flex: 0, alignSelf: "stretch", marginTop: 18 },
 });

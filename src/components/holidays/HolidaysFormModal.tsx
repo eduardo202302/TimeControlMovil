@@ -19,9 +19,16 @@ import {
 } from "react-native";
 import {
   APP_BACKGROUND_V2,
+  ERROR_COLOR,
+  ERROR_TEXT,
   HEADER_BUTTON_BACKGROUND,
   HEADER_TEXT,
+  ON_PRIMARY,
+  PRIMARY_COLOR,
   TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
@@ -40,6 +47,7 @@ import {
 import { toRD } from "../../utils/punchRules";
 import { formatDisplayDate, formatDisplayTime } from "../timeoff/RevisionFinalModal";
 import {
+  ALERT_BANNER,
   BOTTOM_SHEET_CARD,
   CARD_FORM,
   DIALOG_BOX,
@@ -365,7 +373,7 @@ function HolidayForm({
               <View style={styles.rowItem}>
                 <Text style={styles.label}>Creado por</Text>
                 <View style={[styles.select, styles.inputDisabled, styles.auditFieldBox]}>
-                  <Ionicons name="person-outline" size={16} color="#9CA3AF" />
+                  <Ionicons name="person-outline" size={16} color={TEXT_PLACEHOLDER} />
                   <Text style={styles.selectValue} numberOfLines={2}>
                     {holiday?.adminUser?.user?.fullName || "—"}
                   </Text>
@@ -374,7 +382,7 @@ function HolidayForm({
               <View style={styles.rowItem}>
                 <Text style={styles.label}>Fecha de creación</Text>
                 <View style={[styles.select, styles.inputDisabled, styles.auditFieldBox]}>
-                  <Ionicons name="calendar-outline" size={16} color="#9CA3AF" />
+                  <Ionicons name="calendar-outline" size={16} color={TEXT_PLACEHOLDER} />
                   <Text style={styles.selectValue} numberOfLines={2}>
                     {formatCreatedStamp(holiday?.createdDate)}
                   </Text>
@@ -399,7 +407,7 @@ function HolidayForm({
             editable={!readOnly}
             maxLength={100}
             placeholder="Ej. Año Nuevo"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={TEXT_PLACEHOLDER}
           />
           {!!errorFor("name") && <Text style={styles.fieldError}>{errorFor("name")}</Text>}
 
@@ -416,7 +424,7 @@ function HolidayForm({
             disabled={readOnly}
             activeOpacity={0.75}
           >
-            <Ionicons name="calendar-outline" size={16} color="#2563EB" />
+            <Ionicons name="calendar-outline" size={16} color={PRIMARY_COLOR} />
             <Text style={holidayDate ? styles.selectValue : styles.selectPlaceholder}>
               {holidayDate
                 ? formatDisplayDate(
@@ -458,7 +466,7 @@ function HolidayForm({
                     disabled={readOnly}
                     activeOpacity={0.75}
                   >
-                    <Ionicons name="time-outline" size={16} color="#2563EB" />
+                    <Ionicons name="time-outline" size={16} color={PRIMARY_COLOR} />
                     <Text style={startTime ? styles.selectValue : styles.selectPlaceholder}>
                       {startTime
                         ? formatDisplayTime(
@@ -485,7 +493,7 @@ function HolidayForm({
                     disabled={readOnly}
                     activeOpacity={0.75}
                   >
-                    <Ionicons name="time-outline" size={16} color="#2563EB" />
+                    <Ionicons name="time-outline" size={16} color={PRIMARY_COLOR} />
                     <Text style={endTime ? styles.selectValue : styles.selectPlaceholder}>
                       {endTime
                         ? formatDisplayTime(
@@ -525,7 +533,7 @@ function HolidayForm({
 
         {!!submitError && (
           <View style={styles.errorBanner}>
-            <Ionicons name="alert-circle-outline" size={18} color="#B91C1C" />
+            <Ionicons name="alert-circle-outline" size={18} color={ERROR_TEXT} />
             <Text style={styles.errorBannerText}>{submitError}</Text>
           </View>
         )}
@@ -550,7 +558,7 @@ function HolidayForm({
             activeOpacity={0.8}
           >
             {submitting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={ON_PRIMARY} />
             ) : (
               <Text style={styles.saveText}>Guardar</Text>
             )}
@@ -676,20 +684,20 @@ function createStyles(
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(16),
     },
-    label: { fontSize: font(12), fontWeight: "600", color: "#374151", marginBottom: verticalScale(6) },
+    label: { fontSize: font(12), fontWeight: "600", color: TEXT_SECONDARY, marginBottom: verticalScale(6) },
     labelSpaced: { marginTop: verticalScale(12) },
-    required: { color: "#DC2626", fontWeight: "700" },
+    required: { color: ERROR_COLOR, fontWeight: "700" },
     input: {
       ...FIELD_SURFACE,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       fontSize: font(14),
-      color: "#111827",
+      color: TEXT_PRIMARY,
     },
     // Copia literal de AdminPermissionEditModal.tsx:651 — mismo molde readOnly.
     inputDisabled: { ...FIELD_DISABLED, color: TEXT_MUTED },
-    inputInvalid: { borderColor: "#DC2626" },
-    fieldError: { fontSize: font(12), color: "#DC2626", marginTop: verticalScale(4) },
+    inputInvalid: { borderColor: ERROR_COLOR },
+    fieldError: { fontSize: font(12), color: ERROR_COLOR, marginTop: verticalScale(4) },
     select: {
       ...FIELD_SURFACE,
       flexDirection: "row",
@@ -701,8 +709,8 @@ function createStyles(
     // Alto idéntico entre "Creado por" (1 línea) y "Fecha de creación" (2
     // líneas) — sin esto el box de 1 línea se ve más chico que el de 2.
     auditFieldBox: { minHeight: verticalScale(58) },
-    selectValue: { flex: 1, fontSize: font(14), color: "#111827" },
-    selectPlaceholder: { flex: 1, fontSize: font(14), color: "#9CA3AF" },
+    selectValue: { flex: 1, fontSize: font(14), color: TEXT_PRIMARY },
+    selectPlaceholder: { flex: 1, fontSize: font(14), color: TEXT_PLACEHOLDER },
     row: { flexDirection: "row", gap: scale(10) },
     rowSpaced: { marginTop: verticalScale(14) },
     rowItem: { flex: 1 },
@@ -711,20 +719,17 @@ function createStyles(
       alignItems: "center",
       justifyContent: "space-between",
     },
-    switchLabel: { fontSize: font(13), fontWeight: "700", color: "#111827" },
-    linkText: { fontSize: font(14), fontWeight: "700", color: "#2563EB" },
+    switchLabel: { fontSize: font(13), fontWeight: "700", color: TEXT_PRIMARY },
+    linkText: { fontSize: font(14), fontWeight: "700", color: PRIMARY_COLOR },
     errorBanner: {
+      ...ALERT_BANNER,
       flexDirection: "row",
       alignItems: "flex-start",
       gap: scale(8),
-      backgroundColor: "#FEF2F2",
-      borderWidth: 1,
-      borderColor: "#FECACA",
-      borderRadius: RADIUS_LG,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
     },
-    errorBannerText: { flex: 1, fontSize: font(13), color: "#B91C1C" },
+    errorBannerText: { flex: 1, fontSize: font(13), color: ERROR_TEXT },
     footer: {
       ...FOOTER_BAR,
       flexDirection: "row",
@@ -741,13 +746,13 @@ function createStyles(
       borderRadius: RADIUS_LG,
     },
     cancelBtn: { ...FOOTER_BTN_CANCEL },
-    cancelText: { fontSize: font(14), fontWeight: "700", color: "#374151" },
+    cancelText: { fontSize: font(14), fontWeight: "700", color: TEXT_SECONDARY },
     saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
-    saveText: { fontSize: font(14), fontWeight: "700", color: "#fff" },
+    saveText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
     pickerOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.45)",
       justifyContent: "flex-end",
     },
     pickerCard: {
@@ -777,17 +782,17 @@ function createStyles(
     confirmTitle: {
       fontSize: font(15),
       fontWeight: "700",
-      color: "#DC2626",
+      color: ERROR_COLOR,
       marginBottom: verticalScale(8),
     },
-    confirmMessage: { fontSize: font(14), color: "#444" },
+    confirmMessage: { fontSize: font(14), color: TEXT_SECONDARY },
     confirmButtons: {
       flexDirection: "row",
       justifyContent: "flex-end",
       gap: scale(20),
       marginTop: verticalScale(24),
     },
-    confirmCancel: { color: "#6B7280", fontWeight: "600", fontSize: font(14) },
-    confirmConfirm: { color: "#DC2626", fontWeight: "600", fontSize: font(14) },
+    confirmCancel: { color: TEXT_MUTED, fontWeight: "600", fontSize: font(14) },
+    confirmConfirm: { color: ERROR_COLOR, fontWeight: "600", fontSize: font(14) },
   });
 }

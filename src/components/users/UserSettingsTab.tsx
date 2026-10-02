@@ -13,7 +13,7 @@ import TagCreateSheet from "./TagCreateSheet";
 import TagMultiSelectSheet from "./TagMultiSelectSheet";
 import type { UserFormController } from "./useUserForm";
 import type { UserFormStyles } from "./userFormStyles";
-import { SECTION_ICON_COLOR } from "@/constants/colors";
+import { PRIMARY_COLOR, SECTION_ICON_COLOR, TEXT_PLACEHOLDER } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import { SWITCH_COLORS } from "@/styles/surfaces";
 
@@ -103,10 +103,10 @@ export default function UserSettingsTab({ ctl, styles }: UserSettingsTabProps) {
             {/* Clearable, igual que el Form.Dropdown del webapp. */}
             {!disabled && value !== "" ? (
               <TouchableOpacity onPress={() => ctl.setDefTag(field, "")} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                <Ionicons name="close-circle" size={18} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
             ) : (
-              <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+              <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
             )}
           </TouchableOpacity>
         </View>
@@ -186,7 +186,7 @@ export default function UserSettingsTab({ ctl, styles }: UserSettingsTabProps) {
                   <Ionicons
                     name={allSelected ? "checkbox" : "square-outline"}
                     size={18}
-                    color={isWatch ? "#9CA3AF" : "#2563EB"}
+                    color={isWatch ? TEXT_PLACEHOLDER : PRIMARY_COLOR}
                   />
                   <Text style={styles.checkboxText}>Todos</Text>
                 </TouchableOpacity>
@@ -211,7 +211,7 @@ export default function UserSettingsTab({ ctl, styles }: UserSettingsTabProps) {
                       ))}
                     </View>
                   )}
-                  <Ionicons name="chevron-down" size={16} color="#9CA3AF" />
+                  <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
                 </TouchableOpacity>
                 {!isWatch && (
                   // Creación inline de etiqueta (TagsCrud del webapp con la
@@ -222,7 +222,7 @@ export default function UserSettingsTab({ ctl, styles }: UserSettingsTabProps) {
                     activeOpacity={0.8}
                     accessibilityLabel={`Agregar ${category.name}`}
                   >
-                    <Ionicons name="add" size={20} color="#2563EB" />
+                    <Ionicons name="add" size={20} color={PRIMARY_COLOR} />
                   </TouchableOpacity>
                 )}
               </View>

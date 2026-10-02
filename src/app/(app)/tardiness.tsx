@@ -29,6 +29,10 @@ import {
   TEXT_PRIMARY,
   TEXT_SECONDARY,
   SECTION_ICON_COLOR,
+  FIELD_DISABLED_BACKGROUND,
+  ICON_SUBTLE,
+  ON_PRIMARY,
+  TEXT_MUTED,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
@@ -363,9 +367,9 @@ export default function Tardanza() {
                 activeOpacity={0.8}
               >
                 {identifying ? (
-                  <ActivityIndicator color="#fff" size="small" />
+                  <ActivityIndicator color={ON_PRIMARY} size="small" />
                 ) : (
-                  <Camera size={20} color="#fff" />
+                  <Camera size={20} color={ON_PRIMARY} />
                 )}
               </TouchableOpacity>
             </View>
@@ -381,7 +385,7 @@ export default function Tardanza() {
                         resizeMode="cover"
                       />
                     ) : (
-                      <User size={30} color="#9CA3AF" />
+                      <User size={30} color={TEXT_PLACEHOLDER} />
                     )}
                   </View>
                   <View style={styles.employeeInfo}>
@@ -482,14 +486,14 @@ export default function Tardanza() {
                       </View>
                     ) : query.trim().length < SEARCH_MIN_CHARS ? (
                       <View style={styles.emptyBlock}>
-                        <Search size={26} color="#D1D5DB" />
+                        <Search size={26} color={ICON_SUBTLE} />
                         <Text style={styles.emptyText}>
                           Escribe al menos {SEARCH_MIN_CHARS} caracteres
                         </Text>
                       </View>
                     ) : results.length === 0 ? (
                       <View style={styles.emptyBlock}>
-                        <User size={26} color="#D1D5DB" />
+                        <User size={26} color={ICON_SUBTLE} />
                         <Text style={styles.emptyText}>Sin resultados</Text>
                       </View>
                     ) : (
@@ -510,7 +514,7 @@ export default function Tardanza() {
                                 resizeMode="cover"
                               />
                             ) : (
-                              <User size={16} color="#9CA3AF" />
+                              <User size={16} color={TEXT_PLACEHOLDER} />
                             )}
                           </View>
                           <View style={styles.resultInfo}>
@@ -540,7 +544,7 @@ export default function Tardanza() {
           {/* ── Card Tardanzas (semáforo) ── */}
           {!student ? (
             <View style={styles.emptyCard}>
-              <Ionicons name="time-outline" size={26} color="#D1D5DB" />
+              <Ionicons name="time-outline" size={26} color={ICON_SUBTLE} />
               <Text style={styles.emptyText}>No hay registro de tardanzas</Text>
             </View>
           ) : loadingPanel ? (
@@ -587,7 +591,7 @@ export default function Tardanza() {
             activeOpacity={0.8}
           >
             {submitting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={ON_PRIMARY} />
             ) : (
               <Text style={styles.saveText}>Guardar</Text>
             )}
@@ -697,7 +701,7 @@ function createStyles(
       color: RIBBON_TEXT,
     },
     resultsCountBadge: {
-      backgroundColor: "#fff",
+      backgroundColor: CARD_BACKGROUND,
       borderRadius: RADIUS_PILL,
       paddingHorizontal: scale(10),
       paddingVertical: verticalScale(4),
@@ -739,7 +743,7 @@ function createStyles(
       height: scale(32),
       // Círculo: mitad del lado fijo, no un radio de diseño.
       borderRadius: scale(16),
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
       alignItems: "center",
       justifyContent: "center",
       overflow: "hidden",
@@ -756,10 +760,10 @@ function createStyles(
       fontWeight: "700",
       color: TEXT_PRIMARY,
     },
-    resultId: { fontSize: font(12), fontWeight: "400", color: "#6B7280" },
+    resultId: { fontSize: font(12), fontWeight: "400", color: TEXT_MUTED },
     resultMeta: {
       fontSize: font(12),
-      color: "#6B7280",
+      color: TEXT_MUTED,
       marginTop: verticalScale(1),
     },
     resultCaret: { fontSize: font(18), color: TEXT_PLACEHOLDER },
@@ -798,7 +802,7 @@ function createStyles(
       height: scale(56),
       // Círculo: mitad del lado fijo, no un radio de diseño.
       borderRadius: scale(28),
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
       alignItems: "center",
       justifyContent: "center",
       overflow: "hidden",
@@ -871,6 +875,6 @@ function createStyles(
     },
     saveBtn: { ...FOOTER_BTN_SAVE },
     saveBtnBusy: { opacity: 0.7 },
-    saveText: { fontSize: font(14), fontWeight: "700", color: CARD_BACKGROUND },
+    saveText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
   });
 }

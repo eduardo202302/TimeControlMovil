@@ -8,12 +8,28 @@ import type { UserFormController } from "./useUserForm";
 import type { UserFormStyles } from "./userFormStyles";
 import {
   CARD_BORDER,
+  DANGER_ICON,
+  ERROR_COLOR,
+  ERROR_TEXT,
+  ERROR_TINT_BACKGROUND,
+  PRIMARY_COLOR,
   PRIMARY_TINT_50,
   SECTION_ICON_COLOR,
+  SUCCESS_ACCENT,
   SURFACE_SUBTLE,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  WARNING_ACCENT,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
-import { BOTTOM_SHEET_CARD, CARD_FORM, FIELD_SURFACE } from "@/styles/surfaces";
+import {
+  ALERT_BANNER,
+  BOTTOM_SHEET_CARD,
+  CARD_FORM,
+  DIALOG_OVERLAY,
+  FIELD_SURFACE,
+} from "@/styles/surfaces";
 
 interface UserSchedulesTabProps {
   ctl: UserFormController;
@@ -112,14 +128,14 @@ export default function UserSchedulesTab({ ctl, styles }: UserSchedulesTabProps)
       <Ionicons
         name="time-outline"
         size={14}
-        color={tone === "lunch" ? "#D97706" : tone === "exit" ? "#DC2626" : "#16A34A"}
+        color={tone === "lunch" ? WARNING_ACCENT : tone === "exit" ? ERROR_COLOR : SUCCESS_ACCENT}
       />
       <Text style={value ? local.timeText : local.timePlaceholder} numberOfLines={1}>
         {value ? formatTo12Hour(value) : "--:--"}
       </Text>
       {!!value && !disabled && (
         <TouchableOpacity onPress={() => commit(target, "")} hitSlop={8}>
-          <Ionicons name="close-circle" size={14} color="#9CA3AF" />
+          <Ionicons name="close-circle" size={14} color={TEXT_PLACEHOLDER} />
         </TouchableOpacity>
       )}
     </TouchableOpacity>
@@ -139,7 +155,7 @@ export default function UserSchedulesTab({ ctl, styles }: UserSchedulesTabProps)
           <Text style={local.timeLabel}>{entryLabel}</Text>
           {entry}
         </View>
-        <Ionicons name="arrow-forward" size={14} color="#9CA3AF" style={local.arrow} />
+        <Ionicons name="arrow-forward" size={14} color={TEXT_PLACEHOLDER} style={local.arrow} />
         <View style={local.pairItem}>
           <Text style={local.timeLabel}>{exitLabel}</Text>
           {exit}
@@ -163,7 +179,7 @@ export default function UserSchedulesTab({ ctl, styles }: UserSchedulesTabProps)
         activeOpacity={0.8}
         accessibilityLabel="Limpiar"
       >
-        <Ionicons name="trash-outline" size={16} color="#B43333" />
+        <Ionicons name="trash-outline" size={16} color={DANGER_ICON} />
       </TouchableOpacity>
     </View>
   );
@@ -185,14 +201,14 @@ export default function UserSchedulesTab({ ctl, styles }: UserSchedulesTabProps)
             onPress={() => setShowBulk((prev) => !prev)}
             hitSlop={6}
           >
-            <Ionicons name={showBulk ? "eye-off-outline" : "eye-outline"} size={16} color="#2563EB" />
+            <Ionicons name={showBulk ? "eye-off-outline" : "eye-outline"} size={16} color={PRIMARY_COLOR} />
             <Text style={styles.smallBtnText}>{showBulk ? "Ocultar ajustes" : "Mostrar ajustes"}</Text>
           </TouchableOpacity>
         </View>
 
         {!!ctl.scheduleError && (
           <View style={local.errorBox}>
-            <Ionicons name="alert-circle-outline" size={16} color="#B91C1C" />
+            <Ionicons name="alert-circle-outline" size={16} color={ERROR_TEXT} />
             <Text style={local.errorText}>{ctl.scheduleError}</Text>
           </View>
         )}
@@ -255,7 +271,7 @@ export default function UserSchedulesTab({ ctl, styles }: UserSchedulesTabProps)
       {ctl.schedules.map((row) => (
         <View key={row.weekDay} style={local.dayCard}>
           <View style={local.dayHeader}>
-            <Ionicons name="calendar-outline" size={15} color="#2563EB" />
+            <Ionicons name="calendar-outline" size={15} color={PRIMARY_COLOR} />
             <Text style={local.dayTitle}>{row.weekDay}</Text>
           </View>
           {renderPair(
@@ -326,18 +342,15 @@ function createStyles(
 ) {
   return StyleSheet.create({
     errorBox: {
+      ...ALERT_BANNER,
       flexDirection: "row",
       alignItems: "flex-start",
       gap: scale(6),
-      backgroundColor: "#FEF2F2",
-      borderWidth: 1,
-      borderColor: "#FECACA",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(10),
       paddingVertical: verticalScale(8),
       marginBottom: verticalScale(10),
     },
-    errorText: { flex: 1, fontSize: font(12), color: "#B91C1C" },
+    errorText: { flex: 1, fontSize: font(12), color: ERROR_TEXT },
     bulkPanel: {
       borderWidth: 1,
       borderColor: CARD_BORDER,
@@ -361,8 +374,8 @@ function createStyles(
       backgroundColor: PRIMARY_TINT_50,
       paddingVertical: verticalScale(8),
     },
-    bulkClearBtn: { flex: 0, paddingHorizontal: scale(14), backgroundColor: "#FEF2F2" },
-    bulkBtnText: { fontSize: font(12), fontWeight: "700", color: "#2563EB" },
+    bulkClearBtn: { flex: 0, paddingHorizontal: scale(14), backgroundColor: ERROR_TINT_BACKGROUND },
+    bulkBtnText: { fontSize: font(12), fontWeight: "700", color: PRIMARY_COLOR },
     dayCard: {
       ...CARD_FORM,
       paddingHorizontal: scale(14),
@@ -370,13 +383,13 @@ function createStyles(
       gap: verticalScale(8),
     },
     dayHeader: { flexDirection: "row", alignItems: "center", gap: scale(6) },
-    dayTitle: { fontSize: font(14), fontWeight: "700", color: "#111827" },
+    dayTitle: { fontSize: font(14), fontWeight: "700", color: TEXT_PRIMARY },
     section: { gap: verticalScale(4) },
-    sectionTitle: { fontSize: font(11), fontWeight: "700", color: "#6B7280" },
+    sectionTitle: { fontSize: font(11), fontWeight: "700", color: TEXT_MUTED },
     pairRow: { flexDirection: "row", alignItems: "flex-end", gap: scale(6) },
     pairItem: { flex: 1, gap: verticalScale(3) },
     arrow: { marginBottom: verticalScale(10) },
-    timeLabel: { fontSize: font(11), color: "#6B7280" },
+    timeLabel: { fontSize: font(11), color: TEXT_MUTED },
     timeBox: {
       ...FIELD_SURFACE,
       borderRadius: RADIUS_PILL,
@@ -386,11 +399,11 @@ function createStyles(
       paddingHorizontal: scale(10),
       paddingVertical: verticalScale(8),
     },
-    timeText: { flex: 1, fontSize: font(13), fontWeight: "600", color: "#111827" },
-    timePlaceholder: { flex: 1, fontSize: font(13), color: "#9CA3AF" },
+    timeText: { flex: 1, fontSize: font(13), fontWeight: "600", color: TEXT_PRIMARY },
+    timePlaceholder: { flex: 1, fontSize: font(13), color: TEXT_PLACEHOLDER },
     pickerOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.45)",
       justifyContent: "flex-end",
     },
     pickerCard: {

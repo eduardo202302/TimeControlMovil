@@ -14,9 +14,16 @@ import {
 } from "react-native";
 import {
   APP_BACKGROUND_V2,
+  CARD_BORDER,
   HEADER_BUTTON_BACKGROUND,
   HEADER_TEXT,
+  OVERLAY_VIEWER,
+  PRIMARY_COLOR,
   SECTION_ICON_COLOR,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
@@ -62,7 +69,7 @@ interface PermissionDetailViewProps {
 }
 
 /** Colores por defecto de un chip cuando el tag no trae los suyos. */
-const CHIP_FALLBACK = { background: "#E5E7EB", text: "#374151" };
+const CHIP_FALLBACK = { background: CARD_BORDER, text: TEXT_SECONDARY };
 
 function chipColors(tag: PermissionTagRef | null | undefined) {
   return {
@@ -156,12 +163,12 @@ export default function PermissionDetailView({
 
         {loading ? (
           <View style={styles.stateBox}>
-            <ActivityIndicator size="large" color="#2563EB" />
+            <ActivityIndicator size="large" color={PRIMARY_COLOR} />
             <Text style={styles.stateText}>Cargando permiso…</Text>
           </View>
         ) : error || !permission || !range ? (
           <View style={styles.stateBox}>
-            <Ionicons name="alert-circle-outline" size={34} color="#9CA3AF" />
+            <Ionicons name="alert-circle-outline" size={34} color={TEXT_PLACEHOLDER} />
             <Text style={styles.stateTitle}>{error ?? "Permiso no encontrado"}</Text>
           </View>
         ) : (
@@ -321,11 +328,11 @@ export default function PermissionDetailView({
                     onPress={() => openAttachment(path)}
                     activeOpacity={0.75}
                   >
-                    <Ionicons name={attachmentIcon(path)} size={18} color="#6B7280" />
+                    <Ionicons name={attachmentIcon(path)} size={18} color={TEXT_MUTED} />
                     <Text style={styles.attachmentName} numberOfLines={1}>
                       {attachmentFileName(path)}
                     </Text>
-                    <Ionicons name="open-outline" size={16} color="#9CA3AF" />
+                    <Ionicons name="open-outline" size={16} color={TEXT_PLACEHOLDER} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -404,11 +411,11 @@ function createStyles(
       gap: verticalScale(10),
       padding: scale(24),
     },
-    stateText: { fontSize: font(13), color: "#6B7280" },
+    stateText: { fontSize: font(13), color: TEXT_MUTED },
     stateTitle: {
       fontSize: font(15),
       fontWeight: "700",
-      color: "#374151",
+      color: TEXT_SECONDARY,
       textAlign: "center",
     },
 
@@ -424,9 +431,9 @@ function createStyles(
       gap: scale(10),
       marginBottom: verticalScale(12),
     },
-    cardTitle: { fontSize: font(15), fontWeight: "700", color: "#111827" },
+    cardTitle: { fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
 
-    personName: { fontSize: font(17), fontWeight: "700", color: "#111827" },
+    personName: { fontSize: font(17), fontWeight: "700", color: TEXT_PRIMARY },
 
     chipRow: {
       flexDirection: "row",
@@ -441,15 +448,15 @@ function createStyles(
     },
     chipText: { fontSize: font(11), fontWeight: "700" },
 
-    label: { fontSize: font(11), fontWeight: "600", color: "#6B7280" },
+    label: { fontSize: font(11), fontWeight: "600", color: TEXT_MUTED },
     labelSpaced: { marginTop: verticalScale(12) },
     value: {
       fontSize: font(14),
-      color: "#111827",
+      color: TEXT_PRIMARY,
       marginTop: verticalScale(3),
       lineHeight: font(20),
     },
-    muted: { fontSize: font(12), color: "#6B7280", marginTop: verticalScale(3) },
+    muted: { fontSize: font(12), color: TEXT_MUTED, marginTop: verticalScale(3) },
     mutedSpaced: { marginTop: verticalScale(10) },
 
     attachment: {
@@ -464,13 +471,13 @@ function createStyles(
     attachmentName: {
       flex: 1,
       fontSize: font(13),
-      color: "#374151",
+      color: TEXT_SECONDARY,
       fontWeight: "500",
     },
 
     previewOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.92)",
+      backgroundColor: OVERLAY_VIEWER,
       alignItems: "center",
       justifyContent: "center",
       padding: scale(12),

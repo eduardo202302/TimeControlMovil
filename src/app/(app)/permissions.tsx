@@ -12,7 +12,24 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { APP_BACKGROUND_V2 } from "@/constants/colors";
+import {
+  APP_BACKGROUND_V2,
+  CARD_BORDER,
+  DANGER_ICON,
+  ERROR_COLOR,
+  ERROR_TEXT,
+  FOOTER_BORDER,
+  ICON_EDIT,
+  ICON_VIEW,
+  ON_PRIMARY,
+  PRIMARY_COLOR,
+  ROW_ALERT_TINT_BACKGROUND,
+  ROW_ALERT_TINT_BORDER,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+} from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
   RADIUS_MD,
@@ -76,7 +93,7 @@ const SEARCH_DEBOUNCE_MS = 400;
  * vence con la pantalla abierta seguiría mostrando Editar/Eliminar. */
 const NOW_TICK_MS = 60_000;
 const AUSENCIA_ACTION_NAME = "ausencia";
-const CHIP_FALLBACK = { background: "#E2E8F0", text: "#475569" };
+const CHIP_FALLBACK = { background: CARD_BORDER, text: TEXT_SECONDARY };
 const EMPTY_CATALOG: PermissionCatalog = { actionTags: [], stateTags: [], typeCategoryId: null };
 
 function chipColors(tag: PermissionTagRef | null | undefined) {
@@ -160,7 +177,7 @@ function PermissionCard({
         <View style={styles.cardTopRight}>
           {!isHistorical && decision.expired && (
             <View style={styles.expiredMark}>
-              <Ionicons name="alert-circle" size={11} color="#B91C1C" />
+              <Ionicons name="alert-circle" size={11} color={ERROR_TEXT} />
               <Text style={styles.expiredMarkText}>Vencido</Text>
             </View>
           )}
@@ -189,14 +206,14 @@ function PermissionCard({
       <View style={styles.cardFooter}>
         <View style={styles.cardFooterInfo}>
           <View style={styles.footerLine}>
-            <Ionicons name="time-outline" size={13} color="#6B7280" />
+            <Ionicons name="time-outline" size={13} color={TEXT_MUTED} />
             <Text style={styles.cardFooterText} numberOfLines={1}>
               {scheduleLabel(item)}
             </Text>
           </View>
           {!!item.groupWeekDays?.length && (
             <View style={styles.footerLine}>
-              <Ionicons name="repeat-outline" size={13} color="#6B7280" />
+              <Ionicons name="repeat-outline" size={13} color={TEXT_MUTED} />
               <Text style={styles.cardFooterText} numberOfLines={1}>
                 {item.groupWeekDays.join(", ")}
               </Text>
@@ -212,7 +229,7 @@ function PermissionCard({
               hitSlop={6}
               accessibilityLabel="Ver"
             >
-              <Ionicons name="eye-outline" size={18} color="#2185D0" />
+              <Ionicons name="eye-outline" size={18} color={ICON_VIEW} />
             </TouchableOpacity>
           )}
           {decision.canDelete && (
@@ -222,7 +239,7 @@ function PermissionCard({
               hitSlop={6}
               accessibilityLabel="Eliminar"
             >
-              <Ionicons name="trash-outline" size={18} color="#B43333" />
+              <Ionicons name="trash-outline" size={18} color={DANGER_ICON} />
             </TouchableOpacity>
           )}
           {decision.canEdit && (
@@ -232,7 +249,7 @@ function PermissionCard({
               hitSlop={6}
               accessibilityLabel="Editar"
             >
-              <Ionicons name="create-outline" size={18} color="#3F7EA3" />
+              <Ionicons name="create-outline" size={18} color={ICON_EDIT} />
             </TouchableOpacity>
           )}
         </View>
@@ -677,19 +694,19 @@ export default function PermissionsScreen() {
           })}
         </View>
         <View style={styles.searchBox}>
-          <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+          <Ionicons name="search-outline" size={18} color={TEXT_PLACEHOLDER} />
           <TextInput
             style={styles.searchInput}
             value={searchInput}
             onChangeText={setSearchInput}
             placeholder="Buscar permisos…"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={TEXT_PLACEHOLDER}
             autoCorrect={false}
             returnKeyType="search"
           />
           {!!searchInput && (
             <TouchableOpacity onPress={() => setSearchInput("")} hitSlop={8}>
-              <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+              <Ionicons name="close-circle" size={18} color={TEXT_PLACEHOLDER} />
             </TouchableOpacity>
           )}
         </View>
@@ -697,7 +714,7 @@ export default function PermissionsScreen() {
 
       {loading ? (
         <View style={styles.stateBox}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={PRIMARY_COLOR} />
           <Text style={styles.stateText}>Cargando permisos…</Text>
         </View>
       ) : (
@@ -716,7 +733,7 @@ export default function PermissionsScreen() {
               <Ionicons
                 name={listError ? "alert-circle-outline" : "document-outline"}
                 size={34}
-                color="#9CA3AF"
+                color={TEXT_PLACEHOLDER}
               />
               <Text style={styles.stateTitle}>
                 {listError ?? (search ? "Sin resultados para la búsqueda" : "No hay permisos que mostrar")}
@@ -731,7 +748,7 @@ export default function PermissionsScreen() {
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color="#2563EB" />
+                <ActivityIndicator size="small" color={PRIMARY_COLOR} />
               </View>
             ) : null
           }
@@ -746,7 +763,7 @@ export default function PermissionsScreen() {
           activeOpacity={0.85}
           accessibilityLabel="Agregar permiso"
         >
-          <Ionicons name="add" size={26} color="#fff" />
+          <Ionicons name="add" size={26} color={ON_PRIMARY} />
         </TouchableOpacity>
       )}
 
@@ -821,7 +838,7 @@ export default function PermissionsScreen() {
               </TouchableOpacity>
               <TouchableOpacity onPress={confirmDelete} disabled={deleting}>
                 {deleting ? (
-                  <ActivityIndicator size="small" color="#DC2626" />
+                  <ActivityIndicator size="small" color={ERROR_COLOR} />
                 ) : (
                   <Text style={styles.modalConfirm}>Eliminar</Text>
                 )}
@@ -867,8 +884,8 @@ function createStyles(
       paddingVertical: verticalScale(8),
     },
     segmentActive: { ...SEGMENT_ACTIVE },
-    segmentText: { fontSize: font(13), fontWeight: "600", color: "#6B7280" },
-    segmentTextActive: { color: "#fff", fontWeight: "700" },
+    segmentText: { fontSize: font(13), fontWeight: "600", color: TEXT_MUTED },
+    segmentTextActive: { color: ON_PRIMARY, fontWeight: "700" },
     searchBox: {
       ...SEARCH_SURFACE,
       flexDirection: "row",
@@ -879,7 +896,7 @@ function createStyles(
     searchInput: {
       flex: 1,
       fontSize: font(14),
-      color: "#111827",
+      color: TEXT_PRIMARY,
       paddingVertical: verticalScale(10),
     },
     listContent: {
@@ -896,7 +913,7 @@ function createStyles(
       paddingVertical: verticalScale(12),
     },
     /** Mismo tinte que setRowStyle del webapp para filas vencidas. */
-    cardExpired: { backgroundColor: "#FFF1F2", borderColor: "#FFCDD2" },
+    cardExpired: { backgroundColor: ROW_ALERT_TINT_BACKGROUND, borderColor: ROW_ALERT_TINT_BORDER },
     cardTop: {
       flexDirection: "row",
       alignItems: "center",
@@ -914,18 +931,18 @@ function createStyles(
     },
     stateChipText: { fontSize: font(12), fontWeight: "700" },
     expiredMark: { flexDirection: "row", alignItems: "center", gap: scale(3) },
-    expiredMarkText: { fontSize: font(10), color: "#B91C1C", fontWeight: "700" },
-    cardDate: { fontSize: font(12), color: "#374151", fontWeight: "700" },
+    expiredMarkText: { fontSize: font(10), color: ERROR_TEXT, fontWeight: "700" },
+    cardDate: { fontSize: font(12), color: TEXT_SECONDARY, fontWeight: "700" },
     requesterLabel: {
       fontSize: font(11),
-      color: "#6B7280",
+      color: TEXT_MUTED,
       fontWeight: "600",
       marginTop: verticalScale(10),
     },
     requesterName: {
       fontSize: font(14),
       fontWeight: "700",
-      color: "#111827",
+      color: TEXT_PRIMARY,
       marginTop: verticalScale(2),
     },
     cardTags: {
@@ -946,12 +963,12 @@ function createStyles(
       gap: scale(8),
       marginTop: verticalScale(9),
       borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
+      borderTopColor: FOOTER_BORDER,
       paddingTop: verticalScale(9),
     },
     cardFooterInfo: { flex: 1, gap: verticalScale(3) },
     footerLine: { flexDirection: "row", alignItems: "center", gap: scale(6) },
-    cardFooterText: { flex: 1, fontSize: font(12), color: "#6B7280" },
+    cardFooterText: { flex: 1, fontSize: font(12), color: TEXT_MUTED },
     rowActions: { flexDirection: "row", alignItems: "center", gap: scale(4) },
     iconBtn: {
       ...ROW_ACTION_BTN,
@@ -965,14 +982,14 @@ function createStyles(
       paddingVertical: verticalScale(60),
       paddingHorizontal: scale(24),
     },
-    stateText: { fontSize: font(13), color: "#6B7280" },
+    stateText: { fontSize: font(13), color: TEXT_MUTED },
     stateTitle: {
       fontSize: font(14),
       fontWeight: "700",
-      color: "#374151",
+      color: TEXT_SECONDARY,
       textAlign: "center",
     },
-    retryText: { fontSize: font(13), fontWeight: "700", color: "#2563EB" },
+    retryText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_COLOR },
     footerLoader: { paddingVertical: verticalScale(16) },
     fab: {
       ...FAB_SURFACE,
@@ -1000,14 +1017,14 @@ function createStyles(
     modalTitle: {
       fontSize: font(15),
       fontWeight: "700",
-      color: "#DC2626",
+      color: ERROR_COLOR,
       marginBottom: verticalScale(8),
     },
-    modalMessage: { fontSize: font(14), color: "#444" },
+    modalMessage: { fontSize: font(14), color: TEXT_SECONDARY },
     modalFocus: {
       fontSize: font(13),
       fontWeight: "700",
-      color: "#111827",
+      color: TEXT_PRIMARY,
       marginTop: verticalScale(8),
     },
     modalButtons: {
@@ -1016,7 +1033,7 @@ function createStyles(
       gap: scale(20),
       marginTop: verticalScale(24),
     },
-    modalCancel: { color: "#6B7280", fontWeight: "600", fontSize: font(14) },
-    modalConfirm: { color: "#DC2626", fontWeight: "600", fontSize: font(14) },
+    modalCancel: { color: TEXT_MUTED, fontWeight: "600", fontSize: font(14) },
+    modalConfirm: { color: ERROR_COLOR, fontWeight: "600", fontSize: font(14) },
   });
 }
