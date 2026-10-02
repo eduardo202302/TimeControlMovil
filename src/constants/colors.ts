@@ -85,6 +85,30 @@ export const ACCENT_TEAL = "#0D9488";
 export const WARNING_ACCENT = "#D97706";
 
 /**
+ * Estados de los ponchadores (Registrar Acceso / ADM) — verde entrada, rojo
+ * error, ámbar aviso, violeta días. Mismos hex que ya estaban sueltos en
+ * ambas pantallas.
+ *
+ * SUCCESS_ACCENT es el verde de acción/ícono (botón Entrada, "A Tiempo");
+ * SUCCESS_COLOR (#15803D) es otro verde, más oscuro — no son intercambiables.
+ * Los *_TINT_* son el fondo/borde suave de pills, chips y círculos de ícono.
+ * DANGER_TINT_* y no ERROR_TINT_*: ese nombre queda reservado para el banner
+ * de error.
+ */
+export const SUCCESS_ACCENT = "#16A34A";
+export const SUCCESS_TINT_BACKGROUND = "#DCFCE7";
+export const SUCCESS_TINT_BORDER = "#BBF7D0";
+export const DANGER_TINT_BACKGROUND = "#FEE2E2";
+export const DANGER_TINT_BORDER = "#FECACA";
+export const WARNING_TINT_BACKGROUND = "#FEF3C7";
+export const WARNING_TINT_BORDER = "#FDE68A";
+/** Texto sobre WARNING_TINT_BACKGROUND — más oscuro que WARNING_COLOR. */
+export const WARNING_TEXT_STRONG = "#92400E";
+export const VIOLET_TINT_BACKGROUND = "#EDE9FE";
+/** Borde de los chips sobre PRIMARY_TINT_50. */
+export const PRIMARY_TINT_BORDER = "#BFDBFE";
+
+/**
  * Chip de ícono de sección (título de card): cuadrito SÓLIDO del color del
  * tono con el ícono en blanco encima. El tono se elige por tipo de contenido
  * (info azul, detalles violeta, fechas teal, adjuntos ámbar, peligro rojo).

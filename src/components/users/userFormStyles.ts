@@ -28,6 +28,7 @@ import {
   FOOTER_BTN_SAVE,
   MODAL_TOPBAR,
   SEGMENT_ACTIVE,
+  TAB_BTN_SURFACE,
 } from "@/styles/surfaces";
 
 /**
@@ -35,7 +36,8 @@ import {
  * las superficies de styles/surfaces.ts (card/input/select/footer/confirm),
  * igual que HolidaysFormModal.tsx; acá solo viven layout, tipografía y los
  * estados. El tab bar conserva el layout de adminpunchinout.tsx
- * (tabs/tabBtn), con el segmento activo de SEGMENT_ACTIVE.
+ * (tabs/tabBtn) y comparte con él la superficie: TAB_BTN_SURFACE en reposo,
+ * SEGMENT_ACTIVE en el activo.
  */
 export function createUserFormStyles(
   scale: (size: number) => number,
@@ -80,11 +82,10 @@ export function createUserFormStyles(
       paddingTop: verticalScale(12),
     },
     tabBtn: {
+      ...TAB_BTN_SURFACE,
       flex: 1,
       alignItems: "center",
       gap: scale(4),
-      backgroundColor: PRIMARY_TINT_50,
-      borderRadius: RADIUS_LG,
       paddingVertical: verticalScale(10),
       paddingHorizontal: scale(2),
     },

@@ -1,5 +1,43 @@
-import { APP_BACKGROUND } from "@/constants/colors";
-import { MAX_CONTENT_WIDTH, useResponsive } from "@/constants/responsive";
+import SectionIcon from "@/components/ui/SectionIcon";
+import {
+  ACCENT_VIOLET,
+  CARD_BACKGROUND,
+  CARD_BORDER,
+  DANGER_TINT_BACKGROUND,
+  DANGER_TINT_BORDER,
+  ERROR_COLOR,
+  FIELD_BACKGROUND,
+  FIELD_DISABLED_BACKGROUND,
+  FOOTER_BORDER,
+  PRIMARY_COLOR,
+  PRIMARY_TINT_50,
+  PRIMARY_TINT_BACKGROUND,
+  PRIMARY_TINT_BORDER,
+  SECTION_ICON_COLOR,
+  SUCCESS_ACCENT,
+  SUCCESS_TINT_BACKGROUND,
+  SUCCESS_TINT_BORDER,
+  TEXT_MUTED,
+  TEXT_PRIMARY,
+  VIOLET_TINT_BACKGROUND,
+  WARNING_TINT_BACKGROUND,
+  WARNING_TINT_BORDER,
+} from "@/constants/colors";
+import {
+  MAX_CONTENT_WIDTH,
+  RADIUS_LG,
+  RADIUS_MD,
+  RADIUS_PILL,
+  useResponsive,
+} from "@/constants/responsive";
+import { tintedShadow } from "@/constants/shadows";
+import {
+  CARD_FORM,
+  DIALOG_OVERLAY,
+  FIELD_SURFACE,
+  FOOTER_BTN_SAVE,
+  POPUP_CARD,
+} from "@/styles/surfaces";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker, {
   type DateTimePickerEvent,
@@ -1698,7 +1736,13 @@ export default function PunchInOut() {
         {/* ── Reloj ── */}
         <View style={styles.clockFloatCard}>
           <View style={styles.sectionHeaderRow}>
-            <Ionicons name="time-outline" size={18} color="#2563EB" />
+            <SectionIcon tone="teal">
+              <Ionicons
+                name="time-outline"
+                size={18}
+                color={SECTION_ICON_COLOR}
+              />
+            </SectionIcon>
             <Text style={styles.sectionHeaderText}>Hora Actual</Text>
           </View>
           <View style={styles.clockCard}>
@@ -1722,11 +1766,13 @@ export default function PunchInOut() {
         <View style={styles.profileFloatCard}>
           <View style={styles.sectionHeaderToggle}>
             <View style={styles.sectionHeaderToggleLabel}>
-              <Ionicons
-                name="person-circle-outline"
-                size={18}
-                color="#2563EB"
-              />
+              <SectionIcon tone="blue">
+                <Ionicons
+                  name="person-circle-outline"
+                  size={18}
+                  color={SECTION_ICON_COLOR}
+                />
+              </SectionIcon>
               <Text style={styles.sectionHeaderText}>
                 Perfil - Time Control
               </Text>
@@ -1969,11 +2015,13 @@ export default function PunchInOut() {
         {/* ── Categoría + Botón registrar (bloque unificado) ── */}
         <View style={styles.floatCard}>
           <View style={styles.sectionHeaderRow}>
-            <Ionicons
-              name="swap-horizontal-outline"
-              size={18}
-              color="#2563EB"
-            />
+            <SectionIcon tone="blue">
+              <Ionicons
+                name="swap-horizontal-outline"
+                size={18}
+                color={SECTION_ICON_COLOR}
+              />
+            </SectionIcon>
             <Text style={styles.sectionHeaderText}>Reg. Entrada / Salida</Text>
           </View>
           <View style={styles.categories}>
@@ -2057,7 +2105,7 @@ export default function PunchInOut() {
               style={[
                 styles.registerBtn,
                 !isInicio && styles.registerBtnExit,
-                loading && { opacity: 0.7 },
+                loading && styles.registerBtnBusy,
               ]}
               onPress={handleRegister}
               disabled={loading}
@@ -2094,7 +2142,13 @@ export default function PunchInOut() {
             activeOpacity={0.7}
           >
             <View style={styles.sectionHeaderToggleLabel}>
-              <Ionicons name="hourglass-outline" size={18} color="#2563EB" />
+              <SectionIcon tone="violet">
+                <Ionicons
+                  name="hourglass-outline"
+                  size={18}
+                  color={SECTION_ICON_COLOR}
+                />
+              </SectionIcon>
               <Text style={styles.sectionHeaderText}>
                 Ver Botones de Acciones
               </Text>
@@ -2165,7 +2219,13 @@ export default function PunchInOut() {
             activeOpacity={0.7}
           >
             <View style={styles.sectionHeaderToggleLabel}>
-              <Ionicons name="list-outline" size={18} color="#2563EB" />
+              <SectionIcon tone="teal">
+                <Ionicons
+                  name="list-outline"
+                  size={18}
+                  color={SECTION_ICON_COLOR}
+                />
+              </SectionIcon>
               <Text style={styles.sectionHeaderText}>Historial del Día</Text>
             </View>
             <View style={styles.historyChevronBtn}>
@@ -2360,15 +2420,11 @@ const styles = StyleSheet.create({
   },
   /* ── Clock ── */
   clockFloatCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    ...CARD_FORM,
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 12,
     marginTop: 8,
-    elevation: 0,
   },
   clockCard: {
     flexDirection: "row",
@@ -2382,7 +2438,7 @@ const styles = StyleSheet.create({
   clockDivider: {
     width: 1,
     height: 22,
-    backgroundColor: "#BFDBFE",
+    backgroundColor: PRIMARY_TINT_BORDER,
     marginHorizontal: 16,
   },
   clockTime: {
@@ -2398,43 +2454,12 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     color: "#142157",
   },
-  clockDate: {
-    color: "#3B82F6",
-    fontSize: 11,
-    marginTop: 1,
-    textTransform: "capitalize",
-    letterSpacing: 0.2,
-    textAlign: "center",
-  },
   clockDateCompact: {
-    color: "#3B82F6",
+    color: PRIMARY_COLOR,
     fontSize: 16,
     fontWeight: "600",
     textAlign: "center",
   },
-  clockUserRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    marginTop: 12,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  clockUser: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "600",
-    letterSpacing: 0.2,
-  },
-  profileCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 12,
-  },
-  profileCardTitle: { fontSize: 14, fontWeight: "600", color: "#2563EB" },
   profileRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2450,15 +2475,7 @@ const styles = StyleSheet.create({
     height: 13,
     borderRadius: 6.5,
     borderWidth: 2,
-    borderColor: "#fff",
-  },
-  avatar: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: "#E5E7EB",
-    borderWidth: 2,
-    borderColor: "#DBEAFE",
+    borderColor: CARD_BACKGROUND,
   },
   avatarImage: {
     width: AVATAR_SIZE,
@@ -2469,14 +2486,13 @@ const styles = StyleSheet.create({
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: PRIMARY_TINT_50,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "#BFDBFE",
+    borderColor: PRIMARY_TINT_BORDER,
   },
   profileInfo: { flex: 1, justifyContent: "center", gap: 4 },
-  profileRoleText: { fontSize: 12, color: "#2563EB", fontWeight: "600" },
   profileName: {
     fontSize: 25,
     fontWeight: "800",
@@ -2492,71 +2508,55 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 5,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
   },
-  lastPunchPillEntry: { backgroundColor: "#DCFCE7" },
-  lastPunchPillExit: { backgroundColor: "#EFF6FF" },
-  lastPunchPillNeutral: { backgroundColor: "#F3F4F6" },
-  lastPunchPillError: { backgroundColor: "#FEE2E2" },
-  lastPunchPillLate: { backgroundColor: "#FEE2E2" },
-  lastPunchPillEarly: { backgroundColor: "#FEF3C7" },
+  lastPunchPillEntry: { backgroundColor: SUCCESS_TINT_BACKGROUND },
+  lastPunchPillExit: { backgroundColor: PRIMARY_TINT_50 },
+  lastPunchPillNeutral: { backgroundColor: FIELD_DISABLED_BACKGROUND },
+  lastPunchPillError: { backgroundColor: DANGER_TINT_BACKGROUND },
+  lastPunchPillLate: { backgroundColor: DANGER_TINT_BACKGROUND },
+  lastPunchPillEarly: { backgroundColor: WARNING_TINT_BACKGROUND },
   lastPunchPillText: { fontSize: 14, fontWeight: "700" },
   locationBlock: {
-    borderRadius: 12,
+    borderRadius: RADIUS_LG,
     borderWidth: 1,
     paddingVertical: 10,
     paddingHorizontal: 12,
     gap: 4,
     marginBottom: 8,
   },
-  locationBlockWithin: { backgroundColor: "#DCFCE7", borderColor: "#BBF7D0" },
-  locationBlockOutside: { backgroundColor: "#FEE2E2", borderColor: "#FECACA" },
+  locationBlockWithin: {
+    backgroundColor: SUCCESS_TINT_BACKGROUND,
+    borderColor: SUCCESS_TINT_BORDER,
+  },
+  locationBlockOutside: {
+    backgroundColor: DANGER_TINT_BACKGROUND,
+    borderColor: DANGER_TINT_BORDER,
+  },
   locationHeaderRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   locationHeaderText: { fontSize: 12, fontWeight: "700", color: "#6B7280" },
   locationAddressText: { fontSize: 13, color: "#374151" },
   locationStatusRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   locationStatusText: { fontSize: 12, fontWeight: "700" },
-  scheduleCard: {
-    backgroundColor: "#EFF6FF",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#BFDBFE",
-  },
-  noScheduleCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#FEF3C7",
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#FDE68A",
-  },
-  noScheduleText: { fontSize: 13, color: "#92400E" },
-  scheduleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 8,
-  },
-  scheduleTitle: { fontSize: 14, fontWeight: "600", color: "#1D4ED8" },
-  scheduleItems: { gap: 4 },
-  scheduleItem: { flexDirection: "row", alignItems: "center", gap: 6 },
-  scheduleText: { fontSize: 13, color: "#374151" },
   scheduleTable: { flexDirection: "row", gap: 8 },
   scheduleTableCol: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 12,
+    borderRadius: RADIUS_LG,
     borderWidth: 1,
     paddingVertical: 12,
     paddingHorizontal: 8,
     gap: 6,
   },
-  scheduleChipWork: { backgroundColor: "#EFF6FF", borderColor: "#BFDBFE" },
-  scheduleChipLunch: { backgroundColor: "#FEF3C7", borderColor: "#FDE68A" },
+  scheduleChipWork: {
+    backgroundColor: PRIMARY_TINT_50,
+    borderColor: PRIMARY_TINT_BORDER,
+  },
+  scheduleChipLunch: {
+    backgroundColor: WARNING_TINT_BACKGROUND,
+    borderColor: WARNING_TINT_BORDER,
+  },
   scheduleTableRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -2573,26 +2573,18 @@ const styles = StyleSheet.create({
 
   /* ── Floating label card ── */
   floatCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    ...CARD_FORM,
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 18,
     marginTop: 8,
-    elevation: 0,
   },
   profileFloatCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    ...CARD_FORM,
     paddingHorizontal: 16,
     paddingTop: 14,
     paddingBottom: 14,
     marginTop: 8,
-    elevation: 0,
   },
   sectionHeaderRow: {
     flexDirection: "row",
@@ -2616,7 +2608,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: PRIMARY_TINT_50,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2640,7 +2632,7 @@ const styles = StyleSheet.create({
     flexBasis: "47%",
     flexGrow: 1,
     backgroundColor: "#F8FAFF",
-    borderRadius: 10,
+    borderRadius: RADIUS_MD,
     paddingVertical: 7,
     paddingHorizontal: 10,
   },
@@ -2668,73 +2660,22 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#2563EB",
   },
-  floatLabelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-    position: "relative",
-  },
-  logoutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#FEF2F2",
-    borderWidth: 1,
-    borderColor: "#FECACA",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    position: "absolute",
-    right: 0,
-    top: -6,
-  },
-  logoutBtnText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#DC2626",
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 14,
-    padding: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  sectionTitle: { fontSize: 16, fontWeight: "600", color: "#111827" },
-  refreshBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: "#EFF6FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   categories: { flexDirection: "row", gap: 10 },
   categoryBtn: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: "#F8FAFF",
+    borderRadius: RADIUS_LG,
+    backgroundColor: FIELD_BACKGROUND,
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    borderColor: CARD_BORDER,
     gap: 5,
     position: "relative",
   },
   categoryBtnActive: {
-    backgroundColor: "#2563EB",
-    borderColor: "#2563EB",
+    backgroundColor: PRIMARY_COLOR,
+    borderColor: PRIMARY_COLOR,
   },
   categoryText: { fontSize: 12, fontWeight: "600", color: "#6B7280" },
   categoryTextActive: { color: "#fff" },
@@ -2745,12 +2686,13 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#22C55E",
+    backgroundColor: SUCCESS_ACCENT,
     borderWidth: 1.5,
-    borderColor: "#fff",
+    borderColor: CARD_BACKGROUND,
   },
   registerBtn: {
-    borderRadius: 14,
+    ...tintedShadow(SUCCESS_ACCENT),
+    borderRadius: RADIUS_LG,
     paddingVertical: 18,
     paddingHorizontal: 24,
     flexDirection: "row",
@@ -2758,9 +2700,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 12,
     marginTop: 12,
-    backgroundColor: "#16A34A",
+    backgroundColor: SUCCESS_ACCENT,
   },
-  registerBtnExit: { backgroundColor: "#DC2626" },
+  registerBtnExit: {
+    ...tintedShadow(ERROR_COLOR),
+    backgroundColor: ERROR_COLOR,
+  },
+  // Sin sombra mientras envía: en Android la elevation se transparenta a
+  // través de un fondo con opacity < 1.
+  registerBtnBusy: {
+    opacity: 0.7,
+    shadowColor: "transparent",
+    elevation: 0,
+  },
   registerTextWrap: { alignItems: "center" },
   registerBtnText: {
     color: "#fff",
@@ -2781,7 +2733,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: FOOTER_BORDER,
   },
   punchIcon: {
     width: 38,
@@ -2790,28 +2742,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  punchIconEntry: { backgroundColor: "#DCFCE7" },
-  punchIconExit: { backgroundColor: "#DBEAFE" },
-  punchIconExitOnTime: { backgroundColor: "#DCFCE7" },
-  punchIconOvertime: { backgroundColor: "#DBEAFE" },
-  punchIconEarly: { backgroundColor: "#FEF3C7" },
-  punchIconError: { backgroundColor: "#FEE2E2" },
+  punchIconEntry: { backgroundColor: SUCCESS_TINT_BACKGROUND },
+  punchIconExitOnTime: { backgroundColor: SUCCESS_TINT_BACKGROUND },
+  punchIconOvertime: { backgroundColor: PRIMARY_TINT_BACKGROUND },
+  punchIconEarly: { backgroundColor: WARNING_TINT_BACKGROUND },
+  punchIconError: { backgroundColor: DANGER_TINT_BACKGROUND },
   punchInfo: { flex: 1, gap: 4 },
   punchType: { fontSize: 13, fontWeight: "700", color: "#111827" },
   punchBadgeRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
-  punchBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
-  badgeOnTime: { backgroundColor: "#DCFCE7" },
-  badgeLate: { backgroundColor: "#FEE2E2" },
-  badgeEarly: { backgroundColor: "#FEF3C7" },
+  punchBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS_PILL },
+  badgeOnTime: { backgroundColor: SUCCESS_TINT_BACKGROUND },
+  badgeLate: { backgroundColor: DANGER_TINT_BACKGROUND },
+  badgeEarly: { backgroundColor: WARNING_TINT_BACKGROUND },
   /** Pill neutro para el tipo de break (punch.tag?.name) — mismo tono gris
    * que lastPunchPillNeutral, reusado como fondo para este badge. */
-  badgeNeutral: { backgroundColor: "#F3F4F6" },
+  badgeNeutral: { backgroundColor: FIELD_DISABLED_BACKGROUND },
   punchBadgeText: { fontSize: 11, fontWeight: "700" },
   badgeOvertime: {
-    backgroundColor: "#EFF6FF",
+    backgroundColor: PRIMARY_TINT_50,
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 20,
+    borderRadius: RADIUS_PILL,
   },
   badgeOvertimeText: { fontSize: 11, fontWeight: "700", color: "#2563EB" },
   punchTime: { fontSize: 12, fontWeight: "600", color: "#6B7280" },
@@ -2821,8 +2772,8 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#2563EB",
-    backgroundColor: "#EFF6FF",
+    borderColor: PRIMARY_COLOR,
+    backgroundColor: PRIMARY_TINT_50,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2831,8 +2782,8 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#2563EB",
-    backgroundColor: "#EFF6FF",
+    borderColor: PRIMARY_COLOR,
+    backgroundColor: PRIMARY_TINT_50,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2842,22 +2793,22 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#7C3AED",
-    backgroundColor: "#F5F3FF",
+    borderColor: ACCENT_VIOLET,
+    backgroundColor: VIOLET_TINT_BACKGROUND,
     alignItems: "center",
     justifyContent: "center",
   },
   permissionModalIconWrap: {
     width: 42,
     height: 42,
-    borderRadius: 12,
-    backgroundColor: "#EFF6FF",
+    borderRadius: RADIUS_LG,
+    backgroundColor: PRIMARY_TINT_50,
     alignItems: "center",
     justifyContent: "center",
   },
   permissionItemDivider: {
     height: 1,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: CARD_BORDER,
     marginBottom: 16,
   },
   permissionItemAction: { fontSize: 15, fontWeight: "700", color: "#111827" },
@@ -2874,93 +2825,19 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 6,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  modalCard: {
-    width: "100%",
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    overflow: "hidden",
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-  },
-  modalHeaderEntry: { backgroundColor: "#16A34A" },
-  modalHeaderExit: { backgroundColor: "#DC2626" },
-  modalHeaderText: { fontSize: 18, fontWeight: "700", color: "#fff" },
-  modalBody: { padding: 20, gap: 14 },
-  modalRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  modalLabel: { fontSize: 14, color: "#6B7280", flex: 1 },
-  modalValue: { fontSize: 14, fontWeight: "600", color: "#111827" },
-  modalStatusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  modalStatusOnTime: { backgroundColor: "#DCFCE7" },
-  modalStatusLate: { backgroundColor: "#FEE2E2" },
-  modalStatusEarly: { backgroundColor: "#FEF3C7" },
-  modalStatusText: { fontSize: 13, fontWeight: "700" },
-  modalScheduleRef: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: APP_BACKGROUND,
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 4,
-  },
-  modalScheduleRefText: { fontSize: 12, color: "#6B7280" },
-  modalFooter: {
-    flexDirection: "row",
-    borderTopWidth: 1,
-    borderTopColor: "#F3F4F6",
-  },
-  modalBtnCancel: {
-    flex: 1,
-    paddingVertical: 16,
-    alignItems: "center",
-    borderRightWidth: 1,
-    borderRightColor: "#F3F4F6",
-  },
-  modalBtnCancelText: { fontSize: 15, color: "#6B7280", fontWeight: "500" },
-  modalBtnConfirm: { flex: 1, paddingVertical: 16, alignItems: "center" },
-  modalBtnEntry: { backgroundColor: "#F0FDF4" },
-  modalBtnExit: { backgroundColor: "#FEF2F2" },
-  modalBtnConfirmText: { fontSize: 15, fontWeight: "700" },
   /* NextDayExit Modal */
   ndModalOverlay: {
+    ...DIALOG_OVERLAY,
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
   },
   ndModalCard: {
+    ...POPUP_CARD,
     width: "100%",
     maxWidth: 400,
-    backgroundColor: "#fff",
-    borderRadius: 20,
     padding: 24,
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
   },
   ndModalHeader: {
     flexDirection: "row",
@@ -2982,22 +2859,19 @@ const styles = StyleSheet.create({
   ndModalIconWrap: {
     width: 42,
     height: 42,
-    borderRadius: 12,
-    backgroundColor: "#FFFBEB",
+    borderRadius: RADIUS_LG,
+    backgroundColor: WARNING_TINT_BACKGROUND,
     alignItems: "center",
     justifyContent: "center",
   },
-  ndModalTitle: { fontSize: 18, fontWeight: "700", color: "#333" },
+  ndModalTitle: { fontSize: 18, fontWeight: "700", color: TEXT_PRIMARY },
   ndModalBody: { gap: 16 },
-  ndModalMsg: { fontSize: 14, color: "#666", lineHeight: 22 },
+  ndModalMsg: { fontSize: 14, color: TEXT_MUTED, lineHeight: 22 },
   ndTimeBtn: {
+    ...FIELD_SURFACE,
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: APP_BACKGROUND,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
@@ -3012,8 +2886,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#EFF6FF",
-    borderRadius: 10,
+    backgroundColor: PRIMARY_TINT_50,
+    borderRadius: RADIUS_MD,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -3032,21 +2906,28 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
   },
   ndModalBtn: {
+    ...FOOTER_BTN_SAVE,
     marginTop: 8,
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
     paddingVertical: 15,
     alignItems: "center",
     justifyContent: "center",
   },
-  ndModalBtnDisabled: { opacity: 0.5 },
+  // Sin sombra: en Android la elevation se transparenta a través de un fondo
+  // con opacity < 1.
+  ndModalBtnDisabled: {
+    opacity: 0.5,
+    shadowColor: "transparent",
+    elevation: 0,
+  },
   ndModalBtnText: { fontSize: 16, fontWeight: "700", color: "#fff" },
   ndErrorRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     backgroundColor: "#FEF2F2",
-    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: RADIUS_MD,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
@@ -3060,13 +2941,10 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   breakTagSelector: {
+    ...FIELD_SURFACE,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: APP_BACKGROUND,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
@@ -3078,7 +2956,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: FOOTER_BORDER,
   },
   breakTagOptionText: { fontSize: 15, fontWeight: "600", color: "#111827" },
 });

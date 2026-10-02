@@ -1,14 +1,39 @@
-import { APP_BACKGROUND_V2 } from "@/constants/colors";
+import SectionIcon from "@/components/ui/SectionIcon";
+import {
+  APP_BACKGROUND_V2,
+  DANGER_TINT_BACKGROUND,
+  FIELD_DISABLED_BACKGROUND,
+  FOOTER_BORDER,
+  PRIMARY_COLOR,
+  PRIMARY_TINT_50,
+  SECTION_ICON_COLOR,
+  SUCCESS_ACCENT,
+  SUCCESS_TINT_BACKGROUND,
+  VIOLET_TINT_BACKGROUND,
+  WARNING_ACCENT,
+  WARNING_TINT_BACKGROUND,
+} from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
-  RADIUS_2XL,
   RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
   RADIUS_SM,
-  RADIUS_XL,
   useResponsive,
 } from "@/constants/responsive";
+import { SHADOW_PRIMARY, tintedShadow } from "@/constants/shadows";
+import {
+  CARD_FORM,
+  CARD_ROW,
+  DIALOG_BOX,
+  DIALOG_OVERLAY,
+  FIELD_SURFACE,
+  FOOTER_BTN_CANCEL,
+  FOOTER_BTN_SAVE,
+  POPUP_CARD,
+  SEGMENT_ACTIVE,
+  TAB_BTN_SURFACE,
+} from "@/styles/surfaces";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
   type DateTimePickerEvent,
@@ -728,7 +753,7 @@ export default function AdminPunchInOutScreen() {
                     <Ionicons
                       name="person-circle-outline"
                       size={22}
-                      color="#2563EB"
+                      color={SECTION_ICON_COLOR}
                     />
                   </View>
                   <Text style={styles.selectorTitle} numberOfLines={1}>
@@ -879,11 +904,13 @@ export default function AdminPunchInOutScreen() {
                   {/* ── Reg. Entrada / Salida ── */}
                   <View style={styles.floatCard}>
                     <View style={styles.sectionHeaderRow}>
-                      <Ionicons
-                        name="swap-horizontal-outline"
-                        size={18}
-                        color="#2563EB"
-                      />
+                      <SectionIcon tone="blue">
+                        <Ionicons
+                          name="swap-horizontal-outline"
+                          size={18}
+                          color={SECTION_ICON_COLOR}
+                        />
+                      </SectionIcon>
                       <Text style={styles.sectionHeaderText}>
                         Reg. Entrada / Salida
                       </Text>
@@ -1008,11 +1035,13 @@ export default function AdminPunchInOutScreen() {
                       activeOpacity={0.7}
                     >
                       <View style={styles.sectionHeaderRow}>
-                        <Ionicons
-                          name="list-outline"
-                          size={18}
-                          color="#2563EB"
-                        />
+                        <SectionIcon tone="teal">
+                          <Ionicons
+                            name="list-outline"
+                            size={18}
+                            color={SECTION_ICON_COLOR}
+                          />
+                        </SectionIcon>
                         <Text style={styles.historyTitleText} numberOfLines={2}>
                           {historyTitle}
                         </Text>
@@ -1128,7 +1157,11 @@ export default function AdminPunchInOutScreen() {
                 {/* Header: título + cantidad en vivo + cerrar */}
                 <View style={styles.selectorHeader}>
                   <View style={styles.selectorHeaderIcon}>
-                    <Ionicons name="people-outline" size={22} color="#2563EB" />
+                    <Ionicons
+                      name="people-outline"
+                      size={22}
+                      color={SECTION_ICON_COLOR}
+                    />
                   </View>
                   <Text style={styles.selectorTitle}>Seleccionar Usuario</Text>
                   <View style={styles.countBadge}>
@@ -1427,7 +1460,13 @@ export default function AdminPunchInOutScreen() {
         {/* ── No finalizaron Jornada ── */}
         <View style={styles.openSection}>
           <View style={styles.sectionHeaderRow}>
-            <Ionicons name="alert-circle-outline" size={18} color="#D97706" />
+            <SectionIcon tone="amber">
+              <Ionicons
+                name="alert-circle-outline"
+                size={18}
+                color={SECTION_ICON_COLOR}
+              />
+            </SectionIcon>
             <Text style={styles.sectionHeaderText}>No finalizaron Jornada</Text>
             {/* Se oculta en 0: el estado vacío ya dice que no queda nadie, y
                 un "0" mientras carga sería un dato falso. */}
@@ -1573,10 +1612,7 @@ function createStyles(
       width: "100%",
     },
     floatCard: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_FORM,
       paddingHorizontal: scale(16),
       paddingTop: verticalScale(14),
       paddingBottom: verticalScale(14),
@@ -1605,21 +1641,14 @@ function createStyles(
 
     /* ── Entrada: botón que abre el modal ── */
     primaryBtn: {
+      // Misma superficie que el botón Guardar de los formularios: la sombra
+      // teñida lo despega del fondo y lo hace leer como control táctil.
+      ...FOOTER_BTN_SAVE,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       gap: scale(10),
-      backgroundColor: "#2563EB",
-      borderRadius: RADIUS_LG,
       paddingVertical: verticalScale(12),
-      // Elevación: lo despega del fondo y lo hace leer como control táctil.
-      // Misma receta que selectorCard, con la sombra un poco más marcada
-      // porque acá el contraste es azul sobre gris, no blanco sobre gris.
-      elevation: 4,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.2,
-      shadowRadius: 6,
     },
     /**
      * Círculo translúcido detrás del ícono — es lo que le da profundidad al
@@ -1649,7 +1678,7 @@ function createStyles(
       flexDirection: "row",
       alignItems: "center",
       gap: scale(6),
-      backgroundColor: "#FEF3C7",
+      backgroundColor: WARNING_TINT_BACKGROUND,
       borderRadius: RADIUS_PILL,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(5),
@@ -1662,25 +1691,19 @@ function createStyles(
 
     /* ── Modal selector de usuario ── */
     selectorOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       justifyContent: "center",
       alignItems: "center",
       padding: scale(20),
     },
     selectorCard: {
+      ...POPUP_CARD,
       width: "100%",
       // Mismo tope/criterio que el card de RevisionFinalModal.tsx.
       maxWidth: 440,
       maxHeight: "88%",
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_2XL,
       padding: scale(20),
-      elevation: 10,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
     },
     selectorHeader: {
       flexDirection: "row",
@@ -1688,14 +1711,19 @@ function createStyles(
       gap: scale(10),
       paddingBottom: verticalScale(14),
       borderBottomWidth: 1,
-      borderBottomColor: "#F3F4F6",
+      borderBottomColor: FOOTER_BORDER,
     },
-    /** Ícono de cabecera: tamaño fijo, mismo criterio que RevisionFinalModal.tsx. */
+    /**
+     * Ícono de cabecera: chip sólido con el ícono en blanco, mismo que el
+     * picker de AdminPermissionCreateModal.tsx. Tamaño fijo, mismo criterio
+     * que RevisionFinalModal.tsx.
+     */
     selectorHeaderIcon: {
+      ...tintedShadow(PRIMARY_COLOR),
       width: 42,
       height: 42,
       borderRadius: RADIUS_LG,
-      backgroundColor: "#EFF6FF",
+      backgroundColor: PRIMARY_COLOR,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -1706,7 +1734,7 @@ function createStyles(
       color: "#111827",
     },
     countBadge: {
-      backgroundColor: "#EFF6FF",
+      backgroundColor: PRIMARY_TINT_50,
       borderRadius: RADIUS_PILL,
       paddingHorizontal: scale(10),
       paddingVertical: verticalScale(4),
@@ -1725,19 +1753,21 @@ function createStyles(
     },
     /** Botones cuadrados de ícono — lado fijo, mismo criterio que los avatares. */
     iconBtnPrimary: {
+      ...SHADOW_PRIMARY,
       width: 44,
       height: 44,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "#2563EB",
+      backgroundColor: PRIMARY_COLOR,
       borderRadius: RADIUS_MD,
     },
     iconBtnAccent: {
+      ...tintedShadow(WARNING_ACCENT),
       width: 44,
       height: 44,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: "#D97706",
+      backgroundColor: WARNING_ACCENT,
       borderRadius: RADIUS_MD,
     },
     selectorList: { marginTop: verticalScale(6) },
@@ -1749,13 +1779,13 @@ function createStyles(
       paddingBottom: verticalScale(8),
     },
     searchInputWrap: {
+      ...FIELD_SURFACE,
       flex: 1,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      backgroundColor: "#F9FAFB",
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
+      // Pisa el radio de FIELD_SURFACE: va pegado a los iconBtn (RADIUS_MD),
+      // igual que en el picker de AdminPermissionCreateModal.tsx.
       borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
@@ -1773,7 +1803,7 @@ function createStyles(
       gap: scale(10),
       paddingVertical: verticalScale(10),
       borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
+      borderTopColor: FOOTER_BORDER,
     },
     resultInfo: { flex: 1 },
     resultName: {
@@ -1801,16 +1831,12 @@ function createStyles(
       marginTop: verticalScale(14),
     },
     /**
-     * Card por empleado. Mismo lenguaje visual que floatCard (fondo blanco,
-     * borde sutil, RADIUS_XL) pero con padding vertical más corto: la fila
-     * apila identidad + métricas, y con el aire de floatCard cada tarjeta
-     * quedaba innecesariamente alta.
+     * Card por empleado: superficie de fila de lista (CARD_ROW), con padding
+     * vertical más corto que floatCard: la fila apila identidad + métricas, y
+     * con el aire de floatCard cada tarjeta quedaba innecesariamente alta.
      */
     openCard: {
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_XL,
-      borderWidth: 1.5,
-      borderColor: "#E5E7EB",
+      ...CARD_ROW,
       paddingHorizontal: scale(14),
       paddingVertical: verticalScale(10),
     },
@@ -1847,9 +1873,9 @@ function createStyles(
       justifyContent: "center",
       marginBottom: verticalScale(2),
     },
-    metricIconEntry: { backgroundColor: "#DCFCE7" },
-    metricIconExit: { backgroundColor: "#FEE2E2" },
-    metricIconDays: { backgroundColor: "#EDE9FE" },
+    metricIconEntry: { backgroundColor: SUCCESS_TINT_BACKGROUND },
+    metricIconExit: { backgroundColor: DANGER_TINT_BACKGROUND },
+    metricIconDays: { backgroundColor: VIOLET_TINT_BACKGROUND },
     metricLabel: {
       fontSize: font(11),
       color: "#6B7280",
@@ -1867,7 +1893,7 @@ function createStyles(
       height: AVATAR_SIZE,
       // Círculo: mitad del lado fijo, no un radio de diseño.
       borderRadius: AVATAR_SIZE / 2,
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
       alignItems: "center",
       justifyContent: "center",
       overflow: "hidden",
@@ -1883,7 +1909,7 @@ function createStyles(
       height: AVATAR_SM_SIZE,
       // Círculo: mitad del lado fijo, no un radio de diseño.
       borderRadius: AVATAR_SM_SIZE / 2,
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
       alignItems: "center",
       justifyContent: "center",
       overflow: "hidden",
@@ -1920,7 +1946,7 @@ function createStyles(
     },
     rolePill: {
       alignSelf: "flex-start",
-      backgroundColor: "#EFF6FF",
+      backgroundColor: PRIMARY_TINT_50,
       borderRadius: RADIUS_PILL,
       paddingHorizontal: scale(8),
       paddingVertical: verticalScale(2),
@@ -1949,8 +1975,8 @@ function createStyles(
       paddingHorizontal: scale(10),
       paddingVertical: verticalScale(10),
     },
-    scheduleColWork: { backgroundColor: "#EFF6FF" },
-    scheduleColLunch: { backgroundColor: "#FEF3C7" },
+    scheduleColWork: { backgroundColor: PRIMARY_TINT_50 },
+    scheduleColLunch: { backgroundColor: WARNING_TINT_BACKGROUND },
     scheduleColHead: {
       flexDirection: "row",
       alignItems: "center",
@@ -1979,15 +2005,16 @@ function createStyles(
       gap: scale(8),
       marginTop: verticalScale(12),
     },
+    // Misma superficie que el tab bar de Usuarios (userFormStyles.ts), que
+    // copió este layout: TAB_BTN_SURFACE en reposo, SEGMENT_ACTIVE en el activo.
     tabBtn: {
+      ...TAB_BTN_SURFACE,
       flex: 1,
       alignItems: "center",
       gap: scale(4),
-      backgroundColor: "#EFF6FF",
-      borderRadius: RADIUS_LG,
       paddingVertical: verticalScale(12),
     },
-    tabBtnActive: { backgroundColor: "#2563EB" },
+    tabBtnActive: { ...SEGMENT_ACTIVE },
     tabText: { fontSize: font(13), fontWeight: "600", color: "#2563EB" },
     tabTextActive: { color: "#fff" },
     fieldLabel: {
@@ -1998,13 +2025,10 @@ function createStyles(
       marginBottom: verticalScale(6),
     },
     timeSelector: {
+      ...FIELD_SURFACE,
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      backgroundColor: "#F9FAFB",
-      borderWidth: 1,
-      borderColor: "#E5E7EB",
-      borderRadius: RADIUS_MD,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(12),
     },
@@ -2023,17 +2047,27 @@ function createStyles(
     tagSelectorText: { flex: 1, fontSize: font(14), color: "#9CA3AF" },
     tagSelectorTextValue: { color: "#111827", fontWeight: "600" },
     registerBtn: {
+      ...tintedShadow(SUCCESS_ACCENT),
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       gap: scale(10),
-      backgroundColor: "#16A34A",
+      backgroundColor: SUCCESS_ACCENT,
       borderRadius: RADIUS_LG,
       paddingVertical: verticalScale(15),
       marginTop: verticalScale(16),
     },
-    registerBtnExit: { backgroundColor: "#2563EB" },
-    registerBtnDisabled: { opacity: 0.6 },
+    registerBtnExit: {
+      ...tintedShadow(PRIMARY_COLOR),
+      backgroundColor: PRIMARY_COLOR,
+    },
+    // Sin sombra: en Android la elevation se transparenta a través de un
+    // fondo con opacity < 1.
+    registerBtnDisabled: {
+      opacity: 0.6,
+      shadowColor: "transparent",
+      elevation: 0,
+    },
     registerTextWrap: {
       flexDirection: "row",
       alignItems: "baseline",
@@ -2049,7 +2083,7 @@ function createStyles(
       gap: scale(10),
       paddingVertical: verticalScale(10),
       borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
+      borderTopColor: FOOTER_BORDER,
     },
     /** Círculo de ícono — lado fijo, mismo criterio que los avatares. */
     punchIcon: {
@@ -2075,7 +2109,7 @@ function createStyles(
     /** Pill neutro para el tipo de break (punch.tag?.name) — mismo gris que
      * el resto de badges neutros del archivo (avatarPlaceholder, modalBtnGhost). */
     breakTagPill: {
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
       borderRadius: RADIUS_PILL,
       paddingHorizontal: scale(8),
       paddingVertical: verticalScale(1),
@@ -2104,19 +2138,18 @@ function createStyles(
 
     /* ── Modales ── */
     modalOverlay: {
+      ...DIALOG_OVERLAY,
       flex: 1,
-      backgroundColor: "rgba(0,0,0,0.5)",
       alignItems: "center",
       justifyContent: "center",
       paddingHorizontal: scale(24),
     },
     modalCard: {
+      ...DIALOG_BOX,
       width: "100%",
       // Tope en tablet — mismo valor/criterio que los modales de
       // punchinout.tsx y DrawerMenu.tsx.
       maxWidth: 400,
-      backgroundColor: "#fff",
-      borderRadius: RADIUS_XL,
       paddingHorizontal: scale(20),
       paddingVertical: verticalScale(20),
     },
@@ -2132,7 +2165,7 @@ function createStyles(
       height: 40,
       // eslint-disable-next-line local/no-raw-numbers-in-stylesheet -- círculo (mitad del lado fijo), no un radio de diseño
       borderRadius: 20,
-      backgroundColor: "#F3F4F6",
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -2148,22 +2181,20 @@ function createStyles(
       gap: scale(10),
       marginTop: verticalScale(20),
     },
+    // Fondo, radio y sombra los ponen las variantes (FOOTER_BTN_*).
     modalBtn: {
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
-      borderRadius: RADIUS_MD,
       paddingVertical: verticalScale(12),
     },
-    modalBtnGhost: {
-      backgroundColor: "#F3F4F6",
-    },
+    modalBtnGhost: { ...FOOTER_BTN_CANCEL },
     modalBtnGhostText: {
       fontSize: font(15),
       fontWeight: "700",
       color: "#6B7280",
     },
-    modalBtnPrimary: { backgroundColor: "#2563EB" },
+    modalBtnPrimary: { ...FOOTER_BTN_SAVE },
     modalBtnPrimaryText: {
       fontSize: font(15),
       fontWeight: "700",
@@ -2179,7 +2210,7 @@ function createStyles(
       paddingHorizontal: scale(4),
       borderRadius: RADIUS_SM,
       borderTopWidth: 1,
-      borderTopColor: "#F3F4F6",
+      borderTopColor: FOOTER_BORDER,
     },
     tagOptionText: { fontSize: font(14), color: "#111827" },
   });

@@ -12,6 +12,7 @@ import {
   HEADER_NAVY,
   OVERLAY_BACKDROP,
   PRIMARY_COLOR,
+  PRIMARY_TINT_50,
   RIBBON_BACKGROUND,
   SURFACE_SUBTLE,
   SWITCH_TRACK_OFF,
@@ -220,6 +221,16 @@ export const ROW_ACTION_BTN: ViewStyle = {
 export const SEGMENT_ACTIVE: ViewStyle = {
   backgroundColor: PRIMARY_COLOR,
   ...SHADOW_PRIMARY,
+};
+
+/**
+ * Pestaña en reposo de las barras de pestañas con ícono (Jornada/Almuerzo/
+ * Break de Ponche ADM, tabs del formulario de Usuarios). La activa pisa
+ * después con SEGMENT_ACTIVE.
+ */
+export const TAB_BTN_SURFACE: ViewStyle = {
+  backgroundColor: PRIMARY_TINT_50,
+  borderRadius: RADIUS_LG,
 };
 
 /** Colores del <Switch> (props, no ViewStyle): <Switch {...SWITCH_COLORS} />. */
