@@ -30,7 +30,7 @@ import {
   AUTH_REQUIRED,
   AUTH_TEXT,
 } from "@/constants/authColors";
-import { ERROR_COLOR, PRIMARY_700 } from "@/constants/colors";
+import { ERROR_COLOR } from "@/constants/colors";
 import { SHADOW_LG, SHADOW_PRIMARY } from "@/constants/shadows";
 import { useAuthTheme } from "@/hooks/useAuthTheme";
 import type { AuthTheme } from "../../utils/authThemeRules";
@@ -48,8 +48,8 @@ const VerifyPin = ({ onNext }: VerifyPinProps) => {
     [scale, verticalScale, font, theme],
   );
   const inputStyles = useMemo(
-    () => createLocalStyles(scale, verticalScale, font),
-    [scale, verticalScale, font],
+    () => createLocalStyles(scale, verticalScale, font, theme),
+    [scale, verticalScale, font, theme],
   );
 
   const [mensaje, setMensaje] = useState<{
@@ -214,6 +214,7 @@ function createLocalStyles(
   scale: (size: number) => number,
   verticalScale: (size: number) => number,
   font: (size: number) => number,
+  theme: AuthTheme,
 ) {
   return StyleSheet.create({
     labelGroup: {
@@ -238,7 +239,7 @@ function createLocalStyles(
       backgroundColor: AUTH_INPUT_BACKGROUND,
     },
     inputFocused: {
-      borderColor: PRIMARY_700,
+      borderColor: theme.accentColor,
       borderWidth: 1.5,
     },
     inputIcon: {
@@ -309,7 +310,7 @@ function createStyles(
     back: {
       marginTop: verticalScale(15),
       textAlign: "center",
-      color: PRIMARY_700,
+      color: theme.accentColor,
     },
     msg: {
       marginTop: verticalScale(10),

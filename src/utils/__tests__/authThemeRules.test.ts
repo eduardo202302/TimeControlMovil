@@ -21,6 +21,7 @@ describe("defaults", () => {
       buttonText: "#FFFFFF",
       titleColor: "#333333",
       buttonShadowColor: "#2563EB",
+      accentColor: "#2563EB",
     });
   });
 
@@ -79,6 +80,7 @@ describe("hex válidos", () => {
       buttonText: "#ffffff",
       titleColor: "#001e4c",
       buttonShadowColor: "#2f3293",
+      accentColor: "#2f3293",
     });
   });
 
@@ -208,5 +210,47 @@ describe("contrastRatio", () => {
       contrastRatio("#fff", "#2f3293"),
       10,
     );
+  });
+});
+
+describe("accentColor", () => {
+  it("botón con contraste suficiente contra la tarjeta → acento = botón", () => {
+    const bg = "#2f3293";
+    expect(contrastRatio(bg, "#ffffff")).toBeGreaterThanOrEqual(3);
+    const theme = resolveAuthTheme(withColors({ logoPrimary: bg }));
+    expect(theme.accentColor).toBe(bg);
+  });
+
+  it("botón claro (contraste < 3:1) → PRIMARY_COLOR, el botón sí se respeta", () => {
+    const bg = "#ffd400";
+    expect(contrastRatio(bg, "#ffffff")).toBeLessThan(3);
+    const theme = resolveAuthTheme(
+      withColors({ logoPrimary: bg, logoPrimaryText: "#000000" }),
+    );
+    expect(theme.buttonBackground).toBe(bg);
+    expect(theme.accentColor).toBe("#2563EB");
+  });
+
+  it.each(["undefined", "", "red", "#12345"])(
+    "logoPrimary inválido %p → PRIMARY_COLOR",
+    (bad) => {
+      const theme = resolveAuthTheme(withColors({ logoPrimary: bad }));
+      expect(theme.accentColor).toBe("#2563EB");
+    },
+  );
+
+  it("sin color (sin colors, sin logoPrimary o school null) → PRIMARY_COLOR", () => {
+    expect(resolveAuthTheme(null).accentColor).toBe("#2563EB");
+    expect(resolveAuthTheme(withColors(undefined)).accentColor).toBe("#2563EB");
+    expect(
+      resolveAuthTheme(withColors({ headerModal: "#001e4c" })).accentColor,
+    ).toBe("#2563EB");
+  });
+
+  it("no depende de headerModal", () => {
+    const theme = resolveAuthTheme(
+      withColors({ logoPrimary: "#2f3293", headerModal: "#c9cbe4" }),
+    );
+    expect(theme.accentColor).toBe("#2f3293");
   });
 });

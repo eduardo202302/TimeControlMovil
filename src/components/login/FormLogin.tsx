@@ -42,7 +42,7 @@ import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
 import * as Storage from "../../utils/storage";
 import AuthBrandHeader from "./AuthBrandHeader";
 import CompanySelector from "./CompanySelector";
-import { ERROR_COLOR, PRIMARY_700 } from "@/constants/colors";
+import { ERROR_COLOR, ON_PRIMARY } from "@/constants/colors";
 import { SHADOW_LG, SHADOW_PRIMARY } from "@/constants/shadows";
 import { useAuthTheme } from "@/hooks/useAuthTheme";
 import type { AuthTheme } from "../../utils/authThemeRules";
@@ -56,8 +56,8 @@ export default function FormLogin() {
     [scale, verticalScale, font, theme],
   );
   const inputStyles = useMemo(
-    () => createLocalStyles(scale, verticalScale, font),
-    [scale, verticalScale, font],
+    () => createLocalStyles(scale, verticalScale, font, theme),
+    [scale, verticalScale, font, theme],
   );
 
   const [mensaje, setMensaje] = useState<{
@@ -490,11 +490,11 @@ export default function FormLogin() {
             style={styles.rememberMe}
             onPress={() => setRemember(!remember)}
           >
-            <Ionicons
-              name={remember ? "checkbox" : "square-outline"}
-              size={18}
-              color={PRIMARY_700}
-            />
+            <View style={[styles.checkbox, remember && styles.checkboxChecked]}>
+              {remember ? (
+                <Ionicons name="checkmark" size={12} color={ON_PRIMARY} />
+              ) : null}
+            </View>
             <Text style={styles.rememberText}>Recordarme</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push("/forgotPassword")}>
@@ -597,6 +597,7 @@ function createLocalStyles(
   scale: (size: number) => number,
   verticalScale: (size: number) => number,
   font: (size: number) => number,
+  theme: AuthTheme,
 ) {
   return StyleSheet.create({
     labelGroup: {
@@ -621,7 +622,7 @@ function createLocalStyles(
       backgroundColor: AUTH_INPUT_BACKGROUND,
     },
     inputFocused: {
-      borderColor: PRIMARY_700,
+      borderColor: theme.accentColor,
       borderWidth: 1.5,
     },
     inputIcon: {
@@ -679,8 +680,21 @@ function createStyles(
       marginTop: verticalScale(4),
     },
     rememberMe: { flexDirection: "row", alignItems: "center", gap: scale(6) },
+    // Caja propia (no el glifo "checkbox" de Ionicons) para poder pintar
+    // fondo y borde con el acento y el check en ON_PRIMARY. 16 ≈ la caja
+    // visible del antiguo ícono de 18.
+    checkbox: {
+      width: 16,
+      height: 16,
+      borderRadius: scale(4),
+      borderWidth: 1.5,
+      borderColor: theme.accentColor,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    checkboxChecked: { backgroundColor: theme.accentColor },
     rememberText: { fontSize: font(13), color: AUTH_LABEL },
-    forgot: { fontSize: font(13), color: PRIMARY_700 },
+    forgot: { fontSize: font(13), color: theme.accentColor },
     button: {
       ...SHADOW_PRIMARY,
       shadowColor: theme.buttonShadowColor,
@@ -695,13 +709,20 @@ function createStyles(
       fontSize: font(15),
       fontWeight: "600",
     },
+    // gap: separa "¿No tienes cuenta?" de "Crear cuenta" (son dos nodos en
+    // fila, el espacio no puede ir dentro del texto).
     register: {
       flexDirection: "row",
       justifyContent: "center",
+      gap: scale(4),
       marginTop: verticalScale(14),
     },
     registerText: { fontSize: font(13), color: AUTH_MUTED_TEXT },
-    registerLink: { fontSize: font(13), color: PRIMARY_700, fontWeight: "600" },
+    registerLink: {
+      fontSize: font(13),
+      color: theme.accentColor,
+      fontWeight: "600",
+    },
     msg: {
       marginTop: verticalScale(10),
       padding: scale(8),

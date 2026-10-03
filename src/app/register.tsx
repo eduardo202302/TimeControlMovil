@@ -37,7 +37,7 @@ import { RegisterType } from "../../types/typesLogin/RegisterType";
 import { formatCedula, formatPhone } from "../../utils/metodos";
 import * as Storage from "../utils/storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ERROR_COLOR, PRIMARY_700 } from "@/constants/colors";
+import { ERROR_COLOR } from "@/constants/colors";
 import { SHADOW_LG, SHADOW_PRIMARY } from "@/constants/shadows";
 import AuthBrandHeader from "@/components/login/AuthBrandHeader";
 import { useAuthTheme } from "@/hooks/useAuthTheme";
@@ -346,12 +346,18 @@ function InputField({
   required = true,
 }: InputFieldProps) {
   const [focused, setFocused] = useState(false);
+  const { accentColor } = useAuthTheme();
   return (
     <View style={styles.labelGroup}>
       <Text style={styles.label}>
         {placeholder} {required && <Text style={styles.required}>*</Text>}
       </Text>
-      <View style={[styles.inputGroup, focused && styles.inputFocused]}>
+      <View
+        style={[
+          styles.inputGroup,
+          focused && [styles.inputFocused, { borderColor: accentColor }],
+        ]}
+      >
         <Ionicons
           name={icon as any}
           size={18}
@@ -433,8 +439,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     backgroundColor: AUTH_INPUT_BACKGROUND,
   },
+  // borderColor: accentColor (useAuthTheme) en InputField
   inputFocused: {
-    borderColor: PRIMARY_700,
     borderWidth: 1.5,
   },
   inputIcon: {
