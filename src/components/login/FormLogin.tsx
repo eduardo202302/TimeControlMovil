@@ -43,8 +43,10 @@ import { LoginType } from "../../../types/typesLogin/LoginType";
 import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
 import * as Storage from "../../utils/storage";
 import CompanySelector from "./CompanySelector";
-import { ERROR_COLOR, PRIMARY_700, PRIMARY_COLOR } from "@/constants/colors";
+import { ERROR_COLOR, PRIMARY_700 } from "@/constants/colors";
 import { SHADOW_LG, SHADOW_PRIMARY } from "@/constants/shadows";
+import { useAuthTheme } from "@/hooks/useAuthTheme";
+import type { AuthTheme } from "../../utils/authThemeRules";
 
 interface FormLoginProps {
   name?: string;
@@ -53,9 +55,10 @@ interface FormLoginProps {
 
 export default function FormLogin({ name, image }: FormLoginProps) {
   const { scale, verticalScale, font } = useResponsive();
+  const theme = useAuthTheme();
   const styles = useMemo(
-    () => createStyles(scale, verticalScale, font),
-    [scale, verticalScale, font],
+    () => createStyles(scale, verticalScale, font, theme),
+    [scale, verticalScale, font, theme],
   );
   const inputStyles = useMemo(
     () => createLocalStyles(scale, verticalScale, font),
@@ -80,6 +83,17 @@ export default function FormLogin({ name, image }: FormLoginProps) {
   } | null>(null);
 
   const { urlColegio, setMenuResolution } = useSchoolStore();
+
+  // Logo de la compañía: solo si `school.logo` trae algo (puede venir null y
+  // antes se pedía ".../null"). Si la carga falla se recuerda qué URI falló
+  // y se cae al respaldo logoMini + "FaceClass"; un logo nuevo se reintenta.
+  const companyLogoUri =
+    urlColegio && image && image !== "null" && image !== "undefined"
+      ? `${urlColegio}/${image}`
+      : null;
+  const [failedLogoUri, setFailedLogoUri] = useState<string | null>(null);
+  const showCompanyLogo =
+    companyLogoUri !== null && failedLogoUri !== companyLogoUri;
 
   const { handleSubmit, control, setValue } = useForm<LoginType>({
     defaultValues: { usuario: "", password: "" },
@@ -391,25 +405,35 @@ export default function FormLogin({ name, image }: FormLoginProps) {
   return (
     <View style={styles.phone}>
       <View style={styles.card}>
-        <View style={styles.companies}>
-          <View>
-            <Image
-              source={require("../../../assets/images/logos/logoMini.png")}
-              style={styles.logoImage}
-            />
+        {showCompanyLogo ? null : (
+          <View style={styles.companies}>
+            <View>
+              <Image
+                source={require("../../../assets/images/logos/logoMini.png")}
+                style={styles.logoImage}
+              />
+            </View>
+            <View>
+              <Text style={styles.logoTitle}>FaceClass</Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.logoTitle}>FaceClass</Text>
-          </View>
-        </View>
+        )}
         <View style={styles.logo}>
-          {urlColegio && name ? (
+          {showCompanyLogo ? (
             <Image
-              source={{ uri: `${urlColegio}/${image}` }}
+              source={{ uri: companyLogoUri }}
               style={styles.logoImage}
+              resizeMode="contain"
+              onError={() => setFailedLogoUri(companyLogoUri)}
             />
           ) : null}
-          <Text style={styles.logoTitle}>{name}</Text>
+          <Text
+            style={[styles.logoTitle, styles.companyName]}
+            numberOfLines={2}
+            ellipsizeMode="tail"
+          >
+            {name}
+          </Text>
         </View>
 
         {mensaje && (
@@ -642,6 +666,7 @@ function createStyles(
   scale: (size: number) => number,
   verticalScale: (size: number) => number,
   font: (size: number) => number,
+  theme: AuthTheme,
 ) {
   return StyleSheet.create({
     companies: {
@@ -670,6 +695,7 @@ function createStyles(
       color: AUTH_BRAND,
       marginTop: verticalScale(6),
     },
+    companyName: { textAlign: "center" },
     card: {
       ...SHADOW_LG,
       backgroundColor: AUTH_CARD_BACKGROUND,
@@ -681,7 +707,7 @@ function createStyles(
     cardTitle: {
       fontSize: font(17),
       fontWeight: "600",
-      color: AUTH_TEXT,
+      color: theme.titleColor,
       marginBottom: verticalScale(14),
     },
     options: {
@@ -695,13 +721,14 @@ function createStyles(
     forgot: { fontSize: font(13), color: PRIMARY_700 },
     button: {
       ...SHADOW_PRIMARY,
-      backgroundColor: PRIMARY_COLOR,
+      shadowColor: theme.buttonShadowColor,
+      backgroundColor: theme.buttonBackground,
       padding: scale(13),
       borderRadius: RADIUS_LG,
       marginTop: verticalScale(18),
     },
     buttonText: {
-      color: "white",
+      color: theme.buttonText,
       textAlign: "center",
       fontSize: font(15),
       fontWeight: "600",

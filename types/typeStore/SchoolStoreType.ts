@@ -3,6 +3,49 @@ import { MenuItem, RoleItem } from "../typesMenu/MenuTypes";
 
 // ─── Tipos existente ───────────────────────────────────────
 
+/**
+ * `school.settings.colors` — paleta de la compañía que configura el webapp
+ * (mismas claves que DEFAULT_COMPANY_COLORS en face-class-web). Todo opcional:
+ * una compañía sin configurar no trae el objeto o lo trae vacío, y el webapp
+ * puede guardar valores basura ("undefined", ""). Mobile por ahora solo lee
+ * logoPrimary, logoPrimaryText y headerModal (ver resolveAuthTheme).
+ */
+export interface SchoolColors {
+  panel?: string;
+  button?: string;
+  header?: string;
+  ribbon?: string;
+  toggle?: string;
+  btnBack?: string;
+  btnSave?: string;
+  subMenu?: string;
+  submenu?: string;
+  hoverMenu?: string;
+  cardHeader?: string;
+  dropdownBg?: string;
+  headerText?: string;
+  panelModal?: string;
+  btnBackText?: string;
+  btnSaveText?: string;
+  buttonHover?: string;
+  fonstRibbon?: string;
+  footerModal?: string;
+  groupHeader?: string;
+  headerModal?: string;
+  logoPrimary?: string;
+  toggleFalse?: string;
+  btnBackHover?: string;
+  btnSaveHover?: string;
+  submenuActive?: string;
+  cardFontHeader?: string;
+  menuFatherText?: string;
+  buttonTextHover?: string;
+  headerTextModal?: string;
+  logoPrimaryText?: string;
+  activeMenuFather?: string;
+  subMenuActiveText?: string;
+}
+
 export interface SchoolSettings {
   isImageRequired?: boolean;
   isValidLocation?: boolean;
@@ -36,6 +79,8 @@ export interface SchoolSettings {
   // Horario de la escuela por día (arreglo de {weekDay, workEntryTime,
   // workExitTime, …}) — el `companySchedules` del webapp.
   schedulesAdd?: unknown;
+  // Paleta de la compañía — hoy solo la usan las pantallas de acceso.
+  colors?: SchoolColors;
   [key: string]: unknown;
 }
 
