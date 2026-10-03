@@ -1,11 +1,15 @@
 // Imports relativos (no "@/"): tsconfig.jest.json no declara el alias.
 import { AUTH_CARD_BACKGROUND, AUTH_TEXT } from "../constants/authColors";
 import { ON_PRIMARY, PRIMARY_COLOR } from "../constants/colors";
-import type { SchoolSettings } from "../../types/typeStore/SchoolStoreType";
+import type {
+  SchoolColors,
+  SchoolSettings,
+} from "../../types/typeStore/SchoolStoreType";
 
 /**
- * Tema de las pantallas de acceso (login) derivado de
- * `school.settings.colors`. Solo pinta el botón principal y el título de la
+ * Tema de las pantallas de acceso (login) derivado de la paleta de la
+ * compañía — en la app, `lastCompany.colors` (ver useAuthTheme). Solo pinta
+ * el botón principal y el título de la
  * tarjeta; el resto de la pantalla y los tokens globales (PRIMARY_COLOR) no
  * cambian. Una compañía sin colores — o con colores inválidos — devuelve
  * exactamente los valores de hoy.
@@ -78,7 +82,19 @@ function readableTextOn(background: string): string {
 export function resolveAuthTheme(
   school: { settings?: SchoolSettings | null } | null | undefined,
 ): AuthTheme {
-  const colors = school?.settings?.colors;
+  return resolveAuthThemeFromColors(school?.settings?.colors);
+}
+
+/**
+ * Misma regla, a partir de la paleta suelta (p. ej. `lastCompany.colors`, que
+ * ya no viaja dentro de `settings`).
+ */
+export function resolveAuthThemeFromColors(
+  colors:
+    | Pick<SchoolColors, "logoPrimary" | "logoPrimaryText" | "headerModal">
+    | null
+    | undefined,
+): AuthTheme {
   if (!colors) return DEFAULT_AUTH_THEME;
 
   let { buttonBackground, buttonText, titleColor } = DEFAULT_AUTH_THEME;

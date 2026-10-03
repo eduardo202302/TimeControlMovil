@@ -14,7 +14,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useResponsive } from "@/constants/responsive";
 import { AUTH_SCREEN_BACKGROUND } from "@/constants/authColors";
-import { useSchoolStore } from "../../store/useSchoolStore";
 
 const Login = () => {
   const { scale } = useResponsive();
@@ -22,8 +21,6 @@ const Login = () => {
 
   const [showAuth, setShowAuth] = useState(false);
   const [checking, setChecking] = useState(true);
-  const { school } = useSchoolStore();
-  const { name, logo } = school || {};
 
   // useFocusEffect corre cada vez que la pantalla recibe foco —
   // esto cubre tanto el primer mount como cuando se navega de vuelta
@@ -55,7 +52,7 @@ const Login = () => {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <FormLogin name={name} image={logo} />
+          <FormLogin />
         </ScrollView>
       </KeyboardAvoidingView>
 

@@ -1,3 +1,4 @@
+import type { LastCompany } from "../../src/utils/lastCompany";
 import { AppType, MenuTree } from "../../utils/resolveRoute";
 import { MenuItem, RoleItem } from "../typesMenu/MenuTypes";
 
@@ -330,6 +331,11 @@ export interface SchoolStore {
   // docente o no tiene clases hoy, nunca null.
   attendancesToday: TeacherAttendanceToday[];
 
+  // Marca de la última compañía con que se entró (ver src/utils/lastCompany).
+  // Persistida en SecureStore bajo su propia clave; logout() y clear() NO la
+  // tocan — es lo que pinta el login después de cerrar sesión.
+  lastCompany: LastCompany | null;
+
   // Acciones existentes
   setSchool: (school: School) => void;
   setUrlColegio: (url: string) => void;
@@ -343,6 +349,10 @@ export interface SchoolStore {
   setRole: (role: RoleItem) => void;
   setCompanySettings: (companySettings: CompanySettings) => void;
   setAttendancesToday: (attendancesToday: TeacherAttendanceToday[]) => void;
+  /** Actualiza el store y la persiste en SecureStore. */
+  setLastCompany: (lastCompany: LastCompany) => Promise<void>;
+  /** La saca del store y la borra de SecureStore. */
+  clearLastCompany: () => Promise<void>;
 
   // Cerrar sesión
   logout: () => void;

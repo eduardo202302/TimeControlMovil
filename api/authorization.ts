@@ -55,6 +55,19 @@ const authorization = async (data: ClaveRegistroType) => {
     const { success, data: responseData } = peticion.data;
 
     if (success) {
+      // La marca de la última compañía es del PIN/servidor anterior: si
+      // cambia cualquiera de los dos ya no aplica y el login vuelve al default.
+      const previousClave = await Storage.getItemAsync("claveRegistro");
+      const previousUrl = await Storage.getItemAsync("urlColegio");
+      if (previousClave !== claveRegistro || previousUrl !== response.url) {
+        try {
+          await useSchoolStore.getState().clearLastCompany();
+        } catch {
+          // No bloquea la autorización; _layout la descarta igual al
+          // arrancar si el urlColegio no coincide.
+        }
+      }
+
       await Storage.setItemAsync("dataSchool", JSON.stringify(responseData));
       await Storage.setItemAsync("claveRegistro", claveRegistro);
       await Storage.setItemAsync("urlColegio", response.url);

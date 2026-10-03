@@ -3,7 +3,6 @@ import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
-  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -11,7 +10,6 @@ import {
   View,
 } from "react-native";
 import { validatePin } from "../../../api/Login/loginAuthentication";
-import { useSchoolStore } from "../../../store/useSchoolStore";
 import { ValidaPin } from "../../../types/typesLogin/ForgotPasswordType";
 import { RADIUS_3XL, RADIUS_LG, useResponsive } from "@/constants/responsive";
 import {
@@ -21,7 +19,6 @@ import {
   AUTH_BANNER_SUCCESS_BG,
   AUTH_BANNER_SUCCESS_BORDER,
   AUTH_BANNER_SUCCESS_TEXT,
-  AUTH_BRAND,
   AUTH_CARD_BACKGROUND,
   AUTH_ICON_BUTTON,
   AUTH_INPUT_BACKGROUND,
@@ -33,20 +30,22 @@ import {
   AUTH_REQUIRED,
   AUTH_TEXT,
 } from "@/constants/authColors";
-import { ERROR_COLOR, PRIMARY_700, PRIMARY_COLOR } from "@/constants/colors";
+import { ERROR_COLOR, PRIMARY_700 } from "@/constants/colors";
 import { SHADOW_LG, SHADOW_PRIMARY } from "@/constants/shadows";
+import { useAuthTheme } from "@/hooks/useAuthTheme";
+import type { AuthTheme } from "../../utils/authThemeRules";
+import AuthBrandHeader from "./AuthBrandHeader";
 
-interface FormLoginProps {
-  name?: string;
-  image?: string;
+interface VerifyPinProps {
   onNext: () => void; // funciÃ³n para avanzar al siguiente paso
 }
 
-const VerifyPin = ({ name, image, onNext }: FormLoginProps) => {
+const VerifyPin = ({ onNext }: VerifyPinProps) => {
   const { scale, verticalScale, font } = useResponsive();
+  const theme = useAuthTheme();
   const styles = useMemo(
-    () => createStyles(scale, verticalScale, font),
-    [scale, verticalScale, font],
+    () => createStyles(scale, verticalScale, font, theme),
+    [scale, verticalScale, font, theme],
   );
   const inputStyles = useMemo(
     () => createLocalStyles(scale, verticalScale, font),
@@ -57,7 +56,6 @@ const VerifyPin = ({ name, image, onNext }: FormLoginProps) => {
     texto: string;
     tipo: "error" | "success";
   } | null>(null);
-  const { urlColegio } = useSchoolStore();
 
   const valueDefault: ValidaPin = {
     pin: "",
@@ -81,26 +79,8 @@ const VerifyPin = ({ name, image, onNext }: FormLoginProps) => {
     <View style={styles.phone}>
       {/* Card */}
       <View style={styles.card}>
-        {/* Header empresa */}
-        <View style={styles.companies}>
-          <Image
-            source={require("../../../assets/images/logos/logoMini.png")}
-            style={styles.logoImage}
-          />
-          <Text style={styles.logoTitle}>FaceClass</Text>
-        </View>
-
-        {/* Logo colegio */}
-        <View style={styles.logo}>
-          {urlColegio && image ? (
-            <Image
-              source={{ uri: `${urlColegio}/${image}` }}
-              style={styles.logoImage}
-            />
-          ) : null}
-
-          <Text style={styles.logoTitle}>{name}</Text>
-        </View>
+        {/* Marca (última compañía) */}
+        <AuthBrandHeader />
 
         {/* Mensaje */}
         {mensaje && (
@@ -280,20 +260,9 @@ function createStyles(
   scale: (size: number) => number,
   verticalScale: (size: number) => number,
   font: (size: number) => number,
+  theme: AuthTheme,
 ) {
   return StyleSheet.create({
-    companies: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: verticalScale(10),
-    },
-    logoTitle: {
-      fontSize: font(20),
-      fontWeight: "600",
-      color: AUTH_BRAND,
-      marginTop: verticalScale(6),
-    },
     card: {
       ...SHADOW_LG,
       backgroundColor: AUTH_CARD_BACKGROUND,
@@ -305,7 +274,7 @@ function createStyles(
     cardTitle: {
       fontSize: font(17),
       fontWeight: "600",
-      color: AUTH_TEXT,
+      color: theme.titleColor,
       marginBottom: verticalScale(14),
     },
     pinLabel: {
@@ -313,8 +282,6 @@ function createStyles(
       color: AUTH_MUTED_TEXT,
       marginBottom: verticalScale(14),
     },
-    logo: { alignItems: "center", marginBottom: verticalScale(27) },
-    logoImage: { width: 100, height: 100 },
     phone: {
       width: "90%",
       maxWidth: 480,
@@ -322,13 +289,14 @@ function createStyles(
     },
     button: {
       ...SHADOW_PRIMARY,
-      backgroundColor: PRIMARY_COLOR,
+      shadowColor: theme.buttonShadowColor,
+      backgroundColor: theme.buttonBackground,
       padding: scale(13),
       borderRadius: RADIUS_LG,
       marginTop: verticalScale(18),
     },
     buttonText: {
-      color: "white",
+      color: theme.buttonText,
       textAlign: "center",
       fontSize: font(15),
       fontWeight: "600",

@@ -12,6 +12,10 @@ import {
 } from "../utils/session";
 import * as Storage from "../utils/storage";
 import { toRDDateString } from "../utils/punchRules";
+import {
+  LAST_COMPANY_STORAGE_KEY,
+  resolveLastCompany,
+} from "../utils/lastCompany";
 
 export default function RootLayout() {
   const { setSchool, setUrlColegio, setToken, setMenuResolution } =
@@ -36,6 +40,23 @@ export default function RootLayout() {
       const token = await Storage.getItemAsync("token");
       const userRaw = await Storage.getItemAsync("user");
       const menuItemsRaw = await Storage.getItemAsync("menuItems");
+
+      // Marca de la última compañía — se hidrata ANTES de esperar la red para
+      // que el login salga con su logo/colores aunque no haya conexión. Si no
+      // corresponde al servidor actual (o está corrupta) se descarta.
+      try {
+        const lastCompany = resolveLastCompany(
+          await Storage.getItemAsync(LAST_COMPANY_STORAGE_KEY),
+          urlColegio,
+        );
+        if (lastCompany) {
+          await useSchoolStore.getState().setLastCompany(lastCompany);
+        } else {
+          await useSchoolStore.getState().clearLastCompany();
+        }
+      } catch {
+        // Nunca debe bloquear el arranque: sin marca, el login usa el default.
+      }
 
       // Actualizar dataSchool con la información más reciente de la escuela
       const refreshedSchool = await refreshSchoolData();

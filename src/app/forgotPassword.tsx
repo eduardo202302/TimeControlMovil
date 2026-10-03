@@ -10,14 +10,10 @@ import {
   StyleSheet
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSchoolStore } from "../../store/useSchoolStore";
 
 const ForgotPassword = () => {
   const { scale } = useResponsive();
   const styles = useMemo(() => createStyles(scale), [scale]);
-
-  const { school } = useSchoolStore();
-  const { name, logo } = school || {};
 
   // step: 1 = formulario, 2 = PIN, 3 = reset password
   const [step, setStep] = useState(1);
@@ -35,21 +31,17 @@ const ForgotPassword = () => {
         >
           {step === 1 && (
             <FormForgotPassword
-              name={name}
-              image={logo}
               onNext={() => setStep(2)} // cuando termine el primer formulario
             />
           )}
 
           {step === 2 && (
             <VerifyPin
-              name={name}
-              image={logo}
               onNext={() => setStep(3)} // cuando se verifique el PIN
             />
           )}
 
-          {step === 3 && <ResetPassword name={name} image={logo} />}
+          {step === 3 && <ResetPassword />}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

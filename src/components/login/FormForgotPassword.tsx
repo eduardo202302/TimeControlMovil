@@ -23,7 +23,6 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
-  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -31,26 +30,23 @@ import {
   View,
 } from "react-native";
 import { validateUser } from "../../../api/Login/loginAuthentication";
-import { useSchoolStore } from "../../../store/useSchoolStore";
 import { ValidateUser } from "../../../types/typesLogin/ForgotPasswordType";
-import { ERROR_COLOR, PRIMARY_700, PRIMARY_COLOR } from "@/constants/colors";
+import { ERROR_COLOR, PRIMARY_700 } from "@/constants/colors";
 import { SHADOW_LG, SHADOW_PRIMARY } from "@/constants/shadows";
+import { useAuthTheme } from "@/hooks/useAuthTheme";
+import type { AuthTheme } from "../../utils/authThemeRules";
+import AuthBrandHeader from "./AuthBrandHeader";
 
-interface FormLoginProps {
-  name?: string;
-  image?: string;
+interface FormForgotPasswordProps {
   onNext: () => void;
 }
 
-export default function FormForgotPassword({
-  name,
-  image,
-  onNext,
-}: FormLoginProps) {
+export default function FormForgotPassword({ onNext }: FormForgotPasswordProps) {
   const { scale, verticalScale, font } = useResponsive();
+  const theme = useAuthTheme();
   const styles = useMemo(
-    () => createStyles(scale, verticalScale, font),
-    [scale, verticalScale, font],
+    () => createStyles(scale, verticalScale, font, theme),
+    [scale, verticalScale, font, theme],
   );
   const inputStyles = useMemo(
     () => createLocalStyles(scale, verticalScale, font),
@@ -61,7 +57,6 @@ export default function FormForgotPassword({
     texto: string;
     tipo: "error" | "success";
   } | null>(null);
-  const { urlColegio } = useSchoolStore();
 
   const valueDefault: ValidateUser = {
     user: "",
@@ -84,26 +79,7 @@ export default function FormForgotPassword({
   return (
     <View style={styles.phone}>
       <View style={styles.card}>
-        <View style={styles.companies}>
-          <View>
-            <Image
-              source={require("../../../assets/images/logos/logoMini.png")}
-              style={styles.logoImage}
-            />
-          </View>
-          <View>
-            <Text style={styles.logoTitle}>FaceClass</Text>
-          </View>
-        </View>
-        <View style={styles.logo}>
-          {urlColegio && image ? (
-            <Image
-              source={{ uri: `${urlColegio}/${image}` }}
-              style={styles.logoImage}
-            />
-          ) : null}
-          <Text style={styles.logoTitle}>{name}</Text>
-        </View>
+        <AuthBrandHeader />
         {mensaje && (
           <View
             style={[
@@ -281,14 +257,9 @@ function createStyles(
   scale: (size: number) => number,
   verticalScale: (size: number) => number,
   font: (size: number) => number,
+  theme: AuthTheme,
 ) {
   return StyleSheet.create({
-    companies: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: verticalScale(10),
-    },
     phone: {
       width: "90%",
       maxWidth: 480,
@@ -300,14 +271,6 @@ function createStyles(
       marginTop: verticalScale(4),
       marginLeft: scale(4),
       marginBottom: verticalScale(4),
-    },
-    logo: { alignItems: "center", marginBottom: verticalScale(27) },
-    logoImage: { width: 100, height: 100 },
-    logoTitle: {
-      fontSize: font(20),
-      fontWeight: "600",
-      color: AUTH_BRAND,
-      marginTop: verticalScale(6),
     },
     logoCompanies: {
       fontSize: font(20),
@@ -326,7 +289,7 @@ function createStyles(
     formTitle: {
       fontSize: font(17),
       fontWeight: "600",
-      color: AUTH_TEXT,
+      color: theme.titleColor,
       marginBottom: verticalScale(8),
     },
     formSubtitle: {
@@ -336,13 +299,14 @@ function createStyles(
     },
     button: {
       ...SHADOW_PRIMARY,
-      backgroundColor: PRIMARY_COLOR,
+      shadowColor: theme.buttonShadowColor,
+      backgroundColor: theme.buttonBackground,
       padding: scale(13),
       borderRadius: RADIUS_LG,
       marginTop: verticalScale(18),
     },
     buttonText: {
-      color: "white",
+      color: theme.buttonText,
       textAlign: "center",
       fontSize: font(15),
       fontWeight: "600",

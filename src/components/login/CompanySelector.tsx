@@ -7,10 +7,12 @@ import {
   AUTH_INPUT_BORDER,
   AUTH_INPUT_ICON,
   AUTH_LABEL,
-  AUTH_TEXT,
 } from "@/constants/authColors";
 import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
 import { DIALOG_OVERLAY, POPUP_CARD } from "@/styles/surfaces";
+import { useAuthTheme } from "@/hooks/useAuthTheme";
+import type { AuthTheme } from "../../utils/authThemeRules";
+import AuthBrandHeader from "./AuthBrandHeader";
 
 interface CompanySelectorProps {
   visible: boolean;
@@ -26,7 +28,8 @@ export default function CompanySelector({
   onCancel,
 }: CompanySelectorProps) {
   const { scale, verticalScale, font } = useResponsive();
-  const styles = createStyles(scale, verticalScale, font);
+  const theme = useAuthTheme();
+  const styles = createStyles(scale, verticalScale, font, theme);
 
   return (
     <Modal
@@ -38,7 +41,7 @@ export default function CompanySelector({
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.header}>
-            <Ionicons name="business-outline" size={22} color={AUTH_BRAND} />
+            <AuthBrandHeader />
             <Text style={styles.title}>Elige tu compañía</Text>
             <Text style={styles.subtitle}>
               Tu usuario pertenece a varias compañías. Selecciona con cuál
@@ -87,6 +90,7 @@ function createStyles(
   scale: (size: number) => number,
   verticalScale: (size: number) => number,
   font: (size: number) => number,
+  theme: AuthTheme,
 ) {
   return StyleSheet.create({
     backdrop: {
@@ -109,7 +113,7 @@ function createStyles(
     title: {
       fontSize: font(18),
       fontWeight: "700",
-      color: AUTH_TEXT,
+      color: theme.titleColor,
       marginTop: verticalScale(8),
     },
     subtitle: {

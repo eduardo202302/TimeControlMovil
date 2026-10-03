@@ -6,6 +6,11 @@ import {
 } from "../types/typeStore/SchoolStoreType";
 import { MenuItem } from "../types/typesMenu/MenuTypes";
 import { resolveRoute } from "../utils/resolveRoute";
+import {
+  LAST_COMPANY_STORAGE_KEY,
+  serializeLastCompany,
+} from "../src/utils/lastCompany";
+import * as Storage from "../src/utils/storage";
 
 /**
  * `raw` es `school.settings` tal cual llega de chooseschool (objeto grande,
@@ -88,6 +93,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   role: null,
   companySettings: null,
   attendancesToday: [],
+  lastCompany: null,
 
   // ─── Acciones existentes (sin cambios) ──────────────────────────────────────
   setSchool: (school) => set({ school }),
@@ -147,4 +153,17 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   setRole: (role) => set({ role }),
   setCompanySettings: (companySettings) => set({ companySettings }),
   setAttendancesToday: (attendancesToday) => set({ attendancesToday }),
+
+  // ─── Última compañía — fuera de clear()/logout() a propósito ────────────────
+  setLastCompany: async (lastCompany) => {
+    set({ lastCompany });
+    await Storage.setItemAsync(
+      LAST_COMPANY_STORAGE_KEY,
+      serializeLastCompany(lastCompany),
+    );
+  },
+  clearLastCompany: async () => {
+    set({ lastCompany: null });
+    await Storage.deleteItemAsync(LAST_COMPANY_STORAGE_KEY);
+  },
 }));

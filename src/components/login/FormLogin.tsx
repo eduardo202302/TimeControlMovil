@@ -6,7 +6,6 @@ import {
   AUTH_BANNER_SUCCESS_BG,
   AUTH_BANNER_SUCCESS_BORDER,
   AUTH_BANNER_SUCCESS_TEXT,
-  AUTH_BRAND,
   AUTH_CARD_BACKGROUND,
   AUTH_ICON_BUTTON,
   AUTH_INPUT_BACKGROUND,
@@ -24,7 +23,6 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
-  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -42,18 +40,15 @@ import { resolveMobilePath } from "../../constants/mobileRoutes";
 import { LoginType } from "../../../types/typesLogin/LoginType";
 import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
 import * as Storage from "../../utils/storage";
+import AuthBrandHeader from "./AuthBrandHeader";
 import CompanySelector from "./CompanySelector";
 import { ERROR_COLOR, PRIMARY_700 } from "@/constants/colors";
 import { SHADOW_LG, SHADOW_PRIMARY } from "@/constants/shadows";
 import { useAuthTheme } from "@/hooks/useAuthTheme";
 import type { AuthTheme } from "../../utils/authThemeRules";
+import { buildLastCompany } from "../../utils/lastCompany";
 
-interface FormLoginProps {
-  name?: string;
-  image?: string;
-}
-
-export default function FormLogin({ name, image }: FormLoginProps) {
+export default function FormLogin() {
   const { scale, verticalScale, font } = useResponsive();
   const theme = useAuthTheme();
   const styles = useMemo(
@@ -84,17 +79,6 @@ export default function FormLogin({ name, image }: FormLoginProps) {
 
   const { urlColegio, setMenuResolution } = useSchoolStore();
 
-  // Logo de la compañía: solo si `school.logo` trae algo (puede venir null y
-  // antes se pedía ".../null"). Si la carga falla se recuerda qué URI falló
-  // y se cae al respaldo logoMini + "FaceClass"; un logo nuevo se reintenta.
-  const companyLogoUri =
-    urlColegio && image && image !== "null" && image !== "undefined"
-      ? `${urlColegio}/${image}`
-      : null;
-  const [failedLogoUri, setFailedLogoUri] = useState<string | null>(null);
-  const showCompanyLogo =
-    companyLogoUri !== null && failedLogoUri !== companyLogoUri;
-
   const { handleSubmit, control, setValue } = useForm<LoginType>({
     defaultValues: { usuario: "", password: "" },
   });
@@ -121,6 +105,9 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       menuItems: any[],
       usuario: string,
       password: string,
+      // `res.data.data.school` de chooseschool; undefined si no hubo
+      // chooseschool (o falló) — ahí se usa selected.school.
+      chosenSchool?: unknown,
     ) => {
       const currentUrl =
         urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
@@ -191,6 +178,23 @@ export default function FormLogin({ name, image }: FormLoginProps) {
       // Persistir en SecureStore
       await Storage.setItemAsync("isAuthorized", "true");
       await Storage.setItemAsync("token", token);
+
+      // Marca de la compañía para pintar el login la próxima vez. Nunca debe
+      // bloquear el login: cualquier fallo se ignora.
+      try {
+        const lastCompany =
+          buildLastCompany(chosenSchool, currentUrl) ??
+          buildLastCompany(selected?.school, currentUrl);
+        if (lastCompany) {
+          await useSchoolStore.getState().setLastCompany(lastCompany);
+        }
+      } catch (error) {
+        console.warn(
+          "No se pudo guardar lastCompany:",
+          error instanceof Error ? error.message : "error desconocido",
+        );
+      }
+
       await Storage.setItemAsync("urlColegio", currentUrl);
       await Storage.setItemAsync("user", JSON.stringify(fullUser));
       await Storage.setItemAsync("menuItems", JSON.stringify(menuItems));
@@ -271,6 +275,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
         pendingLogin.menuItems,
         pendingLogin.usuario,
         pendingLogin.password,
+        res.data?.data?.school,
       );
     } catch (error) {
       console.error("Error en chooseschool:", error);
@@ -365,6 +370,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
                   menuItems,
                   data.usuario,
                   data.password,
+                  res.data?.data?.school,
                 );
                 return;
               }
@@ -405,36 +411,7 @@ export default function FormLogin({ name, image }: FormLoginProps) {
   return (
     <View style={styles.phone}>
       <View style={styles.card}>
-        {showCompanyLogo ? null : (
-          <View style={styles.companies}>
-            <View>
-              <Image
-                source={require("../../../assets/images/logos/logoMini.png")}
-                style={styles.logoImage}
-              />
-            </View>
-            <View>
-              <Text style={styles.logoTitle}>FaceClass</Text>
-            </View>
-          </View>
-        )}
-        <View style={styles.logo}>
-          {showCompanyLogo ? (
-            <Image
-              source={{ uri: companyLogoUri }}
-              style={styles.logoImage}
-              resizeMode="contain"
-              onError={() => setFailedLogoUri(companyLogoUri)}
-            />
-          ) : null}
-          <Text
-            style={[styles.logoTitle, styles.companyName]}
-            numberOfLines={2}
-            ellipsizeMode="tail"
-          >
-            {name}
-          </Text>
-        </View>
+        <AuthBrandHeader />
 
         {mensaje && (
           <View
@@ -669,12 +646,6 @@ function createStyles(
   theme: AuthTheme,
 ) {
   return StyleSheet.create({
-    companies: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: verticalScale(10),
-    },
     phone: {
       width: "90%",
       maxWidth: 480,
@@ -687,15 +658,6 @@ function createStyles(
       marginLeft: scale(4),
       marginBottom: verticalScale(4),
     },
-    logo: { alignItems: "center", marginBottom: verticalScale(27) },
-    logoImage: { width: 100, height: 100 },
-    logoTitle: {
-      fontSize: font(20),
-      fontWeight: "600",
-      color: AUTH_BRAND,
-      marginTop: verticalScale(6),
-    },
-    companyName: { textAlign: "center" },
     card: {
       ...SHADOW_LG,
       backgroundColor: AUTH_CARD_BACKGROUND,

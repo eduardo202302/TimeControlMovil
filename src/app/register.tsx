@@ -1,10 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
-  Image,
   KeyboardAvoidingView,
   ScrollView,
   StyleSheet,
@@ -20,7 +19,6 @@ import {
   AUTH_BANNER_SUCCESS_BG,
   AUTH_BANNER_SUCCESS_BORDER,
   AUTH_BANNER_SUCCESS_TEXT,
-  AUTH_BRAND,
   AUTH_CARD_BACKGROUND,
   AUTH_ICON_BUTTON,
   AUTH_INPUT_BACKGROUND,
@@ -39,14 +37,29 @@ import { RegisterType } from "../../types/typesLogin/RegisterType";
 import { formatCedula, formatPhone } from "../../utils/metodos";
 import * as Storage from "../utils/storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ERROR_COLOR, PRIMARY_700, PRIMARY_COLOR } from "@/constants/colors";
+import { ERROR_COLOR, PRIMARY_700 } from "@/constants/colors";
 import { SHADOW_LG, SHADOW_PRIMARY } from "@/constants/shadows";
+import AuthBrandHeader from "@/components/login/AuthBrandHeader";
+import { useAuthTheme } from "@/hooks/useAuthTheme";
 
 export default function Register() {
   // Sin SafeAreaView: la raíz reserva la status bar con el inset (edge-to-edge).
   const insets = useSafeAreaInsets();
-  const { school, urlColegio } = useSchoolStore();
-  const { name, logo } = school || {};
+  // `school` (del PIN) sigue mandando en lo funcional: cédula visible y
+  // requerida. La marca del encabezado sale de lastCompany (AuthBrandHeader).
+  const { school } = useSchoolStore();
+  const theme = useAuthTheme();
+  const themed = useMemo(
+    () => ({
+      button: {
+        shadowColor: theme.buttonShadowColor,
+        backgroundColor: theme.buttonBackground,
+      },
+      buttonText: { color: theme.buttonText },
+      cardTitle: { color: theme.titleColor },
+    }),
+    [theme],
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [mensaje, setMensaje] = useState<{
@@ -117,18 +130,7 @@ export default function Register() {
       >
         <View style={styles.phone}>
           <View style={styles.card}>
-            <View style={styles.companies}>
-              <View>
-                <Text style={styles.logoTitle}>FaceClass</Text>
-              </View>
-            </View>
-            <View style={styles.logo}>
-              <Image
-                source={{ uri: `${urlColegio}/${logo}` }}
-                style={{ width: 100, height: 100 }}
-              />
-              <Text style={styles.logoTitle}>{name}</Text>
-            </View>
+            <AuthBrandHeader />
 
             {mensaje && (
               <View
@@ -149,7 +151,9 @@ export default function Register() {
                 </Text>
               </View>
             )}
-            <Text style={styles.cardTitle}>Registro de Usuario</Text>
+            <Text style={[styles.cardTitle, themed.cardTitle]}>
+              Registro de Usuario
+            </Text>
             <Controller
               name="fullName"
               control={control}
@@ -299,10 +303,12 @@ export default function Register() {
               />
             )}
             <TouchableOpacity
-              style={styles.button}
+              style={[styles.button, themed.button]}
               onPress={handleSubmit(onSubmit)}
             >
-              <Text style={styles.buttonText}>Regístrate</Text>
+              <Text style={[styles.buttonText, themed.buttonText]}>
+                Regístrate
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -387,26 +393,10 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: AUTH_SCREEN_BACKGROUND,
   },
-  companies: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
   phone: {
     width: "100%",
     maxWidth: 480,
     padding: 4,
-  },
-  logo: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  logoTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: AUTH_BRAND,
-    marginTop: 6,
   },
   card: {
     ...SHADOW_LG,
@@ -416,10 +406,10 @@ const styles = StyleSheet.create({
     marginHorizontal: -8,
     backgroundColor: AUTH_CARD_BACKGROUND,
   },
+  // color: themed.cardTitle (useAuthTheme)
   cardTitle: {
     fontSize: 17,
     fontWeight: "600",
-    color: AUTH_TEXT,
     marginBottom: 14,
   },
   labelGroup: {
@@ -459,15 +449,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: AUTH_TEXT,
   },
+  // backgroundColor/shadowColor: themed.button (useAuthTheme)
   button: {
     ...SHADOW_PRIMARY,
-    backgroundColor: PRIMARY_COLOR,
     padding: 13,
     borderRadius: 12,
     marginTop: 16,
   },
+  // color: themed.buttonText (useAuthTheme)
   buttonText: {
-    color: "white",
     textAlign: "center",
     fontSize: 15,
     fontWeight: "600",
