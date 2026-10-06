@@ -1,4 +1,7 @@
-import type { UserSchedule } from "../../types/typeStore/SchoolStoreType";
+import type {
+  TodayHoliday,
+  UserSchedule,
+} from "../../types/typeStore/SchoolStoreType";
 
 /**
  * Reglas puras del ponchador: horas en zona RD, permisos del día y
@@ -459,6 +462,159 @@ export function getApprovedPermission(
   );
 }
 
+// ─── Tipos de jornada: normal, Adicional y Fuera de Horario ───────────────────
+
+export const JORNADA_START_TYPES = [
+  "InicioJornada",
+  "InicioJornadaAdicional",
+  "InicioJornadaFH",
+];
+export const JORNADA_END_TYPES = [
+  "FinJornada",
+  "FinJornadaAdicional",
+  "FinJornadaFH",
+];
+
+/** Los tipos nuevos (Adicional/FH), a los que sí se aplica "Inválido". */
+const EXTENDED_JORNADA_TYPES = [
+  "InicioJornadaAdicional",
+  "FinJornadaAdicional",
+  "InicioJornadaFH",
+  "FinJornadaFH",
+];
+
+export function isJornadaStartType(type: string): boolean {
+  return JORNADA_START_TYPES.includes(type);
+}
+
+export function isJornadaEndType(type: string): boolean {
+  return JORNADA_END_TYPES.includes(type);
+}
+
+/**
+ * Intento de jornada que no cuenta como ponche: rechazado por imagen, o fuera
+ * del área permitida. "Inválido" solo se aplica a los tipos Adicional/FH — en
+ * InicioJornada/FinJornada sigue contando, como hasta ahora.
+ */
+export function isRejectedJornadaAttempt(
+  punch: Pick<PunchEvent, "type" | "status">,
+): boolean {
+  if (punch.status === "Error de Imagen" || punch.status === "Fuera de área") {
+    return true;
+  }
+  return (
+    punch.status === "Inválido" && EXTENDED_JORNADA_TYPES.includes(punch.type)
+  );
+}
+
+/**
+ * Último ponche de jornada (inicio o fin, de cualquiera de los 3 tipos) que
+ * cuenta: sin intentos rechazados ni el InicioJornada de un día anterior que
+ * /punches/today marca con hasOpenDay.
+ */
+export function findLastJornadaPunch(
+  punches: PunchEvent[],
+): PunchEvent | undefined {
+  return [...punches]
+    .reverse()
+    .find(
+      (p) =>
+        (isJornadaStartType(p.type) || isJornadaEndType(p.type)) &&
+        !isRejectedJornadaAttempt(p) &&
+        !p.hasOpenDay &&
+        p.hasOpenDay !== ("true" as any),
+    );
+}
+
+// ─── Feriado de hoy ───────────────────────────────────────────────────────────
+
+/**
+ * `raw` es el nodo `data` de chooseschool. Normaliza `data.todayHoliday`;
+ * null si no viene o no trae holidayDate (= hoy no es feriado).
+ */
+export function buildTodayHoliday(raw: unknown): TodayHoliday | null {
+  if (!raw || typeof raw !== "object") return null;
+  const holiday = (raw as Record<string, unknown>).todayHoliday;
+  if (!holiday || typeof holiday !== "object") return null;
+  const h = holiday as Record<string, unknown>;
+  if (h.holidayDate == null) return null;
+  const holidayDate = String(h.holidayDate).trim().split("T")[0];
+  if (!holidayDate) return null;
+  return {
+    id: Number(h.id) || 0,
+    name: String(h.name ?? ""),
+    holidayDate,
+    working: h.working === true || h.working === 1 || h.working === "1",
+  };
+}
+
+/** Hoy (RD) es el feriado indicado y NO es laborable. */
+export function isNonWorkingHoliday(
+  holiday: TodayHoliday | null | undefined,
+  now: Date,
+): boolean {
+  return (
+    !!holiday &&
+    holiday.holidayDate === toRDDateString(now) &&
+    holiday.working !== true
+  );
+}
+
+// ─── Fuera de Horario (FH) ────────────────────────────────────────────────────
+
+/**
+ * Primer permiso "Fuera de Horario" aprobado, vigente ahora (misma ventana
+ * [fromTime, toTime] que getApprovedPermission) y sin consumir: ningún ponche
+ * de jornada lo referencia ya por permissionId.
+ */
+export function getUsableFhPermission(
+  permissions: UserDayPermission[],
+  punches: PunchEvent[],
+  now: Date,
+): UserDayPermission | null {
+  const current = getRDMinutes(now);
+  return (
+    getApprovedPermissionsByAction(
+      permissions,
+      PERMISSION_ACTION.FUERA_DE_HORARIO,
+    ).find(
+      (permission) =>
+        current >= timeStrToMinutes(permission.fromTime) &&
+        current <= timeStrToMinutes(permission.toTime) &&
+        !punches.some(
+          (p) =>
+            (isJornadaStartType(p.type) || isJornadaEndType(p.type)) &&
+            p.permissionId === permission.id,
+        ),
+    ) ?? null
+  );
+}
+
+/**
+ * Tipo que se envía al backend. La UI trabaja con InicioJornada/FinJornada;
+ * el backend solo aplica un permiso FH si el ponche sale como
+ * InicioJornadaFH/FinJornadaFH, y el cierre debe corresponder al inicio.
+ */
+export function resolvePunchTypeForApi(
+  baseType: string,
+  punches: PunchEvent[],
+  permissions: UserDayPermission[],
+  now: Date,
+): string {
+  if (baseType === "InicioJornada") {
+    return getUsableFhPermission(permissions, punches, now)
+      ? "InicioJornadaFH"
+      : "InicioJornada";
+  }
+  if (baseType === "FinJornada") {
+    const openType = findLastJornadaPunch(punches)?.type;
+    if (openType === "InicioJornadaFH") return "FinJornadaFH";
+    if (openType === "InicioJornadaAdicional") return "FinJornadaAdicional";
+    return "FinJornada";
+  }
+  return baseType;
+}
+
 // ─── Visibilidad de botones ───────────────────────────────────────────────────
 
 export function isJornadaVisible(
@@ -469,6 +625,7 @@ export function isJornadaVisible(
   tolWorkOut: number,
   punches: PunchEvent[],
   permissions: UserDayPermission[],
+  holiday?: TodayHoliday | null,
 ): boolean {
   // Ausencia aprobada -> nada disponible mientras dure el permiso
   if (getApprovedPermission(permissions, PERMISSION_ACTION.AUSENCIA, now)) {
@@ -476,36 +633,24 @@ export function isJornadaVisible(
   }
 
   const current = getRDMinutes(now);
-  // Los intentos rechazados por imagen, o fuera del área permitida, no
-  // cuentan como jornada iniciada
-  const lastJornada = [...punches]
-    .reverse()
-    .find(
-      (p) =>
-        (p.type === "InicioJornada" || p.type === "FinJornada") &&
-        p.status !== "Error de Imagen" &&
-        p.status !== "Fuera de área" &&
-        !p.hasOpenDay &&
-        p.hasOpenDay !== ("true" as any),
-    );
-
-  // Habilita entrada y salida fuera de su ventana normal (incluso sin horario)
-  const fueraDeHorario = getApprovedPermission(
-    permissions,
-    PERMISSION_ACTION.FUERA_DE_HORARIO,
-    now,
-  );
+  // Los intentos rechazados (imagen, fuera del área; "Inválido" en
+  // Adicional/FH) no cuentan como jornada iniciada
+  const lastJornada = findLastJornadaPunch(punches);
 
   if (isInicio) {
     // Ya poncho entrada -> ocultar (jornada activa)
-    if (lastJornada?.type === "InicioJornada") return false;
+    if (lastJornada && isJornadaStartType(lastJornada.type)) return false;
+    // FH vigente y sin consumir -> habilitar, aun en feriado y aun después de
+    // un ciclo completo (permite una jornada FH extra)
+    if (getUsableFhPermission(permissions, punches, now)) return true;
+    // Feriado no laborable -> solo se entra con FH
+    if (isNonWorkingHoliday(holiday, now)) return false;
     // Ya salio hoy -> ocultar
-    if (lastJornada?.type === "FinJornada") return false;
+    if (lastJornada && isJornadaEndType(lastJornada.type)) return false;
     // Permiso de entrada tardía aprobado -> habilitar dentro de su ventana
     if (getApprovedPermission(permissions, PERMISSION_ACTION.ENTRADA, now)) {
       return true;
     }
-    if (fueraDeHorario) return true;
     // Sin horario -> ocultar siempre
     if (!schedule) return false;
     // Sin ponche -> visible desde N min antes de entrada (tolerancia) hasta el
@@ -516,12 +661,25 @@ export function isJornadaVisible(
     return current >= entryStart && current < entryEnd;
   } else {
     // Ya salio hoy -> ocultar
-    if (lastJornada?.type === "FinJornada") return false;
+    if (lastJornada && isJornadaEndType(lastJornada.type)) return false;
+    // Jornada FH o Adicional abierta -> siempre se puede cerrar (el feriado
+    // tampoco bloquea la salida)
+    if (
+      lastJornada?.type === "InicioJornadaFH" ||
+      lastJornada?.type === "InicioJornadaAdicional"
+    ) {
+      return true;
+    }
     // Salida anticipada aprobada -> habilitar antes de exitStart
     if (getApprovedPermission(permissions, PERMISSION_ACTION.SALIDA, now)) {
       return true;
     }
-    if (fueraDeHorario) return true;
+    // Fuera de Horario vigente -> habilita la salida fuera de su ventana
+    if (
+      getApprovedPermission(permissions, PERMISSION_ACTION.FUERA_DE_HORARIO, now)
+    ) {
+      return true;
+    }
     // Sin horario -> ocultar siempre
     if (!schedule) return false;
     // Visible desde N min antes de salida, sin limite superior (horas extras)
@@ -537,6 +695,7 @@ export function isAlmuerzoVisible(
   tolLunchOut: number,
   punches: PunchEvent[],
   permissions: UserDayPermission[],
+  holiday?: TodayHoliday | null,
 ): boolean {
   // Ausencia aprobada -> nada disponible mientras dure el permiso
   if (getApprovedPermission(permissions, PERMISSION_ACTION.AUSENCIA, now)) {
@@ -550,6 +709,8 @@ export function isAlmuerzoVisible(
     .find((p) => p.type === "InicioAlmuerzo" || p.type === "FinAlmuerzo");
 
   if (lastAlmuerzo?.type === "InicioAlmuerzo") return true;
+  // Feriado no laborable -> sin almuerzo, salvo cerrar uno ya abierto (arriba)
+  if (isNonWorkingHoliday(holiday, now)) return false;
   if (lastAlmuerzo?.type === "FinAlmuerzo") return false;
 
   // Un permiso de almuerzo aprobado reemplaza la ventana del horario (aunque
@@ -613,6 +774,7 @@ export function isAlmuerzoButtonVisible(
   btnVisLunchOut: number,
   punches: PunchEvent[],
   permissions: UserDayPermission[],
+  holiday?: TodayHoliday | null,
 ): boolean {
   // Ausencia aprobada -> nada disponible mientras dure el permiso
   if (getApprovedPermission(permissions, PERMISSION_ACTION.AUSENCIA, now)) {
@@ -633,6 +795,8 @@ export function isAlmuerzoButtonVisible(
   );
 
   if (isInicio) {
+    // Feriado no laborable -> no se inicia almuerzo
+    if (isNonWorkingHoliday(holiday, now)) return false;
     // Ya entró o ya salió de almorzar hoy -> ocultar entrada
     if (lastAlmuerzo) return false;
 

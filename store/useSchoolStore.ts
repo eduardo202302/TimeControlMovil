@@ -93,6 +93,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   role: null,
   companySettings: null,
   attendancesToday: [],
+  todayHoliday: null,
   lastCompany: null,
 
   // ─── Acciones existentes (sin cambios) ──────────────────────────────────────
@@ -116,6 +117,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       role: null,
       companySettings: null,
       attendancesToday: [],
+      todayHoliday: null,
     }),
 
   // ─── Cerrar sesión — conserva urlColegio y school para poder volver a login ─
@@ -131,6 +133,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       role: null,
       companySettings: null,
       attendancesToday: [],
+      todayHoliday: null,
     }),
 
   // ─── Acción nueva: resuelve app + ruta + menú tras el login ─────────────────
@@ -153,6 +156,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   setRole: (role) => set({ role }),
   setCompanySettings: (companySettings) => set({ companySettings }),
   setAttendancesToday: (attendancesToday) => set({ attendancesToday }),
+  setTodayHoliday: (todayHoliday) => set({ todayHoliday }),
 
   // ─── Última compañía — fuera de clear()/logout() a propósito ────────────────
   setLastCompany: async (lastCompany) => {

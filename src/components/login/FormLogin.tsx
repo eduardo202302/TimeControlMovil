@@ -47,6 +47,7 @@ import { SHADOW_LG, SHADOW_PRIMARY } from "@/constants/shadows";
 import { useAuthTheme } from "@/hooks/useAuthTheme";
 import type { AuthTheme } from "../../utils/authThemeRules";
 import { buildLastCompany } from "../../utils/lastCompany";
+import { buildTodayHoliday } from "../../utils/punchRules";
 
 export default function FormLogin() {
   const { scale, verticalScale, font } = useResponsive();
@@ -267,6 +268,10 @@ export default function FormLogin() {
       useSchoolStore
         .getState()
         .setAttendancesToday(buildAttendancesToday(res.data?.data));
+      // Feriado de hoy, mismo nivel superior de `data`.
+      useSchoolStore
+        .getState()
+        .setTodayHoliday(buildTodayHoliday(res.data?.data));
       setCompanySelectorVisible(false);
       await completeLogin(
         schoolUser,
@@ -363,6 +368,9 @@ export default function FormLogin() {
                 useSchoolStore
                   .getState()
                   .setAttendancesToday(buildAttendancesToday(res.data?.data));
+                useSchoolStore
+                  .getState()
+                  .setTodayHoliday(buildTodayHoliday(res.data?.data));
                 await completeLogin(
                   schoolUser,
                   response.data,

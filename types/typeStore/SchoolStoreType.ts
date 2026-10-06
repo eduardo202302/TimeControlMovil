@@ -306,6 +306,20 @@ export interface TeacherAttendanceToday {
   [key: string]: unknown;
 }
 
+/**
+ * Feriado de hoy, tal como lo publica chooseschool en `data.todayHoliday`
+ * (normalizado por `buildTodayHoliday` en src/utils/punchRules). null cuando
+ * hoy no es feriado.
+ */
+export interface TodayHoliday {
+  id: number;
+  name: string;
+  /** Siempre "YYYY-MM-DD". */
+  holidayDate: string;
+  /** true = feriado laborable (se trabaja normal). */
+  working: boolean;
+}
+
 // ─── Store type extendido ─────────────────────────────────────────────────────
 
 export interface SchoolStore {
@@ -331,6 +345,9 @@ export interface SchoolStore {
   // docente o no tiene clases hoy, nunca null.
   attendancesToday: TeacherAttendanceToday[];
 
+  // Feriado de hoy (chooseschool → `data.todayHoliday`). null = día normal.
+  todayHoliday: TodayHoliday | null;
+
   // Marca de la última compañía con que se entró (ver src/utils/lastCompany).
   // Persistida en SecureStore bajo su propia clave; logout() y clear() NO la
   // tocan — es lo que pinta el login después de cerrar sesión.
@@ -349,6 +366,7 @@ export interface SchoolStore {
   setRole: (role: RoleItem) => void;
   setCompanySettings: (companySettings: CompanySettings) => void;
   setAttendancesToday: (attendancesToday: TeacherAttendanceToday[]) => void;
+  setTodayHoliday: (h: TodayHoliday | null) => void;
   /** Actualiza el store y la persiste en SecureStore. */
   setLastCompany: (lastCompany: LastCompany) => Promise<void>;
   /** La saca del store y la borra de SecureStore. */

@@ -95,10 +95,17 @@ import {
   getRDDayIndex,
   getScheduleForDay,
   getStatusColor,
+  buildTodayHoliday,
+  findLastJornadaPunch,
   isAlmuerzoButtonVisible,
   isAlmuerzoVisible,
   isBreakVisible,
+  isJornadaEndType,
+  isJornadaStartType,
   isJornadaVisible,
+  isNonWorkingHoliday,
+  isRejectedJornadaAttempt,
+  resolvePunchTypeForApi,
   RD_UTC_OFFSET,
   toRD,
   toRDDateString,
@@ -211,6 +218,10 @@ function getPunchTypeLabel(type: string): string {
   const labels: Record<string, string> = {
     InicioJornada: "Inicio Jornada",
     FinJornada: "Fin Jornada",
+    InicioJornadaAdicional: "Inicio Jornada Adicional",
+    FinJornadaAdicional: "Fin Jornada Adicional",
+    InicioJornadaFH: "Inicio Jornada FH",
+    FinJornadaFH: "Fin Jornada FH",
     InicioAlmuerzo: "Entrada Almuerzo",
     FinAlmuerzo: "Salida Almuerzo",
     InicioBreak: "Inicio Break",
@@ -263,17 +274,7 @@ function getDisplayStatus(
 }
 
 function isJornadaActiva(punches: PunchEvent[]): boolean {
-  const last = [...punches]
-    .reverse()
-    .find(
-      (p) =>
-        (p.type === "InicioJornada" || p.type === "FinJornada") &&
-        p.status !== "Error de Imagen" &&
-        p.status !== "Fuera de área" &&
-        !p.hasOpenDay &&
-        p.hasOpenDay !== ("true" as any),
-    );
-  return last?.type === "InicioJornada";
+  return isJornadaStartType(findLastJornadaPunch(punches)?.type ?? "");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -473,7 +474,7 @@ export default function PunchInOut() {
     withinArea: boolean;
   } | null>(null);
 
-  const { user, urlColegio, logout } = useSchoolStore();
+  const { user, urlColegio, logout, todayHoliday } = useSchoolStore();
 
   // El login devuelve los horarios en user.schoolUsers[0].userSchedules
   const schoolUser: SchoolUser | undefined = user?.user?.schoolUsers?.[0];
@@ -481,6 +482,7 @@ export default function PunchInOut() {
     schoolUser?.userSchedules ?? user?.userSchedules ?? [];
   const todaySchedule = getTodaySchedule(userSchedules, now);
   const jornadaIniciada = isJornadaActiva(punches);
+  const nonWorkingHoliday = isNonWorkingHoliday(todayHoliday, now);
   const lastPunch = punches[punches.length - 1];
 
   // Configuración de la escuela (school.settings) y del usuario (schoolUser.settings)
@@ -726,6 +728,10 @@ export default function PunchInOut() {
         useSchoolStore
           .getState()
           .setAttendancesToday(buildAttendancesToday(res.data?.data));
+        // Mismo refresco para el feriado de hoy.
+        useSchoolStore
+          .getState()
+          .setTodayHoliday(buildTodayHoliday(res.data?.data));
 
         // Comparar solo los campos relevantes (ignorar createdDate y campos extra)
         const normalize = (s: UserSchedule[]) =>
@@ -786,6 +792,7 @@ export default function PunchInOut() {
         btnVisLunchOut,
         punches,
         permissions,
+        todayHoliday,
       )
     ) {
       setSelectedCategory("Jornada");
@@ -793,7 +800,7 @@ export default function PunchInOut() {
     if (selectedCategory === "Break" && !isBreakVisible(punches)) {
       setSelectedCategory("Jornada");
     }
-  }, [now, punches, todaySchedule, selectedCategory, permissions]);
+  }, [now, punches, todaySchedule, selectedCategory, permissions, todayHoliday]);
 
   // Motivo de break no debe sobrevivir un cambio de categoría — evita que un
   // motivo elegido para un Break anterior quede preseleccionado en el siguiente.
@@ -950,6 +957,19 @@ export default function PunchInOut() {
   }, [isValidLocation, punches]);
 
   const getNextPunchType = (category: Category): "inicio" | "fin" => {
+    if (category === "Jornada") {
+      // Cualquiera de los 3 tipos de jornada (normal, Adicional, FH)
+      const lastJornada = [...punches]
+        .reverse()
+        .find(
+          (p) =>
+            (isJornadaStartType(p.type) || isJornadaEndType(p.type)) &&
+            !isRejectedJornadaAttempt(p),
+        );
+      return lastJornada && isJornadaStartType(lastJornada.type)
+        ? "fin"
+        : "inicio";
+    }
     const types = PUNCH_TYPE_MAP[category];
     const last = [...punches]
       .reverse()
@@ -1279,9 +1299,28 @@ export default function PunchInOut() {
     }
 
     // ── 3) Ambas validaciones resueltas → construir payload y enviar ──────────
+    // El tipo que viaja al backend: InicioJornadaFH con un FH vigente, y el
+    // Fin que corresponda al inicio abierto. `type` sigue siendo el tipo base.
+    const sendNow = new Date();
+    const apiType = resolvePunchTypeForApi(type, punches, permissions, sendNow);
+    // Re-chequeo con el feriado fresco del store: cubre el arranque en frío
+    // (el poller aún no lo trajo) y un FH que venció durante foto/GPS.
+    const freshHoliday = useSchoolStore.getState().todayHoliday;
+    if (
+      type === "InicioJornada" &&
+      isNonWorkingHoliday(freshHoliday, sendNow) &&
+      apiType !== "InicioJornadaFH"
+    ) {
+      Alert.alert(
+        "Día no laborable",
+        `Hoy es día no laborable (${freshHoliday?.name ?? ""}). Solo puedes registrar entrada con un permiso Fuera de Horario vigente.`,
+      );
+      return;
+    }
+
     setLoading(true);
     try {
-      const payload: PunchPayload = { type };
+      const payload: PunchPayload = { type: apiType };
       if (photo?.base64) payload.photourl = [photo.base64];
       if (todaySchedule) payload.schedule = todaySchedule;
       if (coords) {
@@ -1294,6 +1333,7 @@ export default function PunchInOut() {
 
       console.log("PUNCH REQUEST:", {
         type,
+        apiType,
         clientTimestamp: new Date().toISOString(),
         payload,
       });
@@ -1439,6 +1479,7 @@ export default function PunchInOut() {
         btnVisLunchOut,
         punches,
         permissions,
+        todayHoliday,
       );
     if (cat === "Break") return isBreakVisible(punches);
     if (cat === "Jornada")
@@ -1450,6 +1491,7 @@ export default function PunchInOut() {
         btnVisWorkOut,
         punches,
         permissions,
+        todayHoliday,
       );
     return true;
   });
@@ -1994,6 +2036,23 @@ export default function PunchInOut() {
             </SectionIcon>
             <Text style={styles.sectionHeaderText}>Reg. Entrada / Salida</Text>
           </View>
+          {nonWorkingHoliday && !jornadaIniciada && (
+            <View style={styles.holidayNotice}>
+              <Ionicons
+                name="calendar-outline"
+                size={18}
+                color={WARNING_TEXT_STRONG}
+              />
+              <Text
+                style={[
+                  styles.holidayNoticeText,
+                  { fontSize: font(isTablet ? 14 : 12) },
+                ]}
+              >
+                {`Hoy ${formatRDDate(now)} es día no laborable motivo a ${todayHoliday?.name ?? ""}.`}
+              </Text>
+            </View>
+          )}
           <View style={styles.categories}>
             {visibleCategories.map((cat) => {
               const hasActive = getNextPunchType(cat) === "fin";
@@ -2060,6 +2119,7 @@ export default function PunchInOut() {
                 btnVisWorkOut,
                 punches,
                 permissions,
+                todayHoliday,
               )) ||
             (selectedCategory === "Almuerzo" &&
               isAlmuerzoButtonVisible(
@@ -2070,6 +2130,7 @@ export default function PunchInOut() {
                 btnVisLunchOut,
                 punches,
                 permissions,
+                todayHoliday,
               ))) && (
             <TouchableOpacity
               style={[
@@ -2629,6 +2690,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     color: PRIMARY_COLOR,
+  },
+  holidayNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: WARNING_TINT_BACKGROUND,
+    borderWidth: 1,
+    borderColor: WARNING_TINT_BORDER,
+    borderRadius: RADIUS_LG,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  holidayNoticeText: {
+    flex: 1,
+    fontWeight: "600",
+    color: WARNING_TEXT_STRONG,
   },
   categories: { flexDirection: "row", gap: 10 },
   categoryBtn: {
