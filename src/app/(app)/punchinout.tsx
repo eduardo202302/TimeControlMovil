@@ -164,6 +164,9 @@ const PUNCH_TYPE_MAP: Record<Category, { inicio: string; fin: string }> = {
 const SESSION_MAX_HOURS_FOR_FIRST_ENTRY = 12;
 const HISTORY_COLLAPSED_LIMIT = 3;
 
+/** Logo de Time Control (solo el ícono, sin texto) — título de la card Perfil. */
+const TIME_CONTROL_LOGO = require("../../../assets/images/logos/logopeq.png");
+
 function decodeJWT(token: string): Record<string, any> {
   try {
     const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
@@ -1827,21 +1830,29 @@ export default function PunchInOut() {
               </SectionIcon>
               <Text style={styles.sectionHeaderText}>Perfil</Text>
             </View>
-            {approvedPermissionsToday.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setPermissionInfoModal(true)}
-                activeOpacity={0.7}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <View style={styles.permissionBadge}>
-                  <MaterialCommunityIcons
-                    name="alpha-p"
-                    size={20}
-                    color={PRIMARY_COLOR}
-                  />
-                </View>
-              </TouchableOpacity>
-            )}
+            <View style={styles.profileHeaderRight}>
+              {approvedPermissionsToday.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setPermissionInfoModal(true)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <View style={styles.permissionBadge}>
+                    <MaterialCommunityIcons
+                      name="alpha-p"
+                      size={20}
+                      color={PRIMARY_COLOR}
+                    />
+                  </View>
+                </TouchableOpacity>
+              )}
+              <Image
+                source={TIME_CONTROL_LOGO}
+                style={styles.profileLogo}
+                resizeMode="contain"
+                accessibilityLabel="Time Control"
+              />
+            </View>
           </View>
 
           <View style={styles.profileRow}>
@@ -2731,6 +2742,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  profileHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  // Alto = SectionIcon; ancho por la proporción del PNG (652×411). El PNG
+  // trae ~70px blancos a la derecha (el dibujo termina en x≈580): el margen
+  // negativo alinea el dibujo con el borde de las tarjetas Horario/Almuerzo.
+  profileLogo: {
+    height: 32,
+    width: 51,
+    marginRight: -5,
   },
   historyChevronBtn: {
     width: 20,

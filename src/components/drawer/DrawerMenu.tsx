@@ -240,9 +240,18 @@ function createStyles(
       fontSize: font(12),
       marginTop: verticalScale(1),
     },
-    roleBadge: {
+    /**
+     * Rol + ID del usuario. `maxWidth` se aplica inline (ver
+     * appNameMaxWidth): si no cabe, se trunca el rol, nunca el ID.
+     */
+    roleRow: {
+      flexDirection: "row",
+      alignItems: "center",
       alignSelf: "flex-start",
+      gap: scale(6),
       marginTop: verticalScale(4),
+    },
+    roleBadge: {
       backgroundColor: "rgba(255,255,255,0.18)",
       borderRadius: RADIUS_PILL,
       paddingHorizontal: scale(8),
@@ -490,6 +499,9 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
   const { user, menuTree, app, logout, school, urlColegio } = useSchoolStore();
   const schoolUser = user?.user?.schoolUsers?.[0];
   const activeSchool = schoolUser?.school ?? school;
+  // Mismo criterio que punchinout.tsx para el id del usuario.
+  const userId = schoolUser?.id ?? user?.id;
+  const roleName = user?.role?.name?.trim() ?? "";
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const { width, isTablet, scale, verticalScale, font } = useResponsive();
@@ -608,11 +620,24 @@ const confirmLogout = useCallback(async () => {
               >
                 {user?.user?.fullName ?? "Usuario"}
               </Text>
-              <View style={styles.roleBadge}>
-                <Text style={styles.roleBadgeText} numberOfLines={1}>
-                  {user?.role?.name ?? ""}
-                </Text>
-              </View>
+              {(roleName || userId != null) && (
+                <View style={[styles.roleRow, { maxWidth: appNameMaxWidth }]}>
+                  {roleName ? (
+                    <View style={[styles.roleBadge, { flexShrink: 1 }]}>
+                      <Text style={styles.roleBadgeText} numberOfLines={1}>
+                        {roleName}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {userId != null && (
+                    <View style={styles.roleBadge}>
+                      <Text style={styles.roleBadgeText} numberOfLines={1}>
+                        ID: {userId}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
             </View>
           </View>
         </View>
