@@ -12,8 +12,8 @@ import {
   FOOTER_BORDER,
   HEADER_NAVY,
   ICON_SUBTLE,
-  ONLINE_DOT,
   ON_PRIMARY,
+  ONLINE_DOT,
   PRIMARY_700,
   PRIMARY_COLOR,
   PRIMARY_TINT_25,
@@ -84,19 +84,18 @@ import type {
   UserSchedule,
 } from "../../../types/typeStore/SchoolStoreType";
 import {
+  buildTodayHoliday,
+  findLastJornadaPunch,
   findOpenDayPunch,
   findOpenDayPunchForUser,
-  getBreakTagCategoryId,
-  tagsOfCategory,
   getApprovedPermissionsToday,
+  getBreakTagCategoryId,
   getPendingOpenDayDate,
   getPunchBreakTagName,
   getPunctuality,
   getRDDayIndex,
   getScheduleForDay,
   getStatusColor,
-  buildTodayHoliday,
-  findLastJornadaPunch,
   isAlmuerzoButtonVisible,
   isAlmuerzoVisible,
   isBreakVisible,
@@ -105,15 +104,16 @@ import {
   isJornadaVisible,
   isNonWorkingHoliday,
   isRejectedJornadaAttempt,
-  resolvePunchTypeForApi,
   RD_UTC_OFFSET,
+  resolvePunchTypeForApi,
+  tagsOfCategory,
   toRD,
   toRDDateString,
   WEEK_DAYS,
   type PunchEvent,
   type Tag,
   type ToleranceConfig,
-  type UserDayPermission
+  type UserDayPermission,
 } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
 
@@ -800,7 +800,14 @@ export default function PunchInOut() {
     if (selectedCategory === "Break" && !isBreakVisible(punches)) {
       setSelectedCategory("Jornada");
     }
-  }, [now, punches, todaySchedule, selectedCategory, permissions, todayHoliday]);
+  }, [
+    now,
+    punches,
+    todaySchedule,
+    selectedCategory,
+    permissions,
+    todayHoliday,
+  ]);
 
   // Motivo de break no debe sobrevivir un cambio de categoría — evita que un
   // motivo elegido para un Break anterior quede preseleccionado en el siguiente.
@@ -1081,184 +1088,209 @@ export default function PunchInOut() {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     try {
-    const token = await getToken();
-    if (!urlColegio || !token) {
-      Alert.alert("Error", "No hay conexión activa.");
-      return;
-    }
-    if (
-      !jornadaIniciada &&
-      (selectedCategory === "Almuerzo" || selectedCategory === "Break")
-    ) {
-      Alert.alert("Acción no permitida", "Debes iniciar la jornada primero.");
-      return;
-    }
+      const token = await getToken();
+      if (!urlColegio || !token) {
+        Alert.alert("Error", "No hay conexión activa.");
+        return;
+      }
+      if (
+        !jornadaIniciada &&
+        (selectedCategory === "Almuerzo" || selectedCategory === "Break")
+      ) {
+        Alert.alert("Acción no permitida", "Debes iniciar la jornada primero.");
+        return;
+      }
 
-    const types = PUNCH_TYPE_MAP[selectedCategory];
-    const type = isInicio ? types.inicio : types.fin;
+      const types = PUNCH_TYPE_MAP[selectedCategory];
+      const type = isInicio ? types.inicio : types.fin;
 
-    // Motivo de break obligatorio solo cuando la escuela tiene la categoría
-    // "Tipos de Break" configurada. Si breakTags viene vacío, es una decisión
-    // temporal explícita: no bloquear el Break hasta que se defina qué hacer
-    // con escuelas sin esta categoría configurada.
-    if (type === "InicioBreak" && breakTags.length > 0 && !selectedBreakTagId) {
-      Alert.alert("Motivo requerido", "Selecciona el motivo del break.");
-      return;
-    }
+      // Motivo de break obligatorio solo cuando la escuela tiene la categoría
+      // "Tipos de Break" configurada. Si breakTags viene vacío, es una decisión
+      // temporal explícita: no bloquear el Break hasta que se defina qué hacer
+      // con escuelas sin esta categoría configurada.
+      if (
+        type === "InicioBreak" &&
+        breakTags.length > 0 &&
+        !selectedBreakTagId
+      ) {
+        Alert.alert("Motivo requerido", "Selecciona el motivo del break.");
+        return;
+      }
 
-    // Si hay una jornada del día anterior sin cerrar, ese modal debe resolverse
-    // primero — el relogin por sesión vieja es el segundo paso, no el primero,
-    // cuando ambos casos coinciden.
-    const hasPendingOpenDay =
-      nextDayExitModal || findOpenDayPunch(punches) !== null;
+      // Si hay una jornada del día anterior sin cerrar, ese modal debe resolverse
+      // primero — el relogin por sesión vieja es el segundo paso, no el primero,
+      // cuando ambos casos coinciden.
+      const hasPendingOpenDay =
+        nextDayExitModal || findOpenDayPunch(punches) !== null;
 
-    // Antes de la primera Entrada Jornada del día: si la sesión actual lleva
-    // más de SESSION_MAX_HOURS_FOR_FIRST_ENTRY horas abierta, forzar relogin
-    // para confirmar permisos/settings que un admin pudo haber cambiado desde
-    // entonces. Solo aplica a esta transición — no a Almuerzo/Break/salida.
-    const isFirstJornadaEntryToday =
-      type === "InicioJornada" &&
-      !punches.some((p) => p.type === "InicioJornada") &&
-      !hasPendingOpenDay;
+      // Antes de la primera Entrada Jornada del día: si la sesión actual lleva
+      // más de SESSION_MAX_HOURS_FOR_FIRST_ENTRY horas abierta, forzar relogin
+      // para confirmar permisos/settings que un admin pudo haber cambiado desde
+      // entonces. Solo aplica a esta transición — no a Almuerzo/Break/salida.
+      const isFirstJornadaEntryToday =
+        type === "InicioJornada" &&
+        !punches.some((p) => p.type === "InicioJornada") &&
+        !hasPendingOpenDay;
 
-    if (isFirstJornadaEntryToday) {
-      const jwtPayload = decodeJWT(token);
-      const iat = jwtPayload?.iat;
-      if (typeof iat === "number") {
-        const hoursSinceLogin = (Date.now() / 1000 - iat) / 3600;
-        if (hoursSinceLogin > SESSION_MAX_HOURS_FOR_FIRST_ENTRY) {
+      if (isFirstJornadaEntryToday) {
+        const jwtPayload = decodeJWT(token);
+        const iat = jwtPayload?.iat;
+        if (typeof iat === "number") {
+          const hoursSinceLogin = (Date.now() / 1000 - iat) / 3600;
+          if (hoursSinceLogin > SESSION_MAX_HOURS_FOR_FIRST_ENTRY) {
+            console.warn(
+              "BLOQUEO: Sesión desactualizada antes de la primera Entrada Jornada",
+              { hoursSinceLogin, iat },
+            );
+            Alert.alert(
+              "Sesión desactualizada",
+              "Debes iniciar sesión nuevamente para confirmar tus permisos de hoy.",
+              [{ text: "Aceptar", onPress: forceLogout }],
+              { cancelable: false },
+            );
+            return;
+          }
+        }
+      }
+
+      // La foto solo se exige en InicioJornada — no en Almuerzo/Break ni en
+      // ninguna salida — confirmado con negocio.
+      const imageRequiredForType = isImageRequired && type === "InicioJornada";
+      const locationRequired = isValidLocation;
+
+      console.log("CONFIG SEDE:", {
+        isImageRequired: schoolSettings?.isImageRequired,
+        isValidLocation: schoolSettings?.isValidLocation,
+        schoolUserIsImageRequired: schoolUserSettings?.isImageRequired,
+        schoolUserIsValidLocation: schoolUserSettings?.isValidLocation,
+        imageRequiredForType,
+        locationRequired,
+      });
+      console.log("SCHEDULE SELECCIONADO:", todaySchedule);
+      console.log("TOLERANCIAS:", {
+        tolWorkIn,
+        tolWorkOut,
+        tolLunchIn,
+        tolLunchOut,
+      });
+
+      // ── 1) Validación de UBICACIÓN + GEOCERCA (si la institución la exige) ───
+      // Solo bloquea si faltan coordenadas (propias o de referencia) — error de
+      // configuración. Estar fuera del radio permitido YA NO aborta el ponche:
+      // se envía igual con las coordenadas reales y el backend decide, marcando
+      // el punch con status "Fuera de área" cuando corresponde.
+      let coords: { latitude: number; longitude: number } | null = null;
+      if (locationRequired) {
+        coords = await getCurrentCoordinates();
+        if (!coords) {
           console.warn(
-            "BLOQUEO: Sesión desactualizada antes de la primera Entrada Jornada",
-            { hoursSinceLogin, iat },
-          );
-          Alert.alert(
-            "Sesión desactualizada",
-            "Debes iniciar sesión nuevamente para confirmar tus permisos de hoy.",
-            [{ text: "Aceptar", onPress: forceLogout }],
-            { cancelable: false },
+            "BLOQUEO: Ubicación requerida sin coordenadas — se aborta el ponche",
           );
           return;
         }
-      }
-    }
+        console.log("COORDENADAS OBTENIDAS:", coords);
 
-    // La foto solo se exige en InicioJornada — no en Almuerzo/Break ni en
-    // ninguna salida — confirmado con negocio.
-    const imageRequiredForType = isImageRequired && type === "InicioJornada";
-    const locationRequired = isValidLocation;
+        // Resolución jerárquica de geocerca: usuario → sede/empresa
+        const targetGeo = getTargetGeofenceLocation();
+        const hasValidTarget =
+          Number.isFinite(targetGeo.targetLatitude) &&
+          Number.isFinite(targetGeo.targetLongitude) &&
+          targetGeo.targetLatitude !== 0 &&
+          targetGeo.targetLongitude !== 0;
 
-    console.log("CONFIG SEDE:", {
-      isImageRequired: schoolSettings?.isImageRequired,
-      isValidLocation: schoolSettings?.isValidLocation,
-      schoolUserIsImageRequired: schoolUserSettings?.isImageRequired,
-      schoolUserIsValidLocation: schoolUserSettings?.isValidLocation,
-      imageRequiredForType,
-      locationRequired,
-    });
-    console.log("SCHEDULE SELECCIONADO:", todaySchedule);
-    console.log("TOLERANCIAS:", {
-      tolWorkIn,
-      tolWorkOut,
-      tolLunchIn,
-      tolLunchOut,
-    });
+        if (hasValidTarget) {
+          const distanceMeters = getDistanceInMeters(
+            coords.latitude,
+            coords.longitude,
+            targetGeo.targetLatitude,
+            targetGeo.targetLongitude,
+          );
+          const dentroDeGeocerca = distanceMeters <= targetGeo.radius;
 
-    // ── 1) Validación de UBICACIÓN + GEOCERCA (si la institución la exige) ───
-    // Solo bloquea si faltan coordenadas (propias o de referencia) — error de
-    // configuración. Estar fuera del radio permitido YA NO aborta el ponche:
-    // se envía igual con las coordenadas reales y el backend decide, marcando
-    // el punch con status "Fuera de área" cuando corresponde.
-    let coords: { latitude: number; longitude: number } | null = null;
-    if (locationRequired) {
-      coords = await getCurrentCoordinates();
-      if (!coords) {
-        console.warn(
-          "BLOQUEO: Ubicación requerida sin coordenadas — se aborta el ponche",
-        );
-        return;
-      }
-      console.log("COORDENADAS OBTENIDAS:", coords);
-
-      // Resolución jerárquica de geocerca: usuario → sede/empresa
-      const targetGeo = getTargetGeofenceLocation();
-      const hasValidTarget =
-        Number.isFinite(targetGeo.targetLatitude) &&
-        Number.isFinite(targetGeo.targetLongitude) &&
-        targetGeo.targetLatitude !== 0 &&
-        targetGeo.targetLongitude !== 0;
-
-      if (hasValidTarget) {
-        const distanceMeters = getDistanceInMeters(
-          coords.latitude,
-          coords.longitude,
-          targetGeo.targetLatitude,
-          targetGeo.targetLongitude,
-        );
-        const dentroDeGeocerca = distanceMeters <= targetGeo.radius;
-
-        console.log("🎯 REFERENCIA DE GEOCERCA APLICADA:", {
-          source: targetGeo.source,
-          targetCoords: {
-            lat: targetGeo.targetLatitude,
-            lng: targetGeo.targetLongitude,
-          },
-          userRealCoords: coords,
-          distanceMeters: Math.round(distanceMeters),
-          maxRadius: targetGeo.radius,
-          dentroDeGeocerca,
-        });
-
-        // Fuera de geocerca: ya NO se bloquea del lado cliente — el ponche se
-        // envía igual (con las coordenadas reales) y el backend decide,
-        // devolviendo status "Fuera de área" en la respuesta si corresponde.
-      } else {
-        // isValidLocation es una exigencia explícita — sin coordenadas de
-        // referencia (ni usuario ni sede) no se puede validar, así que se
-        // bloquea el ponche en vez de omitir la validación en silencio.
-        console.error(
-          "BLOQUEO GEOCERCA: Sin coordenadas de referencia (usuario ni sede) para validar — se aborta el ponche",
-          {
+          console.log("🎯 REFERENCIA DE GEOCERCA APLICADA:", {
             source: targetGeo.source,
-            schoolLatitude,
-            schoolLongitude,
-            targetGeo,
-          },
-        );
-        Alert.alert(
-          "Error de Configuración",
-          "No se pudo determinar el área permitida, contacta al administrador.",
-        );
-        return;
-      }
-    }
+            targetCoords: {
+              lat: targetGeo.targetLatitude,
+              lng: targetGeo.targetLongitude,
+            },
+            userRealCoords: coords,
+            distanceMeters: Math.round(distanceMeters),
+            maxRadius: targetGeo.radius,
+            dentroDeGeocerca,
+          });
 
-    // ── 2) Validación de FOTO (si es obligatoria) ─────────────────────────────
-    // Bloqueo estricto: si la captura falla, se cancela o no hay base64,
-    // se aborta inmediatamente y NO se envía el POST /punches.
-    let photo: ImagePicker.ImagePickerAsset | null = null;
-    if (imageRequiredForType) {
-      try {
-        const { status } =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== "granted") {
-          console.warn(
-            "BLOQUEO: Permiso de galería denegado — se aborta el ponche",
+          // Fuera de geocerca: ya NO se bloquea del lado cliente — el ponche se
+          // envía igual (con las coordenadas reales) y el backend decide,
+          // devolviendo status "Fuera de área" en la respuesta si corresponde.
+        } else {
+          // isValidLocation es una exigencia explícita — sin coordenadas de
+          // referencia (ni usuario ni sede) no se puede validar, así que se
+          // bloquea el ponche en vez de omitir la validación en silencio.
+          console.error(
+            "BLOQUEO GEOCERCA: Sin coordenadas de referencia (usuario ni sede) para validar — se aborta el ponche",
+            {
+              source: targetGeo.source,
+              schoolLatitude,
+              schoolLongitude,
+              targetGeo,
+            },
           );
           Alert.alert(
-            "Permiso requerido",
-            "Necesitas permitir el acceso a la galería para registrar tu asistencia.",
+            "Error de Configuración",
+            "No se pudo determinar el área permitida, contacta al administrador.",
           );
           return;
         }
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ["images"],
-          allowsEditing: false,
-          quality: 0.4,
-          base64: true,
-        });
-        if (result.canceled) {
+      }
+
+      // ── 2) Validación de FOTO (si es obligatoria) ─────────────────────────────
+      // Bloqueo estricto: si la captura falla, se cancela o no hay base64,
+      // se aborta inmediatamente y NO se envía el POST /punches.
+      let photo: ImagePicker.ImagePickerAsset | null = null;
+      if (imageRequiredForType) {
+        try {
+          const { status } =
+            await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== "granted") {
+            console.warn(
+              "BLOQUEO: Permiso de galería denegado — se aborta el ponche",
+            );
+            Alert.alert(
+              "Permiso requerido",
+              "Necesitas permitir el acceso a la galería para registrar tu asistencia.",
+            );
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ["images"],
+            allowsEditing: false,
+            quality: 0.4,
+            base64: true,
+          });
+          if (result.canceled) {
+            console.warn(
+              "BLOQUEO: Captura cancelada por el usuario — se aborta el ponche",
+            );
+            Alert.alert(
+              "Foto requerida",
+              "Debes seleccionar una foto para registrar la jornada.",
+            );
+            return;
+          }
+          photo = result.assets[0] ?? null;
+        } catch (error) {
+          console.error("ERROR CAPTURA IMAGEN:", error);
+          Alert.alert(
+            "Error de Imagen",
+            "No se pudo capturar la imagen. Intenta de nuevo.",
+          );
+          return;
+        }
+
+        // Sin base64 → no se puede adjuntar la foto → abortar sin POST
+        if (!photo?.base64) {
           console.warn(
-            "BLOQUEO: Captura cancelada por el usuario — se aborta el ponche",
+            "BLOQUEO: Foto obligatoria sin base64 — se aborta el ponche",
           );
           Alert.alert(
             "Foto requerida",
@@ -1266,150 +1298,174 @@ export default function PunchInOut() {
           );
           return;
         }
-        photo = result.assets[0] ?? null;
-      } catch (error) {
-        console.error("ERROR CAPTURA IMAGEN:", error);
-        Alert.alert(
-          "Error de Imagen",
-          "No se pudo capturar la imagen. Intenta de nuevo.",
-        );
-        return;
+
+        console.log("DATOS IMAGEN CAPTURADA:", {
+          photourl: [photo.base64],
+          uri: photo.uri,
+          mimeType: photo.mimeType,
+          width: photo.width,
+          height: photo.height,
+          fileSize: photo.fileSize,
+        });
       }
 
-      // Sin base64 → no se puede adjuntar la foto → abortar sin POST
-      if (!photo?.base64) {
-        console.warn(
-          "BLOQUEO: Foto obligatoria sin base64 — se aborta el ponche",
-        );
-        Alert.alert(
-          "Foto requerida",
-          "Debes seleccionar una foto para registrar la jornada.",
-        );
-        return;
-      }
-
-      console.log("DATOS IMAGEN CAPTURADA:", {
-        photourl: [photo.base64],
-        uri: photo.uri,
-        mimeType: photo.mimeType,
-        width: photo.width,
-        height: photo.height,
-        fileSize: photo.fileSize,
-      });
-    }
-
-    // ── 3) Ambas validaciones resueltas → construir payload y enviar ──────────
-    // El tipo que viaja al backend: InicioJornadaFH con un FH vigente, y el
-    // Fin que corresponda al inicio abierto. `type` sigue siendo el tipo base.
-    const sendNow = new Date();
-    const apiType = resolvePunchTypeForApi(type, punches, permissions, sendNow);
-    // Re-chequeo con el feriado fresco del store: cubre el arranque en frío
-    // (el poller aún no lo trajo) y un FH que venció durante foto/GPS.
-    const freshHoliday = useSchoolStore.getState().todayHoliday;
-    if (
-      type === "InicioJornada" &&
-      isNonWorkingHoliday(freshHoliday, sendNow) &&
-      apiType !== "InicioJornadaFH"
-    ) {
-      Alert.alert(
-        "Día no laborable",
-        `Hoy es día no laborable (${freshHoliday?.name ?? ""}). Solo puedes registrar entrada con un permiso Fuera de Horario vigente.`,
+      // ── 3) Ambas validaciones resueltas → construir payload y enviar ──────────
+      // El tipo que viaja al backend: InicioJornadaFH con un FH vigente, y el
+      // Fin que corresponda al inicio abierto. `type` sigue siendo el tipo base.
+      const sendNow = new Date();
+      const apiType = resolvePunchTypeForApi(
+        type,
+        punches,
+        permissions,
+        sendNow,
       );
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const payload: PunchPayload = { type: apiType };
-      if (photo?.base64) payload.photourl = [photo.base64];
-      if (todaySchedule) payload.schedule = todaySchedule;
-      if (coords) {
-        payload.latitude = coords.latitude;
-        payload.longitude = coords.longitude;
-      }
-      if (type === "InicioBreak" && selectedBreakTagId) {
-        payload.tagId = selectedBreakTagId;
-      }
-
-      console.log("PUNCH REQUEST:", {
-        type,
-        apiType,
-        clientTimestamp: new Date().toISOString(),
-        payload,
-      });
-
-      const response = await axios.post(`${urlColegio}/punches`, payload, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      console.log("PUNCH RESPONSE:", {
-        type,
-        clientTimestamp: new Date().toISOString(),
-        status: response.status,
-        data: response.data,
-      });
-
-      // El backend valida la geocerca del lado servidor y, si el ponche cae
-      // fuera del área permitida, lo registra igual con status "Fuera de
-      // área" (success sigue en true) — se sincroniza y se avisa, sin tratarlo
-      // como error.
-      if (response.data?.status === "Fuera de área") {
-        await fetchTodayPunches();
+      // Re-chequeo con el feriado fresco del store: cubre el arranque en frío
+      // (el poller aún no lo trajo) y un FH que venció durante foto/GPS.
+      const freshHoliday = useSchoolStore.getState().todayHoliday;
+      if (
+        type === "InicioJornada" &&
+        isNonWorkingHoliday(freshHoliday, sendNow) &&
+        apiType !== "InicioJornadaFH"
+      ) {
         Alert.alert(
-          "Ponche Registrado",
-          "Tu ponche quedó registrado como 'Fuera de área' porque no estabas dentro del rango permitido.",
+          "Día no laborable",
+          `Hoy es día no laborable (${freshHoliday?.name ?? ""}). Solo puedes registrar entrada con un permiso Fuera de Horario vigente.`,
         );
         return;
       }
 
-      if (response.data.success) {
-        if (type === "InicioBreak") setSelectedBreakTagId(null);
-        await fetchTodayPunches();
-      } else {
-        const msg: string = response.data.message ?? "Intenta de nuevo.";
-        const lowerMsg = msg.toLowerCase();
+      setLoading(true);
+      try {
+        const payload: PunchPayload = { type: apiType };
+        if (photo?.base64) payload.photourl = [photo.base64];
+        if (todaySchedule) payload.schedule = todaySchedule;
+        if (coords) {
+          payload.latitude = coords.latitude;
+          payload.longitude = coords.longitude;
+        }
+        if (type === "InicioBreak" && selectedBreakTagId) {
+          payload.tagId = selectedBreakTagId;
+        }
 
-        // El backend pudo registrar el intento con "Error de Imagen"; sincronizar
-        // para que el botón de entrada vuelva a quedar visible y habilitado.
-        await fetchTodayPunches();
+        console.log("PUNCH REQUEST:", {
+          type,
+          apiType,
+          clientTimestamp: new Date().toISOString(),
+          payload,
+        });
 
-        // El backend rechazó por foto no coincidente con el perfil — interpretar
-        // su respuesta con un mensaje claro en vez del Alert genérico.
-        const imageMismatchRejected =
-          isImageRequired &&
-          (response.data.status === "Error de Imagen" ||
-            lowerMsg.includes("imagen"));
+        const response = await axios.post(`${urlColegio}/punches`, payload, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
 
-        if (imageMismatchRejected) {
-          console.warn(
-            "BLOQUEO POST-VALIDACIÓN: El backend rechazó el ponche por foto no coincidente con el perfil",
-            { message: msg, response: response.data },
-          );
+        console.log("PUNCH RESPONSE:", {
+          type,
+          clientTimestamp: new Date().toISOString(),
+          status: response.status,
+          data: response.data,
+        });
+
+        // El backend valida la geocerca del lado servidor y, si el ponche cae
+        // fuera del área permitida, lo registra igual con status "Fuera de
+        // área" (success sigue en true) — se sincroniza y se avisa, sin tratarlo
+        // como error.
+        if (response.data?.status === "Fuera de área") {
+          await fetchTodayPunches();
           Alert.alert(
-            "Foto No Válida",
-            "La foto no coincide con tu perfil. Intenta de nuevo con una foto más clara.",
+            "Ponche Registrado",
+            "Tu ponche quedó registrado como 'Fuera de área' porque no estabas dentro del rango permitido.",
           );
           return;
         }
 
+        if (response.data.success) {
+          if (type === "InicioBreak") setSelectedBreakTagId(null);
+          await fetchTodayPunches();
+        } else {
+          const msg: string = response.data.message ?? "Intenta de nuevo.";
+          const lowerMsg = msg.toLowerCase();
+
+          // El backend pudo registrar el intento con "Error de Imagen"; sincronizar
+          // para que el botón de entrada vuelva a quedar visible y habilitado.
+          await fetchTodayPunches();
+
+          // El backend rechazó por foto no coincidente con el perfil — interpretar
+          // su respuesta con un mensaje claro en vez del Alert genérico.
+          const imageMismatchRejected =
+            isImageRequired &&
+            (response.data.status === "Error de Imagen" ||
+              lowerMsg.includes("imagen"));
+
+          if (imageMismatchRejected) {
+            console.warn(
+              "BLOQUEO POST-VALIDACIÓN: El backend rechazó el ponche por foto no coincidente con el perfil",
+              { message: msg, response: response.data },
+            );
+            Alert.alert(
+              "Foto No Válida",
+              "La foto no coincide con tu perfil. Intenta de nuevo con una foto más clara.",
+            );
+            return;
+          }
+
+          if (
+            lowerMsg.includes("inicio de jornada activo") ||
+            lowerMsg.includes("cerrar la jornada")
+          ) {
+            // Jornada anterior sin cerrar → mostrar modal, sin Alert genérico.
+            // El backend rechaza sin devolver el punch original, así que primero
+            // se resuelve contra el servidor cuál es la jornada abierta: su fecha
+            // real es la única que aceptará el cierre. /punches/today solo
+            // refleja los ponches de HOY, así que si no trae el pendiente se cae
+            // a /punches/opendays (toda la escuela, filtrado client-side por
+            // schoolUserId). Sin ninguno de los dos, el modal abre en estado de
+            // error en vez de adivinar "ayer" — caso realmente excepcional.
+            const schoolUserIdForOpenDay = schoolUser?.id ?? user?.id;
+            const pendingOpenDay =
+              (await fetchTodayPunches()) ??
+              (schoolUserIdForOpenDay
+                ? await fetchOpenDayPunch(
+                    urlColegio,
+                    schoolUserIdForOpenDay,
+                    token,
+                  )
+                : null);
+            if (pendingOpenDay) setNextDayExitPunch(pendingOpenDay);
+            setNextDayExitModal(true);
+            return;
+          } else if (lowerMsg.includes("cambios en el horario")) {
+            Alert.alert(
+              "Horario modificado",
+              msg,
+              [{ text: "Aceptar", onPress: forceLogout }],
+              { cancelable: false },
+            );
+            return;
+          } else {
+            Alert.alert("Error", msg);
+          }
+        }
+      } catch (error: any) {
+        const rawMsg = error?.response?.data?.message ?? "Error de conexión.";
+        const msg: string =
+          typeof rawMsg === "string" ? rawMsg : JSON.stringify(rawMsg);
+        // Sincronizar igualmente en errores de red/servidor para no dejar la UI trabada
+        const pendingFromToday = await fetchTodayPunches();
+        const lowerMsg = msg.toLowerCase();
         if (
           lowerMsg.includes("inicio de jornada activo") ||
           lowerMsg.includes("cerrar la jornada")
         ) {
           // Jornada anterior sin cerrar → mostrar modal, sin Alert genérico.
-          // El backend rechaza sin devolver el punch original, así que primero
-          // se resuelve contra el servidor cuál es la jornada abierta: su fecha
-          // real es la única que aceptará el cierre. /punches/today solo
-          // refleja los ponches de HOY, así que si no trae el pendiente se cae
-          // a /punches/opendays (toda la escuela, filtrado client-side por
-          // schoolUserId). Sin ninguno de los dos, el modal abre en estado de
-          // error en vez de adivinar "ayer" — caso realmente excepcional.
+          // El fetchTodayPunches de arriba ya intentó resolver el punch real;
+          // si no lo encontró, se cae a /punches/opendays antes de abrir el
+          // modal en estado de error.
           const schoolUserIdForOpenDay = schoolUser?.id ?? user?.id;
           const pendingOpenDay =
-            (await fetchTodayPunches()) ??
+            pendingFromToday ??
             (schoolUserIdForOpenDay
               ? await fetchOpenDayPunch(
                   urlColegio,
@@ -1420,47 +1476,11 @@ export default function PunchInOut() {
           if (pendingOpenDay) setNextDayExitPunch(pendingOpenDay);
           setNextDayExitModal(true);
           return;
-        } else if (lowerMsg.includes("cambios en el horario")) {
-          Alert.alert(
-            "Horario modificado",
-            msg,
-            [{ text: "Aceptar", onPress: forceLogout }],
-            { cancelable: false },
-          );
-          return;
-        } else {
-          Alert.alert("Error", msg);
         }
+        Alert.alert("Error", msg);
+      } finally {
+        setLoading(false);
       }
-    } catch (error: any) {
-      const rawMsg = error?.response?.data?.message ?? "Error de conexión.";
-      const msg: string =
-        typeof rawMsg === "string" ? rawMsg : JSON.stringify(rawMsg);
-      // Sincronizar igualmente en errores de red/servidor para no dejar la UI trabada
-      const pendingFromToday = await fetchTodayPunches();
-      const lowerMsg = msg.toLowerCase();
-      if (
-        lowerMsg.includes("inicio de jornada activo") ||
-        lowerMsg.includes("cerrar la jornada")
-      ) {
-        // Jornada anterior sin cerrar → mostrar modal, sin Alert genérico.
-        // El fetchTodayPunches de arriba ya intentó resolver el punch real;
-        // si no lo encontró, se cae a /punches/opendays antes de abrir el
-        // modal en estado de error.
-        const schoolUserIdForOpenDay = schoolUser?.id ?? user?.id;
-        const pendingOpenDay =
-          pendingFromToday ??
-          (schoolUserIdForOpenDay
-            ? await fetchOpenDayPunch(urlColegio, schoolUserIdForOpenDay, token)
-            : null);
-        if (pendingOpenDay) setNextDayExitPunch(pendingOpenDay);
-        setNextDayExitModal(true);
-        return;
-      }
-      Alert.alert("Error", msg);
-    } finally {
-      setLoading(false);
-    }
     } finally {
       isSubmittingRef.current = false;
     }
@@ -1536,7 +1556,11 @@ export default function PunchInOut() {
             <View style={styles.ndModalHeaderRow}>
               <View style={styles.ndModalHeaderLeft}>
                 <View style={styles.ndModalIconWrap}>
-                  <Ionicons name="time-outline" size={22} color={WARNING_ACCENT} />
+                  <Ionicons
+                    name="time-outline"
+                    size={22}
+                    color={WARNING_ACCENT}
+                  />
                 </View>
                 <Text style={styles.ndModalTitle}>Jornada Incompleta</Text>
               </View>
@@ -1562,7 +1586,11 @@ export default function PunchInOut() {
                     onPress={() => setShowTimePicker(true)}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name="time-outline" size={20} color={WARNING_ACCENT} />
+                    <Ionicons
+                      name="time-outline"
+                      size={20}
+                      color={WARNING_ACCENT}
+                    />
                     <Text
                       style={[
                         styles.ndTimeBtnText,
@@ -1573,7 +1601,11 @@ export default function PunchInOut() {
                         ? to12h(nextDayExitTime)
                         : "Seleccionar hora de salida"}
                     </Text>
-                    <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
+                    <Ionicons
+                      name="chevron-down"
+                      size={16}
+                      color={TEXT_PLACEHOLDER}
+                    />
                   </TouchableOpacity>
 
                   {suggestedExitTime && (
@@ -1582,7 +1614,11 @@ export default function PunchInOut() {
                       onPress={handleUseSuggestedExitTime}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="bulb-outline" size={16} color={PRIMARY_COLOR} />
+                      <Ionicons
+                        name="bulb-outline"
+                        size={16}
+                        color={PRIMARY_COLOR}
+                      />
                       <Text style={styles.ndSuggestionText}>
                         Hora sugerida según tu horario:{" "}
                         <Text style={styles.ndSuggestionTextValue}>
@@ -1642,7 +1678,11 @@ export default function PunchInOut() {
           <View style={styles.ndModalCard}>
             <View style={styles.ndModalHeader}>
               <View style={styles.ndModalIconWrap}>
-                <Ionicons name="cafe-outline" size={22} color={WARNING_ACCENT} />
+                <Ionicons
+                  name="cafe-outline"
+                  size={22}
+                  color={WARNING_ACCENT}
+                />
               </View>
               <Text style={styles.ndModalTitle}>Motivo del Break</Text>
             </View>
@@ -1748,7 +1788,7 @@ export default function PunchInOut() {
         {/* ── Reloj ── */}
         <View style={styles.clockFloatCard}>
           <View style={styles.sectionHeaderRow}>
-            <SectionIcon tone="teal">
+            <SectionIcon tone="green">
               <Ionicons
                 name="time-outline"
                 size={18}
@@ -1759,16 +1799,31 @@ export default function PunchInOut() {
           </View>
           <View style={styles.clockCard}>
             <View style={styles.clockTimeGroup}>
-              <Text style={[styles.clockTime, { fontSize: font(isTablet ? 24 : 20) }]}>
+              <Text
+                style={[
+                  styles.clockTime,
+                  { fontSize: font(isTablet ? 24 : 20) },
+                ]}
+              >
                 {formatRDTimeShort(now).split(" ")[0]}
               </Text>
-              <Text style={[styles.clockAmPm, { fontSize: font(isTablet ? 13 : 11) }]}>
+              <Text
+                style={[
+                  styles.clockAmPm,
+                  { fontSize: font(isTablet ? 13 : 11) },
+                ]}
+              >
                 {" "}
                 {formatRDTimeShort(now).split(" ").slice(1).join(" ")}
               </Text>
             </View>
             <View style={styles.clockDivider} />
-            <Text style={[styles.clockDateCompact, { fontSize: font(isTablet ? 16 : 14) }]}>
+            <Text
+              style={[
+                styles.clockDateCompact,
+                { fontSize: font(isTablet ? 16 : 14) },
+              ]}
+            >
               {formatRDDateShort(now)}
             </Text>
           </View>
@@ -1785,9 +1840,7 @@ export default function PunchInOut() {
                   color={SECTION_ICON_COLOR}
                 />
               </SectionIcon>
-              <Text style={styles.sectionHeaderText}>
-                Perfil - Time Control
-              </Text>
+              <Text style={styles.sectionHeaderText}>Perfil</Text>
             </View>
             {approvedPermissionsToday.length > 0 && (
               <TouchableOpacity
@@ -1828,7 +1881,11 @@ export default function PunchInOut() {
               <View
                 style={[
                   styles.avatarStatusDot,
-                  { backgroundColor: jornadaIniciada ? ONLINE_DOT : TEXT_PLACEHOLDER },
+                  {
+                    backgroundColor: jornadaIniciada
+                      ? ONLINE_DOT
+                      : TEXT_PLACEHOLDER,
+                  },
                 ]}
               />
             </View>
@@ -1923,7 +1980,11 @@ export default function PunchInOut() {
               ]}
             >
               <View style={styles.locationHeaderRow}>
-                <Ionicons name="location-outline" size={13} color={TEXT_MUTED} />
+                <Ionicons
+                  name="location-outline"
+                  size={13}
+                  color={TEXT_MUTED}
+                />
                 <Text style={styles.locationHeaderText}>Ubicación</Text>
               </View>
               <Text style={styles.locationAddressText} numberOfLines={2}>
@@ -1933,7 +1994,11 @@ export default function PunchInOut() {
                 <Ionicons
                   name="location-outline"
                   size={13}
-                  color={currentLocationInfo.withinArea ? SUCCESS_ACCENT : ERROR_COLOR}
+                  color={
+                    currentLocationInfo.withinArea
+                      ? SUCCESS_ACCENT
+                      : ERROR_COLOR
+                  }
                 />
                 <Text
                   style={[
@@ -1963,7 +2028,11 @@ export default function PunchInOut() {
                 ]}
               >
                 <View style={styles.scheduleTableRow}>
-                  <Ionicons name="time-outline" size={14} color={PRIMARY_COLOR} />
+                  <Ionicons
+                    name="time-outline"
+                    size={14}
+                    color={PRIMARY_COLOR}
+                  />
                   <Text
                     style={[styles.scheduleTableHeader, { color: PRIMARY_700 }]}
                   >
@@ -1996,28 +2065,37 @@ export default function PunchInOut() {
                       color={WARNING_ACCENT}
                     />
                     <Text
-                      style={[styles.scheduleTableHeader, { color: WARNING_TEXT_STRONG }]}
+                      style={[
+                        styles.scheduleTableHeader,
+                        { color: WARNING_TEXT_STRONG },
+                      ]}
                     >
                       Almuerzo
                     </Text>
                   </View>
                   <Text
-                      style={[
-                        styles.scheduleTableValue,
-                        { fontSize: font(isTablet ? 13 : 11) },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {to12h(todaySchedule.lunchEntryTime)} –{" "}
-                      {to12h(todaySchedule.lunchExitTime ?? "")}
-                    </Text>
+                    style={[
+                      styles.scheduleTableValue,
+                      { fontSize: font(isTablet ? 13 : 11) },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {to12h(todaySchedule.lunchEntryTime)} –{" "}
+                    {to12h(todaySchedule.lunchExitTime ?? "")}
+                  </Text>
                 </View>
               )}
             </View>
           ) : (
             <View style={styles.profileScheduleRow}>
-              <Ionicons name="warning-outline" size={13} color={WARNING_ACCENT} />
-              <Text style={[styles.profileScheduleText, { color: WARNING_ACCENT }]}>
+              <Ionicons
+                name="warning-outline"
+                size={13}
+                color={WARNING_ACCENT}
+              />
+              <Text
+                style={[styles.profileScheduleText, { color: WARNING_ACCENT }]}
+              >
                 Sin horario configurado
               </Text>
             </View>
@@ -2069,7 +2147,9 @@ export default function PunchInOut() {
                   <Ionicons
                     name={CATEGORY_ICONS[cat]}
                     size={22}
-                    color={selectedCategory === cat ? ON_PRIMARY : PRIMARY_COLOR}
+                    color={
+                      selectedCategory === cat ? ON_PRIMARY : PRIMARY_COLOR
+                    }
                   />
                   <Text
                     style={[
@@ -2104,7 +2184,11 @@ export default function PunchInOut() {
                     ? breakTags.find((t) => t.id === selectedBreakTagId)?.name
                     : "Selecciona un motivo"}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
+                <Ionicons
+                  name="chevron-down"
+                  size={16}
+                  color={TEXT_PLACEHOLDER}
+                />
               </TouchableOpacity>
             </View>
           )}
@@ -2173,7 +2257,7 @@ export default function PunchInOut() {
             activeOpacity={0.7}
           >
             <View style={styles.sectionHeaderToggleLabel}>
-              <SectionIcon tone="violet">
+              <SectionIcon tone="sky">
                 <Ionicons
                   name="hourglass-outline"
                   size={18}
@@ -2181,7 +2265,7 @@ export default function PunchInOut() {
                 />
               </SectionIcon>
               <Text style={styles.sectionHeaderText}>
-                Ver Botones de Acciones
+                Tiempo para mostrar acciones
               </Text>
             </View>
             <View style={styles.historyChevronBtn}>
@@ -2200,7 +2284,9 @@ export default function PunchInOut() {
                   isTablet && styles.toleranceCellTablet,
                 ]}
               >
-                <Text style={styles.toleranceCellLabel}>Entrada Jornada</Text>
+                <Text style={[styles.toleranceCellLabel, styles.toleranceLabelIn]}>
+                  Entrada Jornada
+                </Text>
                 <Text style={styles.toleranceCellValue}>
                   {btnVisWorkIn} min antes
                 </Text>
@@ -2211,7 +2297,9 @@ export default function PunchInOut() {
                   isTablet && styles.toleranceCellTablet,
                 ]}
               >
-                <Text style={styles.toleranceCellLabel}>Entrada Almuerzo</Text>
+                <Text style={[styles.toleranceCellLabel, styles.toleranceLabelIn]}>
+                  Entrada Almuerzo
+                </Text>
                 <Text style={styles.toleranceCellValue}>
                   {btnVisLunchIn} min antes
                 </Text>
@@ -2222,7 +2310,9 @@ export default function PunchInOut() {
                   isTablet && styles.toleranceCellTablet,
                 ]}
               >
-                <Text style={styles.toleranceCellLabel}>Salida Jornada</Text>
+                <Text style={[styles.toleranceCellLabel, styles.toleranceLabelOut]}>
+                  Salida Jornada
+                </Text>
                 <Text style={styles.toleranceCellValue}>
                   {btnVisWorkOut} min antes
                 </Text>
@@ -2233,7 +2323,9 @@ export default function PunchInOut() {
                   isTablet && styles.toleranceCellTablet,
                 ]}
               >
-                <Text style={styles.toleranceCellLabel}>Salida Almuerzo</Text>
+                <Text style={[styles.toleranceCellLabel, styles.toleranceLabelOut]}>
+                  Salida Almuerzo
+                </Text>
                 <Text style={styles.toleranceCellValue}>
                   {btnVisLunchOut} min antes
                 </Text>
@@ -2250,7 +2342,7 @@ export default function PunchInOut() {
             activeOpacity={0.7}
           >
             <View style={styles.sectionHeaderToggleLabel}>
-              <SectionIcon tone="teal">
+              <SectionIcon tone="green">
                 <Ionicons
                   name="list-outline"
                   size={18}
@@ -2374,7 +2466,9 @@ export default function PunchInOut() {
                               )
                             )}
                             {!!breakTagName && (
-                              <View style={[styles.punchBadge, styles.badgeNeutral]}>
+                              <View
+                                style={[styles.punchBadge, styles.badgeNeutral]}
+                              >
                                 <Text
                                   style={[
                                     styles.punchBadgeText,
@@ -2686,10 +2780,13 @@ const styles = StyleSheet.create({
     color: TEXT_MUTED,
     marginBottom: 1,
   },
+  // Mismo verde/rojo que los botones Entrada / Salida (registerBtn*).
+  toleranceLabelIn: { color: SUCCESS_ACCENT },
+  toleranceLabelOut: { color: ERROR_COLOR },
   toleranceCellValue: {
     fontSize: 13,
     fontWeight: "700",
-    color: PRIMARY_COLOR,
+    color: TEXT_MUTED,
   },
   holidayNotice: {
     flexDirection: "row",
@@ -2798,7 +2895,11 @@ const styles = StyleSheet.create({
   punchInfo: { flex: 1, gap: 4 },
   punchType: { fontSize: 13, fontWeight: "700", color: TEXT_PRIMARY },
   punchBadgeRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
-  punchBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS_PILL },
+  punchBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: RADIUS_PILL,
+  },
   badgeOnTime: { backgroundColor: SUCCESS_TINT_BACKGROUND },
   badgeLate: { backgroundColor: DANGER_TINT_BACKGROUND },
   badgeEarly: { backgroundColor: WARNING_TINT_BACKGROUND },
@@ -2859,7 +2960,11 @@ const styles = StyleSheet.create({
     backgroundColor: CARD_BORDER,
     marginBottom: 16,
   },
-  permissionItemAction: { fontSize: 15, fontWeight: "700", color: TEXT_PRIMARY },
+  permissionItemAction: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: TEXT_PRIMARY,
+  },
   permissionItemTime: {
     fontSize: 14,
     fontWeight: "600",
@@ -2993,7 +3098,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  breakTagSelectorText: { fontSize: 15, fontWeight: "600", color: TEXT_PLACEHOLDER },
+  breakTagSelectorText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: TEXT_PLACEHOLDER,
+  },
   breakTagSelectorTextValue: { color: TEXT_PRIMARY },
   breakTagOption: {
     flexDirection: "row",

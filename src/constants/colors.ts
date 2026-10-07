@@ -82,6 +82,7 @@ export const TEXT_BODY = "#4B5563";
 export const SUCCESS_COLOR = "#15803D";
 export const ACCENT_VIOLET = "#7C3AED";
 export const ACCENT_TEAL = "#0D9488";
+export const ACCENT_SKY = "#0EA5E9";
 /**
  * Ámbar para íconos/acentos. No confundir con WARNING_COLOR (#B45309), que es
  * el ámbar más oscuro para TEXTO de aviso — este es más claro y no da
@@ -144,13 +145,23 @@ export const TAG_DOT_FALLBACK = "#CBD5E1";
 /**
  * Chip de ícono de sección (título de card): cuadrito SÓLIDO del color del
  * tono con el ícono en blanco encima. El tono se elige por tipo de contenido
- * (info azul, detalles violeta, fechas teal, adjuntos ámbar, peligro rojo).
+ * (info azul, detalles violeta, fechas teal, adjuntos ámbar, peligro rojo;
+ * verde = mismo verde del botón Entrada, cielo = tiempos/tolerancias).
  */
-export type SectionTone = "blue" | "violet" | "teal" | "amber" | "red";
+export type SectionTone =
+  | "blue"
+  | "sky"
+  | "violet"
+  | "teal"
+  | "green"
+  | "amber"
+  | "red";
 export const SECTION_TONES: Record<SectionTone, string> = {
   blue: PRIMARY_COLOR,
+  sky: ACCENT_SKY,
   violet: ACCENT_VIOLET,
   teal: ACCENT_TEAL,
+  green: SUCCESS_ACCENT,
   amber: WARNING_ACCENT,
   red: ERROR_COLOR,
 };

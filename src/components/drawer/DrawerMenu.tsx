@@ -97,6 +97,14 @@ function getIcon(iconName: string): keyof typeof Ionicons.glyphMap {
 }
 
 /**
+ * Los nombres del menú vienen del backend. Algunos traen el sufijo de la
+ * app ("Perfil - Time Control"), que en el móvil sobra.
+ */
+function getLabel(name: string): string {
+  return name?.replace(/\s*-\s*Time\s*Control\s*$/i, "") ?? "";
+}
+
+/**
  * Estilos tokenizados con scale/verticalScale/font de useResponsive(). Vive
  * fuera del componente (función pura) para que tanto DrawerMenu como
  * MenuSection consuman la misma instancia memoizada — evita recalcular por
@@ -413,7 +421,7 @@ function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
           <Text
             style={[styles.sectionTitle, isActive && styles.sectionTitleActive]}
           >
-            {section.parent.name}
+            {getLabel(section.parent.name)}
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -428,7 +436,7 @@ function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
         activeOpacity={0.7}
       >
         <Ionicons name={sectionIcon} size={20} color={PRIMARY_COLOR} />
-        <Text style={styles.sectionTitle}>{section.parent.name}</Text>
+        <Text style={styles.sectionTitle}>{getLabel(section.parent.name)}</Text>
         <Animated.View style={chevronStyle}>
           <Ionicons name="chevron-forward" size={16} color={TEXT_PLACEHOLDER} />
         </Animated.View>
@@ -460,7 +468,7 @@ function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
                 <Text
                   style={[styles.childText, isActive && styles.activeChildText]}
                 >
-                  {child.name}
+                  {getLabel(child.name)}
                 </Text>
               </TouchableOpacity>
             );
