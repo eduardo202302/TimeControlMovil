@@ -36,14 +36,14 @@ import { SHADOW_PRIMARY, tintedShadow } from "@/constants/shadows";
 import {
   CARD_FORM,
   CARD_ROW,
+  CATEGORY_BTN_ACTIVE,
+  CATEGORY_BTN_SURFACE,
   DIALOG_BOX,
   DIALOG_OVERLAY,
   FIELD_SURFACE,
   FOOTER_BTN_CANCEL,
   FOOTER_BTN_SAVE,
   POPUP_CARD,
-  SEGMENT_ACTIVE,
-  TAB_BTN_SURFACE,
 } from "@/styles/surfaces";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, {
@@ -959,14 +959,17 @@ export default function AdminPunchInOutScreen() {
                           >
                             <Ionicons
                               name={CATEGORY_ICONS[cat]}
-                              size={20}
-                              color={active ? ON_PRIMARY : PRIMARY_COLOR}
+                              size={18}
+                              color={active ? ON_PRIMARY : PRIMARY_700}
                             />
                             <Text
                               style={[
                                 styles.tabText,
                                 active && styles.tabTextActive,
                               ]}
+                              numberOfLines={1}
+                              adjustsFontSizeToFit
+                              minimumFontScale={0.85}
                             >
                               {cat}
                             </Text>
@@ -2016,17 +2019,26 @@ function createStyles(
       gap: scale(8),
       marginTop: verticalScale(12),
     },
-    // Misma superficie que el tab bar de Usuarios (userFormStyles.ts), que
-    // copió este layout: TAB_BTN_SURFACE en reposo, SEGMENT_ACTIVE en el activo.
+    // Misma barra que el selector del ponchador normal (punchinout.tsx):
+    // CATEGORY_BTN_SURFACE en reposo, CATEGORY_BTN_ACTIVE en el activo, con el
+    // ícono a la izquierda del texto como el botón Entrada/Salida.
     tabBtn: {
-      ...TAB_BTN_SURFACE,
+      ...CATEGORY_BTN_SURFACE,
       flex: 1,
+      flexDirection: "row",
       alignItems: "center",
-      gap: scale(4),
-      paddingVertical: verticalScale(12),
+      justifyContent: "center",
+      gap: scale(5),
+      minHeight: verticalScale(52),
+      paddingHorizontal: scale(6),
     },
-    tabBtnActive: { ...SEGMENT_ACTIVE },
-    tabText: { fontSize: font(13), fontWeight: "600", color: PRIMARY_COLOR },
+    tabBtnActive: { ...CATEGORY_BTN_ACTIVE },
+    tabText: {
+      fontSize: font(13),
+      fontWeight: "800",
+      letterSpacing: 0.2,
+      color: PRIMARY_700,
+    },
     tabTextActive: { color: ON_PRIMARY },
     fieldLabel: {
       fontSize: font(12),

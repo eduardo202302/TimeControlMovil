@@ -7,7 +7,6 @@ import {
   DANGER_TINT_BORDER,
   ERROR_COLOR,
   ERROR_TEXT,
-  FIELD_BACKGROUND,
   FIELD_DISABLED_BACKGROUND,
   FOOTER_BORDER,
   HEADER_NAVY,
@@ -45,6 +44,8 @@ import { tintedShadow } from "@/constants/shadows";
 import {
   ALERT_BANNER,
   CARD_FORM,
+  CATEGORY_BTN_ACTIVE,
+  CATEGORY_BTN_SURFACE,
   DIALOG_OVERLAY,
   FIELD_SURFACE,
   FOOTER_BTN_SAVE,
@@ -2159,7 +2160,6 @@ export default function PunchInOut() {
           {visibleCategories.length > 1 && (
             <View style={styles.categories}>
               {visibleCategories.map((cat) => {
-                const hasActive = getNextPunchType(cat) === "fin";
                 return (
                   <TouchableOpacity
                     key={cat}
@@ -2172,9 +2172,9 @@ export default function PunchInOut() {
                   >
                     <Ionicons
                       name={CATEGORY_ICONS[cat]}
-                      size={22}
+                      size={18}
                       color={
-                        selectedCategory === cat ? ON_PRIMARY : PRIMARY_COLOR
+                        selectedCategory === cat ? ON_PRIMARY : PRIMARY_700
                       }
                     />
                     <Text
@@ -2182,10 +2182,12 @@ export default function PunchInOut() {
                         styles.categoryText,
                         selectedCategory === cat && styles.categoryTextActive,
                       ]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.85}
                     >
                       {cat}
                     </Text>
-                    {hasActive && <View style={styles.activeDot} />}
                   </TouchableOpacity>
                 );
               })}
@@ -2193,7 +2195,14 @@ export default function PunchInOut() {
           )}
 
           {selectedCategory === "Break" && isInicio && breakTags.length > 0 && (
-            <View style={styles.breakTagWrap}>
+            <View
+              style={[
+                styles.breakTagWrap,
+                // Sin fila de categorías encima, el margen inferior del
+                // header ya separa.
+                visibleCategories.length <= 1 && { marginTop: 0 },
+              ]}
+            >
               <Text style={styles.breakTagLabel}>Motivo del Break</Text>
               <TouchableOpacity
                 style={styles.breakTagSelector}
@@ -2848,36 +2857,25 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: WARNING_TEXT_STRONG,
   },
-  categories: { flexDirection: "row", gap: 10 },
+  categories: { flexDirection: "row", gap: 8 },
   categoryBtn: {
+    ...CATEGORY_BTN_SURFACE,
     flex: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 14,
-    borderRadius: RADIUS_LG,
-    backgroundColor: FIELD_BACKGROUND,
-    borderWidth: 1.5,
-    borderColor: CARD_BORDER,
     gap: 5,
-    position: "relative",
+    minHeight: 52,
+    paddingHorizontal: 6,
   },
-  categoryBtnActive: {
-    backgroundColor: PRIMARY_COLOR,
-    borderColor: PRIMARY_COLOR,
+  categoryBtnActive: { ...CATEGORY_BTN_ACTIVE },
+  categoryText: {
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 0.2,
+    color: PRIMARY_700,
   },
-  categoryText: { fontSize: 12, fontWeight: "600", color: TEXT_MUTED },
   categoryTextActive: { color: ON_PRIMARY },
-  activeDot: {
-    position: "absolute",
-    top: 7,
-    right: 7,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: SUCCESS_ACCENT,
-    borderWidth: 1.5,
-    borderColor: CARD_BACKGROUND,
-  },
   registerBtn: {
     ...tintedShadow(SUCCESS_ACCENT),
     borderRadius: RADIUS_LG,

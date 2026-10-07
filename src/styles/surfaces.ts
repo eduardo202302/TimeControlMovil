@@ -15,6 +15,7 @@ import {
   OVERLAY_BACKDROP,
   PRIMARY_COLOR,
   PRIMARY_TINT_50,
+  PRIMARY_TINT_BORDER,
   RIBBON_BACKGROUND,
   SURFACE_SUBTLE,
   SWITCH_TRACK_OFF,
@@ -35,6 +36,7 @@ import {
   SHADOW_PRIMARY,
   SHADOW_RIBBON,
   SHADOW_SM,
+  tintedShadow,
 } from "@/constants/shadows";
 
 /**
@@ -247,6 +249,27 @@ export const SEGMENT_ACTIVE: ViewStyle = {
 export const TAB_BTN_SURFACE: ViewStyle = {
   backgroundColor: PRIMARY_TINT_50,
   borderRadius: RADIUS_LG,
+};
+
+/**
+ * Selector Jornada / Break / Almuerzo de los dos ponchadores, en reposo.
+ * Misma forma de barra que el botón Entrada/Salida (registerBtn).
+ */
+export const CATEGORY_BTN_SURFACE: ViewStyle = {
+  backgroundColor: PRIMARY_TINT_50,
+  borderWidth: 1,
+  borderColor: PRIMARY_TINT_BORDER,
+  borderRadius: RADIUS_LG,
+};
+
+/**
+ * Selector Jornada / Break / Almuerzo seleccionado: va en el array DESPUÉS de
+ * CATEGORY_BTN_SURFACE. Sombra teñida, igual que registerBtn con su verde.
+ */
+export const CATEGORY_BTN_ACTIVE: ViewStyle = {
+  backgroundColor: PRIMARY_COLOR,
+  borderColor: PRIMARY_COLOR,
+  ...tintedShadow(PRIMARY_COLOR),
 };
 
 /** Colores del <Switch> (props, no ViewStyle): <Switch {...SWITCH_COLORS} />. */
