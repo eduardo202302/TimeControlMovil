@@ -164,8 +164,16 @@ const PUNCH_TYPE_MAP: Record<Category, { inicio: string; fin: string }> = {
 const SESSION_MAX_HOURS_FOR_FIRST_ENTRY = 12;
 const HISTORY_COLLAPSED_LIMIT = 3;
 
-/** Logo de Time Control (solo el ícono, sin texto) — título de la card Perfil. */
+/** Logo de Time Control (solo el ícono, sin texto) — título de la card Hora Actual. */
 const TIME_CONTROL_LOGO = require("../../../assets/images/logos/logopeq.png");
+/** Proporción del PNG (652×411). */
+const TIME_CONTROL_LOGO_ASPECT = 652 / 411;
+/**
+ * Fracción del ancho que el PNG trae en blanco a la derecha (el dibujo
+ * termina en x≈580 de 652). Se compensa con un marginRight negativo para
+ * alinear el dibujo con el borde derecho del contenido de la card.
+ */
+const TIME_CONTROL_LOGO_RIGHT_INSET = 71 / 652;
 
 function decodeJWT(token: string): Record<string, any> {
   try {
@@ -447,7 +455,7 @@ async function fetchOpenDayPunch(
 }
 
 export default function PunchInOut() {
-  const { isTablet, font } = useResponsive();
+  const { isTablet, font, scale } = useResponsive();
   const [now, setNow] = useState(new Date());
   const [selectedCategory, setSelectedCategory] = useState<Category>("Jornada");
   const [punches, setPunches] = useState<PunchEvent[]>([]);
@@ -1531,6 +1539,15 @@ export default function PunchInOut() {
   // permiso o no.
   const approvedPermissionsToday = getApprovedPermissionsToday(permissions);
 
+  // Logo de Hora Actual: más alto que el SectionIcon (scale(32)), pero el
+  // exceso se descuenta con marginBottom negativo para que la fila del título
+  // nunca crezca; ancho por la proporción del PNG.
+  const timeControlLogoHeight = scale(40);
+  const timeControlLogoOverflow = timeControlLogoHeight - scale(32);
+  const timeControlLogoWidth = Math.round(
+    timeControlLogoHeight * TIME_CONTROL_LOGO_ASPECT,
+  );
+
   return (
     <View style={{ flex: 1 }}>
       <Modal
@@ -1784,6 +1801,26 @@ export default function PunchInOut() {
               />
             </SectionIcon>
             <Text style={styles.sectionHeaderText}>Hora Actual</Text>
+            <Image
+              source={TIME_CONTROL_LOGO}
+              style={{
+                height: timeControlLogoHeight,
+                width: timeControlLogoWidth,
+                marginLeft: "auto",
+                marginRight: -Math.floor(
+                  timeControlLogoWidth * TIME_CONTROL_LOGO_RIGHT_INSET,
+                ),
+                // Ocupa en el layout lo mismo que el SectionIcon: el exceso
+                // de alto sobresale hacia abajo, sobre el margen del título.
+                marginBottom: -timeControlLogoOverflow,
+                // Sube el logo sin cambiar el alto de la fila ni mover el
+                // reloj de abajo.
+                position: "relative",
+                top: -scale(4),
+              }}
+              resizeMode="contain"
+              accessibilityLabel="Time Control"
+            />
           </View>
           <View style={styles.clockCard}>
             <View style={styles.clockTimeGroup}>
@@ -1830,29 +1867,21 @@ export default function PunchInOut() {
               </SectionIcon>
               <Text style={styles.sectionHeaderText}>Perfil</Text>
             </View>
-            <View style={styles.profileHeaderRight}>
-              {approvedPermissionsToday.length > 0 && (
-                <TouchableOpacity
-                  onPress={() => setPermissionInfoModal(true)}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <View style={styles.permissionBadge}>
-                    <MaterialCommunityIcons
-                      name="alpha-p"
-                      size={20}
-                      color={PRIMARY_COLOR}
-                    />
-                  </View>
-                </TouchableOpacity>
-              )}
-              <Image
-                source={TIME_CONTROL_LOGO}
-                style={styles.profileLogo}
-                resizeMode="contain"
-                accessibilityLabel="Time Control"
-              />
-            </View>
+            {approvedPermissionsToday.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setPermissionInfoModal(true)}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <View style={styles.permissionBadge}>
+                  <MaterialCommunityIcons
+                    name="alpha-p"
+                    size={20}
+                    color={PRIMARY_COLOR}
+                  />
+                </View>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.profileRow}>
@@ -2742,19 +2771,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  profileHeaderRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  // Alto = SectionIcon; ancho por la proporción del PNG (652×411). El PNG
-  // trae ~70px blancos a la derecha (el dibujo termina en x≈580): el margen
-  // negativo alinea el dibujo con el borde de las tarjetas Horario/Almuerzo.
-  profileLogo: {
-    height: 32,
-    width: 51,
-    marginRight: -5,
   },
   historyChevronBtn: {
     width: 20,
