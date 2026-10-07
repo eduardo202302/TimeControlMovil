@@ -106,6 +106,7 @@ import {
   isRejectedJornadaAttempt,
   RD_UTC_OFFSET,
   resolvePunchTypeForApi,
+  resolveSelectedCategory,
   tagsOfCategory,
   toRD,
   toRDDateString,
@@ -780,34 +781,6 @@ export default function PunchInOut() {
     };
     loadData();
   }, []);
-
-  // Si la categoría seleccionada deja de ser visible → volver a Jornada
-  useEffect(() => {
-    if (
-      selectedCategory === "Almuerzo" &&
-      !isAlmuerzoVisible(
-        now,
-        todaySchedule,
-        btnVisLunchIn,
-        btnVisLunchOut,
-        punches,
-        permissions,
-        todayHoliday,
-      )
-    ) {
-      setSelectedCategory("Jornada");
-    }
-    if (selectedCategory === "Break" && !isBreakVisible(punches)) {
-      setSelectedCategory("Jornada");
-    }
-  }, [
-    now,
-    punches,
-    todaySchedule,
-    selectedCategory,
-    permissions,
-    todayHoliday,
-  ]);
 
   // Motivo de break no debe sobrevivir un cambio de categoría — evita que un
   // motivo elegido para un Break anterior quede preseleccionado en el siguiente.
@@ -1516,6 +1489,18 @@ export default function PunchInOut() {
     return true;
   });
 
+  // Si la categoría seleccionada deja de ser visible → pasar a la primera
+  // visible. Con una sola visible la fila de categorías se oculta, así que
+  // esa acción tiene que quedar seleccionada para que su botón aparezca.
+  // Depende de la clave y no del array: visibleCategories se recrea en cada
+  // render y `now` cambia cada segundo.
+  const visibleCategoriesKey = visibleCategories.join("|");
+  useEffect(() => {
+    const next = resolveSelectedCategory(selectedCategory, visibleCategories);
+    if (next !== selectedCategory) setSelectedCategory(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleCategories queda cubierto por visibleCategoriesKey
+  }, [visibleCategoriesKey, selectedCategory]);
+
   // Los dos consumos de UI leen la MISMA pendingPunchDate que usa el payload.
   const pendingDate = pendingPunchDate ? formatRDDate(pendingPunchDate) : "";
 
@@ -2131,43 +2116,45 @@ export default function PunchInOut() {
               </Text>
             </View>
           )}
-          <View style={styles.categories}>
-            {visibleCategories.map((cat) => {
-              const hasActive = getNextPunchType(cat) === "fin";
-              return (
-                <TouchableOpacity
-                  key={cat}
-                  style={[
-                    styles.categoryBtn,
-                    selectedCategory === cat && styles.categoryBtnActive,
-                  ]}
-                  onPress={() => setSelectedCategory(cat)}
-                  activeOpacity={0.75}
-                >
-                  <Ionicons
-                    name={CATEGORY_ICONS[cat]}
-                    size={22}
-                    color={
-                      selectedCategory === cat ? ON_PRIMARY : PRIMARY_COLOR
-                    }
-                  />
-                  <Text
+          {visibleCategories.length > 1 && (
+            <View style={styles.categories}>
+              {visibleCategories.map((cat) => {
+                const hasActive = getNextPunchType(cat) === "fin";
+                return (
+                  <TouchableOpacity
+                    key={cat}
                     style={[
-                      styles.categoryText,
-                      selectedCategory === cat && styles.categoryTextActive,
+                      styles.categoryBtn,
+                      selectedCategory === cat && styles.categoryBtnActive,
                     ]}
+                    onPress={() => setSelectedCategory(cat)}
+                    activeOpacity={0.75}
                   >
-                    {cat}
-                  </Text>
-                  {hasActive && <View style={styles.activeDot} />}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                    <Ionicons
+                      name={CATEGORY_ICONS[cat]}
+                      size={22}
+                      color={
+                        selectedCategory === cat ? ON_PRIMARY : PRIMARY_COLOR
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.categoryText,
+                        selectedCategory === cat && styles.categoryTextActive,
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                    {hasActive && <View style={styles.activeDot} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
           {selectedCategory === "Break" && isInicio && breakTags.length > 0 && (
             <View style={styles.breakTagWrap}>
-              <Text style={styles.breakTagLabel}>Motivo del break</Text>
+              <Text style={styles.breakTagLabel}>Motivo del Break</Text>
               <TouchableOpacity
                 style={styles.breakTagSelector}
                 onPress={() => setBreakTagModalVisible(true)}
@@ -2219,6 +2206,14 @@ export default function PunchInOut() {
             <TouchableOpacity
               style={[
                 styles.registerBtn,
+                // Sin fila de categorías ni motivo de break encima, el
+                // margen inferior del header / aviso de feriado ya separa.
+                visibleCategories.length <= 1 &&
+                  !(
+                    selectedCategory === "Break" &&
+                    isInicio &&
+                    breakTags.length > 0
+                  ) && { marginTop: 0 },
                 !isInicio && styles.registerBtnExit,
                 loading && styles.registerBtnBusy,
               ]}
@@ -2284,7 +2279,9 @@ export default function PunchInOut() {
                   isTablet && styles.toleranceCellTablet,
                 ]}
               >
-                <Text style={[styles.toleranceCellLabel, styles.toleranceLabelIn]}>
+                <Text
+                  style={[styles.toleranceCellLabel, styles.toleranceLabelIn]}
+                >
                   Entrada Jornada
                 </Text>
                 <Text style={styles.toleranceCellValue}>
@@ -2297,7 +2294,9 @@ export default function PunchInOut() {
                   isTablet && styles.toleranceCellTablet,
                 ]}
               >
-                <Text style={[styles.toleranceCellLabel, styles.toleranceLabelIn]}>
+                <Text
+                  style={[styles.toleranceCellLabel, styles.toleranceLabelIn]}
+                >
                   Entrada Almuerzo
                 </Text>
                 <Text style={styles.toleranceCellValue}>
@@ -2310,7 +2309,9 @@ export default function PunchInOut() {
                   isTablet && styles.toleranceCellTablet,
                 ]}
               >
-                <Text style={[styles.toleranceCellLabel, styles.toleranceLabelOut]}>
+                <Text
+                  style={[styles.toleranceCellLabel, styles.toleranceLabelOut]}
+                >
                   Salida Jornada
                 </Text>
                 <Text style={styles.toleranceCellValue}>
@@ -2323,7 +2324,9 @@ export default function PunchInOut() {
                   isTablet && styles.toleranceCellTablet,
                 ]}
               >
-                <Text style={[styles.toleranceCellLabel, styles.toleranceLabelOut]}>
+                <Text
+                  style={[styles.toleranceCellLabel, styles.toleranceLabelOut]}
+                >
                   Salida Almuerzo
                 </Text>
                 <Text style={styles.toleranceCellValue}>

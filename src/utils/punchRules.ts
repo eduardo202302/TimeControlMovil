@@ -372,15 +372,26 @@ export function getBreakTagCategoryId(settings: unknown): number | undefined {
   return readCategoryDefaultId(defaults.catBreakTypeId);
 }
 
-/** Los tags de una categoría — el picker de "Motivo del break". */
+/**
+ * Los tags de una categoría — el picker de "Motivo del break" — ordenados
+ * alfabéticamente por nombre. La comparación ignora tildes y mayúsculas
+ * ("técnico" va después de "Personal"). Devuelve un array nuevo: `tags` no
+ * se muta.
+ */
 export function tagsOfCategory(
   tags: Tag[],
   categoryId: number | null | undefined,
 ): Tag[] {
   if (categoryId == null) return [];
-  return (tags ?? []).filter(
-    (tag) => (tag.category?.id ?? (tag as any).categoryId) === categoryId,
-  );
+  return (tags ?? [])
+    .filter(
+      (tag) => (tag.category?.id ?? (tag as any).categoryId) === categoryId,
+    )
+    .sort((a, b) =>
+      String(a.name ?? "").localeCompare(String(b.name ?? ""), "es", {
+        sensitivity: "base",
+      }),
+    );
 }
 
 // ─── Permisos del día ─────────────────────────────────────────────────────────
@@ -834,4 +845,18 @@ export function isAlmuerzoButtonVisible(
       current <= exitTime + btnVisLunchOut
     );
   }
+}
+
+/**
+ * Categoría que debe quedar seleccionada en "Reg. Entrada / Salida" según las
+ * categorías visibles: se conserva la seleccionada si sigue visible; si no,
+ * se pasa a la primera visible (con una sola, es la única acción posible y la
+ * fila de categorías se oculta). Sin ninguna visible no hay a dónde moverse.
+ */
+export function resolveSelectedCategory<T extends string>(
+  selected: T,
+  visible: readonly T[],
+): T {
+  if (visible.length === 0 || visible.includes(selected)) return selected;
+  return visible[0];
 }

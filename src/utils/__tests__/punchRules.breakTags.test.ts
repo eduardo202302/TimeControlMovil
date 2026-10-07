@@ -61,7 +61,7 @@ describe("tagsOfCategory", () => {
   ];
 
   test("filtra por el categoryId dinámico", () => {
-    expect(tagsOfCategory(tags, 30).map((t) => t.id)).toEqual([2, 3]);
+    expect(tagsOfCategory(tags, 30).map((t) => t.id)).toEqual([3, 2]);
   });
 
   test("un categoryId de otra categoría no trae motivos de break", () => {
@@ -106,7 +106,31 @@ describe("tagsOfCategory", () => {
     const categoryId = getBreakTagCategoryId({
       categoryDefaultIds: { catBreakTypeId: { label: "Tipos de Break", value: 30 } },
     });
-    expect(tagsOfCategory(tags, categoryId).map((t) => t.id)).toEqual([2, 3]);
+    expect(tagsOfCategory(tags, categoryId).map((t) => t.id)).toEqual([3, 2]);
+  });
+
+  test("ordena alfabéticamente ignorando tildes y mayúsculas", () => {
+    const sinOrden: Tag[] = [
+      "técnico",
+      "Descanso",
+      "Electricidad",
+      "operativo",
+      "Personal",
+    ].map((name, i) => ({ id: i + 1, name, category: { id: 30 } }));
+    expect(tagsOfCategory(sinOrden, 30).map((t) => t.name)).toEqual([
+      "Descanso",
+      "Electricidad",
+      "operativo",
+      "Personal",
+      "técnico",
+    ]);
+  });
+
+  test("no muta el array de entrada", () => {
+    const copia = [...tags];
+    tagsOfCategory(tags, 30);
+    expect(tags).toEqual(copia);
+    expect(tags.map((t) => t.id)).toEqual([1, 2, 3, 4]);
   });
 });
 
