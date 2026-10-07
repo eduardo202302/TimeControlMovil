@@ -89,8 +89,10 @@ import {
   findLastJornadaPunch,
   findOpenDayPunch,
   findOpenDayPunchForUser,
+  formatLateDuration,
   getApprovedPermissionsToday,
   getBreakTagCategoryId,
+  getLateMinutes,
   getPendingOpenDayDate,
   getPunchBreakTagName,
   getPunctuality,
@@ -2431,15 +2433,21 @@ export default function PunchInOut() {
                     historyShowAll ? undefined : HISTORY_COLLAPSED_LIMIT,
                   )
                   .map((punch) => {
+                    const tolerances = {
+                      workIn: tolWorkIn,
+                      workOut: tolWorkOut,
+                      lunchIn: tolLunchIn,
+                      lunchOut: tolLunchOut,
+                    };
                     const displayStatus = getDisplayStatus(
                       punch,
                       userSchedules,
-                      {
-                        workIn: tolWorkIn,
-                        workOut: tolWorkOut,
-                        lunchIn: tolLunchIn,
-                        lunchOut: tolLunchOut,
-                      },
+                      tolerances,
+                    );
+                    const lateMinutes = getLateMinutes(
+                      punch,
+                      userSchedules,
+                      tolerances,
                     );
                     const isJornadaOvertime = displayStatus === "Horas extras";
                     const isLateBadge =
@@ -2517,6 +2525,23 @@ export default function PunchInOut() {
                                 </View>
                               )
                             )}
+                            {/* Duración de la tardanza (solo móvil) */}
+                            {displayStatus === "Tardanza" &&
+                              lateMinutes != null &&
+                              lateMinutes > 0 && (
+                                <View
+                                  style={[styles.punchBadge, styles.badgeLate]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.punchBadgeText,
+                                      { color: getStatusColor("Tardanza") },
+                                    ]}
+                                  >
+                                    {formatLateDuration(lateMinutes)}
+                                  </Text>
+                                </View>
+                              )}
                             {!!breakTagName && (
                               <View
                                 style={[styles.punchBadge, styles.badgeNeutral]}

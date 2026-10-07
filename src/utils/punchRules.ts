@@ -291,6 +291,37 @@ export function getPunctuality(
   }
 }
 
+/**
+ * Minutos de tardanza de un inicio de jornada, para mostrarlos junto al chip
+ * "Tardanza" del historial. Propio del móvil (no existe en el webapp ni en el
+ * backend). Se cuenta desde la hora de entrada del horario, NO desde el fin
+ * de la tolerancia: la tolerancia solo decide SI hubo tardanza.
+ *
+ * null cuando no aplica: otro tipo de ponche, día sin horario, ponche
+ * cubierto por un permiso, o getPunctuality no da "Tardanza".
+ */
+export function getLateMinutes(
+  punch: PunchEvent,
+  schedules: UserSchedule[],
+  defaults: ToleranceConfig,
+): number | null {
+  if (punch.type !== "InicioJornada") return null;
+  if (punch.permissionId != null) return null;
+  const punchDate = new Date(punch.createdDate);
+  const schedule = getScheduleForDay(schedules, punchDate);
+  if (!schedule) return null;
+  if (getPunctuality(punch, schedules, defaults) !== "Tardanza") return null;
+  return getRDMinutes(punchDate) - timeStrToMinutes(schedule.workEntryTime);
+}
+
+/** "7 min", "1 h", "1 h 15 min". */
+export function formatLateDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
 export function timeStrToMinutes(timeStr: string): number {
   const [h, m] = timeStr.split(":").map(Number);
   return h * 60 + m;
