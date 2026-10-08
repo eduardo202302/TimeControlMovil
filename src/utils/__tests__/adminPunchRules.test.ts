@@ -21,6 +21,7 @@ import {
   isAlmuerzoAbierto,
   isBreakAbierto,
   normalizeAdminPanel,
+  resolveAdminPunchTypeForApi,
   toEmployeeOption,
   toOpenWorkdayRows,
   validateAdminPunchTime,
@@ -1576,5 +1577,189 @@ describe("validateAdminPunchTime", () => {
       valid: true,
       errorMessage: null,
     });
+  });
+});
+
+// ── Jornada Adicional (face-class-web AdminPunchInOutForm/helpers.js:439-466) ─
+
+describe("Jornada Adicional en Ponche ADM", () => {
+  const inicio = punch({
+    id: 1,
+    type: "InicioJornada",
+    createdDate: "2026-09-04T12:00:00.000Z",
+  });
+  const fin = punch({
+    id: 2,
+    type: "FinJornada",
+    createdDate: "2026-09-04T21:00:00.000Z",
+  });
+  const inicioAdicional = punch({
+    id: 3,
+    type: "InicioJornadaAdicional",
+    createdDate: "2026-09-04T22:00:00.000Z",
+  });
+
+  test("resolveAdminPunchTypeForApi: sin FinJornada → tipos base", () => {
+    expect(resolveAdminPunchTypeForApi("InicioJornada", [inicio])).toBe(
+      "InicioJornada",
+    );
+    expect(resolveAdminPunchTypeForApi("FinJornada", [inicio])).toBe(
+      "FinJornada",
+    );
+  });
+
+  test("resolveAdminPunchTypeForApi: con FinJornada válido → variantes Adicional", () => {
+    expect(resolveAdminPunchTypeForApi("InicioJornada", [inicio, fin])).toBe(
+      "InicioJornadaAdicional",
+    );
+    expect(resolveAdminPunchTypeForApi("FinJornada", [inicio, fin])).toBe(
+      "FinJornadaAdicional",
+    );
+  });
+
+  test("resolveAdminPunchTypeForApi: Almuerzo/Break pasan tal cual", () => {
+    for (const type of [
+      "InicioAlmuerzo",
+      "FinAlmuerzo",
+      "InicioBreak",
+      "FinBreak",
+    ]) {
+      expect(resolveAdminPunchTypeForApi(type, [inicio, fin])).toBe(type);
+    }
+  });
+
+  test("sin FinJornada → Entrada InicioJornada", () => {
+    expect(getNextAdminAction(panel({}), "Jornada")).toMatchObject({
+      kind: "inicio",
+      type: "InicioJornada",
+    });
+  });
+
+  test("con FinJornada válido → Entrada InicioJornadaAdicional", () => {
+    const next = getNextAdminAction(
+      panel({ punchesToday: [inicio, fin] }),
+      "Jornada",
+    );
+    expect(next).toMatchObject({
+      kind: "inicio",
+      type: "InicioJornadaAdicional",
+      label: "Entrada",
+    });
+  });
+
+  test("con InicioJornadaAdicional abierto → su cierre FinJornadaAdicional", () => {
+    const next = getNextAdminAction(
+      panel({ punchesToday: [inicio, fin, inicioAdicional] }),
+      "Jornada",
+    );
+    expect(next).toMatchObject({
+      kind: "fin",
+      type: "FinJornadaAdicional",
+      label: "Fin",
+    });
+  });
+
+  test("adicional cerrada → otra Entrada InicioJornadaAdicional", () => {
+    const finAdicional = punch({
+      id: 4,
+      type: "FinJornadaAdicional",
+      createdDate: "2026-09-04T23:00:00.000Z",
+    });
+    const next = getNextAdminAction(
+      panel({ punchesToday: [inicio, fin, inicioAdicional, finAdicional] }),
+      "Jornada",
+    );
+    expect(next).toMatchObject({
+      kind: "inicio",
+      type: "InicioJornadaAdicional",
+    });
+  });
+
+  test("FinJornada rechazado no cuenta → InicioJornada / FinJornada base", () => {
+    for (const status of [
+      "Fuera perímetro",
+      "Imagen Fraudulenta",
+      "Fuera de área",
+      "Error de Imagen",
+      "Inválido",
+    ]) {
+      const rechazado = punch({ ...fin, status });
+      expect(
+        resolveAdminPunchTypeForApi("InicioJornada", [inicio, rechazado]),
+      ).toBe("InicioJornada");
+      // El rechazado tampoco cierra la jornada: sigue tocando su Fin, base.
+      expect(
+        getNextAdminAction(
+          panel({ punchesToday: [inicio, rechazado] }),
+          "Jornada",
+        ),
+      ).toMatchObject({ kind: "fin", type: "FinJornada" });
+    }
+  });
+
+  test("cierre de día abierto con adicional arrastrada → FinJornadaAdicional, con la fecha de ese día y sin techo", () => {
+    const dia = "2026-09-02";
+    const p = panel({
+      openDayEvents: [
+        punch({
+          id: 1,
+          type: "InicioJornada",
+          createdDate: `${dia}T12:00:00.000Z`,
+        }),
+        punch({
+          id: 2,
+          type: "FinJornada",
+          createdDate: `${dia}T21:00:00.000Z`,
+        }),
+        punch({
+          id: 3,
+          type: "InicioJornadaAdicional",
+          createdDate: `${dia}T22:00:00.000Z`,
+        }),
+      ],
+    });
+    const action = getNextAdminAction(p, "Jornada");
+    expect(action).toMatchObject({ kind: "fin", type: "FinJornadaAdicional" });
+
+    const today = new Date("2026-09-04T20:00:00.000Z"); // 16:00 RD
+    expect(toRDDateString(getAdminPunchDay(p, action, today))).toBe(dia);
+
+    const picked = new Date("2026-09-05T02:00:00.000Z"); // 22:00 RD — mayor a "ahora"
+    expect(validateAdminPunchTime(p, action, picked, today)).toEqual({
+      valid: true,
+      errorMessage: null,
+    });
+  });
+
+  test("cierre de día abierto sin FinJornada base → FinJornada", () => {
+    const p = panel({
+      openDayEvents: [
+        punch({
+          id: 1,
+          type: "InicioJornada",
+          createdDate: "2026-09-02T12:00:00.000Z",
+        }),
+      ],
+    });
+    expect(getNextAdminAction(p, "Jornada")).toMatchObject({
+      kind: "fin",
+      type: "FinJornada",
+    });
+  });
+
+  test("tras InicioJornadaAdicional solo queda Jornada (sin Almuerzo ni Break)", () => {
+    // helpers.js:279-322 no tiene caso para "Inicio Jornada Adicional": cae en
+    // default → ["jornada"].
+    const lunchSchedule: UserSchedule = {
+      id: 1,
+      weekDay: "Viernes",
+      workEntryTime: "08:00:00",
+      workExitTime: "17:00:00",
+      lunchEntryTime: "12:00:00",
+      lunchExitTime: "13:00:00",
+    };
+    const p = panel({ punchesToday: [inicio, fin, inicioAdicional] });
+    expect(isAdminLunchVisible(p, lunchSchedule)).toBe(false);
+    expect(isAdminBreakEnabled(p)).toBe(false);
   });
 });

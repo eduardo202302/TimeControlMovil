@@ -4,6 +4,9 @@ import {
   getPendingOpenDayDate,
   getRDMinutes,
   getScheduleForDay,
+  hasValidBaseFinJornada,
+  isJornadaEndType,
+  isJornadaStartType,
   RD_UTC_OFFSET,
   toRD,
   toRDDateString,
@@ -441,8 +444,11 @@ export function getHistoryEvents(panel: AdminPunchPanel | null): PunchEvent[] {
  * que se está cerrando" — el mismo error que el ponchador normal ya evita en
  * su modal de "Jornada Incompleta".
  *
- * Solo aplica a FinJornada con jornada abierta arrastrada. Todo lo demás
- * (InicioJornada, Break, y el cierre de una jornada de hoy) va con `today`.
+ * Solo aplica al cierre de Jornada (FinJornada o FinJornadaAdicional) con
+ * jornada abierta arrastrada — el webapp toma la fecha del último registro
+ * sin mirar el tipo (saveCloseDay, AdminPunchInOutForm/index.jsx:416-422).
+ * Todo lo demás (Entrada de Jornada, Break, y el cierre de una jornada de
+ * hoy) va con `today`.
  * Si la fecha de apertura no se puede leer, cae a `today` en vez de adivinar.
  */
 export function getAdminPunchDay(
@@ -450,7 +456,7 @@ export function getAdminPunchDay(
   action: AdminNextAction,
   today: Date,
 ): Date {
-  if (action.type !== ADMIN_PUNCH_TYPE_MAP.Jornada.fin) return today;
+  if (action.category !== "Jornada" || action.kind !== "fin") return today;
   if (!hasOpenWorkday(panel)) return today;
   return getOpenWorkdayDate(panel) ?? today;
 }
@@ -544,12 +550,13 @@ export interface AdminTimeValidation {
  * validateTimeSelection (AdminPunchInOutForm/index.jsx:555-592).
  *
  * TECHO: la hora elegida no puede ser mayor a la hora actual. ÚNICA
- * excepción: cerrar (FinJornada) una jornada arrastrada de un día anterior
- * (`hasOpenWorkday`) — ahí no hay "hora actual" de referencia porque el día
- * que se está cerrando no es hoy. El webapp replica esto mismo mirando
- * `user.dateOpen` en vez de la categoría/acción puntual, pero en este panel
- * dateOpen presente y "cerrar una jornada arrastrada" son la misma situación:
- * la única acción posible con una jornada arrastrada es FinJornada.
+ * excepción: cerrar (FinJornada o FinJornadaAdicional) una jornada
+ * arrastrada de un día anterior (`hasOpenWorkday`) — ahí no hay "hora
+ * actual" de referencia porque el día que se está cerrando no es hoy. El
+ * webapp replica esto mismo mirando `user.dateOpen` en vez de la
+ * categoría/acción puntual, pero en este panel dateOpen presente y "cerrar
+ * una jornada arrastrada" son la misma situación: la única acción posible con
+ * una jornada arrastrada es cerrar la Jornada.
  *
  * PISO: la hora elegida no puede ser menor a la del último registro VÁLIDO
  * del día correspondiente — `getHistoryEvents(panel)` ya resuelve cuál es ese
@@ -570,7 +577,9 @@ export function validateAdminPunchTime(
   now: Date,
 ): AdminTimeValidation {
   const isClosingDraggedWorkday =
-    action.type === ADMIN_PUNCH_TYPE_MAP.Jornada.fin && hasOpenWorkday(panel);
+    action.category === "Jornada" &&
+    action.kind === "fin" &&
+    hasOpenWorkday(panel);
 
   if (!isClosingDraggedWorkday && getRDMinutes(picked) > getRDMinutes(now)) {
     return {
@@ -592,6 +601,31 @@ export function validateAdminPunchTime(
 }
 
 /**
+ * Tipo de Jornada que va al API — port de resolvePunchTypeForApi
+ * (face-class-web AdminPunchInOutForm/helpers.js:439-466), que el webapp usa
+ * al registrar (helpers.js:740) y al cerrar un día abierto (index.jsx:437).
+ * Con un FinJornada base válido en el timeline, InicioJornada/FinJornada
+ * salen como InicioJornadaAdicional/FinJornadaAdicional. El ADM del webapp no
+ * tiene la parte de FH del ponchador del empleado.
+ *
+ * `timeline` es getHistoryEvents(panel): openDayEvents con jornada arrastrada,
+ * punchesToday si no — el normalizedTimelineData del webapp
+ * (index.jsx:276-286).
+ */
+export function resolveAdminPunchTypeForApi(
+  punchType: string,
+  timeline: PunchEvent[],
+): string {
+  if (punchType !== "InicioJornada" && punchType !== "FinJornada") {
+    return punchType;
+  }
+  if (!hasValidBaseFinJornada(timeline)) return punchType;
+  return punchType === "InicioJornada"
+    ? "InicioJornadaAdicional"
+    : "FinJornadaAdicional";
+}
+
+/**
  * Qué acción toca en cada pestaña, mirando el panel de OTRO usuario — el
  * equivalente de getNextPunchType (punchinout.tsx), que solo sabe leer los
  * ponches propios.
@@ -600,20 +634,29 @@ export function validateAdminPunchTime(
  * `openDayEvents`. Una jornada abierta de un día anterior no aparece en
  * `punchesToday`, así que sin ese chequeo la pantalla ofrecería "Entrada"
  * sobre una jornada ya abierta y el backend la rechazaría.
+ *
+ * En Jornada cuentan los tres tipos de inicio/fin (base, Adicional, FH) —
+ * isJornadaStartEntry/isJornadaEndEntry del webapp (helpers.js:325-346) — y
+ * el `type` sale de resolveAdminPunchTypeForApi.
  */
 export function getNextAdminAction(
   panel: AdminPunchPanel | null,
   category: AdminCategory,
 ): AdminNextAction {
   const types = ADMIN_PUNCH_TYPE_MAP[category];
+  const isJornada = category === "Jornada";
+  const isInicio = (type: string) =>
+    isJornada ? isJornadaStartType(type) : type === types.inicio;
+  const isFin = (type: string) =>
+    isJornada ? isJornadaEndType(type) : type === types.fin;
   const punches = acceptedPunches(panel);
   const last = [...punches]
     .reverse()
-    .find((p) => p.type === types.inicio || p.type === types.fin);
+    .find((p) => isInicio(p.type) || isFin(p.type));
 
   let kind: "inicio" | "fin";
   if (last) {
-    kind = last.type === types.inicio ? "fin" : "inicio";
+    kind = isInicio(last.type) ? "fin" : "inicio";
   } else if (category === "Jornada" && hasOpenWorkday(panel)) {
     // Jornada abierta de un día previo: lo único posible es cerrarla.
     kind = "fin";
@@ -621,7 +664,10 @@ export function getNextAdminAction(
     kind = "inicio";
   }
 
-  const type = kind === "inicio" ? types.inicio : types.fin;
+  const baseType = kind === "inicio" ? types.inicio : types.fin;
+  const type = isJornada
+    ? resolveAdminPunchTypeForApi(baseType, getHistoryEvents(panel))
+    : baseType;
   return {
     category,
     kind,

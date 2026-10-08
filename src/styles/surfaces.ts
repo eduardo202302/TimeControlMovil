@@ -242,9 +242,8 @@ export const SEGMENT_ACTIVE: ViewStyle = {
 };
 
 /**
- * Pestaña en reposo de las barras de pestañas con ícono (Jornada/Almuerzo/
- * Break de Ponche ADM, tabs del formulario de Usuarios). La activa pisa
- * después con SEGMENT_ACTIVE.
+ * Pestaña en reposo de la barra de pestañas con ícono del formulario de
+ * Usuarios (userFormStyles.ts). La activa pisa después con SEGMENT_ACTIVE.
  */
 export const TAB_BTN_SURFACE: ViewStyle = {
   backgroundColor: PRIMARY_TINT_50,
