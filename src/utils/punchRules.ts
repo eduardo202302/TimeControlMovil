@@ -2,6 +2,10 @@ import type {
   TodayHoliday,
   UserSchedule,
 } from "../../types/typeStore/SchoolStoreType";
+import {
+  getBreakWindowConfig,
+  type BreakWindowConfig,
+} from "../constants/breakWindow";
 import { buildAttachmentUri } from "./permissionRules";
 
 /**
@@ -913,15 +917,58 @@ export function isAlmuerzoVisible(
 }
 
 /**
- * Visibilidad de la pestaña de Break — oculta mientras haya un Almuerzo
- * activo (InicioAlmuerzo sin FinAlmuerzo), ya que no se puede estar en
- * ambas actividades a la vez.
+ * Visibilidad de la pestaña de Break, en este orden:
+ * 1. Break abierto (InicioBreak sin FinBreak) → visible siempre, para poder
+ *    cerrarlo.
+ * 2. Almuerzo activo (InicioAlmuerzo sin FinAlmuerzo) → oculta, no se puede
+ *    estar en ambas actividades a la vez.
+ * 3. Sin horario → visible (no hay referencia para la ventana).
+ * 4. Con horario → solo dentro de las ventanas de `config` (por defecto
+ *    getBreakWindowConfig()), medidas desde las horas del horario, no de los
+ *    ponches: [entrada + startAfterEntry, almuerzo − endBeforeLunch) y
+ *    [fin almuerzo + startAfterLunch, salida − endBeforeExit), o
+ *    [entrada + startAfterEntry, salida − endBeforeExit) si el horario no
+ *    tiene almuerzo. Una ventana vacía o invertida (horario corto)
+ *    simplemente no muestra nada.
  */
-export function isBreakVisible(punches: PunchEvent[]): boolean {
+export function isBreakVisible(
+  punches: PunchEvent[],
+  now: Date,
+  schedule: UserSchedule | null,
+  config: BreakWindowConfig = getBreakWindowConfig(),
+): boolean {
+  const lastBreak = [...punches]
+    .reverse()
+    .find((p) => p.type === "InicioBreak" || p.type === "FinBreak");
+  if (lastBreak?.type === "InicioBreak") return true;
+
   const lastAlmuerzo = [...punches]
     .reverse()
     .find((p) => p.type === "InicioAlmuerzo" || p.type === "FinAlmuerzo");
-  return lastAlmuerzo?.type !== "InicioAlmuerzo";
+  if (lastAlmuerzo?.type === "InicioAlmuerzo") return false;
+
+  if (!schedule) return true;
+
+  const current = getRDMinutes(now);
+  const inWindow = (start: number, end: number) =>
+    current >= start && current < end;
+
+  const morningStart =
+    timeStrToMinutes(schedule.workEntryTime) + config.startAfterEntry;
+  const dayEnd =
+    timeStrToMinutes(schedule.workExitTime) - config.endBeforeExit;
+
+  if (schedule.lunchEntryTime && schedule.lunchExitTime) {
+    const morningEnd =
+      timeStrToMinutes(schedule.lunchEntryTime) - config.endBeforeLunch;
+    const afternoonStart =
+      timeStrToMinutes(schedule.lunchExitTime) + config.startAfterLunch;
+    return (
+      inWindow(morningStart, morningEnd) || inWindow(afternoonStart, dayEnd)
+    );
+  }
+
+  return inWindow(morningStart, dayEnd);
 }
 
 /**

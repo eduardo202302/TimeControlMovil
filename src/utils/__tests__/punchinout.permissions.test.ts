@@ -3,6 +3,7 @@
 /// <reference types="jest" />
 
 import type { UserSchedule } from "../../../types/typeStore/SchoolStoreType";
+import { getBreakWindowConfig } from "../../constants/breakWindow";
 import {
   PERMISSION_ACTION,
   getApprovedPermission,
@@ -716,19 +717,131 @@ describe("15. isAlmuerzoButtonVisible — Salida", () => {
 
 describe("16. isBreakVisible", () => {
   it("16a. visible sin ningún ponche de almuerzo hoy", () => {
-    expect(isBreakVisible(PUNCHES.ninguno)).toBe(true);
+    expect(isBreakVisible(PUNCHES.ninguno, rd(12), null)).toBe(true);
   });
 
   it("16b. visible con la jornada iniciada, sin haber ido a almorzar", () => {
-    expect(isBreakVisible(PUNCHES.jornadaIniciada)).toBe(true);
+    expect(isBreakVisible(PUNCHES.jornadaIniciada, rd(12), null)).toBe(true);
   });
 
   it("16c. oculto mientras el almuerzo está activo (InicioAlmuerzo sin cerrar)", () => {
-    expect(isBreakVisible(PUNCHES.almuerzoIniciado)).toBe(false);
+    expect(isBreakVisible(PUNCHES.almuerzoIniciado, rd(12), null)).toBe(false);
   });
 
   it("16d. visible de nuevo una vez que el almuerzo ya se cerró", () => {
-    expect(isBreakVisible(PUNCHES.almuerzoCerrado)).toBe(true);
+    expect(isBreakVisible(PUNCHES.almuerzoCerrado, rd(12), null)).toBe(true);
+  });
+});
+
+// ─── 16bis. isBreakVisible — ventanas de tiempo según el horario ─────────────
+
+describe("16bis. isBreakVisible — ventanas de tiempo", () => {
+  /** Config explícito (no el de getBreakWindowConfig) para que estos casos no
+   * dependan de los valores temporales de constants/breakWindow.ts. */
+  const BREAK_CFG = {
+    startAfterEntry: 60,
+    endBeforeLunch: 60,
+    startAfterLunch: 60,
+    endBeforeExit: 60,
+  };
+
+  /** 09:00–18:00, almuerzo 13:30–14:30 → [10:00, 12:30) y [15:30, 17:00) */
+  const horario: UserSchedule = {
+    ...schedule,
+    workEntryTime: "09:00:00",
+    workExitTime: "18:00:00",
+    lunchEntryTime: "13:30:00",
+    lunchExitTime: "14:30:00",
+  };
+
+  const verBreak = (
+    now: Date,
+    sched: UserSchedule | null,
+    punches: PunchEvent[] = PUNCHES.jornadaIniciada,
+  ) => isBreakVisible(punches, now, sched, BREAK_CFG);
+
+  it.each([
+    [9, 59, false],
+    [10, 0, true],
+    [12, 29, true],
+    [12, 30, false],
+    [13, 0, false],
+    [15, 29, false],
+    [15, 30, true],
+    [16, 59, true],
+    [17, 0, false],
+  ])("con almuerzo: %i:%i → %s", (h, m, esperado) => {
+    expect(verBreak(rd(h, m), horario)).toBe(esperado);
+  });
+
+  it("break abierto fuera de ventana (12:45) → visible para poder cerrarlo", () => {
+    const conBreak = [punch("InicioJornada"), punch("InicioBreak")];
+    expect(verBreak(rd(12, 45), horario, conBreak)).toBe(true);
+  });
+
+  it("almuerzo abierto dentro de ventana (11:00) → oculto", () => {
+    expect(verBreak(rd(11), horario, PUNCHES.almuerzoIniciado)).toBe(false);
+  });
+
+  it.each([
+    [8, 59, false],
+    [9, 0, true],
+    [15, 59, true],
+    [16, 0, false],
+  ])("sin almuerzo (08:00–17:00): %i:%i → %s", (h, m, esperado) => {
+    expect(verBreak(rd(h, m), scheduleSinAlmuerzo)).toBe(esperado);
+  });
+
+  it("sin horario → visible (sin referencia)", () => {
+    expect(verBreak(rd(3), null)).toBe(true);
+  });
+
+  it("horario de 2 h → ventanas vacías, oculto sin lanzar error", () => {
+    const corto: UserSchedule = {
+      ...scheduleSinAlmuerzo,
+      workEntryTime: "08:00:00",
+      workExitTime: "10:00:00",
+    };
+    const cortoConAlmuerzo: UserSchedule = {
+      ...corto,
+      lunchEntryTime: "08:45:00",
+      lunchExitTime: "09:15:00",
+    };
+    for (const [h, m] of [[8, 0], [8, 30], [9, 0], [9, 30], [9, 59]]) {
+      expect(() => verBreak(rd(h, m), corto)).not.toThrow();
+      expect(verBreak(rd(h, m), corto)).toBe(false);
+      expect(verBreak(rd(h, m), cortoConAlmuerzo)).toBe(false);
+    }
+  });
+
+  it("sin config explícito usa getBreakWindowConfig()", () => {
+    for (const [h, m] of [[9, 59], [10, 0], [12, 30], [15, 30], [17, 0]]) {
+      expect(isBreakVisible(PUNCHES.jornadaIniciada, rd(h, m), horario)).toBe(
+        isBreakVisible(
+          PUNCHES.jornadaIniciada,
+          rd(h, m),
+          horario,
+          getBreakWindowConfig(),
+        ),
+      );
+    }
+  });
+
+  it("respeta un config propio (30 min en vez de 60)", () => {
+    const cfg30 = {
+      startAfterEntry: 30,
+      endBeforeLunch: 30,
+      startAfterLunch: 30,
+      endBeforeExit: 30,
+    };
+    const ver = (h: number, m: number) =>
+      isBreakVisible(PUNCHES.jornadaIniciada, rd(h, m), horario, cfg30);
+    expect(ver(9, 29)).toBe(false);
+    expect(ver(9, 30)).toBe(true);
+    expect(ver(12, 59)).toBe(true);
+    expect(ver(13, 0)).toBe(false);
+    expect(ver(15, 0)).toBe(true);
+    expect(ver(17, 30)).toBe(false);
   });
 });
 

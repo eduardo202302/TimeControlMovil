@@ -1564,7 +1564,7 @@ export default function PunchInOut() {
         permissions,
         todayHoliday,
       );
-    if (cat === "Break") return isBreakVisible(punches);
+    if (cat === "Break") return isBreakVisible(punches, now, todaySchedule);
     if (cat === "Jornada")
       return isJornadaVisible(
         now,
