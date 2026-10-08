@@ -39,8 +39,8 @@ interface CompanySelectorProps<T extends CompanyOption> {
   currentSchoolId?: number | null;
   /**
    * Deshabilita y marca "Inactiva" las que traen `isActive === false`. Solo
-   * Cambiar Empresa: en el login `isActive` es el del schoolUser y nunca
-   * deshabilitó nada.
+   * Cambiar Empresa: en el login `isActive` es el del schoolUser y los
+   * inactivos ya llegan filtrados (filterActiveSchoolUsers), no se pintan.
    */
   disableInactive?: boolean;
   /** Spinner en lugar de la lista (mientras llega GET /users/schools). */

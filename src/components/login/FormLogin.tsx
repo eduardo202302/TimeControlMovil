@@ -51,6 +51,10 @@ import {
   requestChooseSchool,
   type ChooseSchoolData,
 } from "../../utils/chooseCompany";
+import {
+  filterActiveSchoolUsers,
+  NO_ACTIVE_COMPANY_MESSAGE,
+} from "../../utils/loginCompanies";
 
 export default function FormLogin() {
   const { scale, verticalScale, font } = useResponsive();
@@ -217,7 +221,20 @@ export default function FormLogin() {
 
       if (response.success) {
         const { token } = response.data;
-        const schoolUsers = response.data.user?.schoolUsers ?? [];
+        // /login trae también los schoolUsers inactivos: no se ofrecen ni se
+        // usan. Todo lo de abajo (selector, buildSessionUser, el usuario que
+        // se guarda) trabaja con la respuesta ya filtrada.
+        const schoolUsers = filterActiveSchoolUsers<SchoolUser>(
+          response.data.user?.schoolUsers,
+        );
+        if (schoolUsers.length === 0) {
+          setMensaje({ texto: NO_ACTIVE_COMPANY_MESSAGE, tipo: "error" });
+          return;
+        }
+        const loginData = {
+          ...response.data,
+          user: { ...response.data.user, schoolUsers },
+        };
         // Red de seguridad para la rama en que chooseschool falla y se entra
         // con el token de /login: ese endpoint publica la misma lista, pero
         // bajo `AttendancesToday` (con A mayúscula) y solo cuando el usuario
@@ -238,7 +255,7 @@ export default function FormLogin() {
           // Usuario pertenece a varias compañías → mostrar selector
           setPendingLogin({
             token,
-            loginData: response.data,
+            loginData,
             menuItems,
             usuario: data.usuario,
             password: data.password,
@@ -262,7 +279,7 @@ export default function FormLogin() {
               if (result.ok) {
                 await completeLogin(
                   schoolUser,
-                  response.data,
+                  loginData,
                   result.token,
                   menuItems,
                   data.usuario,
@@ -280,7 +297,7 @@ export default function FormLogin() {
           }
           await completeLogin(
             schoolUser,
-            response.data,
+            loginData,
             token,
             menuItems,
             data.usuario,
