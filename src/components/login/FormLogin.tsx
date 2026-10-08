@@ -18,7 +18,6 @@ import {
   AUTH_TEXT,
 } from "@/constants/authColors";
 import { Ionicons } from "@expo/vector-icons";
-import axios from "axios";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -33,7 +32,6 @@ import { loginAuthentication } from "../../../api/Login/loginAuthentication";
 import { getMenuItems } from "../../../api/menu/getMenuItems";
 import {
   buildAttendancesToday,
-  buildCompanySettings,
   useSchoolStore,
 } from "../../../store/useSchoolStore";
 import { resolveMobilePath } from "../../constants/mobileRoutes";
@@ -46,8 +44,13 @@ import { ERROR_COLOR, ON_PRIMARY } from "@/constants/colors";
 import { SHADOW_LG, SHADOW_PRIMARY } from "@/constants/shadows";
 import { useAuthTheme } from "@/hooks/useAuthTheme";
 import type { AuthTheme } from "../../utils/authThemeRules";
-import { buildLastCompany } from "../../utils/lastCompany";
-import { buildTodayHoliday } from "../../utils/punchRules";
+import {
+  buildSessionUser,
+  commitSession,
+  readChooseSchoolResponse,
+  requestChooseSchool,
+  type ChooseSchoolData,
+} from "../../utils/chooseCompany";
 
 export default function FormLogin() {
   const { scale, verticalScale, font } = useResponsive();
@@ -78,7 +81,7 @@ export default function FormLogin() {
     password: string;
   } | null>(null);
 
-  const { urlColegio, setMenuResolution } = useSchoolStore();
+  const { urlColegio } = useSchoolStore();
 
   const { handleSubmit, control, setValue } = useForm<LoginType>({
     defaultValues: { usuario: "", password: "" },
@@ -106,30 +109,15 @@ export default function FormLogin() {
       menuItems: any[],
       usuario: string,
       password: string,
-      // `res.data.data.school` de chooseschool; undefined si no hubo
-      // chooseschool (o falló) — ahí se usa selected.school.
-      chosenSchool?: unknown,
+      // `res.data.data` de chooseschool; undefined si no hubo chooseschool
+      // (o falló) — ahí no se tocan settings/asistencias/feriado y lastCompany
+      // sale de selected.school.
+      chooseSchoolData?: ChooseSchoolData,
+      // Solo el login multi-compañía guardaba el token re-scopeado en el store.
+      storeToken = false,
     ) => {
       const currentUrl =
         urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
-
-      const schoolUsers = loginData?.user?.schoolUsers ?? [];
-      const selected =
-        schoolUser ??
-        schoolUsers[0] ??
-        (loginData.userSchedules ? { school: loginData.school ?? {} } : null);
-
-      const roleId = selected?.roleId ?? loginData?.roleId;
-      const role = selected?.role ??
-        loginData?.role ?? {
-          id: roleId,
-          name: selected?.role?.name ?? loginData?.roleName ?? "",
-          permissions: {},
-          menu: selected?.role?.menu ?? [],
-          defaultMenu: selected?.role?.defaultMenu ?? null,
-        };
-      const schedules =
-        selected?.userSchedules ?? loginData?.userSchedules ?? [];
 
       // Persistir credenciales de "Recordarme"
       if (remember) {
@@ -142,77 +130,24 @@ export default function FormLogin() {
         await Storage.deleteItemAsync("recordarme");
       }
 
-      // Armar user completo con el rol de la compañía seleccionada.
-      // Reordenar schoolUsers para que la compañía elegida quede en [0],
-      // así el resto de la app (horarios, settings, foto, permisos, geocerca)
-      // que lee schoolUsers[0] usa la compañía correcta.
-      const selectedId = selected?.id ?? selected?.schoolId;
-      const reorderedSchoolUsers = (loginData?.user?.schoolUsers ?? [])
-        .slice()
-        .sort((a: SchoolUser, b: SchoolUser) => {
-          const aSelected = a?.id === selectedId || a?.schoolId === selectedId;
-          const bSelected = b?.id === selectedId || b?.schoolId === selectedId;
-          return (bSelected ? 1 : 0) - (aSelected ? 1 : 0);
-        });
+      // Usuario con el rol de la compañía elegida, y la elegida en
+      // schoolUsers[0] (ver buildSessionUser).
+      const { user: fullUser, selected } = buildSessionUser(
+        schoolUser,
+        loginData,
+        useSchoolStore.getState().school,
+      );
 
-      const fullUser = {
-        ...loginData,
-        user: {
-          ...loginData?.user,
-          schoolUsers: reorderedSchoolUsers,
-        },
-        roleId,
-        role: {
-          id: roleId,
-          name: role?.name ?? "",
-          permissions: {},
-          menu: role?.menu ?? [],
-          defaultMenu: role?.defaultMenu ?? null,
-        },
-        school: selected?.school ?? useSchoolStore.getState().school ?? {},
-        userSchedules: schedules,
-      };
-
-      // Resolver app + ruta + árbol de menú
-      setMenuResolution(fullUser as any, menuItems);
-
-      // Persistir en SecureStore
-      await Storage.setItemAsync("isAuthorized", "true");
-      await Storage.setItemAsync("token", token);
-
-      // Marca de la compañía para pintar el login la próxima vez. Nunca debe
-      // bloquear el login: cualquier fallo se ignora.
-      try {
-        const lastCompany =
-          buildLastCompany(chosenSchool, currentUrl) ??
-          buildLastCompany(selected?.school, currentUrl);
-        if (lastCompany) {
-          await useSchoolStore.getState().setLastCompany(lastCompany);
-        }
-      } catch (error) {
-        console.warn(
-          "No se pudo guardar lastCompany:",
-          error instanceof Error ? error.message : "error desconocido",
-        );
-      }
-
-      await Storage.setItemAsync("urlColegio", currentUrl);
-      await Storage.setItemAsync("user", JSON.stringify(fullUser));
-      await Storage.setItemAsync("menuItems", JSON.stringify(menuItems));
-
-      // Guardar la foto del usuario correspondiente a la compañía seleccionada
-      const selectedPhoto = (selected as any)?.photourl;
-      const selectedS3Photo = (selected as any)?.s3Photo;
-      if (selectedPhoto) {
-        await Storage.setItemAsync("photourl", selectedPhoto);
-      } else {
-        await Storage.deleteItemAsync("photourl");
-      }
-      if (selectedS3Photo) {
-        await Storage.setItemAsync("s3Photo", selectedS3Photo);
-      } else {
-        await Storage.deleteItemAsync("s3Photo");
-      }
+      // SecureStore + lastCompany + store (menú, token, snapshot del día).
+      await commitSession({
+        user: fullUser,
+        selected,
+        menuItems,
+        token,
+        urlColegio: currentUrl,
+        chooseSchoolData,
+        storeToken,
+      });
 
       setMensaje({
         texto: "Autenticación exitosa. Redirigiendo...",
@@ -225,7 +160,7 @@ export default function FormLogin() {
         ) as never,
       );
     },
-    [remember, urlColegio, setMenuResolution],
+    [remember, urlColegio],
   );
 
   const handleSelectCompany = async (schoolUser: SchoolUser) => {
@@ -233,54 +168,30 @@ export default function FormLogin() {
 
     // El token de /login es ambiguo (sin schoolId) — los endpoints protegidos
     // por schoolStrategy lo rechazan. Hay que re-scopearlo a la compañía
-    // elegida vía chooseschool antes de completar el login. Mismo patrón de
-    // llamada que el poller de horario en punchinout.tsx:637-642.
+    // elegida vía chooseschool antes de completar el login.
     try {
       const baseUrl = urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
-      const rawAxios = axios.create();
-      const res = await rawAxios.post(
-        `${baseUrl}/authentication/chooseschool`,
-        { schoolId: schoolUser.schoolId },
-        {
-          headers: {
-            Authorization: `Bearer ${pendingLogin.token}`,
-            platform: "App",
-          },
-        },
+      const result = readChooseSchoolResponse(
+        await requestChooseSchool(
+          baseUrl,
+          pendingLogin.token,
+          schoolUser.schoolId,
+        ),
       );
-
-      const scopedToken = res.data?.data?.token;
-      if (!res.data?.success || !scopedToken) {
+      if (!result.ok) {
         throw new Error("chooseschool no devolvió un token válido");
       }
 
-      useSchoolStore.getState().setToken(scopedToken);
-      const companySettings = buildCompanySettings(
-        res.data?.data?.school?.settings,
-      );
-      if (companySettings) {
-        useSchoolStore.getState().setCompanySettings(companySettings);
-      }
-      // `teacherAttendancesToday` viaja en el nivel superior de `data`
-      // (hermano de token/school, no dentro de school). Se guarda siempre,
-      // aunque venga vacía: un usuario sin ficha de docente no trae el campo
-      // y ahí lo correcto es [], no la lista de la sesión anterior.
-      useSchoolStore
-        .getState()
-        .setAttendancesToday(buildAttendancesToday(res.data?.data));
-      // Feriado de hoy, mismo nivel superior de `data`.
-      useSchoolStore
-        .getState()
-        .setTodayHoliday(buildTodayHoliday(res.data?.data));
       setCompanySelectorVisible(false);
       await completeLogin(
         schoolUser,
         pendingLogin.loginData,
-        scopedToken,
+        result.token,
         pendingLogin.menuItems,
         pendingLogin.usuario,
         pendingLogin.password,
-        res.data?.data?.school,
+        result.data,
+        true,
       );
     } catch (error) {
       console.error("Error en chooseschool:", error);
@@ -345,40 +256,18 @@ export default function FormLogin() {
             try {
               const baseUrl =
                 urlColegio ?? useSchoolStore.getState().urlColegio ?? "";
-              const rawAxios = axios.create();
-              const res = await rawAxios.post(
-                `${baseUrl}/authentication/chooseschool`,
-                { schoolId: schoolUser.schoolId },
-                {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                    platform: "App",
-                  },
-                },
+              const result = readChooseSchoolResponse(
+                await requestChooseSchool(baseUrl, token, schoolUser.schoolId),
               );
-              const scopedToken = res.data?.data?.token;
-              const companySettings = buildCompanySettings(
-                res.data?.data?.school?.settings,
-              );
-              if (res.data?.success && scopedToken) {
-                if (companySettings) {
-                  useSchoolStore.getState().setCompanySettings(companySettings);
-                }
-                // Mismo nivel superior que en handleSelectCompany.
-                useSchoolStore
-                  .getState()
-                  .setAttendancesToday(buildAttendancesToday(res.data?.data));
-                useSchoolStore
-                  .getState()
-                  .setTodayHoliday(buildTodayHoliday(res.data?.data));
+              if (result.ok) {
                 await completeLogin(
                   schoolUser,
                   response.data,
-                  scopedToken,
+                  result.token,
                   menuItems,
                   data.usuario,
                   data.password,
-                  res.data?.data?.school,
+                  result.data,
                 );
                 return;
               }

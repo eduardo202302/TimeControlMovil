@@ -126,6 +126,7 @@ import {
   type UserDayPermission,
 } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
+import { getActiveSchoolId } from "../../utils/chooseCompany";
 
 type Category = "Jornada" | "Almuerzo" | "Break";
 
@@ -736,6 +737,11 @@ export default function PunchInOut() {
         );
 
         if (!res.data?.success) return;
+        // Respuesta de una empresa que ya no es la activa (el usuario cambió
+        // de empresa con esta petición en vuelo): no debe pisar el store.
+        if (getActiveSchoolId(useSchoolStore.getState().user) !== schoolId) {
+          return;
+        }
 
         const freshSchedules: UserSchedule[] =
           res.data?.data?.userSchedules ?? [];

@@ -31,6 +31,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { MenuTree } from "../../../utils/resolveRoute";
+import { canChangeCompany } from "../../utils/chooseCompany";
 import {
   CARD_BACKGROUND,
   ERROR_COLOR,
@@ -336,6 +337,25 @@ function createStyles(
       borderTopColor: FOOTER_BORDER,
       paddingTop: verticalScale(4),
     },
+    /** Misma fila que logoutItem, en el tono de un ítem activo del menú. */
+    changeCompanyItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+      paddingLeft: scale(38),
+      paddingRight: scale(12),
+      paddingVertical: verticalScale(11),
+      borderRadius: RADIUS_SM,
+      marginBottom: verticalScale(2),
+      borderLeftWidth: 2,
+      borderLeftColor: PRIMARY_COLOR,
+      backgroundColor: PRIMARY_TINT_50,
+    },
+    changeCompanyText: {
+      fontSize: font(12),
+      fontWeight: "700",
+      color: PRIMARY_COLOR,
+    },
     logoutItem: {
       flexDirection: "row",
       alignItems: "center",
@@ -491,9 +511,18 @@ function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
 interface DrawerMenuProps {
   isVisible: boolean;
   onClose: () => void;
+  /**
+   * "Cambiar Empresa". El selector vive en (app)/_layout: el drawer se
+   * desmonta al cerrarse, así que no puede ser dueño de ese modal.
+   */
+  onChangeCompany?: () => void;
 }
 
-export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
+export default function DrawerMenu({
+  isVisible,
+  onClose,
+  onChangeCompany,
+}: DrawerMenuProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, menuTree, app, logout, school, urlColegio } = useSchoolStore();
@@ -502,6 +531,7 @@ export default function DrawerMenu({ isVisible, onClose }: DrawerMenuProps) {
   // Mismo criterio que punchinout.tsx para el id del usuario.
   const userId = schoolUser?.id ?? user?.id;
   const roleName = user?.role?.name?.trim() ?? "";
+  const showChangeCompany = !!onChangeCompany && canChangeCompany(user);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const { width, isTablet, scale, verticalScale, font } = useResponsive();
@@ -692,6 +722,16 @@ const confirmLogout = useCallback(async () => {
                   </View>
                 </View>
               </Modal>
+              {showChangeCompany && (
+                <TouchableOpacity
+                  style={styles.changeCompanyItem}
+                  onPress={onChangeCompany}
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="sync-outline" size={18} color={PRIMARY_COLOR} />
+                  <Text style={styles.changeCompanyText}>Cambiar Empresa</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={styles.logoutItem}
                 onPress={handleLogout}

@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Slot, usePathname } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { Slot, router, usePathname } from "expo-router";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
+    Alert,
     StatusBar,
     StyleSheet,
     Text,
@@ -21,6 +22,14 @@ import {
 import { RADIUS_MD, useResponsive } from "@/constants/responsive";
 import { SHADOW_MD } from "@/constants/shadows";
 import DrawerMenu from "../../components/drawer/DrawerMenu";
+import CompanySelector from "../../components/login/CompanySelector";
+import { useSchoolStore } from "../../../store/useSchoolStore";
+import {
+    fetchUserCompanies,
+    getActiveSchoolId,
+    switchCompany,
+    type CompanyOption,
+} from "../../utils/chooseCompany";
 
 const ROUTE_TITLES: Record<string, string> = {
   "/punchinout": "Registrar Acceso",
@@ -58,6 +67,69 @@ export default function AppLayout() {
   const pathname = usePathname();
   const title = ROUTE_TITLES[pathname] ?? "Time Flow";
 
+  // Empresa activa. Es el `key` del Slot: al cambiar de empresa TODAS las
+  // pantallas se remontan y vuelven a cargar con el token nuevo (varias leen
+  // su configuración una sola vez al montar — p. ej. punchinout —, así que
+  // navegar no alcanza si la ruta de inicio es la misma).
+  const activeSchoolId = useSchoolStore((state) =>
+    getActiveSchoolId(state.user),
+  );
+
+  // ── Cambiar Empresa ── null = selector cerrado.
+  const [companyPicker, setCompanyPicker] = useState<{
+    loading: boolean;
+    busy: boolean;
+    companies: CompanyOption[];
+  } | null>(null);
+
+  // Cada apertura tiene su id: si el usuario cancela mientras carga la
+  // lista, la respuesta tardía no reabre el selector.
+  const pickerRequestRef = useRef(0);
+
+  const openCompanyPicker = useCallback(async () => {
+    const requestId = ++pickerRequestRef.current;
+    setDrawerVisible(false);
+    setCompanyPicker({ loading: true, busy: false, companies: [] });
+    const result = await fetchUserCompanies();
+    if (requestId !== pickerRequestRef.current) return;
+    if (!result.ok) {
+      setCompanyPicker(null);
+      Alert.alert("Cambiar Empresa", result.message);
+      return;
+    }
+    setCompanyPicker({ loading: false, busy: false, companies: result.companies });
+  }, []);
+
+  const closeCompanyPicker = useCallback(() => {
+    // Con el cambio en curso no se cierra: ya no se puede deshacer a medias.
+    setCompanyPicker((prev) => {
+      if (prev?.busy) return prev;
+      pickerRequestRef.current += 1;
+      return null;
+    });
+  }, []);
+
+  const handleSelectCompany = useCallback(
+    async (company: CompanyOption) => {
+      // La actual no se re-elige: cerrar es lo mismo y no remonta nada.
+      if (company.schoolId === activeSchoolId) {
+        setCompanyPicker(null);
+        return;
+      }
+      setCompanyPicker((prev) => prev && { ...prev, busy: true });
+      const result = await switchCompany(company.schoolId);
+      if (!result.ok) {
+        // Nada se persistió: la sesión sigue en la empresa actual.
+        setCompanyPicker((prev) => prev && { ...prev, busy: false });
+        Alert.alert("Cambiar Empresa", result.message);
+        return;
+      }
+      setCompanyPicker(null);
+      router.replace(result.path as never);
+    },
+    [activeSchoolId],
+  );
+
   return (
     <SafeAreaView style={styles.safe} edges={["left", "right", "bottom"]}>
       {/*
@@ -80,16 +152,30 @@ export default function AppLayout() {
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* Contenido de cada pantalla */}
-      <Slot />
+      {/* Contenido de cada pantalla — se remonta al cambiar de empresa */}
+      <Slot key={activeSchoolId ?? "none"} />
 
       {/* Drawer compartido */}
       {drawerVisible && (
         <DrawerMenu
           isVisible={drawerVisible}
           onClose={() => setDrawerVisible(false)}
+          onChangeCompany={openCompanyPicker}
         />
       )}
+
+      <CompanySelector
+        visible={companyPicker !== null}
+        companies={companyPicker?.companies ?? []}
+        title="Seleccione una Empresa"
+        subtitle="Selecciona la empresa con la que deseas continuar."
+        currentSchoolId={activeSchoolId}
+        disableInactive
+        loading={companyPicker?.loading ?? false}
+        busy={companyPicker?.busy ?? false}
+        onSelect={handleSelectCompany}
+        onCancel={closeCompanyPicker}
+      />
     </SafeAreaView>
   );
 }

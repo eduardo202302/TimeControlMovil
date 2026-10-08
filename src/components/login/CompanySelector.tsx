@@ -1,6 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { RADIUS_LG, useResponsive } from "@/constants/responsive";
+import {
+  ActivityIndicator,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { RADIUS_LG, RADIUS_PILL, useResponsive } from "@/constants/responsive";
 import {
   AUTH_BRAND,
   AUTH_INPUT_BACKGROUND,
@@ -8,25 +15,55 @@ import {
   AUTH_INPUT_ICON,
   AUTH_LABEL,
 } from "@/constants/authColors";
-import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
+import {
+  ERROR_COLOR,
+  ERROR_TINT_BACKGROUND,
+  OUTCOME_OK_BACKGROUND,
+  SUCCESS_ACCENT,
+} from "@/constants/colors";
 import { DIALOG_OVERLAY, POPUP_CARD } from "@/styles/surfaces";
 import { useAuthTheme } from "@/hooks/useAuthTheme";
 import type { AuthTheme } from "../../utils/authThemeRules";
+import type { CompanyOption } from "../../utils/chooseCompany";
 import AuthBrandHeader from "./AuthBrandHeader";
 
-interface CompanySelectorProps {
+interface CompanySelectorProps<T extends CompanyOption> {
   visible: boolean;
-  companies: SchoolUser[];
-  onSelect: (company: SchoolUser) => void;
+  companies: T[];
+  onSelect: (company: T) => void;
   onCancel: () => void;
+  /** Por defecto, los textos del login. */
+  title?: string;
+  subtitle?: string;
+  /** Empresa de la sesión actual → pill "Actual" (Cambiar Empresa). */
+  currentSchoolId?: number | null;
+  /**
+   * Deshabilita y marca "Inactiva" las que traen `isActive === false`. Solo
+   * Cambiar Empresa: en el login `isActive` es el del schoolUser y nunca
+   * deshabilitó nada.
+   */
+  disableInactive?: boolean;
+  /** Spinner en lugar de la lista (mientras llega GET /users/schools). */
+  loading?: boolean;
+  /** Bloquea los toques mientras se procesa la empresa elegida. */
+  busy?: boolean;
 }
 
-export default function CompanySelector({
+const DEFAULT_SUBTITLE =
+  "Tu usuario pertenece a varias compañías. Selecciona con cuál deseas ingresar.";
+
+export default function CompanySelector<T extends CompanyOption>({
   visible,
   companies,
   onSelect,
   onCancel,
-}: CompanySelectorProps) {
+  title = "Elige tu compañía",
+  subtitle = DEFAULT_SUBTITLE,
+  currentSchoolId = null,
+  disableInactive = false,
+  loading = false,
+  busy = false,
+}: CompanySelectorProps<T>) {
   const { scale, verticalScale, font } = useResponsive();
   const theme = useAuthTheme();
   const styles = createStyles(scale, verticalScale, font, theme);
@@ -42,40 +79,69 @@ export default function CompanySelector({
         <View style={styles.card}>
           <View style={styles.header}>
             <AuthBrandHeader />
-            <Text style={styles.title}>Elige tu compañía</Text>
-            <Text style={styles.subtitle}>
-              Tu usuario pertenece a varias compañías. Selecciona con cuál
-              deseas ingresar.
-            </Text>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle}>{subtitle}</Text>
           </View>
 
-          <View style={styles.list}>
-            {companies.map((company) => (
-              <TouchableOpacity
-                key={company.schoolId ?? company.id}
-                style={styles.companyItem}
-                onPress={() => onSelect(company)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.companyInfo}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>
-                      {(company.school?.name ?? "C").charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.companyName}>
-                      {company.school?.name ?? "Compañía"}
-                    </Text>
-                    {company.role?.name ? (
-                      <Text style={styles.companyRole}>{company.role.name}</Text>
+          {loading ? (
+            <ActivityIndicator color={AUTH_BRAND} style={styles.loader} />
+          ) : (
+            <View style={styles.list}>
+              {companies.map((company) => {
+                // Mismo criterio que CompanyCard del webapp: "Inactiva" gana a
+                // "Actual", y una inactiva no se puede elegir.
+                const isInactive = disableInactive && company.isActive === false;
+                const isCurrent =
+                  !isInactive &&
+                  currentSchoolId != null &&
+                  company.schoolId === currentSchoolId;
+                return (
+                  <TouchableOpacity
+                    key={company.schoolId ?? company.id}
+                    style={[
+                      styles.companyItem,
+                      isInactive && styles.companyItemDisabled,
+                    ]}
+                    onPress={() => onSelect(company)}
+                    disabled={isInactive || busy}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.companyInfo}>
+                      <View style={styles.avatar}>
+                        <Text style={styles.avatarText}>
+                          {(company.school?.name ?? "C").charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.companyName}>
+                          {company.school?.name ?? "Compañía"}
+                        </Text>
+                        {company.role?.name ? (
+                          <Text style={styles.companyRole}>{company.role.name}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                    {isInactive ? (
+                      <View style={[styles.pill, styles.pillInactive]}>
+                        <Ionicons name="ban-outline" size={12} color={ERROR_COLOR} />
+                        <Text style={[styles.pillText, { color: ERROR_COLOR }]}>
+                          Inactiva
+                        </Text>
+                      </View>
+                    ) : isCurrent ? (
+                      <View style={[styles.pill, styles.pillCurrent]}>
+                        <Ionicons name="home-outline" size={12} color={SUCCESS_ACCENT} />
+                        <Text style={[styles.pillText, { color: SUCCESS_ACCENT }]}>
+                          Actual
+                        </Text>
+                      </View>
                     ) : null}
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={AUTH_INPUT_ICON} />
-              </TouchableOpacity>
-            ))}
-          </View>
+                    <Ionicons name="chevron-forward" size={18} color={AUTH_INPUT_ICON} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
 
           <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
             <Text style={styles.cancelText}>Cancelar</Text>
@@ -136,6 +202,21 @@ function createStyles(
       padding: scale(12),
       backgroundColor: AUTH_INPUT_BACKGROUND,
     },
+    /** Misma opacidad que .disabledContainer de CompanyCard en el webapp. */
+    companyItemDisabled: { opacity: 0.7 },
+    loader: { marginVertical: verticalScale(24) },
+    pill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(4),
+      borderRadius: RADIUS_PILL,
+      paddingHorizontal: scale(8),
+      paddingVertical: verticalScale(2),
+      marginRight: scale(6),
+    },
+    pillCurrent: { backgroundColor: OUTCOME_OK_BACKGROUND },
+    pillInactive: { backgroundColor: ERROR_TINT_BACKGROUND },
+    pillText: { fontSize: font(11), fontWeight: "600" },
     companyInfo: {
       flexDirection: "row",
       alignItems: "center",
