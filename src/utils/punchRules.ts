@@ -922,8 +922,12 @@ export function isAlmuerzoVisible(
  *    cerrarlo.
  * 2. Almuerzo activo (InicioAlmuerzo sin FinAlmuerzo) → oculta, no se puede
  *    estar en ambas actividades a la vez.
- * 3. Sin horario → visible (no hay referencia para la ventana).
- * 4. Con horario → solo dentro de las ventanas de `config` (por defecto
+ * 3. Espera entre breaks: si el último FinBreak válido de hoy (fuera de
+ *    INVALID_TIMELINE_STATUSES) fue hace menos de config.cooldownAfterBreak
+ *    minutos (hora RD, desde su createdDate) → oculta. Se suma a las
+ *    ventanas: hay que cumplir las dos.
+ * 4. Sin horario → visible (no hay referencia para la ventana).
+ * 5. Con horario → solo dentro de las ventanas de `config` (por defecto
  *    getBreakWindowConfig()), medidas desde las horas del horario, no de los
  *    ponches: [entrada + startAfterEntry, almuerzo − endBeforeLunch) y
  *    [fin almuerzo + startAfterLunch, salida − endBeforeExit), o
@@ -947,9 +951,25 @@ export function isBreakVisible(
     .find((p) => p.type === "InicioAlmuerzo" || p.type === "FinAlmuerzo");
   if (lastAlmuerzo?.type === "InicioAlmuerzo") return false;
 
+  const current = getRDMinutes(now);
+
+  const today = toRDDateString(now);
+  const lastFinBreak = getNewestPunch(
+    punches.filter((p) => {
+      if (p.type !== "FinBreak" || !isValidTimelinePunch(p)) return false;
+      const date = parseBackendDate(String(p.createdDate ?? ""));
+      return date !== null && toRDDateString(date) === today;
+    }),
+  );
+  if (lastFinBreak) {
+    const finBreakAt = getRDMinutes(
+      parseBackendDate(lastFinBreak.createdDate) as Date,
+    );
+    if (current - finBreakAt < config.cooldownAfterBreak) return false;
+  }
+
   if (!schedule) return true;
 
-  const current = getRDMinutes(now);
   const inWindow = (start: number, end: number) =>
     current >= start && current < end;
 

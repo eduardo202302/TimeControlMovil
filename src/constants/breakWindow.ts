@@ -8,18 +8,24 @@
 
 /** Aparece 1 h después de workEntryTime. */
 export const BREAK_START_AFTER_ENTRY_MIN = 60;
-/** Se oculta 1 h antes de lunchEntryTime. */
-export const BREAK_END_BEFORE_LUNCH_MIN = 60;
+/**
+ * 8-oct: desactivado por pedido (el Break se ve hasta la hora de inicio
+ * del almuerzo). Se deja la variable para la config por compañía.
+ */
+export const BREAK_END_BEFORE_LUNCH_MIN = 0;
 /** Reaparece 1 h después de lunchExitTime. */
 export const BREAK_START_AFTER_LUNCH_MIN = 60;
 /** Se oculta 1 h antes de workExitTime. */
 export const BREAK_END_BEFORE_EXIT_MIN = 60;
+/** Minutos de espera tras terminar un break antes de poder iniciar otro. */
+export const BREAK_COOLDOWN_MIN = 30;
 
 export interface BreakWindowConfig {
   startAfterEntry: number;
   endBeforeLunch: number;
   startAfterLunch: number;
   endBeforeExit: number;
+  cooldownAfterBreak: number;
 }
 
 /**
@@ -32,5 +38,6 @@ export function getBreakWindowConfig(): BreakWindowConfig {
     endBeforeLunch: BREAK_END_BEFORE_LUNCH_MIN,
     startAfterLunch: BREAK_START_AFTER_LUNCH_MIN,
     endBeforeExit: BREAK_END_BEFORE_EXIT_MIN,
+    cooldownAfterBreak: BREAK_COOLDOWN_MIN,
   };
 }

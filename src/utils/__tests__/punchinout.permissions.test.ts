@@ -740,12 +740,13 @@ describe("16bis. isBreakVisible — ventanas de tiempo", () => {
    * dependan de los valores temporales de constants/breakWindow.ts. */
   const BREAK_CFG = {
     startAfterEntry: 60,
-    endBeforeLunch: 60,
+    endBeforeLunch: 0,
     startAfterLunch: 60,
     endBeforeExit: 60,
+    cooldownAfterBreak: 30,
   };
 
-  /** 09:00–18:00, almuerzo 13:30–14:30 → [10:00, 12:30) y [15:30, 17:00) */
+  /** 09:00–18:00, almuerzo 13:30–14:30 → [10:00, 13:30) y [15:30, 17:00) */
   const horario: UserSchedule = {
     ...schedule,
     workEntryTime: "09:00:00",
@@ -764,8 +765,10 @@ describe("16bis. isBreakVisible — ventanas de tiempo", () => {
     [9, 59, false],
     [10, 0, true],
     [12, 29, true],
-    [12, 30, false],
-    [13, 0, false],
+    [12, 30, true],
+    [13, 0, true],
+    [13, 29, true],
+    [13, 30, false],
     [15, 29, false],
     [15, 30, true],
     [16, 59, true],
@@ -774,9 +777,9 @@ describe("16bis. isBreakVisible — ventanas de tiempo", () => {
     expect(verBreak(rd(h, m), horario)).toBe(esperado);
   });
 
-  it("break abierto fuera de ventana (12:45) → visible para poder cerrarlo", () => {
+  it("break abierto fuera de ventana (13:45) → visible para poder cerrarlo", () => {
     const conBreak = [punch("InicioJornada"), punch("InicioBreak")];
-    expect(verBreak(rd(12, 45), horario, conBreak)).toBe(true);
+    expect(verBreak(rd(13, 45), horario, conBreak)).toBe(true);
   });
 
   it("almuerzo abierto dentro de ventana (11:00) → oculto", () => {
@@ -833,6 +836,7 @@ describe("16bis. isBreakVisible — ventanas de tiempo", () => {
       endBeforeLunch: 30,
       startAfterLunch: 30,
       endBeforeExit: 30,
+      cooldownAfterBreak: 30,
     };
     const ver = (h: number, m: number) =>
       isBreakVisible(PUNCHES.jornadaIniciada, rd(h, m), horario, cfg30);
@@ -842,6 +846,78 @@ describe("16bis. isBreakVisible — ventanas de tiempo", () => {
     expect(ver(13, 0)).toBe(false);
     expect(ver(15, 0)).toBe(true);
     expect(ver(17, 30)).toBe(false);
+  });
+});
+
+// ─── 16ter. isBreakVisible — espera entre breaks ─────────────────────────────
+
+describe("16ter. isBreakVisible — espera entre breaks", () => {
+  const BREAK_CFG = {
+    startAfterEntry: 60,
+    endBeforeLunch: 0,
+    startAfterLunch: 60,
+    endBeforeExit: 60,
+    cooldownAfterBreak: 30,
+  };
+
+  /** 09:00–18:00, almuerzo 13:30–14:30 → [10:00, 13:30) y [15:30, 17:00) */
+  const horario: UserSchedule = {
+    ...schedule,
+    workEntryTime: "09:00:00",
+    workExitTime: "18:00:00",
+    lunchEntryTime: "13:30:00",
+    lunchExitTime: "14:30:00",
+  };
+
+  /** Ponche con createdDate a la hora RD h:m del día de rd() */
+  const at = (type: string, h: number, m: number, extra: Partial<PunchEvent> = {}) =>
+    punch(type, { createdDate: rd(h, m).toISOString(), ...extra });
+
+  /** Break de 10:15 a 10:30 */
+  const breakCerrado = [
+    punch("InicioJornada"),
+    at("InicioBreak", 10, 15),
+    at("FinBreak", 10, 30),
+  ];
+
+  it("FinBreak a las 10:30 → 10:59 oculto, 11:00 visible", () => {
+    expect(isBreakVisible(breakCerrado, rd(10, 59), horario, BREAK_CFG)).toBe(false);
+    expect(isBreakVisible(breakCerrado, rd(11, 0), horario, BREAK_CFG)).toBe(true);
+  });
+
+  it("break abierto a las 10:40 → visible (la espera no bloquea el cierre)", () => {
+    const abierto = [...breakCerrado, at("InicioBreak", 10, 40)];
+    expect(isBreakVisible(abierto, rd(10, 40), horario, BREAK_CFG)).toBe(true);
+  });
+
+  it("FinBreak con status inválido no cuenta para la espera", () => {
+    const invalido = [
+      punch("InicioJornada"),
+      at("InicioBreak", 10, 15),
+      at("FinBreak", 10, 30, { status: "Fuera perímetro" }),
+    ];
+    expect(isBreakVisible(invalido, rd(10, 45), horario, BREAK_CFG)).toBe(true);
+  });
+
+  it("FinBreak de otro día no cuenta para la espera", () => {
+    const ayer = [
+      punch("InicioJornada"),
+      punch("FinBreak", {
+        createdDate: new Date(rd(10, 30).getTime() - 24 * 60 * 60000).toISOString(),
+      }),
+    ];
+    expect(isBreakVisible(ayer, rd(10, 45), horario, BREAK_CFG)).toBe(true);
+  });
+
+  it("espera cumplida pero fuera de ventana (15:00) → oculto", () => {
+    expect(isBreakVisible(breakCerrado, rd(15, 0), horario, BREAK_CFG)).toBe(false);
+  });
+
+  it("cooldownAfterBreak por parámetro cambia la espera", () => {
+    const cfg10 = { ...BREAK_CFG, cooldownAfterBreak: 10 };
+    expect(isBreakVisible(breakCerrado, rd(10, 39), horario, cfg10)).toBe(false);
+    expect(isBreakVisible(breakCerrado, rd(10, 40), horario, cfg10)).toBe(true);
+    expect(isBreakVisible(breakCerrado, rd(10, 40), horario, BREAK_CFG)).toBe(false);
   });
 });
 
