@@ -550,6 +550,61 @@ export function isRejectedJornadaAttempt(
 }
 
 /**
+ * Estados que el webapp descarta del timeline. Copia EXACTA de
+ * face-class-web PunchInOutForm/constants.js:37-43 (INVALID_TIMELINE_STATUSES).
+ * La usan las reglas portadas del webapp para la Jornada Adicional (FinJornada
+ * base, primer inicio del día, último estado válido); si una jornada está
+ * abierta lo sigue decidiendo isRejectedJornadaAttempt. No es
+ * REJECTED_PUNCH_STATUSES de adminPunchRules (esa además trae "Invalido" sin
+ * tilde).
+ */
+export const INVALID_TIMELINE_STATUSES: readonly string[] = [
+  "Fuera perímetro",
+  "Imagen Fraudulenta",
+  "Fuera de área",
+  "Error de Imagen",
+  "Inválido",
+];
+
+/** Ponche que el webapp sí cuenta en su timeline (helpers.js:59-64). */
+function isValidTimelinePunch(punch: Pick<PunchEvent, "status">): boolean {
+  return !INVALID_TIMELINE_STATUSES.includes(punch.status);
+}
+
+/**
+ * Hoy ya hay un ponche de tipo EXACTO "FinJornada" válido: a partir de ahí
+ * toda jornada nueva es Adicional (webapp helpers.js:707-713).
+ */
+export function hasValidBaseFinJornada(punches: PunchEvent[]): boolean {
+  return punches.some(
+    (p) => p.type === "FinJornada" && isValidTimelinePunch(p),
+  );
+}
+
+/**
+ * Hoy ya hubo un inicio de jornada (cualquiera de los 3 tipos) válido
+ * (webapp helpers.js:366-373). Ignora el InicioJornada de un día anterior que /punches/today marca con
+ * hasOpenDay.
+ */
+function hasJornadaStartToday(punches: PunchEvent[]): boolean {
+  return punches.some(
+    (p) =>
+      isJornadaStartType(p.type) &&
+      isValidTimelinePunch(p) &&
+      !p.hasOpenDay &&
+      p.hasOpenDay !== ("true" as any),
+  );
+}
+
+/**
+ * Último ponche válido de CUALQUIER tipo (jornada, almuerzo o break), por
+ * createdDate — el "último estado válido" del webapp (helpers.js:275-300).
+ */
+function getLastValidPunch(punches: PunchEvent[]): PunchEvent | null {
+  return getNewestPunch(punches.filter(isValidTimelinePunch));
+}
+
+/**
  * Último ponche de jornada (inicio o fin, de cualquiera de los 3 tipos) que
  * cuenta: sin intentos rechazados ni el InicioJornada de un día anterior que
  * /punches/today marca con hasOpenDay.
@@ -636,6 +691,10 @@ export function getUsableFhPermission(
  * Tipo que se envía al backend. La UI trabaja con InicioJornada/FinJornada;
  * el backend solo aplica un permiso FH si el ponche sale como
  * InicioJornadaFH/FinJornadaFH, y el cierre debe corresponder al inicio.
+ *
+ * Inicio: port del webapp (helpers.js:697-725) — FH vigente tiene prioridad;
+ * si no, con un FinJornada base válido hoy sale como InicioJornadaAdicional.
+ * Fin: regla propia del móvil — cierra con el tipo del inicio abierto.
  */
 export function resolvePunchTypeForApi(
   baseType: string,
@@ -644,8 +703,11 @@ export function resolvePunchTypeForApi(
   now: Date,
 ): string {
   if (baseType === "InicioJornada") {
-    return getUsableFhPermission(permissions, punches, now)
-      ? "InicioJornadaFH"
+    if (getUsableFhPermission(permissions, punches, now)) {
+      return "InicioJornadaFH";
+    }
+    return hasValidBaseFinJornada(punches)
+      ? "InicioJornadaAdicional"
       : "InicioJornada";
   }
   if (baseType === "FinJornada") {
@@ -687,29 +749,33 @@ export function isJornadaVisible(
     if (getUsableFhPermission(permissions, punches, now)) return true;
     // Feriado no laborable -> solo se entra con FH
     if (isNonWorkingHoliday(holiday, now)) return false;
-    // Ya salio hoy -> ocultar
-    if (lastJornada && isJornadaEndType(lastJornada.type)) return false;
-    // Permiso de entrada tardía aprobado -> habilitar dentro de su ventana
-    if (getApprovedPermission(permissions, PERMISSION_ACTION.ENTRADA, now)) {
+    // Permiso de entrada tardía aprobado -> habilitar dentro de su ventana,
+    // solo antes del primer inicio del día (webapp helpers.js:366-373)
+    if (
+      !hasJornadaStartToday(punches) &&
+      getApprovedPermission(permissions, PERMISSION_ACTION.ENTRADA, now)
+    ) {
       return true;
     }
     // Sin horario -> ocultar siempre
     if (!schedule) return false;
-    // Sin ponche -> visible desde N min antes de entrada (tolerancia) hasta el
-    // fin exacto de la jornada (workExitTime, sin tolerancia extra — la ventana
-    // completa de la jornada ya es el margen)
+    // Sin ponche, o tras una salida (la siguiente es Adicional) -> visible
+    // desde N min antes de entrada (Ver botón) hasta el fin exacto de la
+    // jornada (workExitTime, sin tolerancia extra — la ventana completa de la
+    // jornada ya es el margen). Webapp index.jsx:462-483.
     const entryStart = timeStrToMinutes(schedule.workEntryTime) - tolWorkIn;
     const entryEnd = timeStrToMinutes(schedule.workExitTime);
     return current >= entryStart && current < entryEnd;
   } else {
     // Ya salio hoy -> ocultar
     if (lastJornada && isJornadaEndType(lastJornada.type)) return false;
-    // Jornada FH o Adicional abierta -> siempre se puede cerrar (el feriado
-    // tampoco bloquea la salida)
-    if (
-      lastJornada?.type === "InicioJornadaFH" ||
-      lastJornada?.type === "InicioJornadaAdicional"
-    ) {
+    // Jornada FH abierta -> siempre se puede cerrar (el feriado tampoco
+    // bloquea la salida)
+    if (lastJornada?.type === "InicioJornadaFH") return true;
+    // Jornada Adicional -> siempre, pero solo mientras sea el último estado
+    // válido de cualquier tipo; tras un break o almuerzo, regla normal
+    // (webapp index.jsx:343-345)
+    if (getLastValidPunch(punches)?.type === "InicioJornadaAdicional") {
       return true;
     }
     // Salida anticipada aprobada -> habilitar antes de exitStart

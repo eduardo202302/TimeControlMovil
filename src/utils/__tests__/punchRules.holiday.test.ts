@@ -272,7 +272,9 @@ describe("Entrada en feriado no laborable", () => {
 
 describe("Flujo FH", () => {
   it("día normal, ciclo completo + FH vigente → Entrada visible", () => {
-    expect(verEntrada(rd(10), [], PUNCHES.jornadaCerrada, null)).toBe(false);
+    // Tras una salida la Entrada vuelve dentro de la ventana normal: es la
+    // jornada adicional del webapp (PunchInOutForm/index.jsx:462-483).
+    expect(verEntrada(rd(10), [], PUNCHES.jornadaCerrada, null)).toBe(true);
     expect(verEntrada(rd(10), FH, PUNCHES.jornadaCerrada, null)).toBe(true);
   });
 
@@ -282,7 +284,10 @@ describe("Flujo FH", () => {
       punch("FinJornadaFH", { permissionId: 690 }),
     ];
     expect(verEntrada(rd(10), FH, consumido)).toBe(false);
-    expect(verEntrada(rd(10), FH, consumido, null)).toBe(false);
+    // Día normal: tras el ciclo FH la Entrada vuelve dentro de la ventana
+    // normal (webapp PunchInOutForm/index.jsx:462-483). Sale como
+    // InicioJornada porque no hay FinJornada base.
+    expect(verEntrada(rd(10), FH, consumido, null)).toBe(true);
   });
 
   it("InicioJornadaFH abierto → Entrada oculta; Salida visible a cualquier hora, incluso en feriado", () => {

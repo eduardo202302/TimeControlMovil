@@ -59,8 +59,9 @@ function isJornadaVisibleLegacy(
   if (isInicio) {
     // Ya poncho entrada -> ocultar (jornada activa)
     if (lastJornada?.type === "InicioJornada") return false;
-    // Ya salio hoy -> ocultar
-    if (lastJornada?.type === "FinJornada") return false;
+    // "Ya salio hoy -> ocultar" se quitó a propósito: tras una salida la
+    // Entrada vuelve dentro de la ventana normal (Jornada Adicional del
+    // webapp, PunchInOutForm/index.jsx:462-483).
     // Sin ponche -> visible desde N min antes de entrada (tolerancia) hasta el
     // fin exacto de la jornada (workExitTime, sin tolerancia extra — la ventana
     // completa de la jornada ya es el margen)
