@@ -303,7 +303,10 @@ describe("Flujo FH", () => {
 
   it("InicioJornadaAdicional abierto → Salida visible", () => {
     const abierta = [punch("InicioJornadaAdicional")];
-    expect(verSalida(rd(10), [], abierta, null)).toBe(true);
+    // Pedido del 8-oct: en día normal la salida de la adicional solo con la
+    // ventana de salida (17:00 − 5) o un permiso de Salida sin consumir.
+    expect(verSalida(rd(10), [], abierta, null)).toBe(false);
+    expect(verSalida(rd(16, 55), [], abierta, null)).toBe(true);
     expect(verSalida(rd(10), [], abierta)).toBe(true);
     expect(verEntrada(rd(10), [], abierta, null)).toBe(false);
   });

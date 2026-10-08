@@ -1,6 +1,9 @@
 /// <reference types="jest" />
 
-import type { UserSchedule } from "../../../types/typeStore/SchoolStoreType";
+import type {
+  TodayHoliday,
+  UserSchedule,
+} from "../../../types/typeStore/SchoolStoreType";
 import {
   INVALID_TIMELINE_STATUSES,
   isAlmuerzoVisible,
@@ -51,8 +54,9 @@ const permiso = (
   action: string,
   fromTime: string,
   toTime: string,
+  id = 690,
 ): UserDayPermission => ({
-  id: 690,
+  id,
   schoolId: 21,
   schoolUserId: 224,
   permissionDate: "2026-08-19T04:00:00.000Z",
@@ -189,7 +193,10 @@ describe("isJornadaVisible — Entrada tras una salida", () => {
   });
 });
 
-// ─── Salida de la adicional (webapp index.jsx:343-408) ────────────────────────
+// ─── Salida de la adicional (regla propia del móvil, 8-oct) ───────────────────
+// Solo con la ventana de salida (workExitTime − tolWorkOut) o un permiso de
+// Salida aprobado, vigente y sin consumir. Reemplaza a la regla del webapp
+// (index.jsx:343-408), que queda comentada en isJornadaVisible.
 
 describe("isJornadaVisible — Salida de la adicional", () => {
   const adicional = (): PunchEvent[] => [
@@ -197,13 +204,80 @@ describe("isJornadaVisible — Salida de la adicional", () => {
     punch("InicioJornadaAdicional", 11),
   ];
 
-  it("último estado InicioJornadaAdicional → visible a cualquier hora", () => {
-    for (const now of [rd(11, 5), rd(14), rd(23, 30)]) {
-      expect(verJornada(now, false, adicional())).toBe(true);
-    }
+  /** El caso de la captura: la jornada base se cerró con el permiso 690. */
+  const SALIDA_USADA = permiso("Salida", "09:30:00", "11:00:00", 690);
+  const conSalidaUsada = (): PunchEvent[] => [
+    punch("InicioJornada", 8),
+    punch("FinJornada", 9, 45, { permissionId: 690 }),
+    punch("InicioJornadaAdicional", 10),
+  ];
+
+  it("captura: permiso de Salida ya consumido por la jornada base, 10:10 → oculta", () => {
+    expect(
+      verJornada(rd(10, 10), false, conSalidaUsada(), [SALIDA_USADA]),
+    ).toBe(false);
   });
 
-  it("con un break después → regla normal (ventana de salida)", () => {
+  it("mismo caso con un segundo permiso de Salida vigente y sin consumir → visible", () => {
+    const nuevo = permiso("Salida", "10:00:00", "12:00:00", 691);
+    expect(
+      verJornada(rd(10, 10), false, conSalidaUsada(), [SALIDA_USADA, nuevo]),
+    ).toBe(true);
+  });
+
+  it("mismo caso a las 16:55 (ventana de salida) → visible", () => {
+    expect(
+      verJornada(rd(16, 55), false, conSalidaUsada(), [SALIDA_USADA]),
+    ).toBe(true);
+    expect(
+      verJornada(rd(16, 54), false, conSalidaUsada(), [SALIDA_USADA]),
+    ).toBe(false);
+  });
+
+  it("mismo caso con un break después del inicio adicional, 10:10 → oculta", () => {
+    const conBreak = [...conSalidaUsada(), punch("InicioBreak", 10, 5)];
+    expect(verJornada(rd(10, 10), false, conBreak, [SALIDA_USADA])).toBe(false);
+  });
+
+  it("antes de la ventana y sin permisos → oculta; en la ventana → visible", () => {
+    expect(verJornada(rd(11, 5), false, adicional())).toBe(false);
+    expect(verJornada(rd(14), false, adicional())).toBe(false);
+    expect(verJornada(rd(16, 55), false, adicional())).toBe(true);
+    expect(verJornada(rd(23, 30), false, adicional())).toBe(true);
+  });
+
+  it("permiso de Salida nuevo fuera de su ventana → oculta", () => {
+    const salida = [permiso("Salida", "12:00:00", "13:00:00")];
+    expect(verJornada(rd(14), false, adicional(), salida)).toBe(false);
+  });
+
+  it("feriado no laborable, sin permisos, 10:00 → visible (la salida no se bloquea)", () => {
+    const noLaborable: TodayHoliday = {
+      id: 7,
+      name: "Día de la Restauración",
+      holidayDate: "2026-08-19",
+      working: false,
+    };
+    expect(
+      isJornadaVisible(
+        rd(10),
+        schedule,
+        false,
+        TOL.workIn,
+        TOL.workOut,
+        adicional(),
+        [],
+        noLaborable,
+      ),
+    ).toBe(true);
+  });
+
+  it("un FH vigente no habilita la salida de la adicional", () => {
+    const fh = [permiso("Fuera de Horario", "11:00:00", "13:00:00", 692)];
+    expect(verJornada(rd(12), false, adicional(), fh)).toBe(false);
+  });
+
+  it("con un break después → misma regla (ventana de salida)", () => {
     const conBreak = [...adicional(), punch("InicioBreak", 12)];
     expect(verJornada(rd(12, 30), false, conBreak)).toBe(false);
     expect(verJornada(rd(16, 55), false, conBreak)).toBe(true);
@@ -213,10 +287,30 @@ describe("isJornadaVisible — Salida de la adicional", () => {
     expect(verJornada(rd(17), false, breakCerrado)).toBe(true);
   });
 
-  it("con un break después y permiso de Salida vigente → visible", () => {
+  it("con un break después y permiso de Salida vigente sin consumir → visible", () => {
     const conBreak = [...adicional(), punch("InicioBreak", 12)];
     const salida = [permiso("Salida", "12:00:00", "13:00:00")];
     expect(verJornada(rd(12, 30), false, conBreak, salida)).toBe(true);
+  });
+});
+
+// ─── Regresión: salida de la jornada normal y de una FH abierta ───────────────
+
+describe("isJornadaVisible — Salida normal y FH sin cambios", () => {
+  it("jornada normal: ventana de salida, permiso de Salida y FH vigente", () => {
+    const normal = [punch("InicioJornada", 8)];
+    expect(verJornada(rd(16, 54), false, normal)).toBe(false);
+    expect(verJornada(rd(16, 55), false, normal)).toBe(true);
+    const salida = [permiso("Salida", "09:30:00", "11:00:00")];
+    expect(verJornada(rd(10), false, normal, salida)).toBe(true);
+    expect(verJornada(rd(10), false, normal, FH)).toBe(true);
+  });
+
+  it("FH abierta: salida visible a cualquier hora", () => {
+    const fhAbierta = [punch("InicioJornadaFH", 9, 0, { permissionId: 690 })];
+    for (const now of [rd(3), rd(10), rd(14), rd(23, 30)]) {
+      expect(verJornada(now, false, fhAbierta)).toBe(true);
+    }
   });
 });
 

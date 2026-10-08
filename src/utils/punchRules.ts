@@ -600,6 +600,7 @@ function hasJornadaStartToday(punches: PunchEvent[]): boolean {
  * Último ponche válido de CUALQUIER tipo (jornada, almuerzo o break), por
  * createdDate — el "último estado válido" del webapp (helpers.js:275-300).
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- la usa la regla del webapp comentada en isJornadaVisible; se guarda por si se reactiva
 function getLastValidPunch(punches: PunchEvent[]): PunchEvent | null {
   return getNewestPunch(punches.filter(isValidTimelinePunch));
 }
@@ -683,6 +684,28 @@ export function getUsableFhPermission(
             (isJornadaStartType(p.type) || isJornadaEndType(p.type)) &&
             p.permissionId === permission.id,
         ),
+    ) ?? null
+  );
+}
+
+/**
+ * Primer permiso "Salida" aprobado, vigente ahora (misma ventana
+ * [fromTime, toTime] que getApprovedPermission) y sin consumir: ningún ponche
+ * de hoy lo referencia ya por permissionId. Regla propia del móvil para la
+ * salida de la jornada Adicional.
+ */
+export function getUsableSalidaPermission(
+  permissions: UserDayPermission[],
+  punches: PunchEvent[],
+  now: Date,
+): UserDayPermission | null {
+  const current = getRDMinutes(now);
+  return (
+    getApprovedPermissionsByAction(permissions, PERMISSION_ACTION.SALIDA).find(
+      (permission) =>
+        current >= timeStrToMinutes(permission.fromTime) &&
+        current <= timeStrToMinutes(permission.toTime) &&
+        !punches.some((p) => p.permissionId === permission.id),
     ) ?? null
   );
 }
@@ -772,12 +795,28 @@ export function isJornadaVisible(
     // Jornada FH abierta -> siempre se puede cerrar (el feriado tampoco
     // bloquea la salida)
     if (lastJornada?.type === "InicioJornadaFH") return true;
-    // Jornada Adicional -> siempre, pero solo mientras sea el último estado
-    // válido de cualquier tipo; tras un break o almuerzo, regla normal
-    // (webapp index.jsx:343-345)
-    if (getLastValidPunch(punches)?.type === "InicioJornadaAdicional") {
-      return true;
+    // Jornada Adicional abierta -> solo con la ventana de salida o un permiso
+    // de Salida vigente y sin consumir. Return directo: no cae a la regla
+    // normal de abajo (un permiso de Salida ya usado en la jornada base no
+    // la reabre, ni un FH vigente).
+    if (lastJornada?.type === "InicioJornadaAdicional") {
+      // Feriado no laborable -> la salida nunca se bloquea (igual que la FH):
+      // sin esta excepción quedaría atrapado hasta la ventana de salida.
+      if (isNonWorkingHoliday(holiday, now)) return true;
+      const inExitWindow =
+        !!schedule &&
+        current >= timeStrToMinutes(schedule.workExitTime) - tolWorkOut;
+      return (
+        inExitWindow ||
+        getUsableSalidaPermission(permissions, punches, now) != null
+      );
     }
+    // Regla del webapp (index.jsx:343-408), desactivada el 8-oct por pedido:
+    // la salida de la adicional solo con la hora de salida o un permiso de
+    // Salida nuevo.
+    // if (getLastValidPunch(punches)?.type === "InicioJornadaAdicional") {
+    //   return true;
+    // }
     // Salida anticipada aprobada -> habilitar antes de exitStart
     if (getApprovedPermission(permissions, PERMISSION_ACTION.SALIDA, now)) {
       return true;

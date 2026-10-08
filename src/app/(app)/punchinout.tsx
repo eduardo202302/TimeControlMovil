@@ -169,6 +169,8 @@ const PUNCH_TYPE_MAP: Record<Category, { inicio: string; fin: string }> = {
 // para confirmar permisos/settings que un admin pudo haber cambiado.
 const SESSION_MAX_HOURS_FOR_FIRST_ENTRY = 12;
 const HISTORY_COLLAPSED_LIMIT = 3;
+/** Pulsos del parpadeo del ponche recién registrado en el Historial del Día */
+const BLINK_PULSES = 5;
 
 /** Logo de Time Control (solo el ícono, sin texto) — título de la card Hora Actual. */
 const TIME_CONTROL_LOGO = require("../../../assets/images/logos/logopeq.png");
@@ -866,7 +868,7 @@ export default function PunchInOut() {
   }, [punches]);
 
   // Scroll al final cuando el layout ya se pintó, y parpadeo al terminar el
-  // scroll: 3 pulsos 0 → 0.35 → 0.
+  // scroll: BLINK_PULSES pulsos 0 → 0.35 → 0.
   useEffect(() => {
     if (blinkPunchId == null) return;
     let animation: Animated.CompositeAnimation | null = null;
@@ -886,7 +888,7 @@ export default function PunchInOut() {
           useNativeDriver: true,
         }),
       ]);
-      animation = Animated.loop(pulse, { iterations: 3 });
+      animation = Animated.loop(pulse, { iterations: BLINK_PULSES });
       animation.start(({ finished }) => {
         if (finished) setBlinkPunchId(null);
       });
