@@ -38,6 +38,7 @@ import {
   RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
+  RADIUS_XL,
   useResponsive,
 } from "@/constants/responsive";
 import { tintedShadow } from "@/constants/shadows";
@@ -63,6 +64,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Image,
   Modal,
   Platform,
@@ -93,6 +95,7 @@ import {
   getApprovedPermissionsToday,
   getBreakTagCategoryId,
   getLateMinutes,
+  getNewestPunch,
   getPendingOpenDayDate,
   getPunchBreakTagName,
   getPunctuality,
@@ -469,6 +472,11 @@ export default function PunchInOut() {
   const [historyExpanded, setHistoryExpanded] = useState(true);
   const [historyShowAll, setHistoryShowAll] = useState(false);
   const [tolerancesExpanded, setTolerancesExpanded] = useState(true);
+  // Parpadeo del ponche recién registrado (solo inicios de jornada)
+  const [blinkPunchId, setBlinkPunchId] = useState<number | null>(null);
+  const blinkRequestedRef = useRef(false);
+  const blinkOpacity = useRef(new Animated.Value(0)).current;
+  const scrollViewRef = useRef<ScrollView>(null);
   const [nextDayExitModal, setNextDayExitModal] = useState(false);
   const [nextDayExitPunch, setNextDayExitPunch] = useState<PunchEvent | null>(
     null,
@@ -847,6 +855,49 @@ export default function PunchInOut() {
   useEffect(() => {
     fetchTodayPunches();
   }, [fetchTodayPunches]);
+
+  // fetchTodayPunches no devuelve la lista: el pedido de parpadeo se resuelve
+  // cuando llegan los ponches nuevos.
+  useEffect(() => {
+    if (!blinkRequestedRef.current) return;
+    blinkRequestedRef.current = false;
+    const newest = getNewestPunch(punches);
+    if (newest) setBlinkPunchId(newest.id);
+  }, [punches]);
+
+  // Scroll al final cuando el layout ya se pintó, y parpadeo al terminar el
+  // scroll: 3 pulsos 0 → 0.35 → 0.
+  useEffect(() => {
+    if (blinkPunchId == null) return;
+    let animation: Animated.CompositeAnimation | null = null;
+    const scrollTimer = setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+    const blinkTimer = setTimeout(() => {
+      const pulse = Animated.sequence([
+        Animated.timing(blinkOpacity, {
+          toValue: 0.35,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(blinkOpacity, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]);
+      animation = Animated.loop(pulse, { iterations: 3 });
+      animation.start(({ finished }) => {
+        if (finished) setBlinkPunchId(null);
+      });
+    }, 500);
+    return () => {
+      clearTimeout(scrollTimer);
+      clearTimeout(blinkTimer);
+      animation?.stop();
+      blinkOpacity.setValue(0);
+    };
+  }, [blinkPunchId, blinkOpacity]);
 
   // Motivos de Break se traen frescos cada vez que se abre la pantalla — no se
   // cachean entre sesiones, mismo criterio ya usado para settings de la sede.
@@ -1359,6 +1410,18 @@ export default function PunchInOut() {
         // fuera del área permitida, lo registra igual con status "Fuera de
         // área" (success sigue en true) — se sincroniza y se avisa, sin tratarlo
         // como error.
+        //
+        // Un inicio de jornada exitoso colapsa las tolerancias y resalta su
+        // fila en el historial. La bandera se activa ANTES del fetch: el efecto
+        // sobre [punches] la consume en cuanto fetchTodayPunches hace setPunches.
+        const isSuccessfulStart =
+          response.data?.success === true && isJornadaStartType(apiType);
+        if (isSuccessfulStart) {
+          setTolerancesExpanded(false);
+          setHistoryExpanded(true);
+          blinkRequestedRef.current = true;
+        }
+
         if (response.data?.status === "Fuera de área") {
           await fetchTodayPunches();
           Alert.alert(
@@ -1776,6 +1839,7 @@ export default function PunchInOut() {
         />
       )}
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={[
           styles.content,
           isTablet && styles.contentTablet,
@@ -2456,6 +2520,15 @@ export default function PunchInOut() {
                       displayStatus === "Fuera de área";
                     const isEarlyBadge = displayStatus === "Anticipada";
                     const breakTagName = getPunchBreakTagName(punch);
+                    const punchIconColor = isLateBadge
+                      ? ERROR_COLOR
+                      : isEarlyBadge
+                        ? WARNING_ACCENT
+                        : punch.type.startsWith("Inicio")
+                          ? SUCCESS_ACCENT
+                          : isJornadaOvertime
+                            ? PRIMARY_COLOR
+                            : SUCCESS_ACCENT;
 
                     return (
                       <View key={punch.id} style={styles.punchRow}>
@@ -2476,17 +2549,7 @@ export default function PunchInOut() {
                           <Ionicons
                             name={CATEGORY_ICONS[getPunchCategory(punch.type)]}
                             size={16}
-                            color={
-                              isLateBadge
-                                ? ERROR_COLOR
-                                : isEarlyBadge
-                                  ? WARNING_ACCENT
-                                  : punch.type.startsWith("Inicio")
-                                    ? SUCCESS_ACCENT
-                                    : isJornadaOvertime
-                                      ? PRIMARY_COLOR
-                                      : SUCCESS_ACCENT
-                            }
+                            color={punchIconColor}
                           />
                         </View>
                         <View style={styles.punchInfo}>
@@ -2580,6 +2643,18 @@ export default function PunchInOut() {
                         <Text style={styles.punchTime}>
                           {formatRDTimeShort(new Date(punch.createdDate))}
                         </Text>
+                        {punch.id === blinkPunchId && (
+                          <Animated.View
+                            pointerEvents="none"
+                            style={[
+                              styles.punchRowBlink,
+                              {
+                                backgroundColor: punchIconColor,
+                                opacity: blinkOpacity,
+                              },
+                            ]}
+                          />
+                        )}
                       </View>
                     );
                   })
@@ -2945,6 +3020,16 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderBottomWidth: 1,
     borderBottomColor: FOOTER_BORDER,
+  },
+  // Card redondeada (radio de CARD_ROW) un poco más ancha que la fila, sin
+  // tocar el ícono, el texto ni la línea divisoria.
+  punchRowBlink: {
+    position: "absolute",
+    top: 2,
+    bottom: 2,
+    left: -8,
+    right: -8,
+    borderRadius: RADIUS_XL,
   },
   punchIcon: {
     width: 38,

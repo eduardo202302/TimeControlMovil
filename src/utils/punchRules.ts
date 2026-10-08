@@ -891,3 +891,21 @@ export function resolveSelectedCategory<T extends string>(
   if (visible.length === 0 || visible.includes(selected)) return selected;
   return visible[0];
 }
+
+/**
+ * Ponche con el createdDate más reciente. No se asume el orden del array:
+ * /punches/today inyecta el InicioJornada abierto de un día anterior
+ * (hasOpenDay) en cualquier posición. Fechas no parseables se ignoran.
+ */
+export function getNewestPunch(punches: PunchEvent[]): PunchEvent | null {
+  let newest: PunchEvent | null = null;
+  let newestTime = -Infinity;
+  for (const p of punches) {
+    const time = parseBackendDate(String(p.createdDate ?? ""))?.getTime();
+    if (time !== undefined && time > newestTime) {
+      newest = p;
+      newestTime = time;
+    }
+  }
+  return newest;
+}
