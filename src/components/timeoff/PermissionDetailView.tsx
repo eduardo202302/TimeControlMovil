@@ -3,7 +3,6 @@ import * as Linking from "expo-linking";
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Modal,
   ScrollView,
   StatusBar,
@@ -17,7 +16,6 @@ import {
   CARD_BORDER,
   HEADER_BUTTON_BACKGROUND,
   HEADER_TEXT,
-  OVERLAY_VIEWER,
   PRIMARY_COLOR,
   SECTION_ICON_COLOR,
   TEXT_MUTED,
@@ -25,9 +23,9 @@ import {
   TEXT_PRIMARY,
   TEXT_SECONDARY,
 } from "@/constants/colors";
+import ImageViewerModal from "@/components/ui/ImageViewerModal";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
-  RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
   useResponsive,
@@ -342,26 +340,7 @@ export default function PermissionDetailView({
       </View>
 
       {/* ── Visor de imagen ── */}
-      <Modal
-        visible={previewUri !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPreviewUri(null)}
-      >
-        <TouchableOpacity
-          style={styles.previewOverlay}
-          activeOpacity={1}
-          onPress={() => setPreviewUri(null)}
-        >
-          {!!previewUri && (
-            <Image
-              source={{ uri: previewUri }}
-              style={styles.previewImage}
-              resizeMode="contain"
-            />
-          )}
-        </TouchableOpacity>
-      </Modal>
+      <ImageViewerModal uri={previewUri} onClose={() => setPreviewUri(null)} />
     </Modal>
   );
 }
@@ -475,13 +454,5 @@ function createStyles(
       fontWeight: "500",
     },
 
-    previewOverlay: {
-      flex: 1,
-      backgroundColor: OVERLAY_VIEWER,
-      alignItems: "center",
-      justifyContent: "center",
-      padding: scale(12),
-    },
-    previewImage: { width: "100%", height: "100%", borderRadius: RADIUS_LG },
   });
 }

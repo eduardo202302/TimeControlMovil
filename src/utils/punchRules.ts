@@ -2,6 +2,7 @@ import type {
   TodayHoliday,
   UserSchedule,
 } from "../../types/typeStore/SchoolStoreType";
+import { buildAttachmentUri } from "./permissionRules";
 
 /**
  * Reglas puras del ponchador: horas en zona RD, permisos del día y
@@ -48,6 +49,11 @@ export interface PunchEvent {
     categoryId: number;
     category?: { id: number; name: string };
   };
+  /**
+   * Foto tomada al ponchar. El backend la guarda como ruta relativa servida
+   * por `/downloads/`, pero puede llegar ya absoluta (http/data:) o como array.
+   */
+  photourl?: string | string[] | null;
 }
 
 /**
@@ -357,6 +363,28 @@ export function getPunchBreakTagName(
   punch: Pick<PunchEvent, "tag">,
 ): string | undefined {
   return punch.tag?.name;
+}
+
+/**
+ * URL de la foto del ponche para el ícono "Ver imagen" del historial —
+ * calcado de Components/Timeline del webapp. null cuando no hay foto (o no se
+ * puede armar la URL), y entonces no se muestra el ícono.
+ *
+ * Si `photourl` es un array se usa el primer elemento. Una URL ya absoluta
+ * (http/https o data:) se usa tal cual; una ruta relativa se arma contra
+ * `/downloads/` con el mismo helper de los adjuntos de permisos.
+ */
+export function getPunchPhotoUrl(
+  punch: Pick<PunchEvent, "photourl">,
+  baseUrl: string | null | undefined,
+): string | null {
+  const raw = Array.isArray(punch.photourl)
+    ? punch.photourl[0]
+    : punch.photourl;
+  const photo = typeof raw === "string" ? raw.trim() : "";
+  if (!photo) return null;
+  if (/^(https?:|data:)/i.test(photo)) return photo;
+  return buildAttachmentUri(baseUrl, photo) || null;
 }
 
 // ─── Tags y categorías de la escuela ─────────────────────────────────────────

@@ -1,3 +1,4 @@
+import ImageViewerModal from "@/components/ui/ImageViewerModal";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
   ACCENT_VIOLET,
@@ -92,6 +93,7 @@ import {
 import {
   getBreakTagCategoryId,
   getPunchBreakTagName,
+  getPunchPhotoUrl,
   getScheduleForDay,
   getStatusColor,
   RD_UTC_OFFSET,
@@ -299,6 +301,8 @@ export default function AdminPunchInOutScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(true);
   const [historyShowAll, setHistoryShowAll] = useState(false);
+  /** Foto de un ponche del historial abierta en el visor, o null. */
+  const [punchPhotoUri, setPunchPhotoUri] = useState<string | null>(null);
 
   // El día del ponche es SIEMPRE el de la jornada en curso (hoy). Solo la hora
   // es editable — igual que el webapp.
@@ -1091,6 +1095,10 @@ export default function AdminPunchInOutScreen() {
                             // saliendo del tipo.
                             const statusColor = getStatusColor(punch.status);
                             const breakTagName = getPunchBreakTagName(punch);
+                            const photoUrl = getPunchPhotoUrl(
+                              punch,
+                              urlColegio,
+                            );
                             return (
                               <View key={punch.id} style={styles.punchRow}>
                                 <View
@@ -1118,7 +1126,9 @@ export default function AdminPunchInOutScreen() {
                                   <Text style={styles.punchType}>
                                     {getPunchTypeLabel(punch.type)}
                                   </Text>
-                                  {(!!punch.status || !!breakTagName) && (
+                                  {(!!punch.status ||
+                                    !!breakTagName ||
+                                    photoUrl != null) && (
                                     <View style={styles.punchPillRow}>
                                       {!!punch.status && (
                                         <Text
@@ -1136,6 +1146,23 @@ export default function AdminPunchInOutScreen() {
                                             {breakTagName}
                                           </Text>
                                         </View>
+                                      )}
+                                      {/* Foto del ponche — también en "Error de Imagen", igual que el webapp */}
+                                      {photoUrl != null && (
+                                        <TouchableOpacity
+                                          style={styles.punchPhotoBtn}
+                                          onPress={() =>
+                                            setPunchPhotoUri(photoUrl)
+                                          }
+                                          accessibilityRole="button"
+                                          accessibilityLabel="Ver imagen"
+                                        >
+                                          <Ionicons
+                                            name="image-outline"
+                                            size={16}
+                                            color={TEXT_MUTED}
+                                          />
+                                        </TouchableOpacity>
                                       )}
                                     </View>
                                   )}
@@ -1429,6 +1456,11 @@ export default function AdminPunchInOutScreen() {
             </View>
           </View>
         </Modal>
+
+        <ImageViewerModal
+          uri={punchPhotoUri}
+          onClose={() => setPunchPhotoUri(null)}
+        />
 
         {showTimePicker && (
           <DateTimePicker
@@ -2141,6 +2173,17 @@ function createStyles(
       fontSize: font(11),
       fontWeight: "600",
       color: TEXT_MUTED,
+    },
+    /** Botón "Ver imagen" — lado fijo de 28 (sin escalar): es la caja 28×28
+     * de actionIconBox en el Timeline del webapp. Fondo: el token existente más
+     * cercano a su #f1f5f9 (mismo gris que breakTagPill). */
+    punchPhotoBtn: {
+      width: 28,
+      height: 28,
+      borderRadius: RADIUS_SM,
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
+      alignItems: "center",
+      justifyContent: "center",
     },
     punchTime: { fontSize: font(11), fontWeight: "700", color: HEADER_NAVY },
     historyToggleBtn: {

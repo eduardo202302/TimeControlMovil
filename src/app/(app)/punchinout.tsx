@@ -1,3 +1,4 @@
+import ImageViewerModal from "@/components/ui/ImageViewerModal";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
   ACCENT_VIOLET,
@@ -38,6 +39,7 @@ import {
   RADIUS_LG,
   RADIUS_MD,
   RADIUS_PILL,
+  RADIUS_SM,
   RADIUS_XL,
   useResponsive,
 } from "@/constants/responsive";
@@ -98,6 +100,7 @@ import {
   getNewestPunch,
   getPendingOpenDayDate,
   getPunchBreakTagName,
+  getPunchPhotoUrl,
   getPunctuality,
   getRDDayIndex,
   getScheduleForDay,
@@ -473,6 +476,8 @@ export default function PunchInOut() {
   const [phoneImagen, setPhoneImagen] = useState<string | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(true);
   const [historyShowAll, setHistoryShowAll] = useState(false);
+  /** Foto de un ponche del historial abierta en el visor, o null. */
+  const [punchPhotoUri, setPunchPhotoUri] = useState<string | null>(null);
   const [tolerancesExpanded, setTolerancesExpanded] = useState(true);
   // Parpadeo del ponche recién registrado (solo inicios de jornada)
   const [blinkPunchId, setBlinkPunchId] = useState<number | null>(null);
@@ -2522,6 +2527,7 @@ export default function PunchInOut() {
                       displayStatus === "Fuera de área";
                     const isEarlyBadge = displayStatus === "Anticipada";
                     const breakTagName = getPunchBreakTagName(punch);
+                    const photoUrl = getPunchPhotoUrl(punch, urlColegio);
                     const punchIconColor = isLateBadge
                       ? ERROR_COLOR
                       : isEarlyBadge
@@ -2640,6 +2646,21 @@ export default function PunchInOut() {
                                 />
                               </View>
                             )}
+                            {/* Foto del ponche — también en "Error de Imagen", igual que el webapp */}
+                            {photoUrl != null && (
+                              <TouchableOpacity
+                                style={styles.punchPhotoBtn}
+                                onPress={() => setPunchPhotoUri(photoUrl)}
+                                accessibilityRole="button"
+                                accessibilityLabel="Ver imagen"
+                              >
+                                <Ionicons
+                                  name="image-outline"
+                                  size={16}
+                                  color={TEXT_MUTED}
+                                />
+                              </TouchableOpacity>
+                            )}
                           </View>
                         </View>
                         <Text style={styles.punchTime}>
@@ -2677,6 +2698,11 @@ export default function PunchInOut() {
           )}
         </View>
       </ScrollView>
+
+      <ImageViewerModal
+        uri={punchPhotoUri}
+        onClose={() => setPunchPhotoUri(null)}
+      />
     </View>
   );
 }
@@ -3047,7 +3073,14 @@ const styles = StyleSheet.create({
   punchIconError: { backgroundColor: DANGER_TINT_BACKGROUND },
   punchInfo: { flex: 1, gap: 4 },
   punchType: { fontSize: 13, fontWeight: "700", color: TEXT_PRIMARY },
-  punchBadgeRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
+  /* alignItems center: sin él, el botón de foto (28) estira los pills al alto
+   * de la línea. */
+  punchBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexWrap: "wrap",
+  },
   punchBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -3086,6 +3119,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: PRIMARY_COLOR,
     backgroundColor: PRIMARY_TINT_50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  /* Botón "Ver imagen" del historial. Lado fijo de 28 (sin escalar): es la
+   * caja 28×28 de actionIconBox en el Timeline del webapp. Fondo: el token
+   * existente más cercano a su #f1f5f9 (mismo gris que badgeNeutral). */
+  punchPhotoBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: RADIUS_SM,
+    backgroundColor: FIELD_DISABLED_BACKGROUND,
     alignItems: "center",
     justifyContent: "center",
   },

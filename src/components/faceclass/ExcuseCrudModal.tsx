@@ -27,7 +27,6 @@ import {
   HEADER_TEXT,
   ONLINE_DOT,
   ON_PRIMARY,
-  OVERLAY_VIEWER,
   PRIMARY_COLOR,
   SECTION_ICON_COLOR,
   SUCCESS_COLOR,
@@ -41,6 +40,7 @@ import {
   TEXT_SECONDARY,
   WARNING_TEXT_STRONG,
 } from "@/constants/colors";
+import ImageViewerModal from "@/components/ui/ImageViewerModal";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
   MAX_CONTENT_WIDTH,
@@ -996,22 +996,7 @@ function CrudForm({
         </View>
       </Modal>
 
-      <Modal
-        visible={previewUri !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPreviewUri(null)}
-      >
-        <TouchableOpacity
-          style={styles.previewOverlay}
-          activeOpacity={1}
-          onPress={() => setPreviewUri(null)}
-        >
-          {!!previewUri && (
-            <Image source={{ uri: previewUri }} style={styles.previewImage} resizeMode="contain" />
-          )}
-        </TouchableOpacity>
-      </Modal>
+      <ImageViewerModal uri={previewUri} onClose={() => setPreviewUri(null)} />
     </>
   );
 }
@@ -1316,13 +1301,5 @@ function createStyles(
     },
     discardCancel: { fontSize: font(14), fontWeight: "700", color: TEXT_SECONDARY },
     discardConfirm: { fontSize: font(14), fontWeight: "700", color: ERROR_COLOR },
-    previewOverlay: {
-      flex: 1,
-      backgroundColor: OVERLAY_VIEWER,
-      alignItems: "center",
-      justifyContent: "center",
-      padding: scale(12),
-    },
-    previewImage: { width: "100%", height: "100%", borderRadius: RADIUS_LG },
   });
 }
