@@ -1287,23 +1287,23 @@ export default function PunchInOut() {
       let photo: ImagePicker.ImagePickerAsset | null = null;
       if (imageRequiredForType) {
         try {
-          const { status } =
-            await ImagePicker.requestMediaLibraryPermissionsAsync();
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
           if (status !== "granted") {
             console.warn(
-              "BLOQUEO: Permiso de galería denegado — se aborta el ponche",
+              "BLOQUEO: Permiso de cámara denegado — se aborta el ponche",
             );
             Alert.alert(
               "Permiso requerido",
-              "Necesitas permitir el acceso a la galería para registrar tu asistencia.",
+              "Necesitas permitir el acceso a la cámara para registrar tu asistencia.",
             );
             return;
           }
-          const result = await ImagePicker.launchImageLibraryAsync({
+          const result = await ImagePicker.launchCameraAsync({
             mediaTypes: ["images"],
             allowsEditing: false,
             quality: 0.4,
             base64: true,
+            cameraType: ImagePicker.CameraType.front,
           });
           if (result.canceled) {
             console.warn(
@@ -1311,7 +1311,7 @@ export default function PunchInOut() {
             );
             Alert.alert(
               "Foto requerida",
-              "Debes seleccionar una foto para registrar la jornada.",
+              "Debes tomar una foto para registrar la jornada.",
             );
             return;
           }
@@ -1332,7 +1332,7 @@ export default function PunchInOut() {
           );
           Alert.alert(
             "Foto requerida",
-            "Debes seleccionar una foto para registrar la jornada.",
+            "Debes tomar una foto para registrar la jornada.",
           );
           return;
         }
