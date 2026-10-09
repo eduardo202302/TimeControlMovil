@@ -1,8 +1,12 @@
 import {
   addTaskerAddress,
   applyTaskerGeocode,
+  buildCommentPayload,
+  buildLocalComment,
   buildMapsUrl,
   buildTaskerAddress,
+  canSubmitComment,
+  getCommentAttachmentKind,
   emptyTaskerAddressDraft,
   formatTaskerAddress,
   getSelectedTaskerAddress,
@@ -44,6 +48,7 @@ import type {
   TaskerActivity,
   TaskerAddress,
   TaskerAddressDraft,
+  TaskerAttachment,
   TaskerComment,
   TaskerReportAddress,
 } from "../../../types/typesTasker/TaskerTypes";
@@ -237,6 +242,104 @@ describe("sortComments", () => {
   it("fecha inválida cuenta como la más vieja", () => {
     const withBad = [...list, comment(4, "")];
     expect(sortComments(withBad, "asc")[0].id).toBe(4);
+  });
+});
+
+describe("comentarios de Seguimiento", () => {
+  const PNG = "data:image/jpeg;base64,AAAA";
+  const PDF = "data:application/pdf;base64,BBBB";
+  const file = (id: string, dataUri: string): TaskerAttachment => ({
+    id,
+    name: `${id}.bin`,
+    mimeType: dataUri.slice(5, dataUri.indexOf(";")),
+    dataUri,
+  });
+
+  describe("canSubmitComment", () => {
+    it("sin texto ni adjuntos → false", () => {
+      expect(canSubmitComment("", [])).toBe(false);
+    });
+    it("solo espacios y saltos no cuentan como texto", () => {
+      expect(canSubmitComment("  \n\t ", [])).toBe(false);
+    });
+    it("con texto → true", () => {
+      expect(canSubmitComment(" hola ", [])).toBe(true);
+    });
+    it("sin texto pero con adjuntos → true", () => {
+      expect(canSubmitComment("   ", [file("a", PNG)])).toBe(true);
+    });
+  });
+
+  describe("buildLocalComment", () => {
+    const task = { addUser: { id: 21, name: "Jeremy Domínguez" } };
+    const now = new Date(2026, 9, 9, 14, 5, 7);
+
+    it("autor = task.addUser (el solicitante), como Tasker", () => {
+      const c = buildLocalComment({ text: "x", attachments: [], task, now });
+      expect(c.addUser).toEqual({ name: "Jeremy Domínguez" });
+    });
+    it("fecha de ese momento, sin zona, en hora local", () => {
+      const c = buildLocalComment({ text: "x", attachments: [], task, now });
+      expect(c.createdDate).toBe(localIso(2026, 9, 9, 14, 5, 7));
+      expect(formatTaskerDate(c.createdDate)).toBe("09/10/2026 02:05:07 PM");
+    });
+    it("texto recortado al inicio y al final", () => {
+      const c = buildLocalComment({ text: "  hola\nmundo \n", attachments: [], task, now });
+      expect(c.comment).toBe("hola\nmundo");
+    });
+    it("images = data-URIs de los adjuntos, en orden", () => {
+      const c = buildLocalComment({
+        text: "",
+        attachments: [file("a", PNG), file("b", PDF)],
+        task,
+        now,
+      });
+      expect(c.images).toEqual([PNG, PDF]);
+    });
+    it("id negativo (no choca con los del servidor)", () => {
+      const c = buildLocalComment({ text: "x", attachments: [], task, now });
+      expect(c.id).toBeLessThan(0);
+    });
+    it("queda más reciente que los del ejemplo al ordenar desc", () => {
+      const local = buildLocalComment({ text: "x", attachments: [], task, now });
+      const sorted = sortComments([...getTaskerOpenTask().task.comments, local], "desc");
+      expect(sorted[0]).toBe(local);
+    });
+  });
+
+  describe("buildCommentPayload", () => {
+    it("forma exacta de Tasker", () => {
+      expect(buildCommentPayload("  hola  ", [file("a", PNG), file("b", PDF)])).toEqual({
+        taskComments: [{ comment: "hola", images: [PNG, PDF], localAttachments: [] }],
+      });
+    });
+    it("sin adjuntos → images vacío", () => {
+      expect(buildCommentPayload("hola", [])).toEqual({
+        taskComments: [{ comment: "hola", images: [], localAttachments: [] }],
+      });
+    });
+  });
+
+  describe("getCommentAttachmentKind", () => {
+    it("data-URI de imagen → image", () => {
+      expect(getCommentAttachmentKind(PNG)).toBe("image");
+      expect(getCommentAttachmentKind("data:image/png;base64,AAAA")).toBe("image");
+    });
+    it("data-URI de otro tipo (PDF) → file", () => {
+      expect(getCommentAttachmentKind(PDF)).toBe("file");
+    });
+    it("ruta guardada del servidor → server", () => {
+      expect(getCommentAttachmentKind("comentarios/4045/adjunto-1.jpg")).toBe("server");
+    });
+  });
+
+  describe("comentarios de ejemplo", () => {
+    it("hay dos, con fechas distintas, para que el orden se note", () => {
+      const { comments } = getTaskerOpenTask().task;
+      expect(comments).toHaveLength(2);
+      expect(sortComments(comments, "desc").map((c) => c.id)).toEqual([1, 2]);
+      expect(sortComments(comments, "asc").map((c) => c.id)).toEqual([2, 1]);
+    });
   });
 });
 
@@ -668,7 +771,7 @@ describe("buildTaskerAddress", () => {
     expect(built.location).toEqual({ lat: 5, lng: 6 });
     expect(built.address).toBe("X");
   });
-  it("sin geocode ni punto inicial: latitude/longitude null y sin location", () => {
+  it("E4 — sin geocode ni punto inicial: latitude/longitude null y sin location (Tasker pondría el centro de Santo Domingo)", () => {
     const built = buildTaskerAddress({
       previous: emptyAddress({ location: { lat: 1, lng: 2 } }),
       draft: filled,
@@ -836,6 +939,9 @@ describe("resolveTaskerAddressConfig", () => {
 });
 
 describe("getTaskerReportContext (direcciones de ejemplo)", () => {
+  it("no trae adjuntos de ejemplo: la lista arranca vacía", () => {
+    expect(getTaskerReportContext()).not.toHaveProperty("attachments");
+  });
   it("cada dirección trae id, order y selected booleano", () => {
     const { addresses } = getTaskerReportContext();
     addresses.forEach((a, index) => {

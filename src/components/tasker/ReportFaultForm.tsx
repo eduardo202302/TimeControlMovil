@@ -2,7 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import React, { useCallback, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -41,6 +43,7 @@ import {
   useResponsive,
 } from "@/constants/responsive";
 import { getTaskerReportContext, getTaskerTypeTags } from "@/constants/taskerMock";
+import ImageViewerModal from "@/components/ui/ImageViewerModal";
 import SectionIcon from "@/components/ui/SectionIcon";
 import TagOptionSheet from "@/components/permissions/TagOptionSheet";
 import {
@@ -67,19 +70,20 @@ import {
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import type {
   TaskerAddress,
+  TaskerAttachment,
   TaskerReportAddress,
-  TaskerReportAttachment,
   TaskerReportErrors,
 } from "../../../types/typesTasker/TaskerTypes";
 import { showPendingAction } from "./pendingAction";
 import TaskerAddressModal from "./TaskerAddressModal";
+import { useTaskerAttachmentPicker } from "./useTaskerAttachmentPicker";
 
 type Styles = ReturnType<typeof createStyles>;
 
 /**
  * Reportar Avería (Tasker) — FASE B: con los datos fijos de taskerMock.ts.
- * Las direcciones se agregan, editan, borran y marcan en local; lo que
- * necesita backend llama a showPendingAction().
+ * Adjuntos y direcciones se agregan, editan, borran y marcan en local; solo
+ * el envío final llama a showPendingAction().
  */
 export default function ReportFaultForm() {
   const { scale, verticalScale, font, isTablet } = useResponsive();
@@ -97,9 +101,8 @@ export default function ReportFaultForm() {
 
   const [typeId, setTypeId] = useState<number | null>(null);
   const [description, setDescription] = useState("");
-  const [attachments, setAttachments] = useState<TaskerReportAttachment[]>(
-    context.attachments,
-  );
+  const [attachments, setAttachments] = useState<TaskerAttachment[]>([]);
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [errors, setErrors] = useState<TaskerReportErrors>({});
   const [typeSheetVisible, setTypeSheetVisible] = useState(false);
   const [addresses, setAddresses] = useState<TaskerReportAddress[]>(context.addresses);
@@ -115,7 +118,12 @@ export default function ReportFaultForm() {
     setErrors((prev) => (prev.description ? { ...prev, description: undefined } : prev));
   }, []);
 
-  const handleRemoveAttachment = useCallback((id: number) => {
+  const handleAddAttachments = useCallback((added: TaskerAttachment[]) => {
+    setAttachments((prev) => [...prev, ...added]);
+  }, []);
+  const picker = useTaskerAttachmentPicker(attachments, handleAddAttachments);
+
+  const handleRemoveAttachment = useCallback((id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
@@ -155,14 +163,15 @@ export default function ReportFaultForm() {
   const handleCancel = useCallback(() => {
     setTypeId(null);
     setDescription("");
-    setAttachments(context.attachments);
+    setAttachments([]);
     setAddresses(context.addresses);
     setErrors({});
-  }, [context.attachments, context.addresses]);
+  }, [context.addresses]);
 
   const handleSubmit = useCallback(() => {
     const result = validateReport({ typeId, description }, config);
     setErrors(result);
+    // TODO(puente): enviar el reporte (tipo, descripción, adjuntos y direcciones).
     if (Object.keys(result).length === 0) showPendingAction();
   }, [typeId, description, config]);
 
@@ -241,20 +250,22 @@ export default function ReportFaultForm() {
         {/* ── Imágenes ── */}
         <View style={styles.card}>
           <CardHeader styles={styles} tone="amber" icon="images-outline" title="Imágenes">
-            <View style={styles.countChip}>
-              <Text style={styles.countChipText}>
-                {attachments.length} {attachments.length === 1 ? "archivo" : "archivos"}
-              </Text>
-            </View>
+            {attachments.length > 0 && (
+              <View style={styles.countChip}>
+                <Text style={styles.countChipText}>
+                  {attachments.length} {attachments.length === 1 ? "archivo" : "archivos"}
+                </Text>
+              </View>
+            )}
           </CardHeader>
           {attachments.length > 0 && (
             <View style={styles.thumbGrid}>
-              {attachments.map((file, index) => (
+              {attachments.map((file) => (
                 <AttachmentTile
                   key={file.id}
                   file={file}
-                  index={index}
                   styles={styles}
+                  onOpen={setViewerUri}
                   onRemove={handleRemoveAttachment}
                 />
               ))}
@@ -262,10 +273,15 @@ export default function ReportFaultForm() {
           )}
           <TouchableOpacity
             style={[styles.addBtn, attachments.length > 0 && styles.addBtnSpaced]}
-            onPress={showPendingAction}
+            onPress={picker.openPicker}
+            disabled={picker.busy}
             activeOpacity={0.75}
           >
-            <Ionicons name="camera-outline" size={18} color={PRIMARY_700} />
+            {picker.busy ? (
+              <ActivityIndicator size="small" color={PRIMARY_700} />
+            ) : (
+              <Ionicons name="camera-outline" size={18} color={PRIMARY_700} />
+            )}
             <Text style={styles.addBtnText}>Tomar foto o adjuntar archivo</Text>
           </TouchableOpacity>
           <Text style={styles.helper}>Imágenes o PDF.</Text>
@@ -360,6 +376,8 @@ export default function ReportFaultForm() {
         onClose={() => setAddressEditor(null)}
         onSelect={handleAddressSelected}
       />
+
+      <ImageViewerModal uri={viewerUri} onClose={() => setViewerUri(null)} />
     </KeyboardAvoidingView>
   );
 }
@@ -386,30 +404,32 @@ function CardHeader({ styles, tone, icon, title, children }: CardHeaderProps) {
 }
 
 interface AttachmentTileProps {
-  file: TaskerReportAttachment;
-  index: number;
+  file: TaskerAttachment;
   styles: Styles;
-  onRemove: (id: number) => void;
+  /** Abre la imagen en el visor (los PDF no se abren). */
+  onOpen: (uri: string) => void;
+  onRemove: (id: string) => void;
 }
 
-function AttachmentTile({ file, index, styles, onRemove }: AttachmentTileProps) {
-  const isPdf = file.kind === "pdf";
+function AttachmentTile({ file, styles, onOpen, onRemove }: AttachmentTileProps) {
+  const isImage = file.mimeType.startsWith("image/");
   return (
     <View style={styles.thumbTile}>
-      <TouchableOpacity
-        style={styles.thumbPreview}
-        onPress={showPendingAction}
-        activeOpacity={0.8}
-      >
-        <Ionicons
-          name={isPdf ? "document-outline" : "image-outline"}
-          size={26}
-          color={PRIMARY_700}
-        />
-        <Text style={styles.thumbLabel}>
-          {isPdf ? "PDF" : "Foto"} {index + 1}
-        </Text>
-      </TouchableOpacity>
+      {isImage ? (
+        <TouchableOpacity
+          style={styles.thumbPreview}
+          onPress={() => onOpen(file.dataUri)}
+          accessibilityLabel={`Ver ${file.name}`}
+          activeOpacity={0.8}
+        >
+          <Image source={{ uri: file.dataUri }} style={styles.thumbImage} resizeMode="cover" />
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.thumbPreview}>
+          <Ionicons name="document-outline" size={26} color={PRIMARY_700} />
+          <Text style={styles.thumbLabel}>PDF</Text>
+        </View>
+      )}
       <View style={styles.thumbFooter}>
         <Text style={styles.thumbName} numberOfLines={1}>
           {file.name}
@@ -447,10 +467,7 @@ function AddressRow({ address, styles, onEdit, onRemove, onToggleSelected }: Add
     address.longitude !== "";
 
   const openMap = () => {
-    if (!hasCoords) {
-      showPendingAction();
-      return;
-    }
+    if (!hasCoords) return;
     Linking.openURL(buildMapsUrl(address.latitude!, address.longitude!)).catch(
       () => undefined,
     );
@@ -484,10 +501,13 @@ function AddressRow({ address, styles, onEdit, onRemove, onToggleSelected }: Add
         </TouchableOpacity>
       </View>
       <View style={styles.addressActions}>
+        {/* Sin coordenadas no hay qué abrir: deshabilitado y atenuado (no es una acción pendiente). */}
         <TouchableOpacity
-          style={styles.addressBtn}
+          style={[styles.addressBtn, !hasCoords && styles.addressBtnDisabled]}
           onPress={openMap}
+          disabled={!hasCoords}
           accessibilityLabel="Ver dirección en el mapa"
+          accessibilityState={{ disabled: !hasCoords }}
           activeOpacity={0.75}
         >
           <Ionicons name="map-outline" size={18} color={ICON_VIEW} />
@@ -596,6 +616,7 @@ function createStyles(
       justifyContent: "center",
       gap: verticalScale(4),
     },
+    thumbImage: { width: "100%", height: "100%", borderRadius: RADIUS_SM },
     thumbLabel: { fontSize: font(11), fontWeight: "600", color: PRIMARY_700 },
     thumbFooter: {
       flexDirection: "row",
@@ -687,6 +708,7 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
     },
+    addressBtnDisabled: { opacity: 0.4 },
     footer: {
       ...FOOTER_BAR,
       paddingHorizontal: scale(16),

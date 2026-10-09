@@ -92,8 +92,20 @@ export interface TaskerComment {
   addUser: { name: string };
   createdDate: string;
   comment: string;
-  /** Rutas de los adjuntos del comentario. */
+  /**
+   * Adjuntos del comentario: rutas guardadas en el servidor o, en un
+   * comentario recién agregado en local, data-URIs.
+   */
   images: string[];
+}
+
+/** Cuerpo de "Agregar comentario" de Tasker (buildCommentPayload). */
+export interface TaskerCommentPayload {
+  taskComments: {
+    comment: string;
+    images: string[];
+    localAttachments: never[];
+  }[];
 }
 
 export interface TaskerCoordinates {
@@ -152,11 +164,17 @@ export interface TaskerReportConfig {
   isDescriptionRequired: boolean;
 }
 
-/** Adjunto local del formulario de reporte (todavía sin subir). */
-export interface TaskerReportAttachment {
-  id: number;
+/**
+ * Adjunto local (Reportar Avería y comentarios de Seguimiento), todavía sin
+ * subir. Tasker acepta solo imágenes (comprimidas a JPEG) y PDF.
+ */
+export interface TaskerAttachment {
+  id: string;
   name: string;
-  kind: "image" | "pdf";
+  mimeType: string;
+  /** "data:<mime>;base64,…": lo que se manda tal cual en `images`. */
+  dataUri: string;
+  size?: number;
 }
 
 /** Datos de solo lectura que acompañan el formulario de reporte. */
@@ -164,7 +182,6 @@ export interface TaskerReportContext {
   client: TaskerClient & { typeName: string };
   reporter: TaskerUserRef;
   addresses: TaskerReportAddress[];
-  attachments: TaskerReportAttachment[];
 }
 
 export interface TaskerReportErrors {

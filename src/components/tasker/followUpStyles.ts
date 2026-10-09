@@ -28,6 +28,8 @@ import { SHADOW_SM } from "@/constants/shadows";
 import {
   CARD_FORM,
   CARD_ROW,
+  FIELD_SURFACE,
+  FOOTER_BTN_SAVE,
   ROW_ACTION_BTN,
   SEGMENTED_SURFACE,
   SEGMENT_ACTIVE,
@@ -263,7 +265,47 @@ export function createFollowUpStyles(
       alignItems: "center",
       justifyContent: "center",
     },
+    // Adjunto de imagen en local (data-URI): la imagen real llena la miniatura.
+    commentImageFill: { width: "100%", height: "100%", borderRadius: RADIUS_MD },
     emptyText: { fontSize: font(13), color: TEXT_PLACEHOLDER, fontStyle: "italic" },
+
+    /* ── Formulario "Agregar comentario" ── */
+    commentForm: { gap: verticalScale(10), marginBottom: verticalScale(12) },
+    commentInput: {
+      ...FIELD_SURFACE,
+      minHeight: verticalScale(88),
+      padding: scale(12),
+      fontSize: font(14),
+      lineHeight: font(20),
+      color: TEXT_PRIMARY,
+    },
+    commentFormThumb: { position: "relative" },
+    // Botón de quitar sobre la miniatura: 24×24 fijo (área táctil del ícono).
+    commentFormRemove: {
+      position: "absolute",
+      top: -6,
+      right: -6,
+      width: 24,
+      height: 24,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      borderRadius: RADIUS_PILL,
+      backgroundColor: CARD_BACKGROUND,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    commentFormActions: { flexDirection: "row", alignItems: "center", gap: scale(8) },
+    commentSubmitBtn: {
+      ...FOOTER_BTN_SAVE,
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: scale(6),
+      minHeight: verticalScale(40),
+    },
+    commentSubmitBtnDisabled: { opacity: 0.5, shadowColor: "transparent", elevation: 0 },
+    commentSubmitText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
 
     /* ── Pestaña Dirección ── */
     addressGrid: {

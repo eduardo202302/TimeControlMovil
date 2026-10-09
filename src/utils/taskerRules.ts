@@ -9,12 +9,15 @@
 import type {
   TaskerActivity,
   TaskerAddress,
+  TaskerAttachment,
   TaskerAddressConfig,
   TaskerAddressDraft,
   TaskerComment,
+  TaskerCommentPayload,
   TaskerReportAddress,
   TaskerReportConfig,
   TaskerReportErrors,
+  TaskerTask,
 } from "../../types/typesTasker/TaskerTypes";
 import type { CompanySettings } from "../../types/typeStore/SchoolStoreType";
 import {
@@ -114,6 +117,72 @@ export function sortComments(
   return [...comments].sort((a, b) =>
     order === "desc" ? time(b) - time(a) : time(a) - time(b),
   );
+}
+
+// ─── Comentarios de Seguimiento ─────────────────────────────────────────────
+
+/** "Agregar" del formulario: con texto (sin contar espacios) o con adjuntos. */
+export function canSubmitComment(text: string, attachments: TaskerAttachment[]): boolean {
+  return text.trim().length > 0 || attachments.length > 0;
+}
+
+/** "YYYY-MM-DDTHH:mm:ss" en hora local, el mismo formato sin zona de Tasker. */
+function toTaskerLocalIso(date: Date): string {
+  return (
+    `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}` +
+    `T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`
+  );
+}
+
+/**
+ * Comentario que se pinta al momento, sin esperar al servidor. Como Tasker,
+ * el autor es task.addUser (el solicitante), no quien escribe. El id es
+ * negativo para no chocar con los del servidor.
+ */
+export function buildLocalComment({
+  text,
+  attachments,
+  task,
+  now,
+}: {
+  text: string;
+  attachments: TaskerAttachment[];
+  task: Pick<TaskerTask, "addUser">;
+  now: Date;
+}): TaskerComment {
+  return {
+    id: -now.getTime(),
+    addUser: { name: task.addUser.name },
+    createdDate: toTaskerLocalIso(now),
+    comment: text.trim(),
+    images: attachments.map((a) => a.dataUri),
+  };
+}
+
+/** Cuerpo que Tasker manda al agregar un comentario. */
+export function buildCommentPayload(
+  text: string,
+  attachments: TaskerAttachment[],
+): TaskerCommentPayload {
+  return {
+    taskComments: [
+      {
+        comment: text.trim(),
+        images: attachments.map((a) => a.dataUri),
+        localAttachments: [],
+      },
+    ],
+  };
+}
+
+/**
+ * Qué es un adjunto de comentario: data-URI de imagen (se abre en el visor),
+ * data-URI de otro tipo (PDF, no se abre) o ruta guardada en el servidor.
+ */
+export function getCommentAttachmentKind(value: string): "image" | "file" | "server" {
+  if (/^data:image\//i.test(value)) return "image";
+  if (/^data:/i.test(value)) return "file";
+  return "server";
 }
 
 export interface AddressField {
@@ -249,7 +318,7 @@ export function validateReport(
 }
 
 // ─── Direcciones de Reportar Avería (MapAddressSelector de Tasker) ──────────
-// Calcado de Tasker, rarezas incluidas, salvo las excepciones E1–E3 marcadas.
+// Calcado de Tasker, rarezas incluidas, salvo las excepciones E1–E4 marcadas.
 
 /** Campos del borrador, en el orden de la ventana (postalCode sin input). */
 export const TASKER_ADDRESS_DRAFT_FIELDS: (keyof TaskerAddressDraft)[] = [
@@ -369,6 +438,11 @@ export function formatTaskerAddress(draft: TaskerAddressDraft): string {
  * editar) y pisa con el borrador, formattedAddress, address y coordenadas.
  * Las coordenadas son las del RESULTADO de Google (geometry.location), no las
  * del punto tocado; sin resultado, las del punto inicial. No se redondean.
+ *
+ * EXCEPCIÓN E4: una dirección nueva a la que no se le tocó el mapa ni el
+ * buscador (sin resultado y sin punto inicial) se guarda SIN coordenadas
+ * (latitude/longitude null). Tasker le pone las del centro de Santo Domingo;
+ * aquí no, a propósito, para no guardar una ubicación falsa.
  */
 export function buildTaskerAddress({
   previous,

@@ -101,10 +101,6 @@ export function getTaskerReportContext(): TaskerReportContext {
         restrictions: "",
       },
     ],
-    attachments: [
-      { id: 1, name: "tablero_falla.jpg", kind: "image" },
-      { id: 2, name: "bomba_fuga.png", kind: "image" },
-    ],
   };
 }
 
@@ -145,6 +141,13 @@ export function getTaskerOpenTask(): TaskerOpenTaskResponse {
           comment:
             "Contacto establecido con el supervisor en planta. Se coordinó inspección de rutina en el tablero secundario.",
           images: ["comentarios/4045/adjunto-1.jpg"],
+        },
+        {
+          id: 2,
+          addUser: { name: "Jeremy Móvil" },
+          createdDate: "2026-10-06T15:20:05",
+          comment: "Se recibió el reporte. Técnico asignado para la visita.",
+          images: [],
         },
       ],
       activities: [

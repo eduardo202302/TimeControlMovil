@@ -1,10 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { ON_PRIMARY, TEXT_MUTED } from "@/constants/colors";
 import { useResponsive } from "@/constants/responsive";
 import { getTaskerOpenTask } from "@/constants/taskerMock";
-import { getStateActivities, type CommentOrder } from "../../utils/taskerRules";
+import {
+  getStateActivities,
+  sortComments,
+  type CommentOrder,
+} from "../../utils/taskerRules";
+import type { TaskerComment } from "../../../types/typesTasker/TaskerTypes";
 import FollowUpActionsTab from "./FollowUpActionsTab";
 import FollowUpAddressTab from "./FollowUpAddressTab";
 import { StateChip } from "./FollowUpParts";
@@ -20,8 +25,9 @@ const TABS: { key: FollowUpTab; label: string; icon: keyof typeof Ionicons.glyph
 ];
 
 /**
- * Seguimiento de un ticket de Tasker — FASE B: solo pintado, con los datos
- * fijos de taskerMock.ts. Las tres pestañas son estado local de esta pantalla.
+ * Seguimiento de un ticket de Tasker — FASE B: con los datos fijos de
+ * taskerMock.ts. Las tres pestañas son estado local de esta pantalla; los
+ * comentarios se agregan en local (todavía no se envían).
  */
 export default function FollowUpView() {
   const { scale, verticalScale, font, isTablet } = useResponsive();
@@ -34,8 +40,26 @@ export default function FollowUpView() {
   const stateActivities = useMemo(() => getStateActivities(task.activities), [task]);
 
   const [tab, setTab] = useState<FollowUpTab>("ticket");
-  // Vive acá y no en la pestaña: el orden se conserva al cambiar de pestaña.
+  // Viven acá y no en la pestaña: orden y comentarios agregados se conservan
+  // al cambiar de pestaña.
   const [commentOrder, setCommentOrder] = useState<CommentOrder>("desc");
+  /**
+   * Lista tal como se pinta (como Tasker): ordenar reordena TODA la lista por
+   * createdDate; un comentario nuevo entra SIEMPRE arriba, sea cual sea el orden.
+   */
+  const [comments, setComments] = useState<TaskerComment[]>(() =>
+    sortComments(task.comments, "desc"),
+  );
+
+  const handleToggleCommentOrder = useCallback(() => {
+    const next: CommentOrder = commentOrder === "desc" ? "asc" : "desc";
+    setCommentOrder(next);
+    setComments((prev) => sortComments(prev, next));
+  }, [commentOrder]);
+
+  const handleAddComment = useCallback((comment: TaskerComment) => {
+    setComments((prev) => [comment, ...prev]);
+  }, []);
   // "Ahora" se toma UNA vez al montar: Transcurrido y los tiempos abiertos no corren en vivo.
   const [nowMs] = useState(() => Date.now());
 
@@ -98,10 +122,10 @@ export default function FollowUpView() {
             task={task}
             styles={styles}
             nowMs={nowMs}
+            comments={comments}
             commentOrder={commentOrder}
-            onToggleCommentOrder={() =>
-              setCommentOrder((prev) => (prev === "desc" ? "asc" : "desc"))
-            }
+            onToggleCommentOrder={handleToggleCommentOrder}
+            onAddComment={handleAddComment}
           />
         )}
         {tab === "address" && <FollowUpAddressTab address={task.address} styles={styles} />}
