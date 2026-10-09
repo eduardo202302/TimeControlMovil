@@ -1,5 +1,20 @@
 import {
+  addTaskerAddress,
+  applyTaskerGeocode,
   buildMapsUrl,
+  buildTaskerAddress,
+  emptyTaskerAddressDraft,
+  formatTaskerAddress,
+  getSelectedTaskerAddress,
+  isTaskerAddressComplete,
+  nextTaskerAddressId,
+  removeTaskerAddress,
+  resolveTaskerAddressConfig,
+  resolveTaskerInitialPoint,
+  TASKER_ADDRESS_DRAFT_FIELDS,
+  taskerDraftFromAddress,
+  toggleTaskerAddressSelected,
+  updateTaskerAddress,
   formatActivityRange,
   formatElapsed,
   formatPhone,
@@ -19,14 +34,18 @@ import {
 } from "../taskerRules";
 import {
   getTaskerOpenTask,
+  getTaskerReportContext,
   TASKER_STATE_CANCELLED,
   TASKER_STATE_COMPLETED,
 } from "../../constants/taskerMock";
 import type { CompanySettings } from "../../../types/typeStore/SchoolStoreType";
+import type { GeocodeResult } from "../addressRules";
 import type {
   TaskerActivity,
   TaskerAddress,
+  TaskerAddressDraft,
   TaskerComment,
+  TaskerReportAddress,
 } from "../../../types/typesTasker/TaskerTypes";
 
 // Las fechas se arman con new Date(año, mes, día, ...) o con strings sin zona
@@ -401,5 +420,433 @@ describe("resolveTaskerReportConfig", () => {
   it("el resultado alimenta validateReport", () => {
     const config = resolveTaskerReportConfig(settings({ isDescriptionRequired: false }));
     expect(validateReport({ typeId: 11, description: "" }, config)).toEqual({});
+  });
+});
+
+// ─── Direcciones de Reportar Avería ──────────────────────────────────────────
+
+function draft(over: Partial<TaskerAddressDraft> = {}): TaskerAddressDraft {
+  return { ...emptyTaskerAddressDraft(), ...over };
+}
+
+function listAddress(
+  over: Partial<TaskerReportAddress> & { id: number; order: number },
+): TaskerReportAddress {
+  return { ...emptyAddress(), selected: false, ...over };
+}
+
+const FULL_GEOCODE: GeocodeResult = {
+  formatted_address: "C. Luis F. Thomén 412, Santo Domingo, República Dominicana",
+  geometry: { location: { lat: 18.457123456789, lng: -69.952412345678 } },
+  address_components: [
+    { long_name: "412", types: ["street_number"] },
+    { long_name: "Calle Luis F. Thomén", types: ["route"] },
+    { long_name: "El Millón", types: ["neighborhood", "political"] },
+    { long_name: "Sub El Millón", types: ["sublocality_level_1", "sublocality", "political"] },
+    { long_name: "Santo Domingo de Guzmán", types: ["locality", "political"] },
+    { long_name: "Santo Domingo", types: ["administrative_area_level_2", "political"] },
+    { long_name: "Distrito Nacional", types: ["administrative_area_level_1", "political"] },
+    { long_name: "10148", types: ["postal_code"] },
+    { long_name: "Torre Azul", types: ["establishment", "point_of_interest"] },
+    { long_name: "5B", types: ["subpremise"] },
+  ],
+};
+
+describe("TASKER_ADDRESS_DRAFT_FIELDS / borrador", () => {
+  it("orden de Tasker, más postalCode al final", () => {
+    expect(TASKER_ADDRESS_DRAFT_FIELDS).toEqual([
+      "title",
+      "province",
+      "city",
+      "sector",
+      "zone",
+      "street",
+      "streetNumber",
+      "building",
+      "apartmentNumber",
+      "referenceToArrive",
+      "whoReceives",
+      "restrictions",
+      "postalCode",
+    ]);
+  });
+  it("borrador vacío: todos los campos en ''", () => {
+    const empty = emptyTaskerAddressDraft();
+    expect(Object.keys(empty)).toEqual(TASKER_ADDRESS_DRAFT_FIELDS);
+    expect(Object.values(empty).every((v) => v === "")).toBe(true);
+  });
+  it("taskerDraftFromAddress: null → vacío", () => {
+    expect(taskerDraftFromAddress(null)).toEqual(emptyTaskerAddressDraft());
+  });
+  it("taskerDraftFromAddress: copia los campos, faltantes en '' y no arrastra coordenadas", () => {
+    const loaded = taskerDraftFromAddress(
+      emptyAddress({ title: "Casa", street: "Duarte", postalCode: "10101", latitude: 18 }),
+    );
+    expect(loaded).toEqual(draft({ title: "Casa", street: "Duarte", postalCode: "10101" }));
+    expect(taskerDraftFromAddress(emptyAddress()).postalCode).toBe("");
+  });
+});
+
+describe("isTaskerAddressComplete", () => {
+  const complete = draft({
+    province: "D.N.",
+    city: "Santo Domingo",
+    sector: "Piantini",
+    street: "Gustavo Mejía Ricart",
+    streetNumber: "54",
+  });
+  it("los 5 obligatorios con texto → true (title y el resto no cuentan)", () => {
+    expect(isTaskerAddressComplete(complete)).toBe(true);
+  });
+  it.each(["province", "city", "sector", "street", "streetNumber"] as const)(
+    "falta %s → false",
+    (key) => {
+      expect(isTaskerAddressComplete({ ...complete, [key]: "" })).toBe(false);
+    },
+  );
+  it("solo espacios cuenta como vacío", () => {
+    expect(isTaskerAddressComplete({ ...complete, streetNumber: "   " })).toBe(false);
+  });
+});
+
+describe("resolveTaskerInitialPoint", () => {
+  it("null → null", () => {
+    expect(resolveTaskerInitialPoint(null)).toBeNull();
+  });
+  it("usa location si la trae (sobre latitude/longitude)", () => {
+    expect(
+      resolveTaskerInitialPoint(
+        emptyAddress({ location: { lat: 1.5, lng: 2.5 }, latitude: 9, longitude: 9 }),
+      ),
+    ).toEqual({ lat: 1.5, lng: 2.5 });
+  });
+  it("E2: sin location, usa latitude/longitude numéricos", () => {
+    expect(
+      resolveTaskerInitialPoint(emptyAddress({ latitude: 18.4571092, longitude: -69.9524086 })),
+    ).toEqual({ lat: 18.4571092, lng: -69.9524086 });
+  });
+  it("E2: acepta latitude/longitude como texto numérico", () => {
+    expect(resolveTaskerInitialPoint(emptyAddress({ latitude: "18.5", longitude: "-69.9" }))).toEqual(
+      { lat: 18.5, lng: -69.9 },
+    );
+  });
+  it("sin location ni coordenadas válidas → null", () => {
+    expect(resolveTaskerInitialPoint(emptyAddress())).toBeNull();
+    expect(resolveTaskerInitialPoint(emptyAddress({ latitude: "", longitude: "" }))).toBeNull();
+    expect(resolveTaskerInitialPoint(emptyAddress({ latitude: "abc", longitude: 1 }))).toBeNull();
+    expect(resolveTaskerInitialPoint(emptyAddress({ latitude: 18, longitude: null }))).toBeNull();
+  });
+  it("location incompleta → cae a latitude/longitude", () => {
+    expect(
+      resolveTaskerInitialPoint(
+        emptyAddress({ location: {} as never, latitude: 3, longitude: 4 }),
+      ),
+    ).toEqual({ lat: 3, lng: 4 });
+  });
+});
+
+describe("applyTaskerGeocode", () => {
+  const user = draft({
+    title: "Oficina",
+    referenceToArrive: "Frente al parque",
+    whoReceives: "Ana",
+    restrictions: "Solo de día",
+  });
+  it("llena los 9 campos con el mapeo de Tasker", () => {
+    expect(applyTaskerGeocode(user, FULL_GEOCODE)).toEqual({
+      ...user,
+      province: "Distrito Nacional",
+      city: "Santo Domingo de Guzmán",
+      sector: "El Millón",
+      zone: "Santo Domingo",
+      street: "Calle Luis F. Thomén",
+      streetNumber: "412",
+      postalCode: "10148",
+      building: "Torre Azul",
+      apartmentNumber: "5B",
+    });
+  });
+  it("sector: sin neighborhood usa sublocality_level_1", () => {
+    const result = applyTaskerGeocode(draft(), {
+      address_components: [{ long_name: "Gazcue", types: ["sublocality_level_1"] }],
+    });
+    expect(result.sector).toBe("Gazcue");
+  });
+  it("sobrescribe con '' lo que Google no trae, aunque el usuario lo hubiera escrito", () => {
+    const typed = draft({
+      ...user,
+      province: "P",
+      city: "C",
+      sector: "S",
+      zone: "Z",
+      street: "Ca",
+      streetNumber: "1",
+      postalCode: "2",
+      building: "E",
+      apartmentNumber: "3",
+    });
+    expect(applyTaskerGeocode(typed, {})).toEqual(user);
+  });
+  it("no toca title, referenceToArrive, whoReceives ni restrictions", () => {
+    const result = applyTaskerGeocode(user, FULL_GEOCODE);
+    expect(result.title).toBe("Oficina");
+    expect(result.referenceToArrive).toBe("Frente al parque");
+    expect(result.whoReceives).toBe("Ana");
+    expect(result.restrictions).toBe("Solo de día");
+  });
+});
+
+describe("formatTaskerAddress", () => {
+  it("Calle Número, Zona, Sector, Ciudad, Provincia (Zona antes que Sector)", () => {
+    expect(
+      formatTaskerAddress(
+        draft({
+          street: "Duarte",
+          streetNumber: "45",
+          zone: "Zona Norte",
+          sector: "Centro",
+          city: "La Vega",
+          province: "La Vega",
+        }),
+      ),
+    ).toBe("Duarte 45, Zona Norte, Centro, La Vega, La Vega");
+  });
+  it("salta los vacíos", () => {
+    expect(formatTaskerAddress(draft({ street: "Duarte", sector: "Centro", province: "La Vega" }))).toBe(
+      "Duarte, Centro, La Vega",
+    );
+    expect(formatTaskerAddress(draft({ streetNumber: "45", city: "  " }))).toBe("45");
+    expect(formatTaskerAddress(draft())).toBe("");
+  });
+});
+
+describe("buildTaskerAddress", () => {
+  const filled = draft({
+    title: "",
+    province: "D.N.",
+    city: "Santo Domingo",
+    sector: "Piantini",
+    street: "Gustavo Mejía Ricart",
+    streetNumber: "54",
+  });
+
+  it("nueva con geocode: coordenadas del resultado, sin redondear, y address de Google", () => {
+    const built = buildTaskerAddress({
+      previous: null,
+      draft: { ...filled, title: "Casa" },
+      geocode: FULL_GEOCODE,
+      initialPoint: { lat: 1, lng: 1 },
+    });
+    expect(built).toEqual({
+      ...filled,
+      title: "Casa",
+      formattedAddress: "Gustavo Mejía Ricart 54, Piantini, Santo Domingo, D.N.",
+      address: FULL_GEOCODE.formatted_address,
+      location: { lat: 18.457123456789, lng: -69.952412345678 },
+      latitude: 18.457123456789,
+      longitude: -69.952412345678,
+    });
+  });
+  it("sin búsqueda: coordenadas del punto inicial", () => {
+    const built = buildTaskerAddress({
+      previous: null,
+      draft: filled,
+      geocode: null,
+      initialPoint: { lat: 18.4, lng: -69.9 },
+    });
+    expect(built.location).toEqual({ lat: 18.4, lng: -69.9 });
+    expect(built.latitude).toBe(18.4);
+    expect(built.longitude).toBe(-69.9);
+  });
+  it("geocode sin geometry → también el punto inicial", () => {
+    const built = buildTaskerAddress({
+      previous: null,
+      draft: filled,
+      geocode: { formatted_address: "X" },
+      initialPoint: { lat: 5, lng: 6 },
+    });
+    expect(built.location).toEqual({ lat: 5, lng: 6 });
+    expect(built.address).toBe("X");
+  });
+  it("sin geocode ni punto inicial: latitude/longitude null y sin location", () => {
+    const built = buildTaskerAddress({
+      previous: emptyAddress({ location: { lat: 1, lng: 2 } }),
+      draft: filled,
+      geocode: null,
+      initialPoint: null,
+    });
+    expect(built.latitude).toBeNull();
+    expect(built.longitude).toBeNull();
+    expect("location" in built).toBe(false);
+  });
+  it("al editar conserva todas las claves de previous y pisa los campos del borrador", () => {
+    const previous = {
+      ...listAddress({ id: 7, order: 2, selected: true }),
+      title: "Viejo",
+      street: "Vieja",
+      address: "Dirección anterior de Google",
+      extraKey: "se conserva",
+    } as TaskerReportAddress & { extraKey: string };
+    const built = buildTaskerAddress({
+      previous,
+      draft: { ...filled, title: "Nuevo" },
+      geocode: null,
+      initialPoint: { lat: 1, lng: 2 },
+    }) as TaskerReportAddress & { extraKey: string };
+    expect(built.id).toBe(7);
+    expect(built.order).toBe(2);
+    expect(built.selected).toBe(true);
+    expect(built.extraKey).toBe("se conserva");
+    expect(built.title).toBe("Nuevo");
+    expect(built.street).toBe("Gustavo Mejía Ricart");
+    expect(built.address).toBe("Dirección anterior de Google");
+  });
+  it("address: formatted_address de Google > address anterior > ''", () => {
+    const base = { draft: filled, initialPoint: null };
+    expect(
+      buildTaskerAddress({ ...base, previous: emptyAddress({ address: "Ant" }), geocode: FULL_GEOCODE })
+        .address,
+    ).toBe(FULL_GEOCODE.formatted_address);
+    expect(
+      buildTaskerAddress({ ...base, previous: emptyAddress({ address: "Ant" }), geocode: null }).address,
+    ).toBe("Ant");
+    expect(buildTaskerAddress({ ...base, previous: null, geocode: null }).address).toBe("");
+  });
+  it("title vacío se rellena con sector; sin sector, con city", () => {
+    const base = { previous: null, geocode: null, initialPoint: null };
+    expect(buildTaskerAddress({ ...base, draft: filled }).title).toBe("Piantini");
+    expect(buildTaskerAddress({ ...base, draft: { ...filled, title: "  " } }).title).toBe("Piantini");
+    expect(buildTaskerAddress({ ...base, draft: { ...filled, sector: "" } }).title).toBe(
+      "Santo Domingo",
+    );
+  });
+  it("incluye postalCode del borrador", () => {
+    const built = buildTaskerAddress({
+      previous: null,
+      draft: { ...filled, postalCode: "10148" },
+      geocode: null,
+      initialPoint: null,
+    });
+    expect(built.postalCode).toBe("10148");
+  });
+});
+
+describe("lista de direcciones", () => {
+  const a1 = listAddress({ id: 1, order: 1, selected: true, title: "Uno" });
+  const a2 = listAddress({ id: 5, order: 2, title: "Dos" });
+  const a3 = listAddress({ id: 3, order: 3, title: "Tres" });
+
+  describe("nextTaskerAddressId (E1)", () => {
+    it("lista vacía → 1", () => {
+      expect(nextTaskerAddressId([])).toBe(1);
+    });
+    it("el id mayor + 1, no la longitud", () => {
+      expect(nextTaskerAddressId([a1, a2, a3])).toBe(6);
+    });
+  });
+
+  describe("addTaskerAddress", () => {
+    it("lista vacía: id 1, order 1, marcada", () => {
+      const result = addTaskerAddress([], emptyAddress({ title: "Nueva" }));
+      expect(result).toEqual([{ ...emptyAddress({ title: "Nueva" }), id: 1, order: 1, selected: true }]);
+    });
+    it("entra al final, marcada; las demás pasan a false", () => {
+      const result = addTaskerAddress([a1, a2], emptyAddress({ title: "Nueva" }));
+      expect(result.map((a) => [a.id, a.order, a.selected])).toEqual([
+        [1, 1, false],
+        [5, 2, false],
+        [6, 3, true],
+      ]);
+    });
+    it("no muta la lista original", () => {
+      const list = [a1];
+      addTaskerAddress(list, emptyAddress());
+      expect(list[0].selected).toBe(true);
+      expect(list).toHaveLength(1);
+    });
+    it("los ids de las demás no cambian (E1)", () => {
+      const result = addTaskerAddress([a1, a2, a3], emptyAddress());
+      expect(result.map((a) => a.id)).toEqual([1, 5, 3, 6]);
+    });
+  });
+
+  describe("updateTaskerAddress", () => {
+    it("reemplaza por id sin tocar las demás", () => {
+      const result = updateTaskerAddress([a1, a2, a3], { ...a2, title: "Editada" });
+      expect(result.map((a) => a.title)).toEqual(["Uno", "Editada", "Tres"]);
+      expect(result[0]).toBe(a1);
+    });
+    it("ordena por order", () => {
+      const result = updateTaskerAddress([a3, a1, a2], { ...a1, title: "X" });
+      expect(result.map((a) => a.order)).toEqual([1, 2, 3]);
+    });
+    it("id inexistente: no agrega nada", () => {
+      expect(updateTaskerAddress([a1], { ...a2 })).toEqual([a1]);
+    });
+  });
+
+  describe("removeTaskerAddress", () => {
+    it("quita por id y renumera order 1..N", () => {
+      const result = removeTaskerAddress([a1, a2, a3], 5);
+      expect(result.map((a) => [a.id, a.order])).toEqual([
+        [1, 1],
+        [3, 2],
+      ]);
+    });
+    it("si era la principal, no queda ninguna marcada", () => {
+      const result = removeTaskerAddress([a1, a2, a3], 1);
+      expect(result.some((a) => a.selected)).toBe(false);
+      expect(getSelectedTaskerAddress(result)).toBeUndefined();
+    });
+    it("borrar la última deja la lista vacía", () => {
+      expect(removeTaskerAddress([a1], 1)).toEqual([]);
+    });
+  });
+
+  describe("toggleTaskerAddressSelected", () => {
+    it("marca esa y desmarca las demás", () => {
+      const result = toggleTaskerAddressSelected([a1, a2, a3], 3);
+      expect(result.map((a) => a.selected)).toEqual([false, false, true]);
+    });
+    it("si ya estaba marcada, la desmarca y no queda ninguna", () => {
+      const result = toggleTaskerAddressSelected([a1, a2, a3], 1);
+      expect(result.map((a) => a.selected)).toEqual([false, false, false]);
+    });
+  });
+
+  describe("getSelectedTaskerAddress", () => {
+    it("la primera con selected true", () => {
+      const both = [a2, { ...a3, selected: true }, { ...a1, selected: true }];
+      expect(getSelectedTaskerAddress(both)?.id).toBe(3);
+    });
+    it("ninguna o lista vacía → undefined", () => {
+      expect(getSelectedTaskerAddress([a2, a3])).toBeUndefined();
+      expect(getSelectedTaskerAddress([])).toBeUndefined();
+    });
+  });
+});
+
+describe("resolveTaskerAddressConfig", () => {
+  it("Quién Recibe y Restricciones ocultos hasta que el backend los exponga", () => {
+    expect(resolveTaskerAddressConfig()).toEqual({
+      showWhoReceives: false,
+      showRestrictions: false,
+    });
+  });
+});
+
+describe("getTaskerReportContext (direcciones de ejemplo)", () => {
+  it("cada dirección trae id, order y selected booleano", () => {
+    const { addresses } = getTaskerReportContext();
+    addresses.forEach((a, index) => {
+      expect(typeof a.id).toBe("number");
+      expect(a.order).toBe(index + 1);
+      expect(typeof a.selected).toBe("boolean");
+    });
+  });
+  it("si hay una sola, va marcada", () => {
+    const { addresses } = getTaskerReportContext();
+    if (addresses.length === 1) expect(addresses[0].selected).toBe(true);
+    expect(addresses.filter((a) => a.selected).length).toBeLessThanOrEqual(1);
   });
 });

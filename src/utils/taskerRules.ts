@@ -9,7 +9,10 @@
 import type {
   TaskerActivity,
   TaskerAddress,
+  TaskerAddressConfig,
+  TaskerAddressDraft,
   TaskerComment,
+  TaskerReportAddress,
   TaskerReportConfig,
   TaskerReportErrors,
 } from "../../types/typesTasker/TaskerTypes";
@@ -32,6 +35,7 @@ import {
   TASKER_STATE_CANCELLED,
   TASKER_STATE_COMPLETED,
 } from "../constants/taskerMock";
+import { geocodeLocation, type GeocodeResult, type LatLng } from "./addressRules";
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
@@ -242,4 +246,214 @@ export function validateReport(
     errors.description = "La descripción es un campo requerido";
   }
   return errors;
+}
+
+// ─── Direcciones de Reportar Avería (MapAddressSelector de Tasker) ──────────
+// Calcado de Tasker, rarezas incluidas, salvo las excepciones E1–E3 marcadas.
+
+/** Campos del borrador, en el orden de la ventana (postalCode sin input). */
+export const TASKER_ADDRESS_DRAFT_FIELDS: (keyof TaskerAddressDraft)[] = [
+  "title",
+  "province",
+  "city",
+  "sector",
+  "zone",
+  "street",
+  "streetNumber",
+  "building",
+  "apartmentNumber",
+  "referenceToArrive",
+  "whoReceives",
+  "restrictions",
+  "postalCode",
+];
+
+/** Los que deshabilitan "Seleccionar" mientras falten. */
+export const TASKER_REQUIRED_ADDRESS_FIELDS: (keyof TaskerAddressDraft)[] = [
+  "province",
+  "city",
+  "sector",
+  "street",
+  "streetNumber",
+];
+
+export function emptyTaskerAddressDraft(): TaskerAddressDraft {
+  return TASKER_ADDRESS_DRAFT_FIELDS.reduce((acc, key) => {
+    acc[key] = "";
+    return acc;
+  }, {} as TaskerAddressDraft);
+}
+
+/** Carga de la ventana: cada campo de la dirección o "". */
+export function taskerDraftFromAddress(
+  address: TaskerAddress | null | undefined,
+): TaskerAddressDraft {
+  const draft = emptyTaskerAddressDraft();
+  if (!address) return draft;
+  TASKER_ADDRESS_DRAFT_FIELDS.forEach((key) => {
+    const value = address[key];
+    draft[key] = value == null ? "" : String(value);
+  });
+  return draft;
+}
+
+export function isTaskerAddressComplete(draft: TaskerAddressDraft): boolean {
+  return TASKER_REQUIRED_ADDRESS_FIELDS.every((key) => draft[key].trim().length > 0);
+}
+
+function toCoordinate(value: number | string | null | undefined): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/**
+ * Punto inicial de la ventana: `location` de la dirección.
+ * EXCEPCIÓN E2: al editar una dirección sin `location`, Tasker deja latitude y
+ * longitude en undefined. Aquí, si no hay location pero sí latitude/longitude,
+ * se usan esas. Sin ninguna de las dos → null.
+ */
+export function resolveTaskerInitialPoint(
+  address: TaskerAddress | null | undefined,
+): LatLng | null {
+  if (!address) return null;
+  const loc = address.location;
+  if (typeof loc?.lat === "number" && typeof loc?.lng === "number") {
+    return { lat: loc.lat, lng: loc.lng };
+  }
+  const lat = toCoordinate(address.latitude);
+  const lng = toCoordinate(address.longitude);
+  return lat !== null && lng !== null ? { lat, lng } : null;
+}
+
+/**
+ * geocodeDataHandler de Tasker: SOBRESCRIBE estos 9 campos, con "" si Google
+ * no trae el componente, aunque el usuario ya hubiera escrito algo. No toca
+ * title, referenceToArrive, whoReceives ni restrictions.
+ */
+export function applyTaskerGeocode(
+  draft: TaskerAddressDraft,
+  result: GeocodeResult,
+): TaskerAddressDraft {
+  const components = Array.isArray(result.address_components) ? result.address_components : [];
+  const pick = (type: string) =>
+    components.find((component) => component.types?.includes(type))?.long_name ?? "";
+  return {
+    ...draft,
+    province: pick("administrative_area_level_1"),
+    city: pick("locality"),
+    sector: pick("neighborhood") || pick("sublocality_level_1"),
+    zone: pick("administrative_area_level_2"),
+    street: pick("route"),
+    streetNumber: pick("street_number"),
+    postalCode: pick("postal_code"),
+    building: pick("establishment"),
+    apartmentNumber: pick("subpremise"),
+  };
+}
+
+/** "Calle Número, Zona, Sector, Ciudad, Provincia" sin los vacíos (Zona antes que Sector, como Tasker). */
+export function formatTaskerAddress(draft: TaskerAddressDraft): string {
+  const streetLine = [draft.street.trim(), draft.streetNumber.trim()].filter(Boolean).join(" ");
+  return [streetLine, draft.zone, draft.sector, draft.city, draft.province]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+/**
+ * handlerSelect de Tasker: conserva todas las claves de `previous` (al
+ * editar) y pisa con el borrador, formattedAddress, address y coordenadas.
+ * Las coordenadas son las del RESULTADO de Google (geometry.location), no las
+ * del punto tocado; sin resultado, las del punto inicial. No se redondean.
+ */
+export function buildTaskerAddress({
+  previous,
+  draft,
+  geocode,
+  initialPoint,
+}: {
+  previous: TaskerAddress | null | undefined;
+  draft: TaskerAddressDraft;
+  geocode: GeocodeResult | null | undefined;
+  initialPoint: LatLng | null | undefined;
+}): TaskerAddress {
+  const { location: _previousLocation, ...rest } = previous ?? ({} as Partial<TaskerAddress>);
+  const point = geocodeLocation(geocode) ?? initialPoint ?? null;
+  const title = draft.title.trim() ? draft.title : draft.sector.trim() ? draft.sector : draft.city;
+  return {
+    ...rest,
+    ...draft,
+    title,
+    formattedAddress: formatTaskerAddress(draft),
+    address: geocode?.formatted_address || previous?.address || "",
+    ...(point
+      ? { location: { lat: point.lat, lng: point.lng }, latitude: point.lat, longitude: point.lng }
+      : { latitude: null, longitude: null }),
+  };
+}
+
+/**
+ * EXCEPCIÓN E1: en Tasker toda dirección nueva recibe id 2 (error de tipeo) y
+ * editar o borrar una se lleva a las demás. Aquí: lista vacía → 1; si no, el
+ * id mayor + 1.
+ */
+export function nextTaskerAddressId(list: TaskerReportAddress[]): number {
+  return list.reduce((max, a) => Math.max(max, a.id), 0) + 1;
+}
+
+/** La nueva entra al final, marcada; las demás quedan sin marcar. */
+export function addTaskerAddress(
+  list: TaskerReportAddress[],
+  address: TaskerAddress,
+): TaskerReportAddress[] {
+  const added: TaskerReportAddress = {
+    ...address,
+    id: nextTaskerAddressId(list),
+    order: list.length + 1,
+    selected: true,
+  };
+  return [...list.map((a) => ({ ...a, selected: false })), added];
+}
+
+/** Reemplaza por id y ordena por order. */
+export function updateTaskerAddress(
+  list: TaskerReportAddress[],
+  address: TaskerReportAddress,
+): TaskerReportAddress[] {
+  return list.map((a) => (a.id === address.id ? address : a)).sort((a, b) => a.order - b.order);
+}
+
+/** Quita por id y renumera order 1..N. Si era la principal, no queda ninguna. */
+export function removeTaskerAddress(
+  list: TaskerReportAddress[],
+  id: number,
+): TaskerReportAddress[] {
+  return list.filter((a) => a.id !== id).map((a, index) => ({ ...a, order: index + 1 }));
+}
+
+/** Marca esa y desmarca las demás; si ya estaba marcada, no queda ninguna. */
+export function toggleTaskerAddressSelected(
+  list: TaskerReportAddress[],
+  id: number,
+): TaskerReportAddress[] {
+  const wasSelected = list.some((a) => a.id === id && a.selected);
+  return list.map((a) => ({ ...a, selected: !wasSelected && a.id === id }));
+}
+
+export function getSelectedTaskerAddress(
+  list: TaskerReportAddress[],
+): TaskerReportAddress | undefined {
+  return list.find((a) => a.selected === true);
+}
+
+/**
+ * Quién Recibe y Restricciones. Único punto a cambiar cuando el backend
+ * exponga addressSugestion.receiver y addressSugestion.restrictions.
+ */
+export function resolveTaskerAddressConfig(): TaskerAddressConfig {
+  return { showWhoReceives: false, showRestrictions: false };
 }

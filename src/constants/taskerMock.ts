@@ -81,6 +81,10 @@ export function getTaskerReportContext(): TaskerReportContext {
     reporter: { id: 21, name: "Jeremy Domínguez" },
     addresses: [
       {
+        id: 1,
+        order: 1,
+        // Única dirección de ejemplo: va marcada como principal.
+        selected: true,
         title: "El Millón",
         province: "D.N.",
         city: "Santo Domingo de Guzmán",

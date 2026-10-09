@@ -43,6 +43,48 @@ export interface TaskerAddress {
   referenceToArrive: string;
   whoReceives: string;
   restrictions: string;
+  // Lo que agrega la ventana "Seleccionar Ubicación" de Reportar Avería; el
+  // ticket abierto de Seguimiento no los trae.
+  id?: number;
+  order?: number;
+  selected?: boolean;
+  postalCode?: string;
+  /** formatTaskerAddress del borrador ("Calle Número, Zona, …"). */
+  formattedAddress?: string;
+  /** formatted_address del último resultado de Google. */
+  address?: string;
+  location?: { lat: number; lng: number };
+}
+
+/** Dirección de la lista de Reportar Avería: siempre con id, order y selected. */
+export type TaskerReportAddress = TaskerAddress & {
+  id: number;
+  order: number;
+  selected: boolean;
+};
+
+/** Borrador de la ventana "Seleccionar Ubicación": todo texto. */
+export interface TaskerAddressDraft {
+  title: string;
+  province: string;
+  city: string;
+  sector: string;
+  zone: string;
+  street: string;
+  streetNumber: string;
+  building: string;
+  apartmentNumber: string;
+  referenceToArrive: string;
+  whoReceives: string;
+  restrictions: string;
+  /** Sin campo visible: solo lo llena Google. */
+  postalCode: string;
+}
+
+/** Campos opcionales de la ventana de dirección según la compañía. */
+export interface TaskerAddressConfig {
+  showWhoReceives: boolean;
+  showRestrictions: boolean;
 }
 
 export interface TaskerComment {
@@ -121,7 +163,7 @@ export interface TaskerReportAttachment {
 export interface TaskerReportContext {
   client: TaskerClient & { typeName: string };
   reporter: TaskerUserRef;
-  addresses: TaskerAddress[];
+  addresses: TaskerReportAddress[];
   attachments: TaskerReportAttachment[];
 }
 

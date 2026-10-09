@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import React, { useCallback, useMemo, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -20,7 +21,10 @@ import {
   ICON_VIEW,
   ON_PRIMARY,
   PRIMARY_700,
+  PRIMARY_COLOR,
+  PRIMARY_TINT_50,
   PRIMARY_TINT_BACKGROUND,
+  PRIMARY_TINT_BORDER,
   SECTION_ICON_COLOR,
   TAG_DOT_FALLBACK,
   TEXT_MUTED,
@@ -51,24 +55,31 @@ import {
   THUMB_TILE,
 } from "@/styles/surfaces";
 import {
+  addTaskerAddress,
   buildMapsUrl,
   getTagChipTone,
+  removeTaskerAddress,
   resolveTaskerReportConfig,
+  toggleTaskerAddressSelected,
+  updateTaskerAddress,
   validateReport,
 } from "../../utils/taskerRules";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import type {
   TaskerAddress,
+  TaskerReportAddress,
   TaskerReportAttachment,
   TaskerReportErrors,
 } from "../../../types/typesTasker/TaskerTypes";
 import { showPendingAction } from "./pendingAction";
+import TaskerAddressModal from "./TaskerAddressModal";
 
 type Styles = ReturnType<typeof createStyles>;
 
 /**
- * Reportar Avería (Tasker) — FASE B: solo pintado, con los datos fijos de
- * taskerMock.ts. Lo que necesita backend llama a showPendingAction().
+ * Reportar Avería (Tasker) — FASE B: con los datos fijos de taskerMock.ts.
+ * Las direcciones se agregan, editan, borran y marcan en local; lo que
+ * necesita backend llama a showPendingAction().
  */
 export default function ReportFaultForm() {
   const { scale, verticalScale, font, isTablet } = useResponsive();
@@ -91,6 +102,11 @@ export default function ReportFaultForm() {
   );
   const [errors, setErrors] = useState<TaskerReportErrors>({});
   const [typeSheetVisible, setTypeSheetVisible] = useState(false);
+  const [addresses, setAddresses] = useState<TaskerReportAddress[]>(context.addresses);
+  /** null = ventana cerrada; target null = dirección nueva. */
+  const [addressEditor, setAddressEditor] = useState<{
+    target: TaskerReportAddress | null;
+  } | null>(null);
 
   const selectedType = typeTags.find((t) => t.id === typeId) ?? null;
 
@@ -103,12 +119,46 @@ export default function ReportFaultForm() {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
+  const handleAddressSelected = useCallback(
+    (built: TaskerAddress) => {
+      const target = addressEditor?.target ?? null;
+      setAddresses((prev) =>
+        target
+          ? updateTaskerAddress(prev, {
+              ...built,
+              id: target.id,
+              order: target.order,
+              selected: target.selected,
+            })
+          : addTaskerAddress(prev, built),
+      );
+      setAddressEditor(null);
+    },
+    [addressEditor],
+  );
+
+  const handleRemoveAddress = useCallback((address: TaskerReportAddress) => {
+    Alert.alert("Confirmar Eliminar", `Está seguro que desea eliminar la Dirección ${address.order}`, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: () => setAddresses((prev) => removeTaskerAddress(prev, address.id)),
+      },
+    ]);
+  }, []);
+
+  const handleToggleAddress = useCallback((id: number) => {
+    setAddresses((prev) => toggleTaskerAddressSelected(prev, id));
+  }, []);
+
   const handleCancel = useCallback(() => {
     setTypeId(null);
     setDescription("");
     setAttachments(context.attachments);
+    setAddresses(context.addresses);
     setErrors({});
-  }, [context.attachments]);
+  }, [context.attachments, context.addresses]);
 
   const handleSubmit = useCallback(() => {
     const result = validateReport({ typeId, description }, config);
@@ -246,14 +296,22 @@ export default function ReportFaultForm() {
             styles={styles}
             tone="teal"
             icon="location-outline"
-            title={`Direcciones (${context.addresses.length})`}
+            title={`Direcciones (${addresses.length})`}
           />
-          {context.addresses.map((address, index) => (
-            <AddressRow key={index} address={address} styles={styles} />
+          {/* EXCEPCIÓN E3: Tasker reordena arrastrando las filas; aquí no (falta la librería). */}
+          {addresses.map((address) => (
+            <AddressRow
+              key={address.id}
+              address={address}
+              styles={styles}
+              onEdit={() => setAddressEditor({ target: address })}
+              onRemove={() => handleRemoveAddress(address)}
+              onToggleSelected={() => handleToggleAddress(address.id)}
+            />
           ))}
           <TouchableOpacity
-            style={[styles.addBtn, context.addresses.length > 0 && styles.addBtnSpaced]}
-            onPress={showPendingAction}
+            style={[styles.addBtn, addresses.length > 0 && styles.addBtnSpaced]}
+            onPress={() => setAddressEditor({ target: null })}
             activeOpacity={0.75}
           >
             <Ionicons name="add-circle-outline" size={18} color={PRIMARY_700} />
@@ -294,6 +352,13 @@ export default function ReportFaultForm() {
           setTypeSheetVisible(false);
         }}
         onClose={() => setTypeSheetVisible(false)}
+      />
+
+      <TaskerAddressModal
+        visible={addressEditor !== null}
+        address={addressEditor?.target ?? null}
+        onClose={() => setAddressEditor(null)}
+        onSelect={handleAddressSelected}
       />
     </KeyboardAvoidingView>
   );
@@ -362,7 +427,15 @@ function AttachmentTile({ file, index, styles, onRemove }: AttachmentTileProps) 
   );
 }
 
-function AddressRow({ address, styles }: { address: TaskerAddress; styles: Styles }) {
+interface AddressRowProps {
+  address: TaskerReportAddress;
+  styles: Styles;
+  onEdit: () => void;
+  onRemove: () => void;
+  onToggleSelected: () => void;
+}
+
+function AddressRow({ address, styles, onEdit, onRemove, onToggleSelected }: AddressRowProps) {
   const streetLine = [address.street, address.streetNumber && `#${address.streetNumber}`]
     .filter(Boolean)
     .join(" ");
@@ -389,6 +462,26 @@ function AddressRow({ address, styles }: { address: TaskerAddress; styles: Style
         <Text style={styles.addressTitle}>{address.title}</Text>
         {!!streetLine && <Text style={styles.addressStreet}>{streetLine}</Text>}
         {!!areaLine && <Text style={styles.addressArea}>{areaLine}</Text>}
+        <TouchableOpacity
+          style={[styles.selectAddressBtn, address.selected && styles.selectAddressBtnActive]}
+          onPress={onToggleSelected}
+          accessibilityState={{ selected: address.selected }}
+          activeOpacity={0.75}
+        >
+          <Ionicons
+            name={address.selected ? "checkmark-circle" : "ellipse-outline"}
+            size={16}
+            color={address.selected ? ON_PRIMARY : PRIMARY_700}
+          />
+          <Text
+            style={[
+              styles.selectAddressText,
+              address.selected && styles.selectAddressTextActive,
+            ]}
+          >
+            {address.selected ? "Seleccionada" : "Seleccionar"}
+          </Text>
+        </TouchableOpacity>
       </View>
       <View style={styles.addressActions}>
         <TouchableOpacity
@@ -401,11 +494,19 @@ function AddressRow({ address, styles }: { address: TaskerAddress; styles: Style
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.addressBtn}
-          onPress={showPendingAction}
+          onPress={onEdit}
           accessibilityLabel="Editar dirección"
           activeOpacity={0.75}
         >
           <Ionicons name="create-outline" size={18} color={ICON_EDIT} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.addressBtn}
+          onPress={onRemove}
+          accessibilityLabel="Eliminar dirección"
+          activeOpacity={0.75}
+        >
+          <Ionicons name="trash-outline" size={18} color={DANGER_ICON} />
         </TouchableOpacity>
       </View>
     </View>
@@ -560,6 +661,22 @@ function createStyles(
       color: TEXT_SECONDARY,
     },
     addressArea: { fontSize: font(13), lineHeight: font(18), color: TEXT_MUTED },
+    selectAddressBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      alignSelf: "flex-start",
+      gap: scale(6),
+      marginTop: verticalScale(10),
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(6),
+      borderRadius: RADIUS_PILL,
+      borderWidth: 1,
+      borderColor: PRIMARY_TINT_BORDER,
+      backgroundColor: PRIMARY_TINT_50,
+    },
+    selectAddressBtnActive: { borderColor: PRIMARY_COLOR, backgroundColor: PRIMARY_COLOR },
+    selectAddressText: { fontSize: font(12), fontWeight: "700", color: PRIMARY_700 },
+    selectAddressTextActive: { color: ON_PRIMARY },
     addressActions: { flexDirection: "row", gap: scale(6) },
     // Botón de ícono cuadrado: 36×36 fijo (área táctil del ícono).
     addressBtn: {
