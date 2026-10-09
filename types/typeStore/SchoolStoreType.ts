@@ -238,6 +238,10 @@ export interface CompanySettings {
    * que en `resolveAttendanceGating` cae al caso por defecto (foto + manual).
    */
   attendanceMode: string;
+  /** Título de la tarjeta de Servicio en Reportar Avería (Tasker). */
+  serviceNameLabel: string;
+  /** Si la Descripción es obligatoria en Reportar Avería. */
+  isDescriptionRequired: boolean;
 }
 
 /**

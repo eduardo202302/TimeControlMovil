@@ -53,6 +53,8 @@ const ROUTE_TITLES: Record<string, string> = {
   "/roles": "Roles",
   "/entities": "Empresa",
   "/unauthorized": "Sin acceso",
+  "/reportfault": "Reportar Avería",
+  "/followup": "Seguimiento",
 };
 
 export default function AppLayout() {

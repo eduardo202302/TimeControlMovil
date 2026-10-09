@@ -1,0 +1,449 @@
+import { StyleSheet } from "react-native";
+import {
+  APP_BACKGROUND_V2,
+  CARD_BACKGROUND,
+  CARD_BORDER,
+  FIELD_BACKGROUND,
+  FIELD_DISABLED_BACKGROUND,
+  FOOTER_BORDER,
+  ON_PRIMARY,
+  PRIMARY_700,
+  PRIMARY_COLOR,
+  PRIMARY_TINT_50,
+  PRIMARY_TINT_BACKGROUND,
+  PRIMARY_TINT_BORDER,
+  TEXT_MUTED,
+  TEXT_PLACEHOLDER,
+  TEXT_PRIMARY,
+  TEXT_SECONDARY,
+} from "@/constants/colors";
+import {
+  MAX_CONTENT_WIDTH,
+  RADIUS_LG,
+  RADIUS_MD,
+  RADIUS_PILL,
+  RADIUS_SM,
+} from "@/constants/responsive";
+import { SHADOW_SM } from "@/constants/shadows";
+import {
+  CARD_FORM,
+  CARD_ROW,
+  ROW_ACTION_BTN,
+  SEGMENTED_SURFACE,
+  SEGMENT_ACTIVE,
+} from "@/styles/surfaces";
+
+/**
+ * Un solo createStyles para Seguimiento: FollowUpView lo memoiza y lo pasa
+ * por prop a las tres pestañas (ninguna llama useResponsive()).
+ */
+export function createFollowUpStyles(
+  scale: (size: number) => number,
+  verticalScale: (size: number) => number,
+  font: (size: number) => number,
+) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
+    flex: { flex: 1 },
+    contentTablet: {
+      maxWidth: MAX_CONTENT_WIDTH,
+      alignSelf: "center",
+      width: "100%",
+    },
+    content: {
+      paddingHorizontal: scale(16),
+      paddingBottom: verticalScale(24),
+      gap: verticalScale(14),
+    },
+
+    /* ── Pestañas segmentadas (fijas arriba) ── */
+    tabsWrap: {
+      paddingHorizontal: scale(16),
+      paddingTop: verticalScale(16),
+      paddingBottom: verticalScale(14),
+    },
+    segmented: {
+      ...SEGMENTED_SURFACE,
+      flexDirection: "row",
+      padding: scale(3),
+      gap: scale(3),
+    },
+    segment: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: scale(6),
+      minHeight: verticalScale(44),
+      borderRadius: RADIUS_SM,
+    },
+    segmentActive: { ...SEGMENT_ACTIVE },
+    segmentText: { fontSize: font(13), fontWeight: "600", color: TEXT_MUTED },
+    segmentTextActive: { color: ON_PRIMARY, fontWeight: "700" },
+    segmentBadge: {
+      minWidth: scale(18),
+      paddingHorizontal: scale(5),
+      borderRadius: RADIUS_PILL,
+      backgroundColor: FOOTER_BORDER,
+      alignItems: "center",
+    },
+    segmentBadgeActive: { backgroundColor: CARD_BACKGROUND },
+    segmentBadgeText: {
+      fontSize: font(11),
+      lineHeight: font(18),
+      fontWeight: "700",
+      color: TEXT_SECONDARY,
+    },
+    segmentBadgeTextActive: { color: PRIMARY_700 },
+
+    /* ── Tarjetas ── */
+    card: {
+      ...CARD_FORM,
+      paddingHorizontal: scale(16),
+      paddingTop: verticalScale(14),
+      paddingBottom: verticalScale(16),
+    },
+    cardHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(8),
+      marginBottom: verticalScale(14),
+    },
+    cardTitle: { flex: 1, fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
+
+    /* ── Chip de estado (colores en línea desde getStateChipColors) ── */
+    stateChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(6),
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(4),
+      borderRadius: RADIUS_PILL,
+    },
+    // Punto del chip: 8×8 fijo.
+    stateDot: { width: 8, height: 8, borderRadius: RADIUS_PILL },
+    stateText: { fontSize: font(12), fontWeight: "700", color: TEXT_PRIMARY },
+
+    /* ── Franja compacta (Dirección / Acciones) ── */
+    strip: {
+      ...CARD_ROW,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+      paddingHorizontal: scale(16),
+      paddingVertical: verticalScale(12),
+    },
+    stripBody: { flex: 1 },
+    stripTitle: { fontSize: font(14), fontWeight: "700", color: TEXT_PRIMARY },
+    stripClient: { fontSize: font(13), color: TEXT_MUTED },
+
+    /* ── Pestaña Ticket ── */
+    clientRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: scale(8),
+    },
+    clientName: { flexShrink: 1, fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
+    tagChips: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "flex-end",
+      gap: scale(4),
+    },
+    tagChip: {
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(3),
+      borderRadius: RADIUS_PILL,
+    },
+    tagChipText: { fontSize: font(11), fontWeight: "700" },
+    phoneRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(6),
+      marginTop: verticalScale(6),
+    },
+    phoneText: { fontSize: font(13), color: TEXT_MUTED, fontVariant: ["tabular-nums"] },
+    infoList: { gap: verticalScale(8), marginTop: verticalScale(12) },
+    infoRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(10),
+      borderRadius: RADIUS_LG,
+      backgroundColor: FIELD_BACKGROUND,
+    },
+    infoRowHighlight: {
+      backgroundColor: PRIMARY_TINT_50,
+      borderWidth: 1,
+      borderColor: PRIMARY_TINT_BORDER,
+    },
+    // Círculo del ícono de cada fila: 32×32 fijo.
+    infoIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: RADIUS_PILL,
+      backgroundColor: CARD_BACKGROUND,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    infoBody: { flex: 1 },
+    infoLabel: { fontSize: font(11), fontWeight: "600", color: TEXT_MUTED },
+    infoLabelHighlight: { color: PRIMARY_700 },
+    infoValue: { fontSize: font(14), fontWeight: "600", color: TEXT_PRIMARY },
+    infoValueStrong: { fontWeight: "700", fontVariant: ["tabular-nums"] },
+    descriptionBox: {
+      padding: scale(12),
+      borderRadius: RADIUS_LG,
+      backgroundColor: FIELD_DISABLED_BACKGROUND,
+    },
+    descriptionText: { fontSize: font(14), lineHeight: font(20), color: TEXT_SECONDARY },
+    // Botón de ícono cuadrado: 40×40 fijo (área táctil).
+    iconBtn: {
+      ...ROW_ACTION_BTN,
+      width: 40,
+      height: 40,
+      borderRadius: RADIUS_LG,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    addCommentBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(6),
+      minHeight: verticalScale(40),
+      paddingHorizontal: scale(12),
+      borderWidth: 1,
+      borderColor: PRIMARY_TINT_BORDER,
+      borderRadius: RADIUS_LG,
+      backgroundColor: PRIMARY_TINT_50,
+    },
+    addCommentText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_700 },
+    commentList: { gap: verticalScale(8) },
+    comment: {
+      padding: scale(12),
+      borderRadius: RADIUS_LG,
+      backgroundColor: FIELD_BACKGROUND,
+    },
+    commentHeader: { flexDirection: "row", alignItems: "center", gap: scale(10) },
+    // Avatar circular de iniciales: 32×32 fijo.
+    avatar: {
+      width: 32,
+      height: 32,
+      borderRadius: RADIUS_PILL,
+      backgroundColor: PRIMARY_TINT_BACKGROUND,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    avatarText: { fontSize: font(12), fontWeight: "700", color: PRIMARY_700 },
+    commentMeta: { flex: 1 },
+    commentAuthor: { fontSize: font(14), fontWeight: "700", color: TEXT_PRIMARY },
+    commentDate: { fontSize: font(12), color: TEXT_MUTED, fontVariant: ["tabular-nums"] },
+    commentText: {
+      marginTop: verticalScale(8),
+      fontSize: font(14),
+      lineHeight: font(20),
+      color: TEXT_SECONDARY,
+    },
+    commentImages: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: scale(8),
+      marginTop: verticalScale(10),
+    },
+    // Miniatura de adjunto: 56×56 fijo, igual que el mockup.
+    commentImage: {
+      width: 56,
+      height: 56,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      borderRadius: RADIUS_MD,
+      backgroundColor: PRIMARY_TINT_BACKGROUND,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    emptyText: { fontSize: font(13), color: TEXT_PLACEHOLDER, fontStyle: "italic" },
+
+    /* ── Pestaña Dirección ── */
+    addressGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      rowGap: verticalScale(12),
+      padding: scale(12),
+      borderRadius: RADIUS_LG,
+      backgroundColor: FIELD_BACKGROUND,
+    },
+    addressCellFull: { width: "100%" },
+    // Dos columnas: 48% cada una, space-between deja el hueco.
+    addressCellHalf: { width: "48%" },
+    addressTail: {
+      width: "100%",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+    },
+    addressTailFields: { flex: 1, gap: verticalScale(12) },
+    fieldLabel: { fontSize: font(11), fontWeight: "600", color: TEXT_MUTED },
+    fieldValue: { fontSize: font(14), fontWeight: "600", color: TEXT_PRIMARY },
+    mapBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(6),
+      minHeight: verticalScale(44),
+      paddingHorizontal: scale(14),
+      borderWidth: 1,
+      borderColor: PRIMARY_TINT_BORDER,
+      borderRadius: RADIUS_LG,
+      backgroundColor: CARD_BACKGROUND,
+    },
+    mapBtnText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_700 },
+
+    /* ── Pestaña Acciones (línea de tiempo) ── */
+    timelineRow: { flexDirection: "row", gap: scale(10) },
+    // Riel de la línea de tiempo: ancho fijo = diámetro del nodo grande.
+    rail: { width: 28, alignItems: "center" },
+    // Nodo del estado actual: 28×28 fijo con aro de 5.
+    nodeCurrent: {
+      width: 28,
+      height: 28,
+      marginTop: verticalScale(12),
+      borderRadius: RADIUS_PILL,
+      borderWidth: 5,
+      borderColor: PRIMARY_TINT_BORDER,
+      backgroundColor: PRIMARY_COLOR,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    // Centro blanco del nodo actual: 8×8 fijo.
+    nodeCurrentDot: {
+      width: 8,
+      height: 8,
+      borderRadius: RADIUS_PILL,
+      backgroundColor: ON_PRIMARY,
+    },
+    // Nodo de estados anteriores: 12×12 fijo.
+    node: {
+      width: 12,
+      height: 12,
+      marginTop: verticalScale(3),
+      borderRadius: RADIUS_PILL,
+      borderWidth: 2,
+      borderColor: TEXT_PLACEHOLDER,
+      backgroundColor: CARD_BACKGROUND,
+    },
+    // Trazo vertical: 2 de ancho fijo.
+    railLine: { flex: 1, width: 2, marginTop: verticalScale(4), backgroundColor: CARD_BORDER },
+    railLineCurrent: { backgroundColor: PRIMARY_TINT_BORDER },
+    currentCard: {
+      ...SHADOW_SM,
+      flex: 1,
+      marginBottom: verticalScale(18),
+      padding: scale(14),
+      borderRadius: RADIUS_LG,
+      borderWidth: 1,
+      borderColor: PRIMARY_TINT_BORDER,
+      backgroundColor: PRIMARY_TINT_50,
+    },
+    currentBadge: {
+      alignSelf: "flex-start",
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(3),
+      borderRadius: RADIUS_PILL,
+      backgroundColor: PRIMARY_700,
+    },
+    currentBadgeText: {
+      fontSize: font(11),
+      fontWeight: "700",
+      letterSpacing: 0.3,
+      color: ON_PRIMARY,
+    },
+    currentTitle: {
+      marginTop: verticalScale(8),
+      fontSize: font(20),
+      lineHeight: font(24),
+      fontWeight: "800",
+      color: TEXT_PRIMARY,
+    },
+    currentMessage: { fontSize: font(14), fontWeight: "400", color: TEXT_SECONDARY },
+    currentRange: {
+      marginTop: verticalScale(4),
+      fontSize: font(13),
+      lineHeight: font(18),
+      fontWeight: "600",
+      color: TEXT_SECONDARY,
+      fontVariant: ["tabular-nums"],
+    },
+    metaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: scale(8),
+    },
+    currentMetaRow: { marginTop: verticalScale(10) },
+    currentBy: { flexShrink: 1, fontSize: font(12), color: TEXT_SECONDARY },
+    currentByName: { fontWeight: "700", color: TEXT_PRIMARY },
+    currentTime: {
+      paddingHorizontal: scale(8),
+      paddingVertical: verticalScale(2),
+      borderRadius: RADIUS_SM,
+      borderWidth: 1,
+      borderColor: PRIMARY_TINT_BORDER,
+      backgroundColor: CARD_BACKGROUND,
+    },
+    currentTimeText: {
+      fontSize: font(12),
+      fontWeight: "700",
+      color: TEXT_PRIMARY,
+      fontVariant: ["tabular-nums"],
+    },
+    coordsRow: {
+      marginTop: verticalScale(10),
+      paddingTop: verticalScale(10),
+      borderTopWidth: 1,
+      borderTopColor: PRIMARY_TINT_BORDER,
+    },
+    coordsRowPast: { borderTopColor: CARD_BORDER },
+    coordsText: {
+      flexShrink: 1,
+      fontSize: font(12),
+      color: TEXT_SECONDARY,
+      fontVariant: ["tabular-nums"],
+    },
+    smallMapBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(6),
+      minHeight: verticalScale(40),
+      paddingHorizontal: scale(12),
+      borderWidth: 1,
+      borderColor: PRIMARY_TINT_BORDER,
+      borderRadius: RADIUS_LG,
+      backgroundColor: CARD_BACKGROUND,
+    },
+    smallMapBtnText: { fontSize: font(12), fontWeight: "700", color: PRIMARY_700 },
+    pastBody: { flex: 1 },
+    pastBodySpaced: { paddingBottom: verticalScale(18) },
+    pastTitle: { fontSize: font(14), lineHeight: font(18), color: TEXT_SECONDARY },
+    pastAction: { fontWeight: "700" },
+    pastRange: {
+      marginTop: verticalScale(4),
+      fontSize: font(12),
+      lineHeight: font(17),
+      color: TEXT_MUTED,
+      fontVariant: ["tabular-nums"],
+    },
+    pastMetaRow: { marginTop: verticalScale(6) },
+    pastBy: { flexShrink: 1, fontSize: font(12), color: TEXT_MUTED },
+    pastByName: { fontWeight: "600", color: TEXT_SECONDARY },
+    pastTime: {
+      fontSize: font(12),
+      fontWeight: "600",
+      color: TEXT_SECONDARY,
+      fontVariant: ["tabular-nums"],
+    },
+  });
+}
+
+export type FollowUpStyles = ReturnType<typeof createFollowUpStyles>;

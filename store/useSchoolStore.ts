@@ -11,6 +11,10 @@ import {
   serializeLastCompany,
 } from "../src/utils/lastCompany";
 import * as Storage from "../src/utils/storage";
+import {
+  TASKER_DESCRIPTION_REQUIRED_FALLBACK,
+  TASKER_SERVICE_NAME_LABEL_FALLBACK,
+} from "../src/utils/taskerRules";
 
 /**
  * `raw` es `school.settings` tal cual llega de chooseschool (objeto grande,
@@ -47,6 +51,17 @@ export function buildCompanySettings(raw: unknown): CompanySettings | null {
     // en AdminAttendanceForm — "" cae al `default` del switch (foto + manual).
     attendanceMode:
       typeof settings.attendanceMode === "string" ? settings.attendanceMode : "",
+    // Reportar Avería (Tasker). El backend no les pone default: en muchas
+    // compañías no vienen, y ahí aplican los respaldos de taskerRules.
+    serviceNameLabel:
+      typeof settings.serviceNameLabel === "string" &&
+      settings.serviceNameLabel.trim() !== ""
+        ? settings.serviceNameLabel
+        : TASKER_SERVICE_NAME_LABEL_FALLBACK,
+    isDescriptionRequired:
+      typeof settings.isDescriptionRequired === "boolean"
+        ? settings.isDescriptionRequired
+        : TASKER_DESCRIPTION_REQUIRED_FALLBACK,
   };
 }
 

@@ -57,6 +57,7 @@ import {
   useResponsive,
 } from "@/constants/responsive";
 import { SHADOW_LG } from "@/constants/shadows";
+import { TASKER_TEMP_MENU, TASKER_TEMP_MENU_ENABLED } from "@/constants/taskerMock";
 import { DIALOG_BOX, DIALOG_OVERLAY } from "@/styles/surfaces";
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -690,6 +691,26 @@ const confirmLogout = useCallback(async () => {
               styles={styles}
             />
           ))}
+
+          {/* TEMPORAL (Tasker): entradas fijas hasta que el backend registre
+              las rutas. Se omiten en cuanto el menú real trae el mismo path. */}
+          {TASKER_TEMP_MENU_ENABLED &&
+            TASKER_TEMP_MENU.filter(
+              (temp) =>
+                !(menuTree as MenuTree[]).some(
+                  (section) =>
+                    section.parent.path === temp.parent.path ||
+                    section.children.some((child) => child.path === temp.parent.path),
+                ),
+            ).map((section) => (
+              <MenuSection
+                key={section.parent.id}
+                section={section}
+                onNavigate={handleNavigate}
+                pathname={pathname}
+                styles={styles}
+              />
+            ))}
 
           {/* ── Sesión ── */}
           {user && (

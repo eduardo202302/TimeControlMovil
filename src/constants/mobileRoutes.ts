@@ -21,6 +21,8 @@ export const VALID_MOBILE_PATHS: Set<string> = new Set([
   "/myexcuses",
   "/holidays",
   "/users",
+  "/reportfault",
+  "/followup",
 ]);
 
 export const DEFAULT_MOBILE_PATH = "/punchinout";
