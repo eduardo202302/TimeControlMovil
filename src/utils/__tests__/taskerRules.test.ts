@@ -183,14 +183,28 @@ describe("historial de ejemplo (taskerMock)", () => {
   const states = getStateActivities(task.activities).reverse();
   const durationMs = (a: TaskerActivity) =>
     (a.endDate ? ms(a.endDate) : MOCK_NOW) - ms(a.beginDate);
+  const allDates = (t: typeof task) => [
+    t.createdDate,
+    ...t.activities.flatMap((a) => [a.beginDate, a.endDate]).filter((d): d is string => !!d),
+    ...t.comments.map((c) => c.createdDate),
+  ];
 
-  it("fechas armadas hacia atrás desde now", () => {
-    expect(task.createdDate).toBe(localIso(2026, 9, 6, 9, 58, 11));
-    expect(states.map((a) => [a.action, a.beginDate, a.endDate])).toEqual([
-      ["Pendiente", localIso(2026, 9, 6, 9, 58, 11), localIso(2026, 9, 6, 10, 4, 0)],
-      ["Asignada", localIso(2026, 9, 6, 10, 4, 0), localIso(2026, 9, 7, 11, 6, 15)],
-      ["Iniciada", localIso(2026, 9, 7, 11, 6, 15), null],
+  it("horas fijas de oficina sobre el día de now", () => {
+    expect(task.createdDate).toBe(localIso(2026, 9, 7, 8, 15));
+    expect(states.map((a) => [a.action, a.beginDate, a.endDate, a.time])).toEqual([
+      ["Pendiente", localIso(2026, 9, 7, 8, 15), localIso(2026, 9, 7, 8, 22, 30), "7m 30s"],
+      ["Asignada", localIso(2026, 9, 7, 8, 22, 30), localIso(2026, 9, 7, 9, 10), "47m 30s"],
+      ["Iniciada", localIso(2026, 9, 7, 9, 10), null, null],
     ]);
+    const assigned = task.activities.find((a) => a.type === "assignedUser");
+    expect(assigned?.beginDate).toBe(localIso(2026, 9, 7, 8, 22, 30));
+    const byAuthor = Object.fromEntries(task.comments.map((c) => [c.addUser.name, c.createdDate]));
+    expect(byAuthor["Jeremy Móvil"]).toBe(localIso(2026, 9, 7, 8, 35));
+    expect(byAuthor["Jeremy Domínguez"]).toBe(localIso(2026, 9, 7, 9, 20));
+  });
+  it("todas las fechas caen en el mismo día", () => {
+    const days = new Set(allDates(task).map((d) => d.slice(0, 10)));
+    expect([...days]).toEqual(["2026-10-07"]);
   });
   it("ningún estado dura 0", () => {
     for (const a of states) {
@@ -199,40 +213,42 @@ describe("historial de ejemplo (taskerMock)", () => {
     }
   });
   it("cada estado empieza donde termina el anterior", () => {
+    expect(states[0].beginDate).toBe(task.createdDate);
     for (let i = 1; i < states.length; i++) {
       expect(states[i].beginDate).toBe(states[i - 1].endDate);
     }
-    expect(states[0].beginDate).toBe(task.createdDate);
   });
   it("time de los cerrados coincide con sus fechas", () => {
     for (const a of states.filter((s) => s.endDate)) {
       expect(a.time).toBe(formatElapsed(ms(a.beginDate), ms(a.endDate)));
     }
   });
-  it("la suma de los tres da el Transcurrido", () => {
-    const total = states.reduce((sum, a) => sum + durationMs(a), 0);
-    expect(total).toBe(MOCK_NOW - ms(task.createdDate));
-    expect(formatElapsed(0, total)).toBe(formatElapsed(ms(task.createdDate), MOCK_NOW));
+  it("Transcurrido = 7m 30s + 47m 30s + el tiempo de Iniciada", () => {
+    const started = states[2];
+    const startedMs = MOCK_NOW - ms(started.beginDate);
+    expect(getActivityTime(started, task.stateId, MOCK_NOW)).toBe("9h 1m 48s");
+    expect(MOCK_NOW - ms(task.createdDate)).toBe(
+      7 * MIN + 30 * SEC + (47 * MIN + 30 * SEC) + startedMs,
+    );
+    expect(formatElapsed(ms(task.createdDate), MOCK_NOW)).toBe("9h 56m 48s");
   });
-  it("en pantalla: Transcurrido 1d 8h 13m 37s e Iniciada 7h 5m 33s", () => {
-    expect(formatElapsed(ms(task.createdDate), MOCK_NOW)).toBe("1d 8h 13m 37s");
-    expect(states.map((a) => getActivityTime(a, task.stateId, MOCK_NOW))).toEqual([
-      "5m 49s",
-      "1d 1h 2m 15s",
-      "7h 5m 33s",
-    ]);
+  it("con now a las 08:00 AM el día base es el anterior", () => {
+    const early = new Date(2026, 9, 7, 8, 0).getTime();
+    const t = getTaskerOpenTask(early).task;
+    expect(new Set(allDates(t).map((d) => d.slice(0, 10)))).toEqual(new Set(["2026-10-06"]));
+    expect(allDates(t).every((d) => ms(d) <= early)).toBe(true);
   });
-  it("sin depender del día: con otro now (y fracción de segundo) da lo mismo", () => {
-    const later = MOCK_NOW + 3 * DAY + 999;
-    const other = getTaskerOpenTask(later).task;
-    expect(formatElapsed(ms(other.createdDate), later)).toBe("1d 8h 13m 37s");
+  it("el corte es a las 09:30: 09:29:59 → día anterior, 09:30:00 → mismo día", () => {
+    expect(getTaskerOpenTask(new Date(2026, 9, 7, 9, 29, 59).getTime()).task.createdDate).toBe(
+      localIso(2026, 9, 6, 8, 15),
+    );
+    expect(getTaskerOpenTask(new Date(2026, 9, 7, 9, 30).getTime()).task.createdDate).toBe(
+      localIso(2026, 9, 7, 8, 15),
+    );
   });
-  it("comentarios y actividad de responsable relativos al historial", () => {
-    const assigned = task.activities.find((a) => a.type === "assignedUser");
-    expect(assigned?.beginDate).toBe(states[1].beginDate);
-    const byAuthor = Object.fromEntries(task.comments.map((c) => [c.addUser.name, c.createdDate]));
-    expect(byAuthor["Jeremy Móvil"]).toBe(localIso(2026, 9, 6, 10, 18, 11));
-    expect(byAuthor["Jeremy Domínguez"]).toBe(localIso(2026, 9, 7, 11, 15, 42));
+  it("antes del corte el primer día del mes cae en el último del mes anterior", () => {
+    const t = getTaskerOpenTask(new Date(2026, 9, 1, 7, 0).getTime()).task;
+    expect(t.createdDate).toBe(localIso(2026, 8, 30, 8, 15));
   });
 });
 

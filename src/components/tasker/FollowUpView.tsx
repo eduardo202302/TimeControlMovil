@@ -37,7 +37,7 @@ export default function FollowUpView() {
   );
 
   // "Ahora" se toma UNA vez al montar: Transcurrido y los tiempos abiertos no corren en vivo.
-  // El ejemplo se arma con ese mismo instante, así sus tiempos salen siempre iguales.
+  // El ejemplo se arma con ese mismo instante: sus fechas caen en el día de "ahora".
   const [nowMs] = useState(() => Date.now());
   const { task } = useMemo(() => getTaskerOpenTask(nowMs), [nowMs]);
   const stateActivities = useMemo(() => getStateActivities(task.activities), [task]);

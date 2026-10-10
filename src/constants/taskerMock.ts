@@ -106,33 +106,32 @@ export function getTaskerReportContext(): TaskerReportContext {
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
-/** "YYYY-MM-DDTHH:mm:ss" en hora local, el mismo formato sin zona de Tasker. */
-function toTaskerLocalIso(ms: number): string {
-  const d = new Date(ms);
-  return (
-    `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` +
-    `T${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
-  );
-}
-
-const duration = (d: number, h: number, m: number, s: number) =>
-  (((d * 24 + h) * 60 + m) * 60 + s) * 1000;
+/** Antes de esta hora el ejemplo usa el día anterior: Iniciada nunca queda en el futuro. */
+const SAMPLE_DAY_START = { hour: 9, minute: 30 };
 
 /**
- * Ticket abierto de ejemplo. Las fechas se arman hacia atrás desde `now`, así
- * los tiempos que se calculan (Transcurrido, Iniciada) no crecen con los días:
- * Pendiente 5m 49s → Asignada 1d 1h 2m 15s → Iniciada 7h 5m 33s (sigue abierta).
+ * Ticket abierto de ejemplo. Todas las fechas caen en un mismo día (el de
+ * `now`, en hora local) y en horario de oficina:
+ * Pendiente 08:15:00 → Asignada 08:22:30 → Iniciada 09:10:00 (sigue abierta).
  */
 export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskResponse {
-  const nowSec = Math.floor(now / 1000) * 1000;
-  const startedBegin = nowSec - duration(0, 7, 5, 33);
-  const assignedBegin = startedBegin - duration(1, 1, 2, 15);
-  const pendingBegin = assignedBegin - duration(0, 0, 5, 49);
+  const today = new Date(now);
+  const beforeStart =
+    today.getHours() * 60 + today.getMinutes() <
+    SAMPLE_DAY_START.hour * 60 + SAMPLE_DAY_START.minute;
+  const day = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate() - (beforeStart ? 1 : 0),
+  );
+  /** "YYYY-MM-DDTHH:mm:ss" del día base, el mismo formato sin zona de Tasker. */
+  const at = (time: string) =>
+    `${day.getFullYear()}-${pad2(day.getMonth() + 1)}-${pad2(day.getDate())}T${time}`;
 
   return {
     task: {
       id: 4045,
-      createdDate: toTaskerLocalIso(pendingBegin),
+      createdDate: at("08:15:00"),
       action:
         "Falla en termostato central del ala este. No enfría adecuadamente la sala de recuperación.",
       stateId: 3,
@@ -161,7 +160,7 @@ export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskRespo
         {
           id: 1,
           addUser: { name: "Jeremy Domínguez" },
-          createdDate: toTaskerLocalIso(startedBegin + duration(0, 0, 9, 27)),
+          createdDate: at("09:20:00"),
           comment:
             "Contacto establecido con el supervisor en planta. Se coordinó inspección de rutina en el tablero secundario.",
           images: ["comentarios/4045/adjunto-1.jpg"],
@@ -169,7 +168,7 @@ export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskRespo
         {
           id: 2,
           addUser: { name: "Jeremy Móvil" },
-          createdDate: toTaskerLocalIso(pendingBegin + duration(0, 0, 20, 0)),
+          createdDate: at("08:35:00"),
           comment: "Se recibió el reporte. Técnico asignado para la visita.",
           images: [],
         },
@@ -180,7 +179,7 @@ export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskRespo
           type: "assignedUser",
           action: "Responsable",
           message: "Jeremy Móvil",
-          beginDate: toTaskerLocalIso(assignedBegin),
+          beginDate: at("08:22:30"),
           endDate: null,
           user: { name: "Jeremy Domínguez" },
           time: null,
@@ -191,7 +190,7 @@ export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskRespo
           type: "state",
           action: "Iniciada",
           message: "",
-          beginDate: toTaskerLocalIso(startedBegin),
+          beginDate: at("09:10:00"),
           endDate: null,
           user: { name: "Jeremy Domínguez" },
           time: null,
@@ -202,10 +201,10 @@ export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskRespo
           type: "state",
           action: "Asignada",
           message: "a Jeremy Móvil",
-          beginDate: toTaskerLocalIso(assignedBegin),
-          endDate: toTaskerLocalIso(startedBegin),
+          beginDate: at("08:22:30"),
+          endDate: at("09:10:00"),
           user: { name: "Jeremy Domínguez" },
-          time: "1d 1h 2m 15s",
+          time: "47m 30s",
           coordinates: null,
         },
         {
@@ -213,10 +212,10 @@ export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskRespo
           type: "state",
           action: "Pendiente",
           message: "",
-          beginDate: toTaskerLocalIso(pendingBegin),
-          endDate: toTaskerLocalIso(assignedBegin),
+          beginDate: at("08:15:00"),
+          endDate: at("08:22:30"),
           user: { name: "Jeremy Domínguez" },
-          time: "5m 49s",
+          time: "7m 30s",
           coordinates: null,
         },
       ],
