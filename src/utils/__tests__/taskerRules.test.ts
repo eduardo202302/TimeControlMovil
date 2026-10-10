@@ -67,6 +67,10 @@ const MIN = 60 * SEC;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 
+/** "Ahora" fijo para el ejemplo de taskerMock: sus fechas se arman desde acá. */
+const MOCK_NOW = new Date(2026, 9, 7, 18, 11, 48).getTime();
+const ms = (value: string | null) => (value ? new Date(value).getTime() : NaN);
+
 function activity(over: Partial<TaskerActivity>): TaskerActivity {
   return {
     id: 1,
@@ -170,6 +174,65 @@ describe("getStateActivities", () => {
   });
   it("con los datos fijos quedan 3 actividades de estado", () => {
     expect(getStateActivities(getTaskerOpenTask().task.activities)).toHaveLength(3);
+  });
+});
+
+describe("historial de ejemplo (taskerMock)", () => {
+  const { task } = getTaskerOpenTask(MOCK_NOW);
+  // Del más viejo al más nuevo: Pendiente → Asignada → Iniciada.
+  const states = getStateActivities(task.activities).reverse();
+  const durationMs = (a: TaskerActivity) =>
+    (a.endDate ? ms(a.endDate) : MOCK_NOW) - ms(a.beginDate);
+
+  it("fechas armadas hacia atrás desde now", () => {
+    expect(task.createdDate).toBe(localIso(2026, 9, 6, 9, 58, 11));
+    expect(states.map((a) => [a.action, a.beginDate, a.endDate])).toEqual([
+      ["Pendiente", localIso(2026, 9, 6, 9, 58, 11), localIso(2026, 9, 6, 10, 4, 0)],
+      ["Asignada", localIso(2026, 9, 6, 10, 4, 0), localIso(2026, 9, 7, 11, 6, 15)],
+      ["Iniciada", localIso(2026, 9, 7, 11, 6, 15), null],
+    ]);
+  });
+  it("ningún estado dura 0", () => {
+    for (const a of states) {
+      expect(durationMs(a)).toBeGreaterThan(0);
+      expect(getActivityTime(a, task.stateId, MOCK_NOW)).not.toBe("0s");
+    }
+  });
+  it("cada estado empieza donde termina el anterior", () => {
+    for (let i = 1; i < states.length; i++) {
+      expect(states[i].beginDate).toBe(states[i - 1].endDate);
+    }
+    expect(states[0].beginDate).toBe(task.createdDate);
+  });
+  it("time de los cerrados coincide con sus fechas", () => {
+    for (const a of states.filter((s) => s.endDate)) {
+      expect(a.time).toBe(formatElapsed(ms(a.beginDate), ms(a.endDate)));
+    }
+  });
+  it("la suma de los tres da el Transcurrido", () => {
+    const total = states.reduce((sum, a) => sum + durationMs(a), 0);
+    expect(total).toBe(MOCK_NOW - ms(task.createdDate));
+    expect(formatElapsed(0, total)).toBe(formatElapsed(ms(task.createdDate), MOCK_NOW));
+  });
+  it("en pantalla: Transcurrido 1d 8h 13m 37s e Iniciada 7h 5m 33s", () => {
+    expect(formatElapsed(ms(task.createdDate), MOCK_NOW)).toBe("1d 8h 13m 37s");
+    expect(states.map((a) => getActivityTime(a, task.stateId, MOCK_NOW))).toEqual([
+      "5m 49s",
+      "1d 1h 2m 15s",
+      "7h 5m 33s",
+    ]);
+  });
+  it("sin depender del día: con otro now (y fracción de segundo) da lo mismo", () => {
+    const later = MOCK_NOW + 3 * DAY + 999;
+    const other = getTaskerOpenTask(later).task;
+    expect(formatElapsed(ms(other.createdDate), later)).toBe("1d 8h 13m 37s");
+  });
+  it("comentarios y actividad de responsable relativos al historial", () => {
+    const assigned = task.activities.find((a) => a.type === "assignedUser");
+    expect(assigned?.beginDate).toBe(states[1].beginDate);
+    const byAuthor = Object.fromEntries(task.comments.map((c) => [c.addUser.name, c.createdDate]));
+    expect(byAuthor["Jeremy Móvil"]).toBe(localIso(2026, 9, 6, 10, 18, 11));
+    expect(byAuthor["Jeremy Domínguez"]).toBe(localIso(2026, 9, 7, 11, 15, 42));
   });
 });
 
@@ -302,7 +365,7 @@ describe("comentarios de Seguimiento", () => {
     });
     it("queda más reciente que los del ejemplo al ordenar desc", () => {
       const local = buildLocalComment({ text: "x", attachments: [], task, now });
-      const sorted = sortComments([...getTaskerOpenTask().task.comments, local], "desc");
+      const sorted = sortComments([...getTaskerOpenTask(MOCK_NOW).task.comments, local], "desc");
       expect(sorted[0]).toBe(local);
     });
   });
@@ -335,7 +398,7 @@ describe("comentarios de Seguimiento", () => {
 
   describe("comentarios de ejemplo", () => {
     it("hay dos, con fechas distintas, para que el orden se note", () => {
-      const { comments } = getTaskerOpenTask().task;
+      const { comments } = getTaskerOpenTask(MOCK_NOW).task;
       expect(comments).toHaveLength(2);
       expect(sortComments(comments, "desc").map((c) => c.id)).toEqual([1, 2]);
       expect(sortComments(comments, "asc").map((c) => c.id)).toEqual([2, 1]);

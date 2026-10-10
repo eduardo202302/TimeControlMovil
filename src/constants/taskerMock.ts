@@ -104,11 +104,35 @@ export function getTaskerReportContext(): TaskerReportContext {
   };
 }
 
-export function getTaskerOpenTask(): TaskerOpenTaskResponse {
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** "YYYY-MM-DDTHH:mm:ss" en hora local, el mismo formato sin zona de Tasker. */
+function toTaskerLocalIso(ms: number): string {
+  const d = new Date(ms);
+  return (
+    `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` +
+    `T${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
+  );
+}
+
+const duration = (d: number, h: number, m: number, s: number) =>
+  (((d * 24 + h) * 60 + m) * 60 + s) * 1000;
+
+/**
+ * Ticket abierto de ejemplo. Las fechas se arman hacia atrás desde `now`, así
+ * los tiempos que se calculan (Transcurrido, Iniciada) no crecen con los días:
+ * Pendiente 5m 49s → Asignada 1d 1h 2m 15s → Iniciada 7h 5m 33s (sigue abierta).
+ */
+export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskResponse {
+  const nowSec = Math.floor(now / 1000) * 1000;
+  const startedBegin = nowSec - duration(0, 7, 5, 33);
+  const assignedBegin = startedBegin - duration(1, 1, 2, 15);
+  const pendingBegin = assignedBegin - duration(0, 0, 5, 49);
+
   return {
     task: {
       id: 4045,
-      createdDate: "2026-10-06T09:58:11",
+      createdDate: toTaskerLocalIso(pendingBegin),
       action:
         "Falla en termostato central del ala este. No enfría adecuadamente la sala de recuperación.",
       stateId: 3,
@@ -137,7 +161,7 @@ export function getTaskerOpenTask(): TaskerOpenTaskResponse {
         {
           id: 1,
           addUser: { name: "Jeremy Domínguez" },
-          createdDate: "2026-10-07T11:15:42",
+          createdDate: toTaskerLocalIso(startedBegin + duration(0, 0, 9, 27)),
           comment:
             "Contacto establecido con el supervisor en planta. Se coordinó inspección de rutina en el tablero secundario.",
           images: ["comentarios/4045/adjunto-1.jpg"],
@@ -145,7 +169,7 @@ export function getTaskerOpenTask(): TaskerOpenTaskResponse {
         {
           id: 2,
           addUser: { name: "Jeremy Móvil" },
-          createdDate: "2026-10-06T15:20:05",
+          createdDate: toTaskerLocalIso(pendingBegin + duration(0, 0, 20, 0)),
           comment: "Se recibió el reporte. Técnico asignado para la visita.",
           images: [],
         },
@@ -156,7 +180,7 @@ export function getTaskerOpenTask(): TaskerOpenTaskResponse {
           type: "assignedUser",
           action: "Responsable",
           message: "Jeremy Móvil",
-          beginDate: "2026-10-06T09:58:11",
+          beginDate: toTaskerLocalIso(assignedBegin),
           endDate: null,
           user: { name: "Jeremy Domínguez" },
           time: null,
@@ -167,7 +191,7 @@ export function getTaskerOpenTask(): TaskerOpenTaskResponse {
           type: "state",
           action: "Iniciada",
           message: "",
-          beginDate: "2026-10-07T11:06:15",
+          beginDate: toTaskerLocalIso(startedBegin),
           endDate: null,
           user: { name: "Jeremy Domínguez" },
           time: null,
@@ -178,10 +202,10 @@ export function getTaskerOpenTask(): TaskerOpenTaskResponse {
           type: "state",
           action: "Asignada",
           message: "a Jeremy Móvil",
-          beginDate: "2026-10-06T09:58:11",
-          endDate: "2026-10-07T11:06:15",
+          beginDate: toTaskerLocalIso(assignedBegin),
+          endDate: toTaskerLocalIso(startedBegin),
           user: { name: "Jeremy Domínguez" },
-          time: "1d 1h 8m 4s",
+          time: "1d 1h 2m 15s",
           coordinates: null,
         },
         {
@@ -189,10 +213,10 @@ export function getTaskerOpenTask(): TaskerOpenTaskResponse {
           type: "state",
           action: "Pendiente",
           message: "",
-          beginDate: "2026-10-06T09:58:11",
-          endDate: "2026-10-06T09:58:11",
+          beginDate: toTaskerLocalIso(pendingBegin),
+          endDate: toTaskerLocalIso(assignedBegin),
           user: { name: "Jeremy Domínguez" },
-          time: "0s",
+          time: "5m 49s",
           coordinates: null,
         },
       ],

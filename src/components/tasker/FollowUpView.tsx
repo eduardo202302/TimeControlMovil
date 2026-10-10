@@ -36,7 +36,10 @@ export default function FollowUpView() {
     [scale, verticalScale, font],
   );
 
-  const { task } = useMemo(() => getTaskerOpenTask(), []);
+  // "Ahora" se toma UNA vez al montar: Transcurrido y los tiempos abiertos no corren en vivo.
+  // El ejemplo se arma con ese mismo instante, así sus tiempos salen siempre iguales.
+  const [nowMs] = useState(() => Date.now());
+  const { task } = useMemo(() => getTaskerOpenTask(nowMs), [nowMs]);
   const stateActivities = useMemo(() => getStateActivities(task.activities), [task]);
 
   const [tab, setTab] = useState<FollowUpTab>("ticket");
@@ -60,8 +63,6 @@ export default function FollowUpView() {
   const handleAddComment = useCallback((comment: TaskerComment) => {
     setComments((prev) => [comment, ...prev]);
   }, []);
-  // "Ahora" se toma UNA vez al montar: Transcurrido y los tiempos abiertos no corren en vivo.
-  const [nowMs] = useState(() => Date.now());
 
   return (
     <View style={styles.screen}>
