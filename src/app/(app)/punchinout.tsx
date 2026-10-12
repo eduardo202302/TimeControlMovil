@@ -32,6 +32,7 @@ import {
   WARNING_ACCENT,
   WARNING_TEXT_STRONG,
   WARNING_TINT_BACKGROUND,
+  WARNING_TINT_50,
   WARNING_TINT_BORDER,
 } from "@/constants/colors";
 import {
@@ -101,6 +102,7 @@ import {
   getPendingOpenDayDate,
   getPunchBreakTagName,
   getPunchPhotoUrl,
+  getPunchScreenMode,
   getPunctuality,
   getRDDayIndex,
   getScheduleForDay,
@@ -1591,6 +1593,19 @@ export default function PunchInOut() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleCategories queda cubierto por visibleCategoriesKey
   }, [visibleCategoriesKey, selectedCategory]);
 
+  // Modo de la pantalla: se recalcula en cada render (depende de now y
+  // punches), así que si aparece una acción los bloques vuelven solos.
+  const hasVisibleActions = visibleCategories.length > 0;
+  const screenMode = getPunchScreenMode({
+    schedule: todaySchedule,
+    punches,
+    permissions,
+    now,
+    hasVisibleActions,
+  });
+  const isNoSchedule = screenMode === "noSchedule";
+  const showPunchActions = screenMode === "normal";
+
   // Los dos consumos de UI leen la MISMA pendingPunchDate que usa el payload.
   const pendingDate = pendingPunchDate ? formatRDDate(pendingPunchDate) : "";
 
@@ -1630,7 +1645,7 @@ export default function PunchInOut() {
   return (
     <View style={{ flex: 1 }}>
       <Modal
-        visible={nextDayExitModal}
+        visible={nextDayExitModal && !isNoSchedule}
         transparent
         animationType="fade"
         onRequestClose={() => {}}
@@ -1749,7 +1764,7 @@ export default function PunchInOut() {
         </View>
       </Modal>
       <Modal
-        visible={breakTagModalVisible}
+        visible={breakTagModalVisible && !isNoSchedule}
         transparent
         animationType="fade"
         onRequestClose={() => setBreakTagModalVisible(false)}
@@ -1790,7 +1805,7 @@ export default function PunchInOut() {
         </TouchableOpacity>
       </Modal>
       <Modal
-        visible={permissionInfoModal}
+        visible={permissionInfoModal && !isNoSchedule}
         transparent
         animationType="fade"
         onRequestClose={() => setPermissionInfoModal(false)}
@@ -2192,517 +2207,570 @@ export default function PunchInOut() {
               )}
             </View>
           ) : (
-            <View style={styles.profileScheduleRow}>
-              <Ionicons
-                name="warning-outline"
-                size={13}
-                color={WARNING_ACCENT}
-              />
-              <Text
-                style={[styles.profileScheduleText, { color: WARNING_ACCENT }]}
-              >
-                Sin horario configurado
-              </Text>
-            </View>
+            !isNoSchedule && (
+              <View style={styles.profileScheduleRow}>
+                <Ionicons
+                  name="warning-outline"
+                  size={13}
+                  color={WARNING_ACCENT}
+                />
+                <Text
+                  style={[
+                    styles.profileScheduleText,
+                    { color: WARNING_ACCENT },
+                  ]}
+                >
+                  Sin horario configurado
+                </Text>
+              </View>
+            )
           )}
         </View>
 
-        {/* ── Categoría + Botón registrar (bloque unificado) ── */}
-        <View style={styles.floatCard}>
-          <View style={styles.sectionHeaderRow}>
-            <SectionIcon tone="blue">
+        {/* ── Sin horario para hoy ── */}
+        {isNoSchedule && (
+          <View style={styles.noScheduleCard}>
+            <SectionIcon tone="amber" size={48}>
               <Ionicons
-                name="swap-horizontal-outline"
-                size={18}
+                name="calendar-clear-outline"
+                size={26}
                 color={SECTION_ICON_COLOR}
               />
             </SectionIcon>
-            <Text style={styles.sectionHeaderText}>Reg. Entrada / Salida</Text>
+            <Text style={styles.noScheduleText}>
+              {`Sin horario definido para el día ${WEEK_DAYS[getRDDayIndex(now)]}`}
+            </Text>
           </View>
-          {nonWorkingHoliday && !jornadaIniciada && (
-            <View style={styles.holidayNotice}>
-              <Ionicons
-                name="calendar-outline"
-                size={18}
-                color={WARNING_TEXT_STRONG}
-              />
-              <Text
-                style={[
-                  styles.holidayNoticeText,
-                  { fontSize: font(isTablet ? 14 : 12) },
-                ]}
-              >
-                {`Hoy ${formatRDDate(now)} es día no laborable motivo a ${todayHoliday?.name ?? ""}.`}
-              </Text>
-            </View>
-          )}
-          {visibleCategories.length > 1 && (
-            <View style={styles.categories}>
-              {visibleCategories.map((cat) => {
-                return (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.categoryBtn,
-                      selectedCategory === cat && styles.categoryBtnActive,
-                    ]}
-                    onPress={() => setSelectedCategory(cat)}
-                    activeOpacity={0.75}
-                  >
-                    <Ionicons
-                      name={CATEGORY_ICONS[cat]}
-                      size={18}
-                      color={
-                        selectedCategory === cat ? ON_PRIMARY : PRIMARY_700
-                      }
-                    />
-                    <Text
-                      style={[
-                        styles.categoryText,
-                        selectedCategory === cat && styles.categoryTextActive,
-                      ]}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.85}
-                    >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
+        )}
 
-          {selectedCategory === "Break" && isInicio && breakTags.length > 0 && (
-            <View
-              style={[
-                styles.breakTagWrap,
-                // Sin fila de categorías encima, el margen inferior del
-                // header ya separa.
-                visibleCategories.length <= 1 && { marginTop: 0 },
-              ]}
-            >
-              <Text style={styles.breakTagLabel}>Motivo del Break</Text>
-              <TouchableOpacity
-                style={styles.breakTagSelector}
-                onPress={() => setBreakTagModalVisible(true)}
-                activeOpacity={0.8}
-              >
-                <Text
-                  style={[
-                    styles.breakTagSelectorText,
-                    selectedBreakTagId != null &&
-                      styles.breakTagSelectorTextValue,
-                  ]}
-                >
-                  {selectedBreakTagId
-                    ? breakTags.find((t) => t.id === selectedBreakTagId)?.name
-                    : "Selecciona un motivo"}
-                </Text>
+        {/* ── Categoría + Botón registrar (bloque unificado) ── */}
+        {showPunchActions && (
+          <View style={styles.floatCard}>
+            <View style={styles.sectionHeaderRow}>
+              <SectionIcon tone="blue">
                 <Ionicons
-                  name="chevron-down"
-                  size={16}
-                  color={TEXT_PLACEHOLDER}
-                />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {(selectedCategory === "Break" ||
-            (selectedCategory === "Jornada" &&
-              isJornadaVisible(
-                now,
-                todaySchedule,
-                getNextPunchType("Jornada") === "inicio",
-                btnVisWorkIn,
-                btnVisWorkOut,
-                punches,
-                permissions,
-                todayHoliday,
-              )) ||
-            (selectedCategory === "Almuerzo" &&
-              isAlmuerzoButtonVisible(
-                now,
-                todaySchedule,
-                getNextPunchType("Almuerzo") === "inicio",
-                btnVisLunchIn,
-                btnVisLunchOut,
-                punches,
-                permissions,
-                todayHoliday,
-              ))) && (
-            <TouchableOpacity
-              style={[
-                styles.registerBtn,
-                // Sin fila de categorías ni motivo de break encima, el
-                // margen inferior del header / aviso de feriado ya separa.
-                visibleCategories.length <= 1 &&
-                  !(
-                    selectedCategory === "Break" &&
-                    isInicio &&
-                    breakTags.length > 0
-                  ) && { marginTop: 0 },
-                !isInicio && styles.registerBtnExit,
-                loading && styles.registerBtnBusy,
-              ]}
-              onPress={handleRegister}
-              disabled={loading}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator color={ON_PRIMARY} size="small" />
-              ) : (
-                <>
-                  <Ionicons
-                    name={isInicio ? "log-in-outline" : "log-out-outline"}
-                    size={26}
-                    color={ON_PRIMARY}
-                  />
-                  <View style={styles.registerTextWrap}>
-                    <Text style={styles.registerBtnText}>
-                      {isInicio ? "Entrada" : "Salida"}
-                    </Text>
-                    <Text style={styles.registerBtnSub}>
-                      ({selectedCategory})
-                    </Text>
-                  </View>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* ── Tolerancias de visibilidad de botones ── */}
-        <View style={styles.floatCard}>
-          <TouchableOpacity
-            style={styles.sectionHeaderToggle}
-            onPress={() => setTolerancesExpanded((prev) => !prev)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.sectionHeaderToggleLabel}>
-              <SectionIcon tone="sky">
-                <Ionicons
-                  name="hourglass-outline"
+                  name="swap-horizontal-outline"
                   size={18}
                   color={SECTION_ICON_COLOR}
                 />
               </SectionIcon>
               <Text style={styles.sectionHeaderText}>
-                Tiempo para mostrar acciones
+                Reg. Entrada / Salida
               </Text>
             </View>
-            <View style={styles.historyChevronBtn}>
-              <Ionicons
-                name={tolerancesExpanded ? "chevron-up" : "chevron-down"}
-                size={16}
-                color={PRIMARY_COLOR}
-              />
-            </View>
-          </TouchableOpacity>
-          {tolerancesExpanded && (
-            <View style={styles.toleranceGrid}>
-              <View
-                style={[
-                  styles.toleranceCell,
-                  isTablet && styles.toleranceCellTablet,
-                ]}
-              >
+            {nonWorkingHoliday && !jornadaIniciada && (
+              <View style={styles.holidayNotice}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={18}
+                  color={WARNING_TEXT_STRONG}
+                />
                 <Text
-                  style={[styles.toleranceCellLabel, styles.toleranceLabelIn]}
+                  style={[
+                    styles.holidayNoticeText,
+                    { fontSize: font(isTablet ? 14 : 12) },
+                  ]}
                 >
-                  Entrada Jornada
-                </Text>
-                <Text style={styles.toleranceCellValue}>
-                  {btnVisWorkIn} min antes
+                  {`Hoy ${formatRDDate(now)} es día no laborable motivo a ${todayHoliday?.name ?? ""}.`}
                 </Text>
               </View>
-              <View
-                style={[
-                  styles.toleranceCell,
-                  isTablet && styles.toleranceCellTablet,
-                ]}
-              >
-                <Text
-                  style={[styles.toleranceCellLabel, styles.toleranceLabelIn]}
+            )}
+            {visibleCategories.length > 1 && (
+              <View style={styles.categories}>
+                {visibleCategories.map((cat) => {
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[
+                        styles.categoryBtn,
+                        selectedCategory === cat && styles.categoryBtnActive,
+                      ]}
+                      onPress={() => setSelectedCategory(cat)}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons
+                        name={CATEGORY_ICONS[cat]}
+                        size={18}
+                        color={
+                          selectedCategory === cat ? ON_PRIMARY : PRIMARY_700
+                        }
+                      />
+                      <Text
+                        style={[
+                          styles.categoryText,
+                          selectedCategory === cat && styles.categoryTextActive,
+                        ]}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.85}
+                      >
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {selectedCategory === "Break" &&
+              isInicio &&
+              breakTags.length > 0 && (
+                <View
+                  style={[
+                    styles.breakTagWrap,
+                    // Sin fila de categorías encima, el margen inferior del
+                    // header ya separa.
+                    visibleCategories.length <= 1 && { marginTop: 0 },
+                  ]}
                 >
-                  Entrada Almuerzo
-                </Text>
-                <Text style={styles.toleranceCellValue}>
-                  {btnVisLunchIn} min antes
+                  <Text style={styles.breakTagLabel}>Motivo del Break</Text>
+                  <TouchableOpacity
+                    style={styles.breakTagSelector}
+                    onPress={() => setBreakTagModalVisible(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.breakTagSelectorText,
+                        selectedBreakTagId != null &&
+                          styles.breakTagSelectorTextValue,
+                      ]}
+                    >
+                      {selectedBreakTagId
+                        ? breakTags.find((t) => t.id === selectedBreakTagId)
+                            ?.name
+                        : "Selecciona un motivo"}
+                    </Text>
+                    <Ionicons
+                      name="chevron-down"
+                      size={16}
+                      color={TEXT_PLACEHOLDER}
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
+
+            {(selectedCategory === "Break" ||
+              (selectedCategory === "Jornada" &&
+                isJornadaVisible(
+                  now,
+                  todaySchedule,
+                  getNextPunchType("Jornada") === "inicio",
+                  btnVisWorkIn,
+                  btnVisWorkOut,
+                  punches,
+                  permissions,
+                  todayHoliday,
+                )) ||
+              (selectedCategory === "Almuerzo" &&
+                isAlmuerzoButtonVisible(
+                  now,
+                  todaySchedule,
+                  getNextPunchType("Almuerzo") === "inicio",
+                  btnVisLunchIn,
+                  btnVisLunchOut,
+                  punches,
+                  permissions,
+                  todayHoliday,
+                ))) && (
+              <TouchableOpacity
+                style={[
+                  styles.registerBtn,
+                  // Sin fila de categorías ni motivo de break encima, el
+                  // margen inferior del header / aviso de feriado ya separa.
+                  visibleCategories.length <= 1 &&
+                    !(
+                      selectedCategory === "Break" &&
+                      isInicio &&
+                      breakTags.length > 0
+                    ) && { marginTop: 0 },
+                  !isInicio && styles.registerBtnExit,
+                  loading && styles.registerBtnBusy,
+                ]}
+                onPress={handleRegister}
+                disabled={loading}
+                activeOpacity={0.85}
+              >
+                {loading ? (
+                  <ActivityIndicator color={ON_PRIMARY} size="small" />
+                ) : (
+                  <>
+                    <Ionicons
+                      name={isInicio ? "log-in-outline" : "log-out-outline"}
+                      size={26}
+                      color={ON_PRIMARY}
+                    />
+                    <View style={styles.registerTextWrap}>
+                      <Text style={styles.registerBtnText}>
+                        {isInicio ? "Entrada" : "Salida"}
+                      </Text>
+                      <Text style={styles.registerBtnSub}>
+                        ({selectedCategory})
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {/* ── Tolerancias de visibilidad de botones ── */}
+        {showPunchActions && (
+          <View style={styles.floatCard}>
+            <TouchableOpacity
+              style={styles.sectionHeaderToggle}
+              onPress={() => setTolerancesExpanded((prev) => !prev)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.sectionHeaderToggleLabel}>
+                <SectionIcon tone="sky">
+                  <Ionicons
+                    name="hourglass-outline"
+                    size={18}
+                    color={SECTION_ICON_COLOR}
+                  />
+                </SectionIcon>
+                <Text style={styles.sectionHeaderText}>
+                  Tiempo para mostrar acciones
                 </Text>
               </View>
-              <View
-                style={[
-                  styles.toleranceCell,
-                  isTablet && styles.toleranceCellTablet,
-                ]}
-              >
-                <Text
-                  style={[styles.toleranceCellLabel, styles.toleranceLabelOut]}
-                >
-                  Salida Jornada
-                </Text>
-                <Text style={styles.toleranceCellValue}>
-                  {btnVisWorkOut} min antes
-                </Text>
+              <View style={styles.historyChevronBtn}>
+                <Ionicons
+                  name={tolerancesExpanded ? "chevron-up" : "chevron-down"}
+                  size={16}
+                  color={PRIMARY_COLOR}
+                />
               </View>
-              <View
-                style={[
-                  styles.toleranceCell,
-                  isTablet && styles.toleranceCellTablet,
-                ]}
-              >
-                <Text
-                  style={[styles.toleranceCellLabel, styles.toleranceLabelOut]}
+            </TouchableOpacity>
+            {tolerancesExpanded && (
+              <View style={styles.toleranceGrid}>
+                <View
+                  style={[
+                    styles.toleranceCell,
+                    isTablet && styles.toleranceCellTablet,
+                  ]}
                 >
-                  Salida Almuerzo
-                </Text>
-                <Text style={styles.toleranceCellValue}>
-                  {btnVisLunchOut} min antes
-                </Text>
+                  <Text
+                    style={[styles.toleranceCellLabel, styles.toleranceLabelIn]}
+                  >
+                    Entrada Jornada
+                  </Text>
+                  <Text style={styles.toleranceCellValue}>
+                    {btnVisWorkIn} min antes
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.toleranceCell,
+                    isTablet && styles.toleranceCellTablet,
+                  ]}
+                >
+                  <Text
+                    style={[styles.toleranceCellLabel, styles.toleranceLabelIn]}
+                  >
+                    Entrada Almuerzo
+                  </Text>
+                  <Text style={styles.toleranceCellValue}>
+                    {btnVisLunchIn} min antes
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.toleranceCell,
+                    isTablet && styles.toleranceCellTablet,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.toleranceCellLabel,
+                      styles.toleranceLabelOut,
+                    ]}
+                  >
+                    Salida Jornada
+                  </Text>
+                  <Text style={styles.toleranceCellValue}>
+                    {btnVisWorkOut} min antes
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.toleranceCell,
+                    isTablet && styles.toleranceCellTablet,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.toleranceCellLabel,
+                      styles.toleranceLabelOut,
+                    ]}
+                  >
+                    Salida Almuerzo
+                  </Text>
+                  <Text style={styles.toleranceCellValue}>
+                    {btnVisLunchOut} min antes
+                  </Text>
+                </View>
               </View>
-            </View>
-          )}
-        </View>
+            )}
+          </View>
+        )}
 
         {/* ── Registros del día ── */}
-        <View style={styles.floatCard}>
-          <TouchableOpacity
-            style={styles.sectionHeaderToggle}
-            onPress={() => setHistoryExpanded(!historyExpanded)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.sectionHeaderToggleLabel}>
-              <SectionIcon tone="green">
+        {!isNoSchedule && (
+          <View style={styles.floatCard}>
+            <TouchableOpacity
+              style={styles.sectionHeaderToggle}
+              onPress={() => setHistoryExpanded(!historyExpanded)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.sectionHeaderToggleLabel}>
+                <SectionIcon tone="green">
+                  <Ionicons
+                    name="list-outline"
+                    size={18}
+                    color={SECTION_ICON_COLOR}
+                  />
+                </SectionIcon>
+                <Text style={styles.sectionHeaderText}>Historial del Día</Text>
+              </View>
+              <View style={styles.historyChevronBtn}>
                 <Ionicons
-                  name="list-outline"
-                  size={18}
-                  color={SECTION_ICON_COLOR}
-                />
-              </SectionIcon>
-              <Text style={styles.sectionHeaderText}>Historial del Día</Text>
-            </View>
-            <View style={styles.historyChevronBtn}>
-              <Ionicons
-                name={historyExpanded ? "chevron-up" : "chevron-down"}
-                size={16}
-                color={PRIMARY_COLOR}
-              />
-            </View>
-          </TouchableOpacity>
-          {historyExpanded && (
-            <>
-              {loadingPunches ? (
-                <ActivityIndicator
+                  name={historyExpanded ? "chevron-up" : "chevron-down"}
+                  size={16}
                   color={PRIMARY_COLOR}
-                  style={{ marginVertical: 16 }}
                 />
-              ) : punches.length === 0 ? (
-                <View style={styles.emptyPunches}>
-                  <Ionicons name="time-outline" size={32} color={ICON_SUBTLE} />
-                  <Text style={styles.emptyText}>Sin registros hoy</Text>
-                </View>
-              ) : (
-                [...punches]
-                  .reverse()
-                  .slice(
-                    0,
-                    historyShowAll ? undefined : HISTORY_COLLAPSED_LIMIT,
-                  )
-                  .map((punch) => {
-                    const tolerances = {
-                      workIn: tolWorkIn,
-                      workOut: tolWorkOut,
-                      lunchIn: tolLunchIn,
-                      lunchOut: tolLunchOut,
-                    };
-                    const displayStatus = getDisplayStatus(
-                      punch,
-                      userSchedules,
-                      tolerances,
-                    );
-                    const lateMinutes = getLateMinutes(
-                      punch,
-                      userSchedules,
-                      tolerances,
-                    );
-                    const isJornadaOvertime = displayStatus === "Horas extras";
-                    const isLateBadge =
-                      displayStatus === "Tardanza" ||
-                      displayStatus === "Error de Imagen" ||
-                      displayStatus === "Fuera de área";
-                    const isEarlyBadge = displayStatus === "Anticipada";
-                    const breakTagName = getPunchBreakTagName(punch);
-                    const photoUrl = getPunchPhotoUrl(punch, urlColegio);
-                    const punchIconColor = isLateBadge
-                      ? ERROR_COLOR
-                      : isEarlyBadge
-                        ? WARNING_ACCENT
-                        : punch.type.startsWith("Inicio")
-                          ? SUCCESS_ACCENT
-                          : isJornadaOvertime
-                            ? PRIMARY_COLOR
-                            : SUCCESS_ACCENT;
+              </View>
+            </TouchableOpacity>
+            {historyExpanded && (
+              <>
+                {loadingPunches ? (
+                  <ActivityIndicator
+                    color={PRIMARY_COLOR}
+                    style={{ marginVertical: 16 }}
+                  />
+                ) : punches.length === 0 ? (
+                  <View style={styles.emptyPunches}>
+                    <Ionicons
+                      name="time-outline"
+                      size={32}
+                      color={ICON_SUBTLE}
+                    />
+                    <Text style={styles.emptyText}>Sin registros hoy</Text>
+                  </View>
+                ) : (
+                  [...punches]
+                    .reverse()
+                    .slice(
+                      0,
+                      historyShowAll ? undefined : HISTORY_COLLAPSED_LIMIT,
+                    )
+                    .map((punch) => {
+                      const tolerances = {
+                        workIn: tolWorkIn,
+                        workOut: tolWorkOut,
+                        lunchIn: tolLunchIn,
+                        lunchOut: tolLunchOut,
+                      };
+                      const displayStatus = getDisplayStatus(
+                        punch,
+                        userSchedules,
+                        tolerances,
+                      );
+                      const lateMinutes = getLateMinutes(
+                        punch,
+                        userSchedules,
+                        tolerances,
+                      );
+                      const isJornadaOvertime =
+                        displayStatus === "Horas extras";
+                      const isLateBadge =
+                        displayStatus === "Tardanza" ||
+                        displayStatus === "Error de Imagen" ||
+                        displayStatus === "Fuera de área";
+                      const isEarlyBadge = displayStatus === "Anticipada";
+                      const breakTagName = getPunchBreakTagName(punch);
+                      const photoUrl = getPunchPhotoUrl(punch, urlColegio);
+                      const punchIconColor = isLateBadge
+                        ? ERROR_COLOR
+                        : isEarlyBadge
+                          ? WARNING_ACCENT
+                          : punch.type.startsWith("Inicio")
+                            ? SUCCESS_ACCENT
+                            : isJornadaOvertime
+                              ? PRIMARY_COLOR
+                              : SUCCESS_ACCENT;
 
-                    return (
-                      <View key={punch.id} style={styles.punchRow}>
-                        <View
-                          style={[
-                            styles.punchIcon,
-                            isLateBadge
-                              ? styles.punchIconError
-                              : isEarlyBadge
-                                ? styles.punchIconEarly
-                                : punch.type.startsWith("Inicio")
-                                  ? styles.punchIconEntry
-                                  : isJornadaOvertime
-                                    ? styles.punchIconOvertime
-                                    : styles.punchIconExitOnTime,
-                          ]}
-                        >
-                          <Ionicons
-                            name={CATEGORY_ICONS[getPunchCategory(punch.type)]}
-                            size={16}
-                            color={punchIconColor}
-                          />
-                        </View>
-                        <View style={styles.punchInfo}>
-                          <Text style={styles.punchType}>
-                            {getPunchTypeLabel(punch.type)}
-                          </Text>
-                          <View style={styles.punchBadgeRow}>
-                            {isJornadaOvertime ? (
-                              /* Solo FinJornada con overtime → "Horas extras" */
-                              <View style={styles.badgeOvertime}>
-                                <Text style={styles.badgeOvertimeText}>
-                                  Horas extras
-                                </Text>
-                              </View>
-                            ) : (
-                              /* Resto → status normal (almuerzo/break fuera de horario = Tardanza) */
-                              displayStatus && (
+                      return (
+                        <View key={punch.id} style={styles.punchRow}>
+                          <View
+                            style={[
+                              styles.punchIcon,
+                              isLateBadge
+                                ? styles.punchIconError
+                                : isEarlyBadge
+                                  ? styles.punchIconEarly
+                                  : punch.type.startsWith("Inicio")
+                                    ? styles.punchIconEntry
+                                    : isJornadaOvertime
+                                      ? styles.punchIconOvertime
+                                      : styles.punchIconExitOnTime,
+                            ]}
+                          >
+                            <Ionicons
+                              name={
+                                CATEGORY_ICONS[getPunchCategory(punch.type)]
+                              }
+                              size={16}
+                              color={punchIconColor}
+                            />
+                          </View>
+                          <View style={styles.punchInfo}>
+                            <Text style={styles.punchType}>
+                              {getPunchTypeLabel(punch.type)}
+                            </Text>
+                            <View style={styles.punchBadgeRow}>
+                              {isJornadaOvertime ? (
+                                /* Solo FinJornada con overtime → "Horas extras" */
+                                <View style={styles.badgeOvertime}>
+                                  <Text style={styles.badgeOvertimeText}>
+                                    Horas extras
+                                  </Text>
+                                </View>
+                              ) : (
+                                /* Resto → status normal (almuerzo/break fuera de horario = Tardanza) */
+                                displayStatus && (
+                                  <View
+                                    style={[
+                                      styles.punchBadge,
+                                      isLateBadge
+                                        ? styles.badgeLate
+                                        : isEarlyBadge
+                                          ? styles.badgeEarly
+                                          : styles.badgeOnTime,
+                                    ]}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.punchBadgeText,
+                                        {
+                                          color: getStatusColor(displayStatus),
+                                        },
+                                      ]}
+                                    >
+                                      {displayStatus}
+                                    </Text>
+                                  </View>
+                                )
+                              )}
+                              {/* Duración de la tardanza (solo móvil) */}
+                              {displayStatus === "Tardanza" &&
+                                lateMinutes != null &&
+                                lateMinutes > 0 && (
+                                  <View
+                                    style={[
+                                      styles.punchBadge,
+                                      styles.badgeLate,
+                                    ]}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.punchBadgeText,
+                                        { color: getStatusColor("Tardanza") },
+                                      ]}
+                                    >
+                                      {formatLateDuration(lateMinutes)}
+                                    </Text>
+                                  </View>
+                                )}
+                              {!!breakTagName && (
                                 <View
                                   style={[
                                     styles.punchBadge,
-                                    isLateBadge
-                                      ? styles.badgeLate
-                                      : isEarlyBadge
-                                        ? styles.badgeEarly
-                                        : styles.badgeOnTime,
+                                    styles.badgeNeutral,
                                   ]}
                                 >
                                   <Text
                                     style={[
                                       styles.punchBadgeText,
-                                      { color: getStatusColor(displayStatus) },
+                                      { color: TEXT_MUTED },
                                     ]}
                                   >
-                                    {displayStatus}
-                                  </Text>
-                                </View>
-                              )
-                            )}
-                            {/* Duración de la tardanza (solo móvil) */}
-                            {displayStatus === "Tardanza" &&
-                              lateMinutes != null &&
-                              lateMinutes > 0 && (
-                                <View
-                                  style={[styles.punchBadge, styles.badgeLate]}
-                                >
-                                  <Text
-                                    style={[
-                                      styles.punchBadgeText,
-                                      { color: getStatusColor("Tardanza") },
-                                    ]}
-                                  >
-                                    {formatLateDuration(lateMinutes)}
+                                    {breakTagName}
                                   </Text>
                                 </View>
                               )}
-                            {!!breakTagName && (
-                              <View
-                                style={[styles.punchBadge, styles.badgeNeutral]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.punchBadgeText,
-                                    { color: TEXT_MUTED },
-                                  ]}
+                              {punch.permissionId != null && (
+                                <View style={styles.permissionBadgeSmall}>
+                                  <MaterialCommunityIcons
+                                    name="alpha-p"
+                                    size={16}
+                                    color={PRIMARY_COLOR}
+                                  />
+                                </View>
+                              )}
+                              {(punch.hasOpenDay === true ||
+                                (punch.hasOpenDay as unknown) === "true") && (
+                                <View style={styles.openDayBadgeSmall}>
+                                  <Ionicons
+                                    name="lock-open-outline"
+                                    size={16}
+                                    color={ACCENT_VIOLET}
+                                  />
+                                </View>
+                              )}
+                              {/* Foto del ponche — también en "Error de Imagen", igual que el webapp */}
+                              {photoUrl != null && (
+                                <TouchableOpacity
+                                  style={styles.punchPhotoBtn}
+                                  onPress={() => setPunchPhotoUri(photoUrl)}
+                                  accessibilityRole="button"
+                                  accessibilityLabel="Ver imagen"
                                 >
-                                  {breakTagName}
-                                </Text>
-                              </View>
-                            )}
-                            {punch.permissionId != null && (
-                              <View style={styles.permissionBadgeSmall}>
-                                <MaterialCommunityIcons
-                                  name="alpha-p"
-                                  size={16}
-                                  color={PRIMARY_COLOR}
-                                />
-                              </View>
-                            )}
-                            {(punch.hasOpenDay === true ||
-                              (punch.hasOpenDay as unknown) === "true") && (
-                              <View style={styles.openDayBadgeSmall}>
-                                <Ionicons
-                                  name="lock-open-outline"
-                                  size={16}
-                                  color={ACCENT_VIOLET}
-                                />
-                              </View>
-                            )}
-                            {/* Foto del ponche — también en "Error de Imagen", igual que el webapp */}
-                            {photoUrl != null && (
-                              <TouchableOpacity
-                                style={styles.punchPhotoBtn}
-                                onPress={() => setPunchPhotoUri(photoUrl)}
-                                accessibilityRole="button"
-                                accessibilityLabel="Ver imagen"
-                              >
-                                <Ionicons
-                                  name="image-outline"
-                                  size={16}
-                                  color={TEXT_MUTED}
-                                />
-                              </TouchableOpacity>
-                            )}
+                                  <Ionicons
+                                    name="image-outline"
+                                    size={16}
+                                    color={TEXT_MUTED}
+                                  />
+                                </TouchableOpacity>
+                              )}
+                            </View>
                           </View>
+                          <Text style={styles.punchTime}>
+                            {formatRDTimeShort(new Date(punch.createdDate))}
+                          </Text>
+                          {punch.id === blinkPunchId && (
+                            <Animated.View
+                              pointerEvents="none"
+                              style={[
+                                styles.punchRowBlink,
+                                {
+                                  backgroundColor: punchIconColor,
+                                  opacity: blinkOpacity,
+                                },
+                              ]}
+                            />
+                          )}
                         </View>
-                        <Text style={styles.punchTime}>
-                          {formatRDTimeShort(new Date(punch.createdDate))}
-                        </Text>
-                        {punch.id === blinkPunchId && (
-                          <Animated.View
-                            pointerEvents="none"
-                            style={[
-                              styles.punchRowBlink,
-                              {
-                                backgroundColor: punchIconColor,
-                                opacity: blinkOpacity,
-                              },
-                            ]}
-                          />
-                        )}
-                      </View>
-                    );
-                  })
-              )}
-              {punches.length > HISTORY_COLLAPSED_LIMIT && (
-                <TouchableOpacity
-                  style={styles.historyToggleBtn}
-                  onPress={() => setHistoryShowAll(!historyShowAll)}
-                >
-                  <Text style={styles.historyToggleText}>
-                    {historyShowAll
-                      ? "Ver menos"
-                      : `Ver todos (${punches.length})`}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </>
-          )}
-        </View>
+                      );
+                    })
+                )}
+                {punches.length > HISTORY_COLLAPSED_LIMIT && (
+                  <TouchableOpacity
+                    style={styles.historyToggleBtn}
+                    onPress={() => setHistoryShowAll(!historyShowAll)}
+                  >
+                    <Text style={styles.historyToggleText}>
+                      {historyShowAll
+                        ? "Ver menos"
+                        : `Ver todos (${punches.length})`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       <ImageViewerModal
@@ -2889,6 +2957,23 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 18,
     marginTop: 8,
+  },
+  /** Card destacada del modo "noSchedule": CARD_FORM en tono warning. */
+  noScheduleCard: {
+    ...CARD_FORM,
+    backgroundColor: WARNING_TINT_50,
+    borderColor: WARNING_TINT_BORDER,
+    alignItems: "center",
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  noScheduleText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: "700",
+    color: WARNING_TEXT_STRONG,
+    textAlign: "center",
   },
   profileFloatCard: {
     ...CARD_FORM,

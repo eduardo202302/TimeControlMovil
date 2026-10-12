@@ -1078,6 +1078,52 @@ export function isAlmuerzoButtonVisible(
   }
 }
 
+// ─── Modo de la pantalla Registrar Acceso ─────────────────────────────────────
+
+export type PunchScreenMode = "noSchedule" | "dayFinished" | "normal";
+
+/**
+ * Qué bloques muestra el ponchador del empleado:
+ * - "noSchedule": hoy no tiene horario, no hay jornada abierta ni FH usable →
+ *   no hay nada que ponchar.
+ * - "dayFinished": la última jornada válida está cerrada y no queda ninguna
+ *   acción visible (ventana de adicional, FH, etc.).
+ * - "normal": todo lo demás.
+ * "noSchedule" se evalúa primero. Se recalcula en cada render: si aparece una
+ * acción, la pantalla vuelve sola a "normal".
+ */
+export function getPunchScreenMode({
+  schedule,
+  punches,
+  permissions,
+  now,
+  hasVisibleActions,
+}: {
+  schedule: UserSchedule | null;
+  punches: PunchEvent[];
+  permissions: UserDayPermission[];
+  now: Date;
+  hasVisibleActions: boolean;
+}): PunchScreenMode {
+  const lastJornada = findLastJornadaPunch(punches);
+  const jornadaAbierta = !!lastJornada && isJornadaStartType(lastJornada.type);
+  if (
+    schedule == null &&
+    !jornadaAbierta &&
+    getUsableFhPermission(permissions, punches, now) == null
+  ) {
+    return "noSchedule";
+  }
+  if (
+    !!lastJornada &&
+    isJornadaEndType(lastJornada.type) &&
+    hasVisibleActions === false
+  ) {
+    return "dayFinished";
+  }
+  return "normal";
+}
+
 /**
  * Categoría que debe quedar seleccionada en "Reg. Entrada / Salida" según las
  * categorías visibles: se conserva la seleccionada si sigue visible; si no,
