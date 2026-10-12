@@ -1,6 +1,7 @@
 /// <reference types="jest" />
 import { buildCompanySettings } from "../../../store/useSchoolStore";
 import {
+  getTaskerReportTitle,
   TASKER_DESCRIPTION_REQUIRED_FALLBACK,
   TASKER_SERVICE_NAME_LABEL_FALLBACK,
 } from "../taskerRules";
@@ -33,8 +34,18 @@ describe("buildCompanySettings — claves de Reportar Avería (Tasker)", () => {
       }
     });
     it("string vacío o solo espacios → respaldo", () => {
-      expect(buildCompanySettings({ serviceNameLabel: "" })?.serviceNameLabel).toBe("Servicio");
-      expect(buildCompanySettings({ serviceNameLabel: "   " })?.serviceNameLabel).toBe("Servicio");
+      expect(buildCompanySettings({ serviceNameLabel: "" })?.serviceNameLabel).toBe(
+        "Reportar Servicio",
+      );
+      expect(buildCompanySettings({ serviceNameLabel: "   " })?.serviceNameLabel).toBe(
+        "Reportar Servicio",
+      );
+    });
+    it("getTaskerReportTitle sin valor en school.settings → 'Reportar Servicio'", () => {
+      expect(getTaskerReportTitle(buildCompanySettings({}))).toBe("Reportar Servicio");
+      expect(getTaskerReportTitle(buildCompanySettings({ serviceNameLabel: "" }))).toBe(
+        "Reportar Servicio",
+      );
     });
   });
 

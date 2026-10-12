@@ -24,6 +24,7 @@ import { SHADOW_MD } from "@/constants/shadows";
 import DrawerMenu from "../../components/drawer/DrawerMenu";
 import CompanySelector from "../../components/login/CompanySelector";
 import { useSchoolStore } from "../../../store/useSchoolStore";
+import { getTaskerReportTitle, TASKER_REPORT_PATH } from "../../utils/taskerRules";
 import {
     fetchUserCompanies,
     getActiveSchoolId,
@@ -53,7 +54,6 @@ const ROUTE_TITLES: Record<string, string> = {
   "/roles": "Roles",
   "/entities": "Empresa",
   "/unauthorized": "Sin acceso",
-  "/reportfault": "Reportar Avería",
   "/followup": "Seguimiento",
 };
 
@@ -67,7 +67,12 @@ export default function AppLayout() {
 
   const [drawerVisible, setDrawerVisible] = useState(false);
   const pathname = usePathname();
-  const title = ROUTE_TITLES[pathname] ?? "Time Flow";
+  // Reportar Avería toma el nombre de la compañía (school.settings), igual que su tarjeta.
+  const companySettings = useSchoolStore((state) => state.companySettings);
+  const title =
+    pathname === TASKER_REPORT_PATH
+      ? getTaskerReportTitle(companySettings)
+      : (ROUTE_TITLES[pathname] ?? "Time Flow");
 
   // Empresa activa. Es el `key` del Slot: al cambiar de empresa TODAS las
   // pantallas se remontan y vuelven a cargar con el token nuevo (varias leen

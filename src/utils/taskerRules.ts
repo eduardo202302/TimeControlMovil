@@ -305,8 +305,9 @@ export function getInitials(name: string | null | undefined): string {
  * Respaldos de la config de Reportar Avería cuando la compañía no trae las
  * claves en school.settings (el backend no les pone default). Los usa
  * buildCompanySettings (store/useSchoolStore.ts) y resolveTaskerReportConfig.
+ * El nombre también es el título de la pantalla y la opción del menú.
  */
-export const TASKER_SERVICE_NAME_LABEL_FALLBACK = "Servicio";
+export const TASKER_SERVICE_NAME_LABEL_FALLBACK = "Reportar Servicio";
 export const TASKER_DESCRIPTION_REQUIRED_FALLBACK = true;
 
 /** Config de Reportar Avería a partir de companySettings (null → respaldos). */
@@ -323,6 +324,17 @@ export function resolveTaskerReportConfig(
     serviceNameLabel: companySettings.serviceNameLabel,
     isDescriptionRequired: companySettings.isDescriptionRequired,
   };
+}
+
+/** Ruta de Reportar Avería (encabezado y menú la reconocen por esta ruta). */
+export const TASKER_REPORT_PATH = "/reportfault";
+
+/**
+ * Título de Reportar Avería en el encabezado y en el menú: el mismo
+ * serviceNameLabel que muestra la tarjeta de la pantalla.
+ */
+export function getTaskerReportTitle(companySettings: CompanySettings | null): string {
+  return resolveTaskerReportConfig(companySettings).serviceNameLabel;
 }
 
 /** Validación de "Guardar y enviar", con los textos de Tasker. */

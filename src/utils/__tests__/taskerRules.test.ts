@@ -30,10 +30,12 @@ import {
   getStateActivities,
   getStateChipColors,
   getTagChipTone,
+  getTaskerReportTitle,
   resolveTaskerReportConfig,
   sortComments,
   TASKER_DESCRIPTION_REQUIRED_FALLBACK,
   TASKER_SERVICE_NAME_LABEL_FALLBACK,
+  TASKER_REPORT_PATH,
   TASKER_STATE_COLOR_FALLBACK,
   validateReport,
 } from "../taskerRules";
@@ -649,13 +651,13 @@ describe("resolveTaskerReportConfig", () => {
     ...over,
   });
 
-  it("respaldos: 'Servicio' y descripción requerida", () => {
-    expect(TASKER_SERVICE_NAME_LABEL_FALLBACK).toBe("Servicio");
+  it("respaldos: 'Reportar Servicio' y descripción requerida", () => {
+    expect(TASKER_SERVICE_NAME_LABEL_FALLBACK).toBe("Reportar Servicio");
     expect(TASKER_DESCRIPTION_REQUIRED_FALLBACK).toBe(true);
   });
   it("sin companySettings → respaldos", () => {
     expect(resolveTaskerReportConfig(null)).toEqual({
-      serviceNameLabel: "Servicio",
+      serviceNameLabel: "Reportar Servicio",
       isDescriptionRequired: true,
     });
   });
@@ -669,6 +671,27 @@ describe("resolveTaskerReportConfig", () => {
   it("el resultado alimenta validateReport", () => {
     const config = resolveTaskerReportConfig(settings({ isDescriptionRequired: false }));
     expect(validateReport({ typeId: 11, description: "" }, config)).toEqual({});
+  });
+
+  describe("getTaskerReportTitle", () => {
+    it("ruta de Reportar Avería", () => {
+      expect(TASKER_REPORT_PATH).toBe("/reportfault");
+    });
+    it("con valor → el serviceNameLabel de la compañía, tal cual", () => {
+      expect(getTaskerReportTitle(settings({ serviceNameLabel: "Reportar Avería" }))).toBe(
+        "Reportar Avería",
+      );
+    });
+    it("con null → el respaldo", () => {
+      expect(getTaskerReportTitle(null)).toBe("Reportar Servicio");
+    });
+    it("es el mismo valor que el título de la tarjeta", () => {
+      for (const companySettings of [null, settings({ serviceNameLabel: "Área" })]) {
+        expect(getTaskerReportTitle(companySettings)).toBe(
+          resolveTaskerReportConfig(companySettings).serviceNameLabel,
+        );
+      }
+    });
   });
 });
 

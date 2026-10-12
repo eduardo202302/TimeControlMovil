@@ -32,6 +32,8 @@ import Animated, {
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { MenuTree } from "../../../utils/resolveRoute";
 import { canChangeCompany } from "../../utils/chooseCompany";
+import { getTaskerReportTitle, TASKER_REPORT_PATH } from "../../utils/taskerRules";
+import type { CompanySettings } from "../../../types/typeStore/SchoolStoreType";
 import {
   CARD_BACKGROUND,
   ERROR_COLOR,
@@ -104,6 +106,19 @@ function getIcon(iconName: string): keyof typeof Ionicons.glyphMap {
  */
 function getLabel(name: string): string {
   return name?.replace(/\s*-\s*Time\s*Control\s*$/i, "") ?? "";
+}
+
+/**
+ * Etiqueta de una opción. Reportar Avería (temporal o del backend, padre o
+ * hijo) muestra el serviceNameLabel de la compañía, como su pantalla.
+ */
+function getItemLabel(
+  item: { name: string; path: string },
+  companySettings: CompanySettings | null,
+): string {
+  return item.path === TASKER_REPORT_PATH
+    ? getTaskerReportTitle(companySettings)
+    : getLabel(item.name);
 }
 
 /**
@@ -421,9 +436,16 @@ interface SectionProps {
   onNavigate: (path: string) => void;
   pathname: string;
   styles: DrawerStyles;
+  companySettings: CompanySettings | null;
 }
 
-function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
+function MenuSection({
+  section,
+  onNavigate,
+  pathname,
+  styles,
+  companySettings,
+}: SectionProps) {
   const [expanded, setExpanded] = useState(false);
   const { scale } = useResponsive();
   const sectionIcon = getIcon(section.parent.icon);
@@ -451,7 +473,7 @@ function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
           <Text
             style={[styles.sectionTitle, isActive && styles.sectionTitleActive]}
           >
-            {getLabel(section.parent.name)}
+            {getItemLabel(section.parent, companySettings)}
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -466,7 +488,9 @@ function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
         activeOpacity={0.7}
       >
         <Ionicons name={sectionIcon} size={20} color={PRIMARY_COLOR} />
-        <Text style={styles.sectionTitle}>{getLabel(section.parent.name)}</Text>
+        <Text style={styles.sectionTitle}>
+          {getItemLabel(section.parent, companySettings)}
+        </Text>
         <Animated.View style={chevronStyle}>
           <Ionicons name="chevron-forward" size={16} color={TEXT_PLACEHOLDER} />
         </Animated.View>
@@ -498,7 +522,7 @@ function MenuSection({ section, onNavigate, pathname, styles }: SectionProps) {
                 <Text
                   style={[styles.childText, isActive && styles.activeChildText]}
                 >
-                  {getLabel(child.name)}
+                  {getItemLabel(child, companySettings)}
                 </Text>
               </TouchableOpacity>
             );
@@ -526,7 +550,8 @@ export default function DrawerMenu({
 }: DrawerMenuProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, menuTree, app, logout, school, urlColegio } = useSchoolStore();
+  const { user, menuTree, app, logout, school, urlColegio, companySettings } =
+    useSchoolStore();
   const schoolUser = user?.user?.schoolUsers?.[0];
   const activeSchool = schoolUser?.school ?? school;
   // Mismo criterio que punchinout.tsx para el id del usuario.
@@ -689,6 +714,7 @@ const confirmLogout = useCallback(async () => {
               onNavigate={handleNavigate}
               pathname={pathname}
               styles={styles}
+              companySettings={companySettings}
             />
           ))}
 
@@ -709,6 +735,7 @@ const confirmLogout = useCallback(async () => {
                 onNavigate={handleNavigate}
                 pathname={pathname}
                 styles={styles}
+                companySettings={companySettings}
               />
             ))}
 
