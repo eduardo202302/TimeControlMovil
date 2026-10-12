@@ -106,13 +106,15 @@ export function getTaskerReportContext(): TaskerReportContext {
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
-/** Antes de esta hora el ejemplo usa el día anterior: Iniciada nunca queda en el futuro. */
-const SAMPLE_DAY_START = { hour: 9, minute: 30 };
+/** Antes de esta hora el ejemplo usa el día anterior: ninguna fecha queda en el futuro. */
+const SAMPLE_DAY_START = { hour: 11, minute: 30 };
 
 /**
  * Ticket abierto de ejemplo. Todas las fechas caen en un mismo día (el de
  * `now`, en hora local) y en horario de oficina:
- * Pendiente 08:15:00 → Asignada 08:22:30 → Iniciada 09:10:00 (sigue abierta).
+ * Reportado 08:15:00 → Asignada 09:50:20 → Iniciada 10:48:35 (sigue abierta).
+ * Iniciada lleva `time` fijo a propósito: así los tiempos van de mayor a
+ * menor (Reportado > Asignada > Iniciada).
  */
 export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskResponse {
   const today = new Date(now);
@@ -160,7 +162,7 @@ export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskRespo
         {
           id: 1,
           addUser: { name: "Jeremy Domínguez" },
-          createdDate: at("09:20:00"),
+          createdDate: at("10:55:00"),
           comment:
             "Contacto establecido con el supervisor en planta. Se coordinó inspección de rutina en el tablero secundario.",
           images: ["comentarios/4045/adjunto-1.jpg"],
@@ -168,7 +170,7 @@ export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskRespo
         {
           id: 2,
           addUser: { name: "Jeremy Móvil" },
-          createdDate: at("08:35:00"),
+          createdDate: at("09:55:00"),
           comment: "Se recibió el reporte. Técnico asignado para la visita.",
           images: [],
         },
@@ -179,7 +181,7 @@ export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskRespo
           type: "assignedUser",
           action: "Responsable",
           message: "Jeremy Móvil",
-          beginDate: at("08:22:30"),
+          beginDate: at("09:50:20"),
           endDate: null,
           user: { name: "Jeremy Domínguez" },
           time: null,
@@ -190,10 +192,10 @@ export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskRespo
           type: "state",
           action: "Iniciada",
           message: "",
-          beginDate: at("09:10:00"),
+          beginDate: at("10:48:35"),
           endDate: null,
           user: { name: "Jeremy Domínguez" },
-          time: null,
+          time: "22m 10s",
           coordinates: { latitude: 18.4571092, longitude: -69.9524086 },
         },
         {
@@ -201,21 +203,21 @@ export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskRespo
           type: "state",
           action: "Asignada",
           message: "a Jeremy Móvil",
-          beginDate: at("08:22:30"),
-          endDate: at("09:10:00"),
+          beginDate: at("09:50:20"),
+          endDate: at("10:48:35"),
           user: { name: "Jeremy Domínguez" },
-          time: "47m 30s",
+          time: "58m 15s",
           coordinates: null,
         },
         {
           id: 1,
           type: "state",
-          action: "Pendiente",
+          action: "Reportado",
           message: "",
           beginDate: at("08:15:00"),
-          endDate: at("08:22:30"),
+          endDate: at("09:50:20"),
           user: { name: "Jeremy Domínguez" },
-          time: "7m 30s",
+          time: "1h 35m 20s",
           coordinates: null,
         },
       ],

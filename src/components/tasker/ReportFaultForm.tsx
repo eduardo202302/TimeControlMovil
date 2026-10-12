@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import * as Linking from "expo-linking";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,7 +19,6 @@ import {
   DANGER_ICON,
   ERROR_COLOR,
   ICON_EDIT,
-  ICON_VIEW,
   ON_PRIMARY,
   PRIMARY_700,
   PRIMARY_COLOR,
@@ -50,7 +48,6 @@ import {
   ADD_FILE_BTN,
   CARD_FORM,
   FIELD_SURFACE,
-  FILE_ROW,
   FOOTER_BAR,
   FOOTER_BTN_CANCEL,
   FOOTER_BTN_SAVE,
@@ -59,7 +56,6 @@ import {
 } from "@/styles/surfaces";
 import {
   addTaskerAddress,
-  buildMapsUrl,
   getTagChipTone,
   removeTaskerAddress,
   resolveTaskerReportConfig,
@@ -76,6 +72,7 @@ import type {
 } from "../../../types/typesTasker/TaskerTypes";
 import { showPendingAction } from "./pendingAction";
 import TaskerAddressModal from "./TaskerAddressModal";
+import TaskerAddressSummary from "./TaskerAddressSummary";
 import { useTaskerAttachmentPicker } from "./useTaskerAttachmentPicker";
 
 type Styles = ReturnType<typeof createStyles>;
@@ -232,7 +229,7 @@ export default function ReportFaultForm() {
             title="Descripción"
           />
           <Text style={styles.label}>
-            Descripción
+            Detalles
             {config.isDescriptionRequired && <Text style={styles.required}> *</Text>}
           </Text>
           <TextInput
@@ -456,80 +453,52 @@ interface AddressRowProps {
 }
 
 function AddressRow({ address, styles, onEdit, onRemove, onToggleSelected }: AddressRowProps) {
-  const streetLine = [address.street, address.streetNumber && `#${address.streetNumber}`]
-    .filter(Boolean)
-    .join(" ");
-  const areaLine = [address.sector, address.city, address.province].filter(Boolean).join(", ");
-  const hasCoords =
-    address.latitude != null &&
-    address.latitude !== "" &&
-    address.longitude != null &&
-    address.longitude !== "";
-
-  const openMap = () => {
-    if (!hasCoords) return;
-    Linking.openURL(buildMapsUrl(address.latitude!, address.longitude!)).catch(
-      () => undefined,
-    );
-  };
-
   return (
-    <View style={styles.addressRow}>
-      <View style={styles.addressBody}>
-        <Text style={styles.addressTitle}>{address.title}</Text>
-        {!!streetLine && <Text style={styles.addressStreet}>{streetLine}</Text>}
-        {!!areaLine && <Text style={styles.addressArea}>{areaLine}</Text>}
-        <TouchableOpacity
-          style={[styles.selectAddressBtn, address.selected && styles.selectAddressBtnActive]}
-          onPress={onToggleSelected}
-          accessibilityState={{ selected: address.selected }}
-          activeOpacity={0.75}
-        >
-          <Ionicons
-            name={address.selected ? "checkmark-circle" : "ellipse-outline"}
-            size={16}
-            color={address.selected ? ON_PRIMARY : PRIMARY_700}
-          />
-          <Text
-            style={[
-              styles.selectAddressText,
-              address.selected && styles.selectAddressTextActive,
-            ]}
+    <TaskerAddressSummary
+      address={address}
+      style={styles.addressRow}
+      actions={
+        <>
+          <TouchableOpacity
+            style={styles.addressBtn}
+            onPress={onEdit}
+            accessibilityLabel="Editar dirección"
+            activeOpacity={0.75}
           >
-            {address.selected ? "Seleccionada" : "Seleccionar"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-      <View style={styles.addressActions}>
-        {/* Sin coordenadas no hay qué abrir: deshabilitado y atenuado (no es una acción pendiente). */}
-        <TouchableOpacity
-          style={[styles.addressBtn, !hasCoords && styles.addressBtnDisabled]}
-          onPress={openMap}
-          disabled={!hasCoords}
-          accessibilityLabel="Ver dirección en el mapa"
-          accessibilityState={{ disabled: !hasCoords }}
-          activeOpacity={0.75}
+            <Ionicons name="create-outline" size={18} color={ICON_EDIT} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addressBtn}
+            onPress={onRemove}
+            accessibilityLabel="Eliminar dirección"
+            activeOpacity={0.75}
+          >
+            <Ionicons name="trash-outline" size={18} color={DANGER_ICON} />
+          </TouchableOpacity>
+        </>
+      }
+    >
+      <TouchableOpacity
+        style={[styles.selectAddressBtn, address.selected && styles.selectAddressBtnActive]}
+        onPress={onToggleSelected}
+        accessibilityState={{ selected: address.selected }}
+        activeOpacity={0.75}
+      >
+        <Ionicons
+          name={address.selected ? "checkmark-circle" : "ellipse-outline"}
+          size={16}
+          color={address.selected ? ON_PRIMARY : PRIMARY_700}
+        />
+        <Text
+          style={[
+            styles.selectAddressText,
+            address.selected && styles.selectAddressTextActive,
+          ]}
         >
-          <Ionicons name="map-outline" size={18} color={ICON_VIEW} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.addressBtn}
-          onPress={onEdit}
-          accessibilityLabel="Editar dirección"
-          activeOpacity={0.75}
-        >
-          <Ionicons name="create-outline" size={18} color={ICON_EDIT} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.addressBtn}
-          onPress={onRemove}
-          accessibilityLabel="Eliminar dirección"
-          activeOpacity={0.75}
-        >
-          <Ionicons name="trash-outline" size={18} color={DANGER_ICON} />
-        </TouchableOpacity>
-      </View>
-    </View>
+          {address.selected ? "Seleccionada" : "Seleccionar"}
+        </Text>
+      </TouchableOpacity>
+    </TaskerAddressSummary>
   );
 }
 
@@ -665,23 +634,8 @@ function createStyles(
     },
     reporterText: { fontSize: font(13), color: TEXT_MUTED },
     reporterName: { fontWeight: "600", color: TEXT_SECONDARY },
-    addressRow: {
-      ...FILE_ROW,
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: scale(10),
-      padding: scale(12),
-      marginBottom: verticalScale(8),
-    },
-    addressBody: { flex: 1 },
-    addressTitle: { fontSize: font(14), fontWeight: "700", color: TEXT_PRIMARY },
-    addressStreet: {
-      marginTop: verticalScale(2),
-      fontSize: font(13),
-      lineHeight: font(18),
-      color: TEXT_SECONDARY,
-    },
-    addressArea: { fontSize: font(13), lineHeight: font(18), color: TEXT_MUTED },
+    // El resto de la fila vive en TaskerAddressSummary.
+    addressRow: { marginBottom: verticalScale(8) },
     selectAddressBtn: {
       flexDirection: "row",
       alignItems: "center",
@@ -698,7 +652,6 @@ function createStyles(
     selectAddressBtnActive: { borderColor: PRIMARY_COLOR, backgroundColor: PRIMARY_COLOR },
     selectAddressText: { fontSize: font(12), fontWeight: "700", color: PRIMARY_700 },
     selectAddressTextActive: { color: ON_PRIMARY },
-    addressActions: { flexDirection: "row", gap: scale(6) },
     // Botón de ícono cuadrado: 36×36 fijo (área táctil del ícono).
     addressBtn: {
       width: 36,
@@ -708,7 +661,6 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
     },
-    addressBtnDisabled: { opacity: 0.4 },
     footer: {
       ...FOOTER_BAR,
       paddingHorizontal: scale(16),

@@ -17,6 +17,7 @@ import {
 import type { TaskerAddress } from "../../../types/typesTasker/TaskerTypes";
 import { FollowUpCardHeader } from "./FollowUpParts";
 import type { FollowUpStyles } from "./followUpStyles";
+import TaskerAddressSummary from "./TaskerAddressSummary";
 
 /**
  * Textos largos: van a lo ancho, apilados al final junto a "Ver en mapa"
@@ -73,6 +74,12 @@ export default function FollowUpAddressTab({ address, styles }: FollowUpAddressT
           </View>
         )}
       </View>
+      {/* Resumen como la fila de Reportar Avería, sin botones: aquí es solo lectura. */}
+      <TaskerAddressSummary
+        address={address}
+        style={styles.addressSummary}
+        showMapButton={false}
+      />
     </View>
   );
 }

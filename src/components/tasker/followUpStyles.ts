@@ -341,6 +341,7 @@ export function createFollowUpStyles(
       backgroundColor: CARD_BACKGROUND,
     },
     mapBtnText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_700 },
+    addressSummary: { marginTop: verticalScale(12) },
 
     /* ── Pestaña Acciones (línea de tiempo) ── */
     timelineRow: { flexDirection: "row", gap: scale(10) },

@@ -25,6 +25,7 @@ import {
   formatTaskerDate,
   getActivityTime,
   getAddressFields,
+  getTaskerAddressLines,
   getInitials,
   getStateActivities,
   getStateChipColors,
@@ -179,7 +180,7 @@ describe("getStateActivities", () => {
 
 describe("historial de ejemplo (taskerMock)", () => {
   const { task } = getTaskerOpenTask(MOCK_NOW);
-  // Del más viejo al más nuevo: Pendiente → Asignada → Iniciada.
+  // Del más viejo al más nuevo: Reportado → Asignada → Iniciada.
   const states = getStateActivities(task.activities).reverse();
   const durationMs = (a: TaskerActivity) =>
     (a.endDate ? ms(a.endDate) : MOCK_NOW) - ms(a.beginDate);
@@ -188,23 +189,43 @@ describe("historial de ejemplo (taskerMock)", () => {
     ...t.activities.flatMap((a) => [a.beginDate, a.endDate]).filter((d): d is string => !!d),
     ...t.comments.map((c) => c.createdDate),
   ];
+  /** "1h 35m 20s" → ms, para comparar los time fijos. */
+  const parseElapsed = (value: string | null) =>
+    (value ?? "").split(" ").reduce((total, part) => {
+      const n = parseInt(part, 10);
+      const unit = { d: DAY, h: HOUR, m: MIN, s: SEC }[part.slice(-1)] ?? NaN;
+      return total + n * unit;
+    }, 0);
 
   it("horas fijas de oficina sobre el día de now", () => {
     expect(task.createdDate).toBe(localIso(2026, 9, 7, 8, 15));
     expect(states.map((a) => [a.action, a.beginDate, a.endDate, a.time])).toEqual([
-      ["Pendiente", localIso(2026, 9, 7, 8, 15), localIso(2026, 9, 7, 8, 22, 30), "7m 30s"],
-      ["Asignada", localIso(2026, 9, 7, 8, 22, 30), localIso(2026, 9, 7, 9, 10), "47m 30s"],
-      ["Iniciada", localIso(2026, 9, 7, 9, 10), null, null],
+      ["Reportado", localIso(2026, 9, 7, 8, 15), localIso(2026, 9, 7, 9, 50, 20), "1h 35m 20s"],
+      ["Asignada", localIso(2026, 9, 7, 9, 50, 20), localIso(2026, 9, 7, 10, 48, 35), "58m 15s"],
+      ["Iniciada", localIso(2026, 9, 7, 10, 48, 35), null, "22m 10s"],
     ]);
     const assigned = task.activities.find((a) => a.type === "assignedUser");
-    expect(assigned?.beginDate).toBe(localIso(2026, 9, 7, 8, 22, 30));
+    expect(assigned?.beginDate).toBe(localIso(2026, 9, 7, 9, 50, 20));
     const byAuthor = Object.fromEntries(task.comments.map((c) => [c.addUser.name, c.createdDate]));
-    expect(byAuthor["Jeremy Móvil"]).toBe(localIso(2026, 9, 7, 8, 35));
-    expect(byAuthor["Jeremy Domínguez"]).toBe(localIso(2026, 9, 7, 9, 20));
+    expect(byAuthor["Jeremy Móvil"]).toBe(localIso(2026, 9, 7, 9, 55));
+    expect(byAuthor["Jeremy Domínguez"]).toBe(localIso(2026, 9, 7, 10, 55));
   });
   it("todas las fechas caen en el mismo día", () => {
     const days = new Set(allDates(task).map((d) => d.slice(0, 10)));
     expect([...days]).toEqual(["2026-10-07"]);
+  });
+  it("tiempos de mayor a menor: Reportado > Asignada > Iniciada", () => {
+    const [reported, assigned, started] = states.map((a) =>
+      parseElapsed(getActivityTime(a, task.stateId, MOCK_NOW)),
+    );
+    expect(reported).toBeGreaterThan(assigned);
+    expect(assigned).toBeGreaterThan(started);
+  });
+  it("Iniciada muestra su time fijo aunque now avance", () => {
+    const late = new Date(2026, 9, 7, 23, 59, 59).getTime();
+    const started = getStateActivities(getTaskerOpenTask(late).task.activities)[0];
+    expect(started.action).toBe("Iniciada");
+    expect(getActivityTime(started, task.stateId, late)).toBe("22m 10s");
   });
   it("ningún estado dura 0", () => {
     for (const a of states) {
@@ -223,28 +244,23 @@ describe("historial de ejemplo (taskerMock)", () => {
       expect(a.time).toBe(formatElapsed(ms(a.beginDate), ms(a.endDate)));
     }
   });
-  it("Transcurrido = 7m 30s + 47m 30s + el tiempo de Iniciada", () => {
-    const started = states[2];
-    const startedMs = MOCK_NOW - ms(started.beginDate);
-    expect(getActivityTime(started, task.stateId, MOCK_NOW)).toBe("9h 1m 48s");
-    expect(MOCK_NOW - ms(task.createdDate)).toBe(
-      7 * MIN + 30 * SEC + (47 * MIN + 30 * SEC) + startedMs,
-    );
-    expect(formatElapsed(ms(task.createdDate), MOCK_NOW)).toBe("9h 56m 48s");
-  });
   it("con now a las 08:00 AM el día base es el anterior", () => {
     const early = new Date(2026, 9, 7, 8, 0).getTime();
     const t = getTaskerOpenTask(early).task;
     expect(new Set(allDates(t).map((d) => d.slice(0, 10)))).toEqual(new Set(["2026-10-06"]));
     expect(allDates(t).every((d) => ms(d) <= early)).toBe(true);
   });
-  it("el corte es a las 09:30: 09:29:59 → día anterior, 09:30:00 → mismo día", () => {
-    expect(getTaskerOpenTask(new Date(2026, 9, 7, 9, 29, 59).getTime()).task.createdDate).toBe(
+  it("el corte es a las 11:30: 11:29:59 → día anterior, 11:30:00 → mismo día", () => {
+    expect(getTaskerOpenTask(new Date(2026, 9, 7, 11, 29, 59).getTime()).task.createdDate).toBe(
       localIso(2026, 9, 6, 8, 15),
     );
-    expect(getTaskerOpenTask(new Date(2026, 9, 7, 9, 30).getTime()).task.createdDate).toBe(
+    expect(getTaskerOpenTask(new Date(2026, 9, 7, 11, 30).getTime()).task.createdDate).toBe(
       localIso(2026, 9, 7, 8, 15),
     );
+  });
+  it("justo en el corte ninguna fecha queda en el futuro", () => {
+    const cutoff = new Date(2026, 9, 7, 11, 30).getTime();
+    expect(allDates(getTaskerOpenTask(cutoff).task).every((d) => ms(d) <= cutoff)).toBe(true);
   });
   it("antes del corte el primer día del mes cae en el último del mes anterior", () => {
     const t = getTaskerOpenTask(new Date(2026, 9, 1, 7, 0).getTime()).task;
@@ -418,6 +434,57 @@ describe("comentarios de Seguimiento", () => {
       expect(comments).toHaveLength(2);
       expect(sortComments(comments, "desc").map((c) => c.id)).toEqual([1, 2]);
       expect(sortComments(comments, "asc").map((c) => c.id)).toEqual([2, 1]);
+    });
+  });
+});
+
+describe("getTaskerAddressLines", () => {
+  it("completa: título, calle con #número y sector, ciudad, provincia", () => {
+    expect(
+      getTaskerAddressLines(
+        emptyAddress({
+          title: "El Millón",
+          street: "Calle Luis F. Thomén",
+          streetNumber: "412",
+          sector: "Sector El Millón",
+          city: "Santo Domingo de Guzmán",
+          province: "D.N.",
+        }),
+      ),
+    ).toEqual({
+      title: "El Millón",
+      streetLine: "Calle Luis F. Thomén #412",
+      areaLine: "Sector El Millón, Santo Domingo de Guzmán, D.N.",
+    });
+  });
+  it("con vacíos: se saltan sin dejar comas sueltas", () => {
+    expect(getTaskerAddressLines(emptyAddress({ title: "Casa", city: "Santiago" }))).toEqual({
+      title: "Casa",
+      streetLine: "",
+      areaLine: "Santiago",
+    });
+    expect(
+      getTaskerAddressLines(emptyAddress({ sector: "Gazcue", province: "D.N." })).areaLine,
+    ).toBe("Gazcue, D.N.");
+    expect(getTaskerAddressLines(emptyAddress())).toEqual({
+      title: "",
+      streetLine: "",
+      areaLine: "",
+    });
+  });
+  it("sin número: solo la calle, sin #", () => {
+    expect(getTaskerAddressLines(emptyAddress({ street: "Av. Las Marías" })).streetLine).toBe(
+      "Av. Las Marías",
+    );
+  });
+  it("sin calle: solo #número", () => {
+    expect(getTaskerAddressLines(emptyAddress({ streetNumber: "104" })).streetLine).toBe("#104");
+  });
+  it("con la dirección de ejemplo de Seguimiento", () => {
+    expect(getTaskerAddressLines(getTaskerOpenTask(MOCK_NOW).task.address!)).toEqual({
+      title: "Clínica Las Marías",
+      streetLine: "Av. Las Marías #104",
+      areaLine: "Sector Norte, Santo Domingo, Distrito Nacional",
     });
   });
 });

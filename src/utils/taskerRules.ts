@@ -218,6 +218,27 @@ export function getAddressFields(address: TaskerAddress | null): AddressField[] 
   });
 }
 
+export interface TaskerAddressLines {
+  title: string;
+  /** "Calle #Número" sin los vacíos. */
+  streetLine: string;
+  /** "Sector, Ciudad, Provincia" sin los vacíos. */
+  areaLine: string;
+}
+
+/** Textos del resumen de una dirección (fila de Reportar Avería y pestaña Dirección). */
+export function getTaskerAddressLines(
+  address: Pick<TaskerAddress, "title" | "street" | "streetNumber" | "sector" | "city" | "province">,
+): TaskerAddressLines {
+  return {
+    title: address.title,
+    streetLine: [address.street, address.streetNumber && `#${address.streetNumber}`]
+      .filter(Boolean)
+      .join(" "),
+    areaLine: [address.sector, address.city, address.province].filter(Boolean).join(", "),
+  };
+}
+
 export interface ChipTone {
   background: string;
   text: string;
