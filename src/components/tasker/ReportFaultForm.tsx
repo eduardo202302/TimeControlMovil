@@ -229,7 +229,7 @@ export default function ReportFaultForm() {
             title="Descripción"
           />
           <Text style={styles.label}>
-            Detalles
+            Detalle(s)
             {config.isDescriptionRequired && <Text style={styles.required}> *</Text>}
           </Text>
           <TextInput
