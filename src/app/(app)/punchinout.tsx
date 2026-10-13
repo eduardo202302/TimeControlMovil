@@ -476,6 +476,11 @@ export default function PunchInOut() {
   const [punches, setPunches] = useState<PunchEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingPunches, setLoadingPunches] = useState(true);
+  // Primera carga terminada de ponches / permisos. A diferencia de
+  // loadingPunches, no vuelven a false en el pull-to-refresh ni tras ponchar:
+  // solo evitan que la pantalla caiga en "noActions" con datos aún vacíos.
+  const [punchesLoaded, setPunchesLoaded] = useState(false);
+  const [permissionsLoaded, setPermissionsLoaded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [phoneImagen, setPhoneImagen] = useState<string | null>(null);
   const [historyExpanded, setHistoryExpanded] = useState(true);
@@ -865,6 +870,7 @@ export default function PunchInOut() {
       } finally {
         setLoadingPunches(false);
         setRefreshing(false);
+        setPunchesLoaded(true);
       }
     }, [urlColegio, getToken]);
 
@@ -946,12 +952,16 @@ export default function PunchInOut() {
   // Permisos del día — igual que los motivos de Break, se refrescan al entrar a
   // la pantalla y en el pull-to-refresh. Un fallo aquí no bloquea el ponchador.
   const loadTodayPermissions = useCallback(async () => {
-    const token = await getToken();
-    const schoolUserId = schoolUser?.id ?? user?.id;
-    if (!urlColegio || !token || !schoolUserId) return;
-    setPermissions(
-      await fetchTodayPermissions(urlColegio, schoolUserId, token),
-    );
+    try {
+      const token = await getToken();
+      const schoolUserId = schoolUser?.id ?? user?.id;
+      if (!urlColegio || !token || !schoolUserId) return;
+      setPermissions(
+        await fetchTodayPermissions(urlColegio, schoolUserId, token),
+      );
+    } finally {
+      setPermissionsLoaded(true);
+    }
   }, [urlColegio, getToken, schoolUser?.id, user?.id]);
 
   useEffect(() => {
@@ -1628,7 +1638,11 @@ export default function PunchInOut() {
     punches,
     permissions,
     now,
-    hasVisibleActions,
+    // Hasta la primera carga de ponches y permisos, "sin acciones" puede ser
+    // solo falta de datos: no ocultar la tarjeta Reg todavía (evita el
+    // parpadeo "solo Historial" → "normal" al abrir la pantalla).
+    hasVisibleActions:
+      hasVisibleActions || !punchesLoaded || !permissionsLoaded,
   });
   const isNoSchedule = screenMode === "noSchedule";
   const showPunchActions = screenMode === "normal";
@@ -2270,6 +2284,26 @@ export default function PunchInOut() {
           </View>
         )}
 
+        {/* ── Aviso de feriado — fuera de la tarjeta Reg: en un feriado sin
+            acciones la pantalla queda en "noActions" y la tarjeta no se ve ── */}
+        {!isNoSchedule && nonWorkingHoliday && !jornadaIniciada && (
+          <View style={[styles.holidayNotice, { marginTop: 8, marginBottom: 0 }]}>
+            <Ionicons
+              name="calendar-outline"
+              size={18}
+              color={WARNING_TEXT_STRONG}
+            />
+            <Text
+              style={[
+                styles.holidayNoticeText,
+                { fontSize: font(isTablet ? 14 : 12) },
+              ]}
+            >
+              {`Hoy ${formatRDDate(now)} es día no laborable motivo a ${todayHoliday?.name ?? ""}.`}
+            </Text>
+          </View>
+        )}
+
         {/* ── Categoría + Botón registrar (bloque unificado) ── */}
         {showPunchActions && (
           <View style={styles.floatCard}>
@@ -2285,23 +2319,6 @@ export default function PunchInOut() {
                 Reg. Entrada / Salida
               </Text>
             </View>
-            {nonWorkingHoliday && !jornadaIniciada && (
-              <View style={styles.holidayNotice}>
-                <Ionicons
-                  name="calendar-outline"
-                  size={18}
-                  color={WARNING_TEXT_STRONG}
-                />
-                <Text
-                  style={[
-                    styles.holidayNoticeText,
-                    { fontSize: font(isTablet ? 14 : 12) },
-                  ]}
-                >
-                  {`Hoy ${formatRDDate(now)} es día no laborable motivo a ${todayHoliday?.name ?? ""}.`}
-                </Text>
-              </View>
-            )}
             {visibleCategories.length > 1 && (
               <View style={styles.categories}>
                 {visibleCategories.map((cat) => {
@@ -2405,7 +2422,7 @@ export default function PunchInOut() {
                 style={[
                   styles.registerBtn,
                   // Sin fila de categorías ni motivo de break encima, el
-                  // margen inferior del header / aviso de feriado ya separa.
+                  // margen inferior del header ya separa.
                   visibleCategories.length <= 1 &&
                     !(
                       selectedCategory === "Break" &&

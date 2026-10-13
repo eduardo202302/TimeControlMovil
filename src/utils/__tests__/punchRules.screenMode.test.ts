@@ -107,7 +107,7 @@ describe("getPunchScreenMode", () => {
     ).toBe("noSchedule");
   });
 
-  it("sin horario y jornada FH ya cerrada → noSchedule antes que dayFinished", () => {
+  it("sin horario y jornada FH ya cerrada → noSchedule antes que noActions", () => {
     expect(
       getPunchScreenMode({
         schedule: null,
@@ -122,7 +122,7 @@ describe("getPunchScreenMode", () => {
     ).toBe("noSchedule");
   });
 
-  it("FinJornada y sin acciones → dayFinished", () => {
+  it("FinJornada y sin acciones → noActions", () => {
     expect(
       getPunchScreenMode({
         schedule,
@@ -131,7 +131,7 @@ describe("getPunchScreenMode", () => {
         now: rd(18),
         hasVisibleActions: false,
       }),
-    ).toBe("dayFinished");
+    ).toBe("noActions");
   });
 
   it("FinJornada pero con acciones (ventana de adicional o FH) → normal", () => {
@@ -146,7 +146,7 @@ describe("getPunchScreenMode", () => {
     ).toBe("normal");
   });
 
-  it("FinJornadaAdicional sin acciones → dayFinished", () => {
+  it("FinJornadaAdicional sin acciones → noActions", () => {
     expect(
       getPunchScreenMode({
         schedule,
@@ -160,10 +160,10 @@ describe("getPunchScreenMode", () => {
         now: rd(18),
         hasVisibleActions: false,
       }),
-    ).toBe("dayFinished");
+    ).toBe("noActions");
   });
 
-  it("FinJornadaFH sin acciones → dayFinished", () => {
+  it("FinJornadaFH sin acciones → noActions", () => {
     expect(
       getPunchScreenMode({
         schedule,
@@ -175,13 +175,13 @@ describe("getPunchScreenMode", () => {
         now: rd(11, 30),
         hasVisibleActions: false,
       }),
-    ).toBe("dayFinished");
+    ).toBe("noActions");
   });
 
-  it("FinJornada rechazado no cuenta: la jornada sigue abierta → normal", () => {
+  it("sin horario, FinJornada rechazado no cuenta: la jornada sigue abierta → noActions, no noSchedule", () => {
     expect(
       getPunchScreenMode({
-        schedule,
+        schedule: null,
         punches: [
           punch("InicioJornada", 8),
           punch("FinJornada", 17, 0, { status: "Fuera de área" }),
@@ -190,10 +190,10 @@ describe("getPunchScreenMode", () => {
         now: rd(18),
         hasVisibleActions: false,
       }),
-    ).toBe("normal");
+    ).toBe("noActions");
   });
 
-  it("jornada abierta → normal", () => {
+  it("jornada abierta y sin acciones → noActions", () => {
     expect(
       getPunchScreenMode({
         schedule,
@@ -202,10 +202,22 @@ describe("getPunchScreenMode", () => {
         now: rd(10),
         hasVisibleActions: false,
       }),
+    ).toBe("noActions");
+  });
+
+  it("jornada abierta con acciones → normal", () => {
+    expect(
+      getPunchScreenMode({
+        schedule,
+        punches: [punch("InicioJornada", 8)],
+        permissions: [],
+        now: rd(10),
+        hasVisibleActions: true,
+      }),
     ).toBe("normal");
   });
 
-  it("con horario y sin ponches → normal", () => {
+  it("con horario, sin ponches y sin acciones → noActions", () => {
     expect(
       getPunchScreenMode({
         schedule,
@@ -214,6 +226,30 @@ describe("getPunchScreenMode", () => {
         now: rd(6),
         hasVisibleActions: false,
       }),
+    ).toBe("noActions");
+  });
+
+  it("con horario, sin ponches y con acciones → normal", () => {
+    expect(
+      getPunchScreenMode({
+        schedule,
+        punches: [],
+        permissions: [],
+        now: rd(7, 55),
+        hasVisibleActions: true,
+      }),
     ).toBe("normal");
+  });
+
+  it("sin horario, jornada cerrada y sin acciones → noSchedule (prioridad sobre noActions)", () => {
+    expect(
+      getPunchScreenMode({
+        schedule: null,
+        punches: [punch("InicioJornada", 8), punch("FinJornada", 17)],
+        permissions: [],
+        now: rd(18),
+        hasVisibleActions: false,
+      }),
+    ).toBe("noSchedule");
   });
 });

@@ -1094,17 +1094,18 @@ export function isAlmuerzoButtonVisible(
 
 // ─── Modo de la pantalla Registrar Acceso ─────────────────────────────────────
 
-export type PunchScreenMode = "noSchedule" | "dayFinished" | "normal";
+export type PunchScreenMode = "noSchedule" | "noActions" | "normal";
 
 /**
  * Qué bloques muestra el ponchador del empleado:
  * - "noSchedule": hoy no tiene horario, no hay jornada abierta ni FH usable →
  *   no hay nada que ponchar.
- * - "dayFinished": la última jornada válida está cerrada y no queda ninguna
- *   acción visible (ventana de adicional, FH, etc.).
+ * - "noActions": ninguna acción visible ahora mismo (visibleCategories
+ *   vacío), con la jornada abierta o cerrada → solo queda el Historial.
  * - "normal": todo lo demás.
- * "noSchedule" se evalúa primero. Se recalcula en cada render: si aparece una
- * acción, la pantalla vuelve sola a "normal".
+ * "noSchedule" se evalúa primero. Se recalcula en cada render: en cuanto
+ * aparece una acción (ventana de Break, Almuerzo, salida, adicional, FH), la
+ * pantalla vuelve sola a "normal".
  */
 export function getPunchScreenMode({
   schedule,
@@ -1128,13 +1129,7 @@ export function getPunchScreenMode({
   ) {
     return "noSchedule";
   }
-  if (
-    !!lastJornada &&
-    isJornadaEndType(lastJornada.type) &&
-    hasVisibleActions === false
-  ) {
-    return "dayFinished";
-  }
+  if (hasVisibleActions === false) return "noActions";
   return "normal";
 }
 
