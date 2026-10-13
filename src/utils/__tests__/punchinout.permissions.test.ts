@@ -737,7 +737,7 @@ describe("16. isBreakVisible", () => {
 
 describe("16bis. isBreakVisible — ventanas de tiempo", () => {
   /** Config explícito (no el de getBreakWindowConfig) para que estos casos no
-   * dependan de los valores temporales de constants/breakWindow.ts. */
+   * dependan de los respaldos de constants/breakWindow.ts. */
   const BREAK_CFG = {
     startAfterEntry: 60,
     endBeforeLunch: 0,
@@ -846,6 +846,21 @@ describe("16bis. isBreakVisible — ventanas de tiempo", () => {
     expect(ver(13, 0)).toBe(false);
     expect(ver(15, 0)).toBe(true);
     expect(ver(17, 30)).toBe(false);
+  });
+
+  it("config leída de school.settings (breakShowAfterEntryMinutes 30)", () => {
+    const cfg = getBreakWindowConfig({ breakShowAfterEntryMinutes: 30 });
+    const ver = (h: number, m: number) =>
+      isBreakVisible(PUNCHES.jornadaIniciada, rd(h, m), horario, cfg);
+    expect(ver(9, 29)).toBe(false);
+    expect(ver(9, 30)).toBe(true);
+    // El resto sigue en respaldo: almuerzo 13:30 (−0), fin 14:30 (+60),
+    // salida 18:00 (−60).
+    expect(ver(13, 29)).toBe(true);
+    expect(ver(13, 30)).toBe(false);
+    expect(ver(15, 29)).toBe(false);
+    expect(ver(15, 30)).toBe(true);
+    expect(ver(17, 0)).toBe(false);
   });
 });
 

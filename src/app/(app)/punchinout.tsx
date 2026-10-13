@@ -1,5 +1,6 @@
 import ImageViewerModal from "@/components/ui/ImageViewerModal";
 import SectionIcon from "@/components/ui/SectionIcon";
+import { getBreakWindowConfig } from "@/constants/breakWindow";
 import {
   ACCENT_VIOLET,
   CARD_BACKGROUND,
@@ -1566,7 +1567,13 @@ export default function PunchInOut() {
         permissions,
         todayHoliday,
       );
-    if (cat === "Break") return isBreakVisible(punches, now, todaySchedule);
+    if (cat === "Break")
+      return isBreakVisible(
+        punches,
+        now,
+        todaySchedule,
+        getBreakWindowConfig(schoolSettings),
+      );
     if (cat === "Jornada")
       return isJornadaVisible(
         now,
