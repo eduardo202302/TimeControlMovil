@@ -10,10 +10,13 @@ import {
   getApprovedPermissionsToday,
   getPunctuality,
   getRDMinutes,
+  getStatusColor,
   isAlmuerzoButtonVisible,
   isAlmuerzoVisible,
   isBreakVisible,
   isJornadaVisible,
+  isOffScheduleStatus,
+  OFF_SCHEDULE_STATUS,
   timeStrToMinutes,
   warnedUnexpectedActions,
   type PunchEvent,
@@ -1091,21 +1094,31 @@ describe("getApprovedPermissionsToday", () => {
   });
 });
 
-// ─── 17. Ponches cubiertos por un permiso ────────────────────────────────────
-// Cuando el backend asocia el ponche a un permiso (permissionId), ya resolvió
-// el estado teniéndolo en cuenta. El cálculo local no tiene el permiso a la
-// vista y marcaría Tardanza/Anticipada, pisando el valor correcto — por eso
-// getPunctuality se salta el cálculo y devuelve null, dejando que la UI caiga
-// en el fallback `punch.status`.
+// ─── 17. Estado mostrado = status que guardó el backend ──────────────────────
+// El historial y el pill de último ponche del empleado muestran el status del
+// backend tal cual, igual que el webapp y el Ponche ADM. Antes se recalculaba
+// la puntualidad localmente (getPunctuality) con reglas distintas a las del
+// backend: el almuerzo contra la hora fija del horario en vez de la duración,
+// y "Tardanza" en lugar de "Fuera de Horario". getPunctuality se conserva sin
+// uso; aquí solo aparece como contraste, para mostrar que su resultado ya no
+// llega a la UI.
 
-describe("17. getPunctuality con permissionId", () => {
-  /** Réplica del fallback de la UI: puntualidad local > status del backend.
-   * (La cadena completa vive en punchinout.tsx; aquí solo el tramo relevante.) */
-  const displayStatus = (p: PunchEvent) =>
-    getPunctuality(p, [schedule], TOL) ?? p.status ?? "A Tiempo";
+describe("17. getDisplayStatus usa el status del backend", () => {
+  /** Réplica LITERAL de getDisplayStatus en punchinout.tsx (no exportada). */
+  const displayStatusReal = (punch: PunchEvent): string => {
+    const hasOvertime = parseFloat(String(punch.overtime ?? 0)) > 0;
+    const isJornadaOvertime = punch.type === "FinJornada" && hasOvertime;
+    return isJornadaOvertime
+      ? "Horas extras"
+      : punch.status === "Error de Imagen"
+        ? "Error de Imagen"
+        : punch.status === "Fuera de área"
+          ? "Fuera de área"
+          : punch.status || "A Tiempo";
+  };
 
-  /** El caso real: entrada 11:53 con permiso de llegada tardía aprobado.
-   * Horario 08:00 + 5 min de tolerancia -> localmente sería "Tardanza". */
+  /** Entrada 11:53 con permiso de llegada tardía aprobado. Horario 08:00 + 5
+   * min de tolerancia: el recálculo local habría dado "Tardanza". */
   const entradaConPermiso = punch("InicioJornada", {
     id: 9666,
     createdDate: "2026-08-19T15:53:31.000Z",
@@ -1113,142 +1126,130 @@ describe("17. getPunctuality con permissionId", () => {
     status: "A Tiempo",
   });
 
-  it("17a. InicioJornada con permissionId no se recalcula: queda A Tiempo", () => {
-    expect(getPunctuality(entradaConPermiso, [schedule], TOL)).toBeNull();
-    expect(displayStatus(entradaConPermiso)).toBe("A Tiempo");
+  it("17a. InicioJornada con permissionId muestra el status del backend", () => {
+    expect(displayStatusReal(entradaConPermiso)).toBe("A Tiempo");
   });
 
-  it("17b. el mismo ponche SIN permissionId sí se marca Tardanza", () => {
-    const sinPermiso = { ...entradaConPermiso, permissionId: null };
-    expect(getPunctuality(sinPermiso, [schedule], TOL)).toBe("Tardanza");
-    expect(displayStatus(sinPermiso)).toBe("Tardanza");
+  it("17b. InicioJornada sin permiso tampoco se recalcula", () => {
+    // Ej. reentrada: el backend la guarda "A Tiempo" aunque la hora sea tarde.
+    const reentrada = { ...entradaConPermiso, permissionId: null };
+    expect(getPunctuality(reentrada, [schedule], TOL)).toBe("Tardanza");
+    expect(displayStatusReal(reentrada)).toBe("A Tiempo");
 
-    // permissionId ausente por completo se comporta igual que null
-    const { permissionId, ...omitido } = entradaConPermiso;
-    expect(getPunctuality(omitido, [schedule], TOL)).toBe("Tardanza");
+    // Y si el backend dice Tardanza, se muestra Tardanza.
+    expect(displayStatusReal({ ...reentrada, status: "Tardanza" })).toBe(
+      "Tardanza",
+    );
   });
 
-  it("17c. FinJornada con permissionId tampoco se recalcula", () => {
-    // 14:00, muy antes de las 17:00 -> localmente sería "Anticipada"
+  it("17c. FinJornada muestra el status del backend", () => {
+    // 14:00, antes de las 17:00: el backend lo guarda "Anticipada"
     const salida = punch("FinJornada", {
       createdDate: "2026-08-19T18:00:00.000Z",
-      permissionId: 700,
-      status: "A Tiempo",
+      status: "Anticipada",
     });
-    expect(getPunctuality(salida, [schedule], TOL)).toBeNull();
-    expect(displayStatus(salida)).toBe("A Tiempo");
+    expect(displayStatusReal(salida)).toBe("Anticipada");
 
-    const sinPermiso = { ...salida, permissionId: null };
-    expect(getPunctuality(sinPermiso, [schedule], TOL)).toBe("Anticipada");
+    // Con permiso, el backend ya resolvió el estado teniéndolo en cuenta.
+    const conPermiso = { ...salida, permissionId: 700, status: "A Tiempo" };
+    expect(displayStatusReal(conPermiso)).toBe("A Tiempo");
   });
 
-  it("17d. Almuerzo NO cambia: sigue calculándose aunque traiga permissionId", () => {
-    // 12:30, pasada la ventana 12:00 + 5 -> "Tardanza" con o sin permiso
+  it("17d. InicioAlmuerzo tarde: se muestra 'Fuera de Horario' tal cual, no Tardanza", () => {
+    // 12:30, pasada la ventana 12:00 + 5. El backend lo guarda "Fuera de
+    // Horario"; el recálculo local decía "Tardanza".
     const inicio = punch("InicioAlmuerzo", {
       createdDate: "2026-08-19T16:30:00.000Z",
-      permissionId: 701,
+      status: "Fuera de Horario",
     });
     expect(getPunctuality(inicio, [schedule], TOL)).toBe("Tardanza");
+    expect(displayStatusReal(inicio)).toBe("Fuera de Horario");
+  });
 
-    // 13:30, pasada la ventana 13:00 + 5 -> "Tardanza"
+  it("17e. FinAlmuerzo 'Anticipada' se muestra tal cual, no Tardanza", () => {
+    // Caso real: almuerzo 12:15 → 13:09 (54 min de 60). El backend mide la
+    // duración (esperado 13:15 ± 5) y guarda "Anticipada"; el recálculo local
+    // comparaba contra la hora fija 13:00 + 5 y decía "Tardanza".
     const fin = punch("FinAlmuerzo", {
-      createdDate: "2026-08-19T17:30:00.000Z",
-      permissionId: 701,
+      createdDate: "2026-08-19T17:09:00.000Z",
+      status: "Anticipada",
     });
     expect(getPunctuality(fin, [schedule], TOL)).toBe("Tardanza");
+    expect(displayStatusReal(fin)).toBe("Anticipada");
   });
 
-  it("17e. sin horario del día devuelve null como siempre", () => {
-    expect(getPunctuality(entradaConPermiso, [], TOL)).toBeNull();
-  });
-
-  /** Réplica LITERAL de la cadena completa de punchinout.tsx (getDisplayStatus),
-   * no la versión simplificada de arriba. El bug real estaba aquí: con
-   * permissionId válido, punctuality da null y la cadena caía en
-   * lateEntry/earlyExit (que ignoran el permiso) antes de llegar a status. */
-  const displayStatusReal = (
-    punch: PunchEvent,
-    isJornadaOvertime: boolean,
-  ): string => {
-    const punctuality = getPunctuality(punch, [schedule], TOL);
-    return isJornadaOvertime
-      ? "Horas extras"
-      : punch.status === "Error de Imagen"
-        ? "Error de Imagen"
-        : punch.status === "Fuera de área"
-          ? "Fuera de área"
-          : punctuality !== null
-            ? punctuality
-            : punch.permissionId != null
-              ? punch.status || "A Tiempo"
-              : punch.lateEntry
-                ? "Tardanza"
-                : punch.earlyExit
-                  ? "Anticipada"
-                  : punch.status || "A Tiempo";
-  };
-
-  it("17f. cadena completa: permissionId + lateEntry:true + status A Tiempo -> A Tiempo, no Tardanza", () => {
-    const conPermisoYFlagSucio = punch("InicioJornada", {
-      createdDate: "2026-08-19T15:53:31.000Z", // 11:53 RD, tardaría si se recalculara
-      permissionId: 698,
-      status: "A Tiempo",
-      lateEntry: true, // flag "sucio" del backend que el permiso debe ignorar
-    });
-    expect(displayStatusReal(conPermisoYFlagSucio, false)).toBe("A Tiempo");
-
-    // sin permissionId, el mismo lateEntry:true SÍ debe producir Tardanza
-    const sinPermiso = { ...conPermisoYFlagSucio, permissionId: null };
-    expect(displayStatusReal(sinPermiso, false)).toBe("Tardanza");
-  });
-
-  it("17g. FinBreak respeta el status real del backend, no lo pisa con A Tiempo", () => {
-    // getPunctuality no calcula nada para Break (default: null en el switch),
-    // así que la cadena debe caer directo en punch.status del backend.
-    const finBreakTarde = punch("FinBreak", { status: "Tardanza" });
-    expect(getPunctuality(finBreakTarde, [schedule], TOL)).toBeNull();
-    expect(displayStatusReal(finBreakTarde, false)).toBe("Tardanza");
-
-    // y si el backend manda A Tiempo, se respeta igual
-    const finBreakOk = punch("FinBreak", { status: "A Tiempo" });
-    expect(displayStatusReal(finBreakOk, false)).toBe("A Tiempo");
-  });
-
-  it("17h. lastPunch con lateEntry:true da Tardanza, no A Tiempo (bug del pill de último ponche)", () => {
-    // InicioBreak: getPunctuality no lo calcula (default null en el switch) y
-    // el status del backend viene "A Tiempo" — el pill de último ponche
-    // (antes de extraer getDisplayStatus) solo miraba status==="Error de
-    // Imagen" y type.startsWith("Inicio"), así que esto rendería verde
-    // ignorando por completo el flag lateEntry. La cadena completa debe
-    // preferir el flag y devolver "Tardanza".
-    const ultimoPonche = punch("InicioBreak", {
+  it("17f. los flags lateEntry/earlyExit ya no pisan el status (el backend no los usa)", () => {
+    const conFlag = punch("InicioJornada", {
       status: "A Tiempo",
       lateEntry: true,
     });
-    expect(getPunctuality(ultimoPonche, [schedule], TOL)).toBeNull();
-    expect(displayStatusReal(ultimoPonche, false)).toBe("Tardanza");
+    expect(displayStatusReal(conFlag)).toBe("A Tiempo");
+
+    const conEarly = punch("InicioBreak", {
+      status: "A Tiempo",
+      earlyExit: true,
+    });
+    expect(displayStatusReal(conEarly)).toBe("A Tiempo");
   });
 
-  it("17i. status 'Fuera de área' le gana a puntualidad local y a lateEntry/earlyExit", () => {
-    // InicioJornada a las 11:53 RD, muy tarde vs 08:00 + tolerancia -> la
-    // puntualidad local daría "Tardanza" si se calculara. El backend ya
-    // resolvió "Fuera de área" (geocerca del lado servidor) y eso debe
-    // prevalecer, con la misma prioridad que "Error de Imagen".
+  it("17g. FinBreak respeta el status real del backend", () => {
+    expect(displayStatusReal(punch("FinBreak", { status: "Tardanza" }))).toBe(
+      "Tardanza",
+    );
+    expect(displayStatusReal(punch("FinBreak", { status: "A Tiempo" }))).toBe(
+      "A Tiempo",
+    );
+  });
+
+  it("17h. status vacío cae a 'A Tiempo'", () => {
+    expect(displayStatusReal(punch("InicioBreak", { status: "" }))).toBe(
+      "A Tiempo",
+    );
+  });
+
+  it("17i. 'Fuera de área' y 'Error de Imagen' se muestran con su prioridad", () => {
     const fueraDeArea = punch("InicioJornada", {
       createdDate: "2026-08-19T15:53:31.000Z",
       status: "Fuera de área",
     });
-    expect(getPunctuality(fueraDeArea, [schedule], TOL)).toBe("Tardanza");
-    expect(displayStatusReal(fueraDeArea, false)).toBe("Fuera de área");
+    expect(displayStatusReal(fueraDeArea)).toBe("Fuera de área");
 
-    // también le gana al flag earlyExit en un tipo que getPunctuality no
-    // calcula (Break), para confirmar que no depende de la puntualidad
-    const fueraDeAreaBreak = punch("FinBreak", {
-      status: "Fuera de área",
-      earlyExit: true,
+    const errorImagen = punch("FinJornada", {
+      status: "Error de Imagen",
+      overtime: 0,
     });
-    expect(getPunctuality(fueraDeAreaBreak, [schedule], TOL)).toBeNull();
-    expect(displayStatusReal(fueraDeAreaBreak, false)).toBe("Fuera de área");
+    expect(displayStatusReal(errorImagen)).toBe("Error de Imagen");
+  });
+
+  it("17j. FinJornada con overtime > 0 sigue mostrando 'Horas extras'", () => {
+    const salidaTarde = punch("FinJornada", {
+      status: "Fuera de Horario",
+      overtime: 1.25,
+    });
+    expect(displayStatusReal(salidaTarde)).toBe("Horas extras");
+
+    // overtime como string (viene así de la BD) también cuenta
+    expect(displayStatusReal({ ...salidaTarde, overtime: "0.50" })).toBe(
+      "Horas extras",
+    );
+
+    // Solo FinJornada: un FinAlmuerzo con overtime muestra su status
+    const finAlmuerzo = punch("FinAlmuerzo", {
+      status: "Tardanza",
+      overtime: 0.3,
+    });
+    expect(displayStatusReal(finAlmuerzo)).toBe("Tardanza");
+  });
+
+  it("17k. isOffScheduleStatus reconoce 'Fuera de Horario' sin importar mayúsculas", () => {
+    expect(isOffScheduleStatus("Fuera de Horario")).toBe(true);
+    expect(isOffScheduleStatus("Fuera De Horario")).toBe(true);
+    expect(isOffScheduleStatus("  fuera de horario ")).toBe(true);
+    expect(isOffScheduleStatus("Fuera de área")).toBe(false);
+    expect(isOffScheduleStatus(null)).toBe(false);
+    expect(isOffScheduleStatus(undefined)).toBe(false);
+    // y su color es el mismo que usa Ponche ADM
+    expect(getStatusColor(OFF_SCHEDULE_STATUS)).toBe("#D97706");
   });
 });
 

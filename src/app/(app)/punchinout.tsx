@@ -104,7 +104,6 @@ import {
   getPunchBreakTagName,
   getPunchPhotoUrl,
   getPunchScreenMode,
-  getPunctuality,
   getRDDayIndex,
   getScheduleForDay,
   getStatusColor,
@@ -115,7 +114,9 @@ import {
   isJornadaStartType,
   isJornadaVisible,
   isNonWorkingHoliday,
+  isOffScheduleStatus,
   isRejectedJornadaAttempt,
+  OFF_SCHEDULE_STATUS,
   RD_UTC_OFFSET,
   resolvePunchTypeForApi,
   resolveSelectedCategory,
@@ -125,7 +126,6 @@ import {
   WEEK_DAYS,
   type PunchEvent,
   type Tag,
-  type ToleranceConfig,
   type UserDayPermission,
 } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
@@ -270,34 +270,36 @@ function getPunchCategory(type: string): Category {
 /**
  * Estado a mostrar para un punch, con la misma cadena de prioridad en
  * todos los lugares que lo necesitan (historial del día, pill del último
- * ponche): horas extras > error de imagen / fuera de área > puntualidad
- * local (corrige estados erróneos del backend) > permiso (ignora flags
- * lateEntry/earlyExit) > flags del backend > status del backend.
+ * ponche): horas extras > error de imagen / fuera de área > status del
+ * backend. Muestra lo mismo que el webapp y el Ponche ADM: ya no se
+ * recalcula la puntualidad localmente (ver getPunctuality).
  */
-function getDisplayStatus(
-  punch: PunchEvent,
-  userSchedules: UserSchedule[],
-  tolerances: ToleranceConfig,
-): string {
+function getDisplayStatus(punch: PunchEvent): string {
   const hasOvertime = parseFloat(String(punch.overtime ?? 0)) > 0;
   // Solo FinJornada puede generar horas extras
   const isJornadaOvertime = punch.type === "FinJornada" && hasOvertime;
-  const punctuality = getPunctuality(punch, userSchedules, tolerances);
   return isJornadaOvertime
     ? "Horas extras"
     : punch.status === "Error de Imagen"
       ? "Error de Imagen"
       : punch.status === "Fuera de área"
         ? "Fuera de área"
-        : punctuality !== null
-          ? punctuality
-          : punch.permissionId != null
-            ? punch.status || "A Tiempo"
-            : punch.lateEntry
-              ? "Tardanza"
-              : punch.earlyExit
-                ? "Anticipada"
-                : punch.status || "A Tiempo";
+        : punch.status || "A Tiempo";
+  // Cadena anterior (recálculo local de puntualidad). Las ramas de permiso y
+  // de flags quedaron inútiles: con permiso el resultado ya es punch.status, y
+  // el backend nunca guarda lateEntry/earlyExit en true (el webapp tampoco
+  // los mira).
+  // const punctuality = getPunctuality(punch, userSchedules, tolerances);
+  // ...
+  //       : punctuality !== null
+  //         ? punctuality
+  //         : punch.permissionId != null
+  //           ? punch.status || "A Tiempo"
+  //           : punch.lateEntry
+  //             ? "Tardanza"
+  //             : punch.earlyExit
+  //               ? "Anticipada"
+  //               : punch.status || "A Tiempo";
 }
 
 function isJornadaActiva(punches: PunchEvent[]): boolean {
@@ -575,19 +577,14 @@ export default function PunchInOut() {
     schoolSettings?.toleranceLunchTimeOut ??
     5;
 
-  const lastPunchDisplayStatus = lastPunch
-    ? getDisplayStatus(lastPunch, userSchedules, {
-        workIn: tolWorkIn,
-        workOut: tolWorkOut,
-        lunchIn: tolLunchIn,
-        lunchOut: tolLunchOut,
-      })
-    : null;
+  const lastPunchDisplayStatus = lastPunch ? getDisplayStatus(lastPunch) : null;
+  const isLastPunchOffSchedule = isOffScheduleStatus(lastPunchDisplayStatus);
 
   // "Ver Botón" — minutos antes del horario en que el botón de acción se
-  // hace VISIBLE (distinto de tolWorkIn/etc., que solo decide la etiqueta
-  // Tardanza/Anticipada/A Tiempo). Campos confirmados por consulta directa
-  // a la BD: lblWorkTimeIn/lblWorkTimeOut/lblLunchTimeIn/lblLunchTimeOut.
+  // hace VISIBLE (distinto de tolWorkIn/etc., la Tolerancia; la etiqueta
+  // Tardanza/Anticipada/A Tiempo ya la decide el backend). Campos
+  // confirmados por consulta directa a la BD:
+  // lblWorkTimeIn/lblWorkTimeOut/lblLunchTimeIn/lblLunchTimeOut.
   // Si no está configurado, cae al valor de Tolerancia (comportamiento
   // idéntico al actual — sin ventana "Anticipada" visible — para no
   // romper cuentas que aún no configuraron "Ver Botón").
@@ -2087,7 +2084,8 @@ export default function PunchInOut() {
                       ? styles.lastPunchPillError
                       : lastPunchDisplayStatus === "Tardanza"
                         ? styles.lastPunchPillLate
-                        : lastPunchDisplayStatus === "Anticipada"
+                        : lastPunchDisplayStatus === "Anticipada" ||
+                            isLastPunchOffSchedule
                           ? styles.lastPunchPillEarly
                           : lastPunch.type.startsWith("Inicio")
                             ? styles.lastPunchPillEntry
@@ -2112,9 +2110,11 @@ export default function PunchInOut() {
                           ? ERROR_COLOR
                           : lastPunchDisplayStatus === "Anticipada"
                             ? WARNING_ACCENT
-                            : lastPunch.type.startsWith("Inicio")
-                              ? SUCCESS_ACCENT
-                              : PRIMARY_COLOR
+                            : isLastPunchOffSchedule
+                              ? getStatusColor(OFF_SCHEDULE_STATUS)
+                              : lastPunch.type.startsWith("Inicio")
+                                ? SUCCESS_ACCENT
+                                : PRIMARY_COLOR
                   }
                 />
                 <Text
@@ -2131,9 +2131,11 @@ export default function PunchInOut() {
                             ? ERROR_COLOR
                             : lastPunchDisplayStatus === "Anticipada"
                               ? WARNING_ACCENT
-                              : lastPunch.type.startsWith("Inicio")
-                                ? SUCCESS_ACCENT
-                                : PRIMARY_COLOR,
+                              : isLastPunchOffSchedule
+                                ? getStatusColor(OFF_SCHEDULE_STATUS)
+                                : lastPunch.type.startsWith("Inicio")
+                                  ? SUCCESS_ACCENT
+                                  : PRIMARY_COLOR,
                     },
                   ]}
                   numberOfLines={1}
@@ -2626,21 +2628,11 @@ export default function PunchInOut() {
                       historyShowAll ? undefined : HISTORY_COLLAPSED_LIMIT,
                     )
                     .map((punch) => {
-                      const tolerances = {
-                        workIn: tolWorkIn,
-                        workOut: tolWorkOut,
-                        lunchIn: tolLunchIn,
-                        lunchOut: tolLunchOut,
-                      };
-                      const displayStatus = getDisplayStatus(
-                        punch,
-                        userSchedules,
-                        tolerances,
-                      );
+                      const displayStatus = getDisplayStatus(punch);
                       const lateMinutes = getLateMinutes(
                         punch,
                         userSchedules,
-                        tolerances,
+                        displayStatus,
                       );
                       const isJornadaOvertime =
                         displayStatus === "Horas extras";
@@ -2649,17 +2641,28 @@ export default function PunchInOut() {
                         displayStatus === "Error de Imagen" ||
                         displayStatus === "Fuera de área";
                       const isEarlyBadge = displayStatus === "Anticipada";
+                      // "Fuera de Horario" (lo guarda el backend, ej. InicioAlmuerzo
+                      // tarde): color propio de getStatusColor, como en Ponche ADM.
+                      const isOffScheduleBadge =
+                        isOffScheduleStatus(displayStatus);
+                      const badgeTextColor = getStatusColor(
+                        isOffScheduleBadge
+                          ? OFF_SCHEDULE_STATUS
+                          : displayStatus,
+                      );
                       const breakTagName = getPunchBreakTagName(punch);
                       const photoUrl = getPunchPhotoUrl(punch, urlColegio);
                       const punchIconColor = isLateBadge
                         ? ERROR_COLOR
                         : isEarlyBadge
                           ? WARNING_ACCENT
-                          : punch.type.startsWith("Inicio")
-                            ? SUCCESS_ACCENT
-                            : isJornadaOvertime
-                              ? PRIMARY_COLOR
-                              : SUCCESS_ACCENT;
+                          : isOffScheduleBadge
+                            ? badgeTextColor
+                            : punch.type.startsWith("Inicio")
+                              ? SUCCESS_ACCENT
+                              : isJornadaOvertime
+                                ? PRIMARY_COLOR
+                                : SUCCESS_ACCENT;
 
                       return (
                         <View key={punch.id} style={styles.punchRow}>
@@ -2668,7 +2671,7 @@ export default function PunchInOut() {
                               styles.punchIcon,
                               isLateBadge
                                 ? styles.punchIconError
-                                : isEarlyBadge
+                                : isEarlyBadge || isOffScheduleBadge
                                   ? styles.punchIconEarly
                                   : punch.type.startsWith("Inicio")
                                     ? styles.punchIconEntry
@@ -2698,14 +2701,14 @@ export default function PunchInOut() {
                                   </Text>
                                 </View>
                               ) : (
-                                /* Resto → status normal (almuerzo/break fuera de horario = Tardanza) */
+                                /* Resto → status que guardó el backend, tal cual */
                                 displayStatus && (
                                   <View
                                     style={[
                                       styles.punchBadge,
                                       isLateBadge
                                         ? styles.badgeLate
-                                        : isEarlyBadge
+                                        : isEarlyBadge || isOffScheduleBadge
                                           ? styles.badgeEarly
                                           : styles.badgeOnTime,
                                     ]}
@@ -2713,9 +2716,7 @@ export default function PunchInOut() {
                                     <Text
                                       style={[
                                         styles.punchBadgeText,
-                                        {
-                                          color: getStatusColor(displayStatus),
-                                        },
+                                        { color: badgeTextColor },
                                       ]}
                                     >
                                       {displayStatus}

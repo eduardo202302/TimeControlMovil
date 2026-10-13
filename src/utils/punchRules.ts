@@ -249,6 +249,12 @@ export function getScheduleForDay(
  * contra el horario del día correspondiente. Devuelve null cuando no hay
  * horario aplicable (ej. Break, días sin schedule) para dejar que la UI
  * use el estado que devuelva el backend.
+ *
+ * SIN USO en la UI: el historial y el pill de último ponche muestran el
+ * status que guardó el backend, igual que el webapp y el Ponche ADM. Este
+ * recálculo usaba reglas distintas a las del backend (almuerzo contra la hora
+ * fija del horario en vez de la duración, "Tardanza" en vez de "Fuera de
+ * Horario", otra fuente de tolerancias). Se conserva como referencia.
  */
 export function getPunctuality(
   punch: PunchEvent,
@@ -308,19 +314,20 @@ export function getPunctuality(
  * de la tolerancia: la tolerancia solo decide SI hubo tardanza.
  *
  * null cuando no aplica: otro tipo de ponche, día sin horario, ponche
- * cubierto por un permiso, o getPunctuality no da "Tardanza".
+ * cubierto por un permiso, o el estado mostrado (status del backend) no es
+ * "Tardanza".
  */
 export function getLateMinutes(
   punch: PunchEvent,
   schedules: UserSchedule[],
-  defaults: ToleranceConfig,
+  displayStatus: string,
 ): number | null {
   if (punch.type !== "InicioJornada") return null;
   if (punch.permissionId != null) return null;
+  if (displayStatus !== "Tardanza") return null;
   const punchDate = new Date(punch.createdDate);
   const schedule = getScheduleForDay(schedules, punchDate);
   if (!schedule) return null;
-  if (getPunctuality(punch, schedules, defaults) !== "Tardanza") return null;
   return getRDMinutes(punchDate) - timeStrToMinutes(schedule.workEntryTime);
 }
 
@@ -356,6 +363,21 @@ export function getStatusColor(status: string | null | undefined): string {
   if (status === "Error de Imagen") return "#DC2626";
   if (status === "Fuera de área") return "#DC2626";
   return "#16A34A";
+}
+
+/** Status con el que el backend marca un ponche fuera del horario esperado
+ * (ej. InicioAlmuerzo pasada la tolerancia). */
+export const OFF_SCHEDULE_STATUS = "Fuera de Horario";
+
+/** true para "Fuera de Horario" sin importar mayúsculas ni espacios: el
+ * webapp lo muestra capitalizado por CSS ("Fuera De Horario"), así que no se
+ * asume una sola escritura. */
+export function isOffScheduleStatus(
+  status: string | null | undefined,
+): boolean {
+  return (
+    (status ?? "").trim().toLowerCase() === OFF_SCHEDULE_STATUS.toLowerCase()
+  );
 }
 
 /**
