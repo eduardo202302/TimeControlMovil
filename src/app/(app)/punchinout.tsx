@@ -1158,6 +1158,22 @@ export default function PunchInOut() {
       const types = PUNCH_TYPE_MAP[selectedCategory];
       const type = isInicio ? types.inicio : types.fin;
 
+      // Re-chequeo al tocar: el botón pudo quedar en pantalla (o el render ir
+      // un tick atrasado) durante la espera entre breaks. Solo InicioBreak —
+      // un break abierto siempre debe poder cerrarse.
+      if (
+        type === "InicioBreak" &&
+        !isBreakVisible(
+          punches,
+          new Date(),
+          todaySchedule,
+          getBreakWindowConfig(schoolSettings),
+        )
+      ) {
+        Alert.alert("Break no disponible", "Aún no puedes iniciar otro break.");
+        return;
+      }
+
       // Motivo de break obligatorio solo cuando la escuela tiene la categoría
       // "Tipos de Break" configurada. Si breakTags viene vacío, es una decisión
       // temporal explícita: no bloquear el Break hasta que se defina qué hacer
@@ -1594,6 +1610,10 @@ export default function PunchInOut() {
   // Depende de la clave y no del array: visibleCategories se recrea en cada
   // render y `now` cambia cada segundo.
   const visibleCategoriesKey = visibleCategories.join("|");
+  // Con visibleCategories vacío resolveSelectedCategory conserva la selección
+  // (p. ej. "Break" en plena espera tras un FinBreak): la UI no debe ofrecer
+  // la acción de una categoría que ya no está visible.
+  const selectedIsVisible = visibleCategories.includes(selectedCategory);
   useEffect(() => {
     const next = resolveSelectedCategory(selectedCategory, visibleCategories);
     if (next !== selectedCategory) setSelectedCategory(next);
@@ -2320,6 +2340,7 @@ export default function PunchInOut() {
             )}
 
             {selectedCategory === "Break" &&
+              selectedIsVisible &&
               isInicio &&
               breakTags.length > 0 && (
                 <View
@@ -2357,7 +2378,7 @@ export default function PunchInOut() {
                 </View>
               )}
 
-            {(selectedCategory === "Break" ||
+            {((selectedCategory === "Break" && selectedIsVisible) ||
               (selectedCategory === "Jornada" &&
                 isJornadaVisible(
                   now,

@@ -5,6 +5,8 @@
 // La configuración es por compañía (school.settings, Compañía → Configuración
 // → Break en el webapp). Estas constantes son el respaldo cuando la compañía
 // no configuró el valor.
+//
+// Todo en 0 = sin restricción de horario.
 
 /** Aparece 1 h después de workEntryTime. */
 export const BREAK_START_AFTER_ENTRY_MIN = 60;

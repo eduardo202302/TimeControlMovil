@@ -926,8 +926,11 @@ export function isAlmuerzoVisible(
  *    INVALID_TIMELINE_STATUSES) fue hace menos de config.cooldownAfterBreak
  *    minutos (hora RD, desde su createdDate) → oculta. Se suma a las
  *    ventanas: hay que cumplir las dos.
- * 4. Sin horario → visible (no hay referencia para la ventana).
- * 5. Con horario → solo dentro de las ventanas de `config` (por defecto
+ * 4. Todo en 0 = sin restricción de horario: si los 5 valores de `config`
+ *    son 0 → visible a cualquier hora (la jornada iniciada la exige
+ *    punchinout.tsx).
+ * 5. Sin horario → visible (no hay referencia para la ventana).
+ * 6. Con horario → solo dentro de las ventanas de `config` (por defecto
  *    getBreakWindowConfig()), medidas desde las horas del horario, no de los
  *    ponches: [entrada + startAfterEntry, almuerzo − endBeforeLunch) y
  *    [fin almuerzo + startAfterLunch, salida − endBeforeExit), o
@@ -966,6 +969,17 @@ export function isBreakVisible(
       parseBackendDate(lastFinBreak.createdDate) as Date,
     );
     if (current - finBreakAt < config.cooldownAfterBreak) return false;
+  }
+
+  // Todo en 0 = sin restricción de horario
+  if (
+    config.startAfterEntry === 0 &&
+    config.endBeforeLunch === 0 &&
+    config.startAfterLunch === 0 &&
+    config.endBeforeExit === 0 &&
+    config.cooldownAfterBreak === 0
+  ) {
+    return true;
   }
 
   if (!schedule) return true;

@@ -936,6 +936,61 @@ describe("16ter. isBreakVisible — espera entre breaks", () => {
   });
 });
 
+// ─── 16quater. isBreakVisible — todo en 0 = sin restricción de horario ───────
+
+describe("16quater. isBreakVisible — config todo en 0", () => {
+  const CERO = {
+    startAfterEntry: 0,
+    endBeforeLunch: 0,
+    startAfterLunch: 0,
+    endBeforeExit: 0,
+    cooldownAfterBreak: 0,
+  };
+
+  /** Ponche con createdDate a la hora RD h:m del día de rd() */
+  const at = (type: string, h: number, m: number) =>
+    punch(type, { createdDate: rd(h, m).toISOString() });
+
+  // `schedule`: 08:00–17:00, almuerzo 12:00–13:00
+  it.each([
+    [7, 30, "antes de la entrada"],
+    [12, 30, "bloque de almuerzo, sin almuerzo abierto"],
+    [17, 30, "después de la salida"],
+  ])("%i:%i (%s) → visible", (h, m) => {
+    expect(
+      isBreakVisible(PUNCHES.jornadaIniciada, rd(h, m), schedule, CERO),
+    ).toBe(true);
+  });
+
+  it("almuerzo abierto → oculto", () => {
+    expect(
+      isBreakVisible(PUNCHES.almuerzoIniciado, rd(12, 30), schedule, CERO),
+    ).toBe(false);
+  });
+
+  it("FinBreak 10:10, now 10:10 → visible (espera 0)", () => {
+    const breakCerrado = [
+      punch("InicioJornada"),
+      at("InicioBreak", 10, 0),
+      at("FinBreak", 10, 10),
+    ];
+    expect(isBreakVisible(breakCerrado, rd(10, 10), schedule, CERO)).toBe(true);
+  });
+
+  it("control: solo la espera en 0 → las ventanas siguen aplicando (12:30 oculto)", () => {
+    const soloEsperaCero = {
+      startAfterEntry: 60,
+      endBeforeLunch: 0,
+      startAfterLunch: 60,
+      endBeforeExit: 60,
+      cooldownAfterBreak: 0,
+    };
+    expect(
+      isBreakVisible(PUNCHES.jornadaIniciada, rd(12, 30), schedule, soloEsperaCero),
+    ).toBe(false);
+  });
+});
+
 // ─── Helper puro: getApprovedPermission ───────────────────────────────────────
 
 describe("getApprovedPermission", () => {
