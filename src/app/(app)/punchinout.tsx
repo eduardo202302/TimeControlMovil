@@ -271,21 +271,26 @@ function getPunchCategory(type: string): Category {
 /**
  * Estado a mostrar para un punch, con la misma cadena de prioridad en
  * todos los lugares que lo necesitan (historial del día, pill del último
- * ponche): horas extras > error de imagen / fuera de área > status del
- * backend. Muestra lo mismo que el webapp y el Ponche ADM: ya no se
- * recalcula la puntualidad localmente (ver getPunctuality).
+ * ponche): error de imagen / fuera de área > status del backend. Muestra lo
+ * mismo que el webapp y el Ponche ADM: ya no se recalcula la puntualidad
+ * localmente (ver getPunctuality) ni se pisa el status con "Horas extras".
  */
 function getDisplayStatus(punch: PunchEvent): string {
-  const hasOvertime = parseFloat(String(punch.overtime ?? 0)) > 0;
-  // Solo FinJornada puede generar horas extras
-  const isJornadaOvertime = punch.type === "FinJornada" && hasOvertime;
-  return isJornadaOvertime
-    ? "Horas extras"
-    : punch.status === "Error de Imagen"
-      ? "Error de Imagen"
-      : punch.status === "Fuera de área"
-        ? "Fuera de área"
-        : punch.status || "A Tiempo";
+  // Override "Horas extras" quitado: el webapp no lo tiene y tapaba el status
+  // real (salida 18:00, FinJornada 18:14 → el backend guarda "Fuera de
+  // Horario" y el APK mostraba "Horas extras"). Las horas extras viven en
+  // exitStatus/extraTime, no en status (face-class-api migración 151).
+  // const hasOvertime = parseFloat(String(punch.overtime ?? 0)) > 0;
+  // // Solo FinJornada puede generar horas extras
+  // const isJornadaOvertime = punch.type === "FinJornada" && hasOvertime;
+  // return isJornadaOvertime
+  //   ? "Horas extras"
+  //   : punch.status === "Error de Imagen" ...
+  return punch.status === "Error de Imagen"
+    ? "Error de Imagen"
+    : punch.status === "Fuera de área"
+      ? "Fuera de área"
+      : punch.status || "A Tiempo";
   // Cadena anterior (recálculo local de puntualidad). Las ramas de permiso y
   // de flags quedaron inútiles: con permiso el resultado ya es punch.status, y
   // el backend nunca guarda lateEntry/earlyExit en true (el webapp tampoco
@@ -2700,8 +2705,12 @@ export default function PunchInOut() {
                         userSchedules,
                         displayStatus,
                       );
-                      const isJornadaOvertime =
-                        displayStatus === "Horas extras";
+                      // getDisplayStatus ya no devuelve "Horas extras": el
+                      // badge propio queda apagado y un status del backend
+                      // siempre va por el badge normal con getStatusColor.
+                      // const isJornadaOvertime =
+                      //   displayStatus === "Horas extras";
+                      const isJornadaOvertime = false;
                       const isLateBadge =
                         displayStatus === "Tardanza" ||
                         displayStatus === "Error de Imagen" ||

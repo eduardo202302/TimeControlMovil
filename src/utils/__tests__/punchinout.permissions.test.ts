@@ -1105,17 +1105,12 @@ describe("getApprovedPermissionsToday", () => {
 
 describe("17. getDisplayStatus usa el status del backend", () => {
   /** Réplica LITERAL de getDisplayStatus en punchinout.tsx (no exportada). */
-  const displayStatusReal = (punch: PunchEvent): string => {
-    const hasOvertime = parseFloat(String(punch.overtime ?? 0)) > 0;
-    const isJornadaOvertime = punch.type === "FinJornada" && hasOvertime;
-    return isJornadaOvertime
-      ? "Horas extras"
-      : punch.status === "Error de Imagen"
-        ? "Error de Imagen"
-        : punch.status === "Fuera de área"
-          ? "Fuera de área"
-          : punch.status || "A Tiempo";
-  };
+  const displayStatusReal = (punch: PunchEvent): string =>
+    punch.status === "Error de Imagen"
+      ? "Error de Imagen"
+      : punch.status === "Fuera de área"
+        ? "Fuera de área"
+        : punch.status || "A Tiempo";
 
   /** Entrada 11:53 con permiso de llegada tardía aprobado. Horario 08:00 + 5
    * min de tolerancia: el recálculo local habría dado "Tardanza". */
@@ -1221,17 +1216,26 @@ describe("17. getDisplayStatus usa el status del backend", () => {
     expect(displayStatusReal(errorImagen)).toBe("Error de Imagen");
   });
 
-  it("17j. FinJornada con overtime > 0 sigue mostrando 'Horas extras'", () => {
+  it("17j. FinJornada con overtime > 0 muestra el status del backend, no 'Horas extras'", () => {
+    // Caso QA: salida 18:00, FinJornada 18:14 → el backend guarda "Fuera de
+    // Horario" y el webapp lo muestra así.
     const salidaTarde = punch("FinJornada", {
       status: "Fuera de Horario",
       overtime: 1.25,
     });
-    expect(displayStatusReal(salidaTarde)).toBe("Horas extras");
+    expect(displayStatusReal(salidaTarde)).toBe("Fuera de Horario");
 
-    // overtime como string (viene así de la BD) también cuenta
+    // overtime como string (viene así de la BD) tampoco pisa el status
     expect(displayStatusReal({ ...salidaTarde, overtime: "0.50" })).toBe(
-      "Horas extras",
+      "Fuera de Horario",
     );
+
+    // Dentro de la tolerancia: overtime > 0 con "A Tiempo" → "A Tiempo"
+    expect(
+      displayStatusReal(
+        punch("FinJornada", { status: "A Tiempo", overtime: 0.1 }),
+      ),
+    ).toBe("A Tiempo");
 
     // Solo FinJornada: un FinAlmuerzo con overtime muestra su status
     const finAlmuerzo = punch("FinAlmuerzo", {
