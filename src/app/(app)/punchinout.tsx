@@ -1583,15 +1583,30 @@ export default function PunchInOut() {
   ).filter((cat) => {
     if (!jornadaIniciada && (cat === "Almuerzo" || cat === "Break"))
       return false;
+    // La pestaña exige también el botón (mismos argumentos que su render):
+    // con el almuerzo abierto fuera de la ventana de salida, la pestaña sola
+    // dejaba la tarjeta Reg sin acción y evitaba el modo "noActions".
     if (cat === "Almuerzo")
-      return isAlmuerzoVisible(
-        now,
-        todaySchedule,
-        btnVisLunchIn,
-        btnVisLunchOut,
-        punches,
-        permissions,
-        todayHoliday,
+      return (
+        isAlmuerzoVisible(
+          now,
+          todaySchedule,
+          btnVisLunchIn,
+          btnVisLunchOut,
+          punches,
+          permissions,
+          todayHoliday,
+        ) &&
+        isAlmuerzoButtonVisible(
+          now,
+          todaySchedule,
+          getNextPunchType("Almuerzo") === "inicio",
+          btnVisLunchIn,
+          btnVisLunchOut,
+          punches,
+          permissions,
+          todayHoliday,
+        )
       );
     if (cat === "Break")
       return isBreakVisible(
