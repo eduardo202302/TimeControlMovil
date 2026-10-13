@@ -91,6 +91,7 @@ import type {
   UserSchedule,
 } from "../../../types/typeStore/SchoolStoreType";
 import {
+  buildOpenDayFromChooseSchool,
   buildTodayHoliday,
   findLastJornadaPunch,
   findOpenDayPunch,
@@ -515,7 +516,8 @@ export default function PunchInOut() {
     withinArea: boolean;
   } | null>(null);
 
-  const { user, urlColegio, logout, todayHoliday } = useSchoolStore();
+  const { user, urlColegio, logout, todayHoliday, pendingOpenDay } =
+    useSchoolStore();
 
   // El login devuelve los horarios en user.schoolUsers[0].userSchedules
   const schoolUser: SchoolUser | undefined = user?.user?.schoolUsers?.[0];
@@ -773,6 +775,11 @@ export default function PunchInOut() {
         useSchoolStore
           .getState()
           .setTodayHoliday(buildTodayHoliday(res.data?.data));
+        // Y para la jornada abierta de un día anterior (punchOpen/dateOpen),
+        // que es lo que abre el modal "Jornada Incompleta" al cargar.
+        useSchoolStore
+          .getState()
+          .setPendingOpenDay(buildOpenDayFromChooseSchool(res.data?.data));
 
         // Comparar solo los campos relevantes (ignorar createdDate y campos extra)
         const normalize = (s: UserSchedule[]) =>
@@ -849,13 +856,16 @@ export default function PunchInOut() {
         if (!response.data.success) return null;
         const data: PunchEvent[] = response.data.data ?? [];
         setPunches(data);
+        // findOpenDayPunch es código muerto con el contrato actual (ver su
+        // doc): /punches/today no marca la jornada abierta. Se deja por si el
+        // backend vuelve a marcarla. Sin rama else a propósito: cerraba el
+        // modal que abre pendingOpenDay (chooseschool) en cuanto llegaban los
+        // ponches de hoy. El modal se cierra solo al registrar el FinJornada
+        // (handleSubmitNextDayExit) o con su botón de cerrar.
         const pending = findOpenDayPunch(data);
         if (pending) {
           setNextDayExitPunch(pending);
           setNextDayExitModal(true);
-        } else {
-          setNextDayExitModal(false);
-          setNextDayExitPunch(null);
         }
         return pending;
       } catch (error: any) {
@@ -874,6 +884,28 @@ export default function PunchInOut() {
   useEffect(() => {
     fetchTodayPunches();
   }, [fetchTodayPunches]);
+
+  // Jornada abierta de un día anterior (chooseschool: login y poller). El
+  // modal se abre solo en la transición null → ponche: el poller entrega un
+  // objeto nuevo cada 10 s y no debe reabrirlo si el usuario lo cerró. El
+  // día recién cerrado se ignora por si un poll en vuelo desde antes del
+  // FinJornada lo trae de vuelta.
+  const prevPendingOpenDayRef = useRef<PunchEvent | null>(null);
+  const closedOpenDayRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevPendingOpenDayRef.current;
+    prevPendingOpenDayRef.current = pendingOpenDay;
+    if (!pendingOpenDay || prev) return;
+    const pendingDate = getPendingOpenDayDate(pendingOpenDay);
+    if (
+      pendingDate &&
+      toRDDateString(pendingDate) === closedOpenDayRef.current
+    ) {
+      return;
+    }
+    setNextDayExitPunch(pendingOpenDay);
+    setNextDayExitModal(true);
+  }, [pendingOpenDay]);
 
   // fetchTodayPunches no devuelve la lista: el pedido de parpadeo se resuelve
   // cuando llegan los ponches nuevos.
@@ -1117,6 +1149,9 @@ export default function PunchInOut() {
         setNextDayExitModal(false);
         setNextDayExitTime("");
         setNextDayExitPunch(null);
+        // El siguiente poll de chooseschool lo confirma con dateOpen null.
+        closedOpenDayRef.current = baseDateStr;
+        useSchoolStore.getState().setPendingOpenDay(null);
         await fetchTodayPunches();
       } else {
         Alert.alert("Error", response.data.message ?? "Intenta de nuevo.");
@@ -1198,7 +1233,9 @@ export default function PunchInOut() {
       // primero — el relogin por sesión vieja es el segundo paso, no el primero,
       // cuando ambos casos coinciden.
       const hasPendingOpenDay =
-        nextDayExitModal || findOpenDayPunch(punches) !== null;
+        nextDayExitModal ||
+        pendingOpenDay !== null ||
+        findOpenDayPunch(punches) !== null;
 
       // Antes de la primera Entrada Jornada del día: si la sesión actual lleva
       // más de SESSION_MAX_HOURS_FOR_FIRST_ENTRY horas abierta, forzar relogin
@@ -1698,7 +1735,9 @@ export default function PunchInOut() {
   return (
     <View style={{ flex: 1 }}>
       <Modal
-        visible={nextDayExitModal && !isNoSchedule}
+        // Sin el filtro de isNoSchedule, igual que el webapp: la jornada
+        // pendiente se cierra aunque hoy no haya horario.
+        visible={nextDayExitModal}
         transparent
         animationType="fade"
         onRequestClose={() => {}}

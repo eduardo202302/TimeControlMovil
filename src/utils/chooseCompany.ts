@@ -14,7 +14,7 @@ import type {
 } from "../../types/typeStore/SchoolStoreType";
 import { resolveMobilePath } from "../constants/mobileRoutes";
 import { buildLastCompany } from "./lastCompany";
-import { buildTodayHoliday } from "./punchRules";
+import { buildOpenDayFromChooseSchool, buildTodayHoliday } from "./punchRules";
 import * as Storage from "./storage";
 
 /**
@@ -316,9 +316,10 @@ export async function fetchUserCompanies(): Promise<
 
 /**
  * Snapshot del día que trae chooseschool en el nivel superior de `data`:
- * settings de la empresa, asistencias de hoy del docente y feriado. Las
- * asistencias y el feriado se guardan siempre (vacío/null es el valor
- * correcto, no el de la empresa anterior); los settings solo si vinieron.
+ * settings de la empresa, asistencias de hoy del docente, feriado y jornada
+ * abierta de un día anterior. Las asistencias, el feriado y la jornada
+ * abierta se guardan siempre (vacío/null es el valor correcto, no el de la
+ * empresa anterior); los settings solo si vinieron.
  */
 export function applyChooseSchoolSnapshot(data: ChooseSchoolData): void {
   const store = useSchoolStore.getState();
@@ -328,6 +329,7 @@ export function applyChooseSchoolSnapshot(data: ChooseSchoolData): void {
   if (companySettings) store.setCompanySettings(companySettings);
   store.setAttendancesToday(buildAttendancesToday(data));
   store.setTodayHoliday(buildTodayHoliday(data));
+  store.setPendingOpenDay(buildOpenDayFromChooseSchool(data));
 }
 
 export interface CommitSessionInput {

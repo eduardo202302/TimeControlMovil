@@ -1,6 +1,7 @@
 /// <reference types="jest" />
 import type { UserSchedule } from "../../../types/typeStore/SchoolStoreType";
 import {
+  buildOpenDayFromChooseSchool,
   findOpenDayPunch,
   findOpenDayPunchForUser,
   getPendingOpenDayDate,
@@ -138,6 +139,122 @@ describe("findOpenDayPunchForUser — respaldo vía GET /punches/opendays", () =
       [openDayPunch({})],
       224,
     );
+    expect(day(pending)).toBe("2026-08-22");
+  });
+});
+
+describe("buildOpenDayFromChooseSchool — punchOpen/dateOpen de chooseschool", () => {
+  const inicio = punch({ id: 9511, createdDate: "2026-08-22T15:38:55.000Z" });
+
+  test("punchOpen true + evento de inicio → ese evento", () => {
+    const data = {
+      punchOpen: true,
+      dateOpen: "2026-08-22T15:38:55.000Z",
+      openDayEvents: [inicio],
+    };
+    expect(buildOpenDayFromChooseSchool(data)).toBe(inicio);
+  });
+
+  test("punchOpen true sin eventos → sintético con dateOpen", () => {
+    const data = {
+      punchOpen: true,
+      dateOpen: "2026-08-22T15:38:55.000Z",
+      openDayEvents: [],
+    };
+    expect(buildOpenDayFromChooseSchool(data)).toMatchObject({
+      type: "InicioJornada",
+      createdDate: "2026-08-22T15:38:55.000Z",
+    });
+  });
+
+  test("sin openDayEvents en la respuesta → sintético con dateOpen", () => {
+    const data = { punchOpen: true, dateOpen: "2026-08-22T15:38:55.000Z" };
+    expect(buildOpenDayFromChooseSchool(data)?.type).toBe("InicioJornada");
+  });
+
+  test("punchOpen false o dateOpen null → null", () => {
+    expect(
+      buildOpenDayFromChooseSchool({
+        punchOpen: false,
+        dateOpen: "2026-08-22T15:38:55.000Z",
+        openDayEvents: [inicio],
+      }),
+    ).toBeNull();
+    expect(
+      buildOpenDayFromChooseSchool({
+        punchOpen: true,
+        dateOpen: null,
+        openDayEvents: [inicio],
+      }),
+    ).toBeNull();
+    expect(buildOpenDayFromChooseSchool({})).toBeNull();
+    expect(buildOpenDayFromChooseSchool(null)).toBeNull();
+  });
+
+  test("openDayEvents con Adicional/FH → toma el que es tipo inicio", () => {
+    const adicional = punch({
+      id: 20,
+      type: "InicioJornadaAdicional",
+      createdDate: "2026-08-22T20:00:00.000Z",
+    });
+    const fh = punch({
+      id: 30,
+      type: "InicioJornadaFH",
+      createdDate: "2026-08-22T22:00:00.000Z",
+    });
+    const data = {
+      punchOpen: true,
+      dateOpen: "2026-08-22T20:00:00.000Z",
+      openDayEvents: [
+        punch({ id: 10, type: "FinJornada" }),
+        punch({ id: 11, type: "InicioAlmuerzo" }),
+        adicional,
+        fh,
+      ],
+    };
+    expect(buildOpenDayFromChooseSchool(data)?.id).toBe(20);
+    expect(
+      buildOpenDayFromChooseSchool({ ...data, openDayEvents: [fh] })?.id,
+    ).toBe(30);
+  });
+
+  test("prefiere un inicio no rechazado (lista sin filtrar de punchOpen persistido)", () => {
+    const data = {
+      punchOpen: true,
+      dateOpen: "2026-08-22T15:38:55.000Z",
+      openDayEvents: [
+        punch({ id: 1, status: "Error de Imagen" }),
+        punch({ id: 2, status: "A Tiempo" }),
+      ],
+    };
+    expect(buildOpenDayFromChooseSchool(data)?.id).toBe(2);
+  });
+
+  test("fecha del modal y del payload de cierre: evento real", () => {
+    // 15:38Z = sábado 22-ago 11:38 RD.
+    const pending = buildOpenDayFromChooseSchool({
+      punchOpen: true,
+      dateOpen: "2026-08-22T15:38:55.000Z",
+      openDayEvents: [inicio],
+    });
+    expect(day(pending)).toBe("2026-08-22");
+  });
+
+  test("fecha del modal y del payload de cierre: sintético ISO", () => {
+    // 01:00Z del 23 = 21:00 RD del 22: no se corre al día siguiente.
+    const pending = buildOpenDayFromChooseSchool({
+      punchOpen: true,
+      dateOpen: "2026-08-23T01:00:00.000Z",
+    });
+    expect(day(pending)).toBe("2026-08-22");
+  });
+
+  test("fecha del modal y del payload de cierre: sintético \"YYYY-MM-DD HH:mm:ss\" (hora RD)", () => {
+    const pending = buildOpenDayFromChooseSchool({
+      punchOpen: true,
+      dateOpen: "2026-08-22 21:30:00",
+    });
+    expect(pending?.createdDate).toBe("2026-08-22T21:30:00");
     expect(day(pending)).toBe("2026-08-22");
   });
 });

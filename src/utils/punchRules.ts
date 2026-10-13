@@ -156,7 +156,17 @@ export function toRDDateString(date: Date): string {
   return `${year}-${mm}-${dd}`;
 }
 
-/** El InicioJornada abierto sin cerrar, o null si la lista no trae ninguno */
+/**
+ * El InicioJornada abierto sin cerrar, o null si la lista no trae ninguno.
+ *
+ * CÓDIGO MUERTO con el contrato actual del backend: GET /punches/today nunca
+ * ha devuelto `hasOpenDay` por ponche (solo los ponches de hoy), así que esto
+ * siempre da null. `hasOpenDay` existió solo como campo de nivel superior de
+ * login/chooseschool y se reemplazó por punchOpen/dateOpen en face-class-api
+ * b7f9be2 (2026-03-25). La jornada abierta al cargar sale de
+ * buildOpenDayFromChooseSchool. Se conserva por si el backend vuelve a marcar
+ * el ponche en /punches/today.
+ */
 export function findOpenDayPunch(punches: PunchEvent[]): PunchEvent | null {
   return (
     punches.find(
@@ -215,6 +225,46 @@ export function findOpenDayPunchForUser(
     const latestTime = getPendingOpenDayDate(latest)?.getTime() ?? -Infinity;
     return pTime > latestTime ? p : latest;
   });
+}
+
+/**
+ * Jornada abierta de un día anterior según POST /authentication/chooseschool:
+ * `data.punchOpen`, `data.dateOpen` y `data.openDayEvents` — la misma fuente
+ * del aviso "No completaste la Salida del día X" del webapp (reducer
+ * CHOOSE_COMPANY de face-class-web). `raw` es el nodo `data` de la respuesta.
+ *
+ * Devuelve el ponche de inicio (Jornada, Adicional o FH) de `openDayEvents`,
+ * prefiriendo uno no rechazado: con punchOpen ya persistido el backend arma
+ * esa lista sin filtrar estados. Si la lista no trae inicio, un ponche
+ * sintético con `createdDate = dateOpen` — getPendingOpenDayDate solo lee la
+ * fecha, que es lo único que necesitan el modal y el payload de cierre.
+ * null si no hay jornada abierta.
+ */
+export function buildOpenDayFromChooseSchool(raw: unknown): PunchEvent | null {
+  if (!raw || typeof raw !== "object") return null;
+  const data = raw as Record<string, unknown>;
+  if (data.punchOpen !== true) return null;
+  const dateOpen =
+    typeof data.dateOpen === "string" ? data.dateOpen.trim() : "";
+  if (!dateOpen) return null;
+
+  const events = Array.isArray(data.openDayEvents)
+    ? (data.openDayEvents as PunchEvent[])
+    : [];
+  const starts = events.filter(
+    (e) => !!e && typeof e.type === "string" && isJornadaStartType(e.type),
+  );
+  const start = starts.find((e) => !isRejectedJornadaAttempt(e)) ?? starts[0];
+  if (start) return start;
+
+  // dateOpen puede llegar como "YYYY-MM-DD HH:mm:ss" (el moment().format con
+  // que el backend lo guarda): la "T" lo deja en ISO para parseBackendDate.
+  return {
+    id: 0,
+    type: "InicioJornada",
+    status: "",
+    createdDate: dateOpen.replace(" ", "T"),
+  };
 }
 
 export const WEEK_DAYS: Record<number, string> = {
