@@ -110,6 +110,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   attendancesToday: [],
   todayHoliday: null,
   pendingOpenDay: null,
+  closedOpenDayKey: null,
   lastCompany: null,
 
   // ─── Acciones existentes (sin cambios) ──────────────────────────────────────
@@ -135,6 +136,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       attendancesToday: [],
       todayHoliday: null,
       pendingOpenDay: null,
+      closedOpenDayKey: null,
     }),
 
   // ─── Cerrar sesión — conserva urlColegio y school para poder volver a login ─
@@ -152,6 +154,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       attendancesToday: [],
       todayHoliday: null,
       pendingOpenDay: null,
+      closedOpenDayKey: null,
     }),
 
   // ─── Acción nueva: resuelve app + ruta + menú tras el login ─────────────────
@@ -176,6 +179,7 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   setAttendancesToday: (attendancesToday) => set({ attendancesToday }),
   setTodayHoliday: (todayHoliday) => set({ todayHoliday }),
   setPendingOpenDay: (pendingOpenDay) => set({ pendingOpenDay }),
+  setClosedOpenDayKey: (closedOpenDayKey) => set({ closedOpenDayKey }),
 
   // ─── Última compañía — fuera de clear()/logout() a propósito ────────────────
   setLastCompany: async (lastCompany) => {

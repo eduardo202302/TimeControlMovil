@@ -155,21 +155,18 @@ describe("buildOpenDayFromChooseSchool — punchOpen/dateOpen de chooseschool", 
     expect(buildOpenDayFromChooseSchool(data)).toBe(inicio);
   });
 
-  test("punchOpen true sin eventos → sintético con dateOpen", () => {
+  test("punchOpen/dateOpen con openDayEvents vacío → null (punchOpen viejo, ponches borrados)", () => {
     const data = {
       punchOpen: true,
       dateOpen: "2026-08-22T15:38:55.000Z",
       openDayEvents: [],
     };
-    expect(buildOpenDayFromChooseSchool(data)).toMatchObject({
-      type: "InicioJornada",
-      createdDate: "2026-08-22T15:38:55.000Z",
-    });
+    expect(buildOpenDayFromChooseSchool(data)).toBeNull();
   });
 
-  test("sin openDayEvents en la respuesta → sintético con dateOpen", () => {
+  test("punchOpen/dateOpen sin openDayEvents en la respuesta → null", () => {
     const data = { punchOpen: true, dateOpen: "2026-08-22T15:38:55.000Z" };
-    expect(buildOpenDayFromChooseSchool(data)?.type).toBe("InicioJornada");
+    expect(buildOpenDayFromChooseSchool(data)).toBeNull();
   });
 
   test("punchOpen false o dateOpen null → null", () => {
@@ -191,31 +188,102 @@ describe("buildOpenDayFromChooseSchool — punchOpen/dateOpen de chooseschool", 
     expect(buildOpenDayFromChooseSchool(null)).toBeNull();
   });
 
-  test("openDayEvents con Adicional/FH → toma el que es tipo inicio", () => {
-    const adicional = punch({
-      id: 20,
-      type: "InicioJornadaAdicional",
-      createdDate: "2026-08-22T20:00:00.000Z",
-    });
-    const fh = punch({
-      id: 30,
-      type: "InicioJornadaFH",
-      createdDate: "2026-08-22T22:00:00.000Z",
-    });
+  test("openDayEvents con solo InicioJornadaAdicional/FH sin Fin → null", () => {
+    // El modal cierra con FinJornada: un Adicional/FH abierto no lo puede
+    // cerrar, y el POST tampoco bloquea al usuario por él.
     const data = {
       punchOpen: true,
       dateOpen: "2026-08-22T20:00:00.000Z",
       openDayEvents: [
-        punch({ id: 10, type: "FinJornada" }),
-        punch({ id: 11, type: "InicioAlmuerzo" }),
-        adicional,
-        fh,
+        punch({ id: 20, type: "InicioJornadaAdicional" }),
+        punch({ id: 30, type: "InicioJornadaFH" }),
       ],
     };
-    expect(buildOpenDayFromChooseSchool(data)?.id).toBe(20);
-    expect(
-      buildOpenDayFromChooseSchool({ ...data, openDayEvents: [fh] })?.id,
-    ).toBe(30);
+    expect(buildOpenDayFromChooseSchool(data)).toBeNull();
+  });
+
+  test("Adicional abierto junto a un InicioJornada sin Fin → el InicioJornada", () => {
+    const data = {
+      punchOpen: true,
+      dateOpen: "2026-08-22T15:38:55.000Z",
+      openDayEvents: [
+        inicio,
+        punch({
+          id: 20,
+          type: "InicioJornadaAdicional",
+          createdDate: "2026-08-22T20:00:00.000Z",
+        }),
+      ],
+    };
+    expect(buildOpenDayFromChooseSchool(data)?.id).toBe(9511);
+  });
+
+  test("InicioJornada + FinJornada válido posterior → null (punchOpen viejo)", () => {
+    const data = {
+      punchOpen: true,
+      dateOpen: "2026-08-22T15:38:55.000Z",
+      openDayEvents: [
+        inicio,
+        punch({
+          id: 9520,
+          type: "FinJornada",
+          createdDate: "2026-08-22T22:00:00.000Z",
+        }),
+      ],
+    };
+    expect(buildOpenDayFromChooseSchool(data)).toBeNull();
+  });
+
+  test("FinJornada rechazado no cierra la jornada", () => {
+    const data = {
+      punchOpen: true,
+      dateOpen: "2026-08-22T15:38:55.000Z",
+      openDayEvents: [
+        inicio,
+        punch({
+          id: 9520,
+          type: "FinJornada",
+          status: "Fuera de área",
+          createdDate: "2026-08-22T22:00:00.000Z",
+        }),
+      ],
+    };
+    expect(buildOpenDayFromChooseSchool(data)?.id).toBe(9511);
+  });
+
+  test("FinJornada anterior al InicioJornada (otro ciclo) no lo cierra", () => {
+    const data = {
+      punchOpen: true,
+      dateOpen: "2026-08-22T18:00:00.000Z",
+      openDayEvents: [
+        punch({ id: 1, createdDate: "2026-08-22T12:00:00.000Z" }),
+        punch({
+          id: 2,
+          type: "FinJornada",
+          createdDate: "2026-08-22T16:00:00.000Z",
+        }),
+        punch({ id: 3, createdDate: "2026-08-22T18:00:00.000Z" }),
+      ],
+    };
+    expect(buildOpenDayFromChooseSchool(data)?.id).toBe(3);
+  });
+
+  test("InicioJornada con \"Error de Imagen\" como único inicio → null", () => {
+    const data = {
+      punchOpen: true,
+      dateOpen: "2026-08-22T15:38:55.000Z",
+      openDayEvents: [punch({ id: 1, status: "Error de Imagen" })],
+    };
+    expect(buildOpenDayFromChooseSchool(data)).toBeNull();
+  });
+
+  test("eventos sin ningún InicioJornada (inicio borrado) → null, no sintético", () => {
+    const data = {
+      punchOpen: true,
+      dateOpen: "2026-08-22T15:38:55.000Z",
+      openDayEvents: [punch({ id: 11, type: "InicioAlmuerzo" })],
+    };
+    expect(buildOpenDayFromChooseSchool(data)).toBeNull();
   });
 
   test("prefiere un inicio no rechazado (lista sin filtrar de punchOpen persistido)", () => {
@@ -240,21 +308,18 @@ describe("buildOpenDayFromChooseSchool — punchOpen/dateOpen de chooseschool", 
     expect(day(pending)).toBe("2026-08-22");
   });
 
-  test("fecha del modal y del payload de cierre: sintético ISO", () => {
+  test("fecha del modal y del payload de cierre: InicioJornada nocturno", () => {
     // 01:00Z del 23 = 21:00 RD del 22: no se corre al día siguiente.
     const pending = buildOpenDayFromChooseSchool({
       punchOpen: true,
       dateOpen: "2026-08-23T01:00:00.000Z",
+      openDayEvents: [punch({ createdDate: "2026-08-23T01:00:00.000Z" })],
     });
     expect(day(pending)).toBe("2026-08-22");
   });
 
-  test("fecha del modal y del payload de cierre: sintético \"YYYY-MM-DD HH:mm:ss\" (hora RD)", () => {
-    const pending = buildOpenDayFromChooseSchool({
-      punchOpen: true,
-      dateOpen: "2026-08-22 21:30:00",
-    });
-    expect(pending?.createdDate).toBe("2026-08-22T21:30:00");
-    expect(day(pending)).toBe("2026-08-22");
-  });
+  // Se eliminó el test de fecha del sintético con dateOpen "YYYY-MM-DD
+  // HH:mm:ss": el ponche sintético está desactivado, la fecha ya solo sale
+  // del createdDate de un InicioJornada real (ISO), que cubren los dos tests
+  // de arriba.
 });

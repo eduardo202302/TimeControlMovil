@@ -357,6 +357,11 @@ export interface SchoolStore {
   // openDayEvents, ver buildOpenDayFromChooseSchool). null = no hay.
   pendingOpenDay: PunchEvent | null;
 
+  // Día (RD "YYYY-MM-DD") de la última jornada pendiente cerrada desde el
+  // modal. Vive en el store —no en la pantalla— para que un punchOpen viejo
+  // del backend no reabra el modal al volver a punchinout.
+  closedOpenDayKey: string | null;
+
   // Marca de la última compañía con que se entró (ver src/utils/lastCompany).
   // Persistida en SecureStore bajo su propia clave; logout() y clear() NO la
   // tocan — es lo que pinta el login después de cerrar sesión.
@@ -377,6 +382,7 @@ export interface SchoolStore {
   setAttendancesToday: (attendancesToday: TeacherAttendanceToday[]) => void;
   setTodayHoliday: (h: TodayHoliday | null) => void;
   setPendingOpenDay: (p: PunchEvent | null) => void;
+  setClosedOpenDayKey: (key: string | null) => void;
   /** Actualiza el store y la persiste en SecureStore. */
   setLastCompany: (lastCompany: LastCompany) => Promise<void>;
   /** La saca del store y la borra de SecureStore. */

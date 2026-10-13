@@ -233,12 +233,17 @@ export function findOpenDayPunchForUser(
  * del aviso "No completaste la Salida del día X" del webapp (reducer
  * CHOOSE_COMPANY de face-class-web). `raw` es el nodo `data` de la respuesta.
  *
- * Devuelve el ponche de inicio (Jornada, Adicional o FH) de `openDayEvents`,
- * prefiriendo uno no rechazado: con punchOpen ya persistido el backend arma
- * esa lista sin filtrar estados. Si la lista no trae inicio, un ponche
- * sintético con `createdDate = dateOpen` — getPendingOpenDayDate solo lee la
- * fecha, que es lo único que necesitan el modal y el payload de cierre.
- * null si no hay jornada abierta.
+ * chooseschool no revalida un punchOpen ya persistido y cuenta también los
+ * inicios Adicional/FH, así que puede reportar una jornada que el POST no
+ * bloquea y que el modal (que envía FinJornada) no puede cerrar. Por eso se
+ * revalida contra `openDayEvents` (todos los ponches de ese día):
+ * - solo cuenta un InicioJornada válido (no rechazado) — el más reciente;
+ * - si hay un FinJornada válido posterior, la jornada ya está cerrada → null;
+ * - lista vacía o sin InicioJornada abierto → null, aunque punchOpen/dateOpen
+ *   tengan valor: con los ponches borrados chooseschool sigue devolviendo el
+ *   dateOpen persistido y el modal pediría cerrar un día que no existe. Una
+ *   jornada real siempre trae su InicioJornada en openDayEvents, y el
+ *   respaldo por rechazo del POST (/punches/opendays) cubre el resto.
  */
 export function buildOpenDayFromChooseSchool(raw: unknown): PunchEvent | null {
   if (!raw || typeof raw !== "object") return null;
@@ -249,22 +254,40 @@ export function buildOpenDayFromChooseSchool(raw: unknown): PunchEvent | null {
   if (!dateOpen) return null;
 
   const events = Array.isArray(data.openDayEvents)
-    ? (data.openDayEvents as PunchEvent[])
+    ? (data.openDayEvents as PunchEvent[]).filter(
+        (e) => !!e && typeof e.type === "string",
+      )
     : [];
-  const starts = events.filter(
-    (e) => !!e && typeof e.type === "string" && isJornadaStartType(e.type),
-  );
-  const start = starts.find((e) => !isRejectedJornadaAttempt(e)) ?? starts[0];
-  if (start) return start;
 
-  // dateOpen puede llegar como "YYYY-MM-DD HH:mm:ss" (el moment().format con
-  // que el backend lo guarda): la "T" lo deja en ISO para parseBackendDate.
-  return {
-    id: 0,
-    type: "InicioJornada",
-    status: "",
-    createdDate: dateOpen.replace(" ", "T"),
-  };
+  // Ponche sintético desactivado (ver doc): con openDayEvents vacío, dateOpen
+  // es un punchOpen viejo sin ponches detrás, no una jornada que cerrar.
+  // if (events.length === 0) {
+  //   // dateOpen puede llegar como "YYYY-MM-DD HH:mm:ss" (el moment().format
+  //   // con que el backend lo guarda): la "T" lo deja en ISO para
+  //   // parseBackendDate.
+  //   return {
+  //     id: 0,
+  //     type: "InicioJornada",
+  //     status: "",
+  //     createdDate: dateOpen.replace(" ", "T"),
+  //   };
+  // }
+
+  const timeOf = (p: PunchEvent) =>
+    parseBackendDate(String(p.createdDate ?? ""))?.getTime() ?? -Infinity;
+  const start = getNewestPunch(
+    events.filter((e) => e.type === "InicioJornada" && isValidTimelinePunch(e)),
+  );
+  if (!start) return null;
+
+  const startTime = timeOf(start);
+  const closed = events.some(
+    (e) =>
+      e.type === "FinJornada" &&
+      isValidTimelinePunch(e) &&
+      timeOf(e) > startTime,
+  );
+  return closed ? null : start;
 }
 
 export const WEEK_DAYS: Record<number, string> = {

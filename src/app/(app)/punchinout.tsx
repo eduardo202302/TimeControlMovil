@@ -516,8 +516,14 @@ export default function PunchInOut() {
     withinArea: boolean;
   } | null>(null);
 
-  const { user, urlColegio, logout, todayHoliday, pendingOpenDay } =
-    useSchoolStore();
+  const {
+    user,
+    urlColegio,
+    logout,
+    todayHoliday,
+    pendingOpenDay,
+    closedOpenDayKey,
+  } = useSchoolStore();
 
   // El login devuelve los horarios en user.schoolUsers[0].userSchedules
   const schoolUser: SchoolUser | undefined = user?.user?.schoolUsers?.[0];
@@ -885,27 +891,43 @@ export default function PunchInOut() {
     fetchTodayPunches();
   }, [fetchTodayPunches]);
 
-  // Jornada abierta de un día anterior (chooseschool: login y poller). El
-  // modal se abre solo en la transición null → ponche: el poller entrega un
-  // objeto nuevo cada 10 s y no debe reabrirlo si el usuario lo cerró. El
-  // día recién cerrado se ignora por si un poll en vuelo desde antes del
-  // FinJornada lo trae de vuelta.
-  const prevPendingOpenDayRef = useRef<PunchEvent | null>(null);
-  const closedOpenDayRef = useRef<string | null>(null);
+  // Jornada abierta de un día anterior (chooseschool: login y poller), por
+  // clave estable: el día RD pendiente. El poller entrega un objeto nuevo
+  // cada 10 s; solo un cambio de día abre o cierra el modal, así que no se
+  // reabre si el usuario lo cerró con la X. Al volver a la pantalla abre de
+  // inmediato con el snapshot del store; si el primer poll dice null, se
+  // cierra — pero solo si lo abrió chooseschool, no un rechazo del POST.
+  // El día ya cerrado desde el modal (closedOpenDayKey) no se reabre aunque
+  // el backend siga con punchOpen viejo.
+  const pendingOpenDayKey = useMemo(() => {
+    const d = getPendingOpenDayDate(pendingOpenDay);
+    return d ? toRDDateString(d) : null;
+  }, [pendingOpenDay]);
+  const prevPendingOpenDayKeyRef = useRef<string | null>(null);
+  const modalFromChooseSchoolRef = useRef(false);
   useEffect(() => {
-    const prev = prevPendingOpenDayRef.current;
-    prevPendingOpenDayRef.current = pendingOpenDay;
-    if (!pendingOpenDay || prev) return;
-    const pendingDate = getPendingOpenDayDate(pendingOpenDay);
-    if (
-      pendingDate &&
-      toRDDateString(pendingDate) === closedOpenDayRef.current
-    ) {
+    const prevKey = prevPendingOpenDayKeyRef.current;
+    prevPendingOpenDayKeyRef.current = pendingOpenDayKey;
+    if (pendingOpenDayKey === prevKey) return;
+
+    if (!pendingOpenDayKey || pendingOpenDayKey === closedOpenDayKey) {
+      if (modalFromChooseSchoolRef.current) {
+        modalFromChooseSchoolRef.current = false;
+        setNextDayExitModal(false);
+        setNextDayExitPunch(null);
+      }
       return;
     }
+
+    modalFromChooseSchoolRef.current = true;
+    // El modal también lo abren los rechazos del POST, así que es estado
+    // propio y no se puede derivar de pendingOpenDay; sincronizarlo con el
+    // store desde un efecto es lo que la regla marca. Solo corre cuando
+    // cambia el día pendiente, no en cada poll.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- ver arriba
     setNextDayExitPunch(pendingOpenDay);
     setNextDayExitModal(true);
-  }, [pendingOpenDay]);
+  }, [pendingOpenDayKey, pendingOpenDay, closedOpenDayKey]);
 
   // fetchTodayPunches no devuelve la lista: el pedido de parpadeo se resuelve
   // cuando llegan los ponches nuevos.
@@ -1146,11 +1168,12 @@ export default function PunchInOut() {
       });
       console.log("RESPUESTA BACKEND:", response.data);
       if (response.data.success) {
+        modalFromChooseSchoolRef.current = false;
         setNextDayExitModal(false);
         setNextDayExitTime("");
         setNextDayExitPunch(null);
         // El siguiente poll de chooseschool lo confirma con dateOpen null.
-        closedOpenDayRef.current = baseDateStr;
+        useSchoolStore.getState().setClosedOpenDayKey(baseDateStr);
         useSchoolStore.getState().setPendingOpenDay(null);
         await fetchTodayPunches();
       } else {
@@ -1234,7 +1257,8 @@ export default function PunchInOut() {
       // cuando ambos casos coinciden.
       const hasPendingOpenDay =
         nextDayExitModal ||
-        pendingOpenDay !== null ||
+        (pendingOpenDayKey !== null &&
+          pendingOpenDayKey !== closedOpenDayKey) ||
         findOpenDayPunch(punches) !== null;
 
       // Antes de la primera Entrada Jornada del día: si la sesión actual lleva
@@ -1756,7 +1780,10 @@ export default function PunchInOut() {
                 <Text style={styles.ndModalTitle}>Jornada Incompleta</Text>
               </View>
               <TouchableOpacity
-                onPress={() => setNextDayExitModal(false)}
+                onPress={() => {
+                  modalFromChooseSchoolRef.current = false;
+                  setNextDayExitModal(false);
+                }}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
                 <Ionicons name="close" size={22} color={TEXT_PLACEHOLDER} />
