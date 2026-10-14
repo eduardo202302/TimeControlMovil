@@ -108,6 +108,7 @@ import {
   getRDDayIndex,
   getScheduleForDay,
   getStatusColor,
+  hasBlockingOpenDay,
   isAlmuerzoButtonVisible,
   isAlmuerzoVisible,
   isBreakVisible,
@@ -1212,6 +1213,16 @@ export default function PunchInOut() {
     if (isSubmittingRef.current) return;
     isSubmittingRef.current = true;
     try {
+      // Jornada de un día anterior sin cerrar: ningún ponche hasta cerrarla
+      // desde el modal (que hace su propio POST, no pasa por aquí). La X solo
+      // deja navegar; tocar cualquier botón de ponche lo vuelve a abrir.
+      if (hasBlockingOpenDay(pendingOpenDay, closedOpenDayKey)) {
+        modalFromChooseSchoolRef.current = true;
+        setNextDayExitPunch(pendingOpenDay);
+        setNextDayExitModal(true);
+        return;
+      }
+
       const token = await getToken();
       if (!urlColegio || !token) {
         Alert.alert("Error", "No hay conexión activa.");

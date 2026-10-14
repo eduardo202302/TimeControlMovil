@@ -193,6 +193,25 @@ export function getPendingOpenDayDate(punch: PunchEvent | null): Date | null {
 }
 
 /**
+ * true si hay una jornada abierta de un día anterior (pendingOpenDay de
+ * chooseschool) que el usuario todavía no cerró desde el modal. Mientras sea
+ * true no se permite ponchar: si el backend aceptara un ponche nuevo, el día
+ * pendiente ya no se podría cerrar ("La fecha y hora no pueden ser anteriores
+ * al último registro del usuario"). El webapp hace lo mismo ocultando
+ * "Registrar Acceso" mientras dateOpen tenga valor.
+ *
+ * La clave es la misma del efecto que abre el modal: el día RD del punch. Sin
+ * fecha determinable no bloquea, igual que ese efecto no abre el modal.
+ */
+export function hasBlockingOpenDay(
+  pendingOpenDay: PunchEvent | null,
+  closedOpenDayKey: string | null,
+): boolean {
+  const d = getPendingOpenDayDate(pendingOpenDay);
+  return d !== null && toRDDateString(d) !== closedOpenDayKey;
+}
+
+/**
  * Aísla el InicioJornada abierto de un usuario dentro de la lista
  * escuela-completa que devuelve GET /punches/opendays (no filtra por usuario
  * en el backend). Se usa como respaldo cuando /punches/today no trae el

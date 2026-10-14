@@ -6,6 +6,7 @@ import {
   findOpenDayPunchForUser,
   getPendingOpenDayDate,
   getScheduleForDay,
+  hasBlockingOpenDay,
   toRDDateString,
   type PunchEvent,
 } from "../punchRules";
@@ -322,4 +323,30 @@ describe("buildOpenDayFromChooseSchool — punchOpen/dateOpen de chooseschool", 
   // HH:mm:ss": el ponche sintético está desactivado, la fecha ya solo sale
   // del createdDate de un InicioJornada real (ISO), que cubren los dos tests
   // de arriba.
+});
+
+describe("hasBlockingOpenDay — bloqueo de ponches con jornada pendiente", () => {
+  // 15:38Z = sábado 22-ago 11:38 RD.
+  const pending = punch({ createdDate: "2026-08-22T15:38:55.000Z" });
+
+  test("sin jornada pendiente no bloquea", () => {
+    expect(hasBlockingOpenDay(null, null)).toBe(false);
+    expect(hasBlockingOpenDay(null, "2026-08-22")).toBe(false);
+  });
+
+  test("pendiente ya cerrada desde el modal (misma clave) no bloquea", () => {
+    expect(hasBlockingOpenDay(pending, "2026-08-22")).toBe(false);
+  });
+
+  test("pendiente con otra clave bloquea", () => {
+    expect(hasBlockingOpenDay(pending, null)).toBe(true);
+    expect(hasBlockingOpenDay(pending, "2026-08-21")).toBe(true);
+  });
+
+  test("la clave es el día RD, no el UTC", () => {
+    // 01:00Z del 23 = 21:00 RD del 22.
+    const nocturno = punch({ createdDate: "2026-08-23T01:00:00.000Z" });
+    expect(hasBlockingOpenDay(nocturno, "2026-08-22")).toBe(false);
+    expect(hasBlockingOpenDay(nocturno, "2026-08-23")).toBe(true);
+  });
 });
