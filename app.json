@@ -9,10 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "icon": "./assets/expo.icon",
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Esta aplicación requiere acceso a tu ubicación para validar que el ponche se realice dentro del área permitida de la institución."
-      }
+      "icon": "./assets/expo.icon"
     },
     "android": {
       "package": "com.timecontrol.movil",
@@ -60,7 +57,10 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Esta aplicación requiere acceso a tu ubicación para validar que el ponche se realice dentro del área permitida de la institución."
+          "locationWhenInUsePermission": "Tu ubicación se registra junto a cada ponche y, si tu empresa lo requiere, se usa para validar que estés en el área permitida.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "motionUsagePermission": false
         }
       ]
     ],

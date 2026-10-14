@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Slot, router, usePathname } from "expo-router";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Alert,
     StatusBar,
@@ -31,6 +31,8 @@ import {
     switchCompany,
     type CompanyOption,
 } from "../../utils/chooseCompany";
+import { expoLocationApi } from "../../utils/locationApi";
+import { promptLocationPermission } from "../../utils/punchLocation";
 
 const ROUTE_TITLES: Record<string, string> = {
   "/punchinout": "Registrar Acceso",
@@ -66,6 +68,13 @@ export default function AppLayout() {
   );
 
   const [drawerVisible, setDrawerVisible] = useState(false);
+
+  // Permiso de ubicación (primer plano) al entrar con sesión — aquí y no en el
+  // layout raíz para no tapar el login. No se espera: nunca frena la navegación.
+  useEffect(() => {
+    void promptLocationPermission(expoLocationApi);
+  }, []);
+
   const pathname = usePathname();
   // Reportar Avería toma el nombre de la compañía (school.settings), igual que su tarjeta.
   const companySettings = useSchoolStore((state) => state.companySettings);

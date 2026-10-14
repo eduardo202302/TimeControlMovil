@@ -63,7 +63,7 @@ import DateTimePicker, {
 import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -132,6 +132,12 @@ import {
 } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
 import { getActiveSchoolId } from "../../utils/chooseCompany";
+import { expoLocationApi } from "../../utils/locationApi";
+import {
+  getBestEffortCoordinates,
+  promptLocationPermission,
+  startOptionalPunchCoordinates,
+} from "../../utils/punchLocation";
 
 type Category = "Jornada" | "Almuerzo" | "Break";
 
@@ -1025,6 +1031,14 @@ export default function PunchInOut() {
     loadTodayPermissions();
   }, [loadTodayPermissions]);
 
+  // Permiso de ubicación (primer plano) cada vez que se entra al ponchador,
+  // mientras el sistema deje preguntar. No se espera: nunca frena la pantalla.
+  useFocusEffect(
+    useCallback(() => {
+      void promptLocationPermission(expoLocationApi);
+    }, []),
+  );
+
   // Ubicación EN VIVO del dispositivo (card de Perfil) — solo lectura, no
   // forma parte del flujo de ponchar. Independiente de las coordenadas del
   // último ponche: el webapp muestra la posición actual evaluada contra la
@@ -1315,6 +1329,12 @@ export default function PunchInOut() {
       // ninguna salida — confirmado con negocio.
       const imageRequiredForType = isImageRequired && type === "InicioJornada";
       const locationRequired = isValidLocation;
+      // Sin validación, las coordenadas son de mejor esfuerzo (como el webapp):
+      // arrancan ya, en paralelo con la cámara, y se esperan al armar el payload.
+      const optionalCoordsPromise = startOptionalPunchCoordinates(
+        locationRequired,
+        () => getBestEffortCoordinates(expoLocationApi),
+      );
 
       console.log("CONFIG SEDE:", {
         isImageRequired: schoolSettings?.isImageRequired,
@@ -1494,6 +1514,7 @@ export default function PunchInOut() {
 
       setLoading(true);
       try {
+        if (optionalCoordsPromise) coords = await optionalCoordsPromise;
         const payload: PunchPayload = { type: apiType };
         if (photo?.base64) payload.photourl = [photo.base64];
         if (todaySchedule) payload.schedule = todaySchedule;
