@@ -8,13 +8,18 @@ import {
   PERMISSION_ACTION,
   getApprovedPermission,
   getApprovedPermissionsToday,
+  getButtonVisibilityMinutes,
   getPunctuality,
   getRDMinutes,
   getStatusColor,
+  getWorkflowCategories,
   isAlmuerzoButtonVisible,
   isAlmuerzoVisible,
+  isApplyFlagEnabled,
   isBreakVisible,
   isJornadaVisible,
+  isLunchExceeded,
+  LUNCH_EXCEEDED_MESSAGE,
   isOffScheduleStatus,
   OFF_SCHEDULE_STATUS,
   timeStrToMinutes,
@@ -71,7 +76,9 @@ function isJornadaVisibleLegacy(
     // completa de la jornada ya es el margen)
     const entryStart = timeStrToMinutes(schedule.workEntryTime) - tolWorkIn;
     const entryEnd = timeStrToMinutes(schedule.workExitTime);
-    return current >= entryStart && current < entryEnd;
+    // Actualizado a propósito: el webapp incluye el minuto de salida
+    // (index.jsx:487, <=).
+    return current >= entryStart && current <= entryEnd;
   } else {
     // Ya salio hoy -> ocultar
     if (lastJornada?.type === "FinJornada") return false;
@@ -430,8 +437,10 @@ describe("4–5. Permiso de Entrada (llegada tardía)", () => {
   it("5. pasada la ventana el botón Entrada vuelve a estar visible", () => {
     expect(verEntrada(rd(11, 31), entrada)).toBe(true);
     expect(verEntrada(rd(13), entrada)).toBe(true);
-    // y sigue respetando el horario normal: a las 17:00 ya venció la ventana
-    expect(verEntrada(rd(17), entrada)).toBe(false);
+    // y sigue respetando el horario normal: 17:00 es el último minuto
+    // (inclusive, como el webapp) y a las 17:01 ya venció la ventana
+    expect(verEntrada(rd(17), entrada)).toBe(true);
+    expect(verEntrada(rd(17, 1), entrada)).toBe(false);
   });
 
   it("5b. no afecta Salida ni Almuerzo", () => {
@@ -574,14 +583,11 @@ describe("13. Ausencia + Entrada el mismo día", () => {
   });
 });
 
-// ─── 14. isAlmuerzoButtonVisible — Entrada usa TODO el bloque de almuerzo ─────
-// A diferencia de Salida (ventana simétrica alrededor de su propio horario),
-// Entrada arranca en lunchEntryTime - margen pero se extiende hasta
-// lunchExitTime + margen — el bloque completo de almuerzo con colchón en
-// ambas puntas, para que llegar tarde a marcar la entrada no deje a la
-// persona sin acceso al resto de su almuerzo. Horario fixture: almuerzo
+// ─── 14. isAlmuerzoButtonVisible — Entrada, como el webapp ───────────────────
+// Webapp isAlmuerzoEntryAllowed (index.jsx:600-663): desde lunchEntryTime −
+// Ver Botón hasta lunchExitTime, ambos inclusive. Horario fixture: almuerzo
 // 12:00–13:00, BTN.lunchIn/Out=10 (distinto de TOL=5 a propósito) -> Entrada
-// visible 11:50–13:10. La etiqueta de puntualidad (Tardanza/A Tiempo) sigue
+// visible 11:50–13:00. La etiqueta de puntualidad (Tardanza/A Tiempo) sigue
 // siendo cosa de Tolerancia (getPunctuality, fuera de este archivo) — un
 // ponche tardío dentro de esta ventana ensanchada sigue pudiendo dar
 // Tardanza si corresponde.
@@ -607,8 +613,9 @@ describe("14. isAlmuerzoButtonVisible — Entrada", () => {
     expect(verAlmuerzoBotonEntrada(rd(13, 0))).toBe(true);
   });
 
-  it("14f. visible justo al cierre de la ventana (13:10, 10 min después de salida)", () => {
-    expect(verAlmuerzoBotonEntrada(rd(13, 10))).toBe(true);
+  it("14f. oculto apenas pasa la hora de salida (13:01) — sin margen extra", () => {
+    expect(verAlmuerzoBotonEntrada(rd(13, 1))).toBe(false);
+    expect(verAlmuerzoBotonEntrada(rd(13, 10))).toBe(false);
   });
 
   it("14g. oculto apenas se pasa del cierre (13:11)", () => {
@@ -650,35 +657,80 @@ describe("14. isAlmuerzoButtonVisible — Entrada", () => {
     expect(verAlmuerzoBotonEntrada(rd(12, 30), ausencia)).toBe(false);
   });
 
-  it("14l. permiso de Almuerzo reemplaza la ventana, mismo criterio ensanchado", () => {
+  it("14l. permiso de Almuerzo: desde fromTime (sin Ver Botón) hasta fromTime + duración del horario", () => {
     const permisoAlmuerzo = [permiso("Almuerzo", "15:00:00", "16:00:00")];
-    expect(verAlmuerzoBotonEntrada(rd(14, 49), permisoAlmuerzo)).toBe(false);
-    expect(verAlmuerzoBotonEntrada(rd(14, 50), permisoAlmuerzo)).toBe(true);
+    expect(verAlmuerzoBotonEntrada(rd(14, 50), permisoAlmuerzo)).toBe(false);
+    expect(verAlmuerzoBotonEntrada(rd(14, 59), permisoAlmuerzo)).toBe(false);
+    expect(verAlmuerzoBotonEntrada(rd(15, 0), permisoAlmuerzo)).toBe(true);
     expect(verAlmuerzoBotonEntrada(rd(15, 30), permisoAlmuerzo)).toBe(true);
-    expect(verAlmuerzoBotonEntrada(rd(16, 10), permisoAlmuerzo)).toBe(true);
-    expect(verAlmuerzoBotonEntrada(rd(16, 11), permisoAlmuerzo)).toBe(false);
+    expect(verAlmuerzoBotonEntrada(rd(16, 0), permisoAlmuerzo)).toBe(true);
+    expect(verAlmuerzoBotonEntrada(rd(16, 1), permisoAlmuerzo)).toBe(false);
+  });
+
+  it("14m. la duración es la del horario, no la del permiso (permiso de 30 min)", () => {
+    const corto = [permiso("Almuerzo", "15:00:00", "15:30:00")];
+    // 15:00 + 60 min del horario 12:00–13:00
+    expect(verAlmuerzoBotonEntrada(rd(15, 45), corto)).toBe(true);
+    expect(verAlmuerzoBotonEntrada(rd(16, 0), corto)).toBe(true);
+    expect(verAlmuerzoBotonEntrada(rd(16, 1), corto)).toBe(false);
+  });
+
+  it("14n. permiso de Almuerzo sin horario de almuerzo configurado → oculto (como el webapp)", () => {
+    const permisoAlmuerzo = [permiso("Almuerzo", "15:00:00", "16:00:00")];
+    expect(
+      verAlmuerzoBotonEntrada(
+        rd(15, 30),
+        permisoAlmuerzo,
+        PUNCHES.jornadaIniciada,
+        scheduleSinAlmuerzo,
+      ),
+    ).toBe(false);
+  });
+
+  it("14o. un InicioAlmuerzo 'Fuera de área' no cuenta: la Entrada sigue disponible", () => {
+    const rechazado = [
+      punch("InicioJornada"),
+      punch("InicioAlmuerzo", { status: "Fuera de área" }),
+    ];
+    expect(verAlmuerzoBotonEntrada(rd(12, 30), [], rechazado)).toBe(true);
   });
 });
 
+/** Ponche con createdDate a la hora RD h:m del día de rd() */
+const punchAt = (
+  type: string,
+  h: number,
+  m = 0,
+  extra: Partial<PunchEvent> = {},
+): PunchEvent => punch(type, { createdDate: rd(h, m).toISOString(), ...extra });
+
+// ─── 15. isAlmuerzoButtonVisible — Salida desde el ponche real ───────────────
+// Webapp isWithinLunchExitWindow (index.jsx:493-585): elapsed desde el último
+// InicioAlmuerzo válido ∈ [max(0, duración − Ver Botón), duración + Ver
+// Botón). Horario 12:00–13:00 (60 min), BTN.lunchOut = 10.
+
 describe("15. isAlmuerzoButtonVisible — Salida", () => {
-  it("15a. oculto antes de que abra la ventana (12:49, 11 min antes)", () => {
-    expect(verAlmuerzoBotonSalida(rd(12, 49))).toBe(false);
+  /** Almuerzo iniciado a las 12:00 RD */
+  const alas12 = [punchAt("InicioJornada", 8), punchAt("InicioAlmuerzo", 12)];
+
+  it("15a. oculto antes de que abra la ventana (12:49, 49 min transcurridos)", () => {
+    expect(verAlmuerzoBotonSalida(rd(12, 49), [], alas12)).toBe(false);
   });
 
-  it("15b. visible apenas abre la ventana (12:50, 10 min antes)", () => {
-    expect(verAlmuerzoBotonSalida(rd(12, 50))).toBe(true);
+  it("15b. visible apenas abre la ventana (12:50, 50 min)", () => {
+    expect(verAlmuerzoBotonSalida(rd(12, 50), [], alas12)).toBe(true);
   });
 
-  it("15c. visible exactamente en el horario (13:00)", () => {
-    expect(verAlmuerzoBotonSalida(rd(13, 0))).toBe(true);
+  it("15c. visible exactamente al cumplir la duración (13:00)", () => {
+    expect(verAlmuerzoBotonSalida(rd(13, 0), [], alas12)).toBe(true);
   });
 
-  it("15d. visible justo al cierre de la ventana (13:10, 10 min después)", () => {
-    expect(verAlmuerzoBotonSalida(rd(13, 10))).toBe(true);
+  it("15d. visible en el último minuto (13:09)", () => {
+    expect(verAlmuerzoBotonSalida(rd(13, 9), [], alas12)).toBe(true);
   });
 
-  it("15e. oculto apenas se pasa del cierre (13:11)", () => {
-    expect(verAlmuerzoBotonSalida(rd(13, 11))).toBe(false);
+  it("15e. oculto al llegar a duración + Ver Botón (13:10, límite exclusivo)", () => {
+    expect(verAlmuerzoBotonSalida(rd(13, 10), [], alas12)).toBe(false);
   });
 
   it("15f. oculto si no inició almuerzo, o si ya lo cerró", () => {
@@ -686,33 +738,44 @@ describe("15. isAlmuerzoButtonVisible — Salida", () => {
       verAlmuerzoBotonSalida(rd(13, 0), [], PUNCHES.jornadaIniciada),
     ).toBe(false);
     expect(
-      verAlmuerzoBotonSalida(rd(13, 0), [], PUNCHES.almuerzoCerrado),
+      verAlmuerzoBotonSalida(rd(13, 0), [], [
+        ...alas12,
+        punchAt("FinAlmuerzo", 12, 55),
+      ]),
     ).toBe(false);
   });
 
   it("15g. Ausencia aprobada oculta el botón igual que siempre", () => {
     const ausencia = [permiso("Ausencia", "00:00:00", "23:59:00")];
-    expect(verAlmuerzoBotonSalida(rd(13, 0), ausencia)).toBe(false);
+    expect(verAlmuerzoBotonSalida(rd(13, 0), ausencia, alas12)).toBe(false);
   });
 
-  it("15h. permiso de Almuerzo reemplaza la ventana, mismo margen simétrico", () => {
-    const permisoAlmuerzo = [permiso("Almuerzo", "15:00:00", "16:00:00")];
-    const conAlmuerzoIniciado = [
-      ...PUNCHES.jornadaIniciada,
-      punch("InicioAlmuerzo"),
+  it("15h. con permiso de Almuerzo la duración sigue siendo la del horario", () => {
+    const permisoAlmuerzo = [permiso("Almuerzo", "15:00:00", "15:30:00")];
+    const alas15 = [punchAt("InicioJornada", 8), punchAt("InicioAlmuerzo", 15)];
+    // 60 min del horario, no los 30 del permiso → [15:50, 16:10)
+    expect(verAlmuerzoBotonSalida(rd(15, 49), permisoAlmuerzo, alas15)).toBe(false);
+    expect(verAlmuerzoBotonSalida(rd(15, 50), permisoAlmuerzo, alas15)).toBe(true);
+    expect(verAlmuerzoBotonSalida(rd(16, 9), permisoAlmuerzo, alas15)).toBe(true);
+    expect(verAlmuerzoBotonSalida(rd(16, 10), permisoAlmuerzo, alas15)).toBe(false);
+  });
+
+  it("15i. cuenta el InicioAlmuerzo válido, no uno rechazado posterior", () => {
+    const conRechazo = [
+      ...alas12,
+      punchAt("InicioAlmuerzo", 12, 30, { status: "Fuera de área" }),
     ];
-    expect(
-      verAlmuerzoBotonSalida(rd(15, 49), permisoAlmuerzo, conAlmuerzoIniciado),
-    ).toBe(false);
-    expect(
-      verAlmuerzoBotonSalida(rd(15, 50), permisoAlmuerzo, conAlmuerzoIniciado),
-    ).toBe(true);
-    expect(
-      verAlmuerzoBotonSalida(rd(16, 10), permisoAlmuerzo, conAlmuerzoIniciado),
-    ).toBe(true);
-    expect(
-      verAlmuerzoBotonSalida(rd(16, 11), permisoAlmuerzo, conAlmuerzoIniciado),
-    ).toBe(false);
+    expect(verAlmuerzoBotonSalida(rd(12, 50), [], conRechazo)).toBe(true);
+  });
+
+  it("15j. Ver Botón mayor que la duración → abre desde el inicio (max 0)", () => {
+    const sch30: UserSchedule = { ...schedule, lunchExitTime: "12:30:00" };
+    const alas12b = [punchAt("InicioJornada", 8), punchAt("InicioAlmuerzo", 12)];
+    const ver = (h: number, m: number) =>
+      isAlmuerzoButtonVisible(rd(h, m), sch30, false, 0, 40, alas12b, []);
+    expect(ver(12, 0)).toBe(true);
+    expect(ver(13, 9)).toBe(true);
+    expect(ver(13, 10)).toBe(false);
   });
 });
 
@@ -1280,6 +1343,218 @@ describe("18. isJornadaVisible — 'Fuera de área' no cuenta como jornada inici
       punch("InicioJornada", { status: "Error de Imagen" }),
     ];
     expect(verEntrada(rd(9), [], errorImagen)).toBe(true);
+  });
+});
+
+// ─── 19. Caso QA — Salida de Almuerzo desde el ponche real ───────────────────
+// Almuerzo 13:30–14:30, Ver Botón Salida Almuerzo 10, InicioAlmuerzo 13:41.
+// Antes la Salida se medía contra 14:30 ± 10 y a las 14:41 la pantalla quedaba
+// en "noActions" sin forma de cerrar el almuerzo.
+
+describe("19. Caso QA — almuerzo iniciado 13:41", () => {
+  const horarioQA: UserSchedule = {
+    ...schedule,
+    workEntryTime: "09:00:00",
+    workExitTime: "18:00:00",
+    lunchEntryTime: "13:30:00",
+    lunchExitTime: "14:30:00",
+  };
+  const ponches = [
+    punchAt("InicioJornada", 9),
+    punchAt("InicioAlmuerzo", 13, 41),
+  ];
+  const salida = (h: number, m: number) =>
+    isAlmuerzoButtonVisible(rd(h, m), horarioQA, false, 10, 10, ponches, []);
+  const excedido = (h: number, m: number) =>
+    isLunchExceeded(rd(h, m), horarioQA, ponches, [], 10);
+
+  it("19a. Salida visible de 14:31 a 14:50", () => {
+    expect(salida(14, 31)).toBe(true);
+    expect(salida(14, 41)).toBe(true);
+    expect(salida(14, 50)).toBe(true);
+  });
+
+  it("19b. Salida oculta a las 14:30 y a las 14:51", () => {
+    expect(salida(14, 30)).toBe(false);
+    expect(salida(14, 51)).toBe(false);
+  });
+
+  it("19c. isLunchExceeded: false hasta las 14:50, true desde las 14:51", () => {
+    expect(excedido(14, 41)).toBe(false);
+    expect(excedido(14, 50)).toBe(false);
+    expect(excedido(14, 51)).toBe(true);
+    expect(excedido(17, 0)).toBe(true);
+  });
+
+  it("19d. isLunchExceeded false si el almuerzo ya se cerró", () => {
+    const cerrado = [...ponches, punchAt("FinAlmuerzo", 14, 45)];
+    expect(isLunchExceeded(rd(15, 0), horarioQA, cerrado, [], 10)).toBe(false);
+  });
+
+  it("19e. isLunchExceeded false con Ausencia aprobada (el webapp no lo muestra)", () => {
+    const ausencia = [permiso("Ausencia", "00:00:00", "23:59:00")];
+    expect(isLunchExceeded(rd(14, 51), horarioQA, ponches, ausencia, 10)).toBe(
+      false,
+    );
+  });
+
+  it("19f. texto idéntico al del webapp (index.jsx:975)", () => {
+    expect(LUNCH_EXCEEDED_MESSAGE).toBe(
+      "Excedió su tiempo de almuerzo por favor contactarse con un administrador",
+    );
+  });
+});
+
+// ─── 20. isApplyLunch / isApplyBreak — compañía Y usuario ────────────────────
+// En punchinout.tsx (visibleCategories) la categoría exige el flag ADEMÁS de
+// su regla de hora: Almuerzo = flag && isAlmuerzoButtonVisible, Break = flag
+// && isBreakVisible (ventanas y espera del Break se mantienen).
+
+describe("20. isApplyFlagEnabled", () => {
+  it("20a. compañía y usuario en true → habilitado", () => {
+    expect(
+      isApplyFlagEnabled({ isApplyLunch: true }, { isApplyLunch: true }, "isApplyLunch"),
+    ).toBe(true);
+  });
+
+  it("20b. apagado en la compañía o en el usuario → deshabilitado", () => {
+    expect(
+      isApplyFlagEnabled({ isApplyLunch: false }, { isApplyLunch: true }, "isApplyLunch"),
+    ).toBe(false);
+    expect(
+      isApplyFlagEnabled({ isApplyLunch: true }, { isApplyLunch: false }, "isApplyLunch"),
+    ).toBe(false);
+  });
+
+  it("20c. sin valor → deshabilitado (webapp: get(..., false))", () => {
+    expect(isApplyFlagEnabled({}, { isApplyBreak: true }, "isApplyBreak")).toBe(false);
+    expect(isApplyFlagEnabled(undefined, undefined, "isApplyBreak")).toBe(false);
+  });
+
+  it("20d. isApplyLunch false → sin Almuerzo aunque el botón estaría visible", () => {
+    const flag = isApplyFlagEnabled(
+      { isApplyLunch: true },
+      { isApplyLunch: false },
+      "isApplyLunch",
+    );
+    const boton = verAlmuerzoBotonEntrada(rd(12, 30));
+    expect(boton).toBe(true);
+    expect(flag && boton).toBe(false);
+  });
+
+  it("20e. isApplyBreak false → sin Break aunque esté en ventana", () => {
+    const flag = isApplyFlagEnabled(
+      { isApplyBreak: false },
+      { isApplyBreak: true },
+      "isApplyBreak",
+    );
+    const enVentana = isBreakVisible(PUNCHES.jornadaIniciada, rd(10), schedule, {
+      startAfterEntry: 60,
+      endBeforeLunch: 0,
+      startAfterLunch: 60,
+      endBeforeExit: 60,
+      cooldownAfterBreak: 30,
+    });
+    expect(enVentana).toBe(true);
+    expect(flag && enVentana).toBe(false);
+  });
+});
+
+// ─── 21. Flujo del webapp: Jornada oculta con almuerzo o break abierto ───────
+
+describe("21. getWorkflowCategories", () => {
+  const jornada = punchAt("InicioJornada", 8);
+
+  it("21a. almuerzo abierto → solo Almuerzo (sin Jornada)", () => {
+    const cats = getWorkflowCategories([jornada, punchAt("InicioAlmuerzo", 12)]);
+    expect(cats).toEqual(["Almuerzo"]);
+    expect(cats).not.toContain("Jornada");
+  });
+
+  it("21b. break abierto → solo Break (sin Jornada)", () => {
+    const cats = getWorkflowCategories([jornada, punchAt("InicioBreak", 10)]);
+    expect(cats).toEqual(["Break"]);
+    expect(cats).not.toContain("Jornada");
+  });
+
+  it("21c. tras cerrarlos la Jornada vuelve", () => {
+    expect(
+      getWorkflowCategories([
+        jornada,
+        punchAt("InicioAlmuerzo", 12),
+        punchAt("FinAlmuerzo", 13),
+      ]),
+    ).toEqual(["Break", "Jornada"]);
+    expect(
+      getWorkflowCategories([
+        jornada,
+        punchAt("InicioBreak", 10),
+        punchAt("FinBreak", 10, 15),
+      ]),
+    ).toEqual(["Almuerzo", "Break", "Jornada"]);
+  });
+
+  it("21d. sin ponches o tras FinJornada → solo Jornada", () => {
+    expect(getWorkflowCategories([])).toEqual(["Jornada"]);
+    expect(
+      getWorkflowCategories([jornada, punchAt("FinJornada", 17)]),
+    ).toEqual(["Jornada"]);
+  });
+
+  it("21e. un ponche rechazado no cambia el estado", () => {
+    expect(
+      getWorkflowCategories([
+        jornada,
+        punchAt("InicioAlmuerzo", 12, 0, { status: "Fuera de área" }),
+      ]),
+    ).toEqual(["Almuerzo", "Break", "Jornada"]);
+  });
+});
+
+// ─── 22. "Ver Botón" solo de la compañía ─────────────────────────────────────
+
+describe("22. getButtonVisibilityMinutes", () => {
+  it("22a. lee los lbl* de la compañía", () => {
+    expect(
+      getButtonVisibilityMinutes({
+        lblWorkTimeIn: 15,
+        lblWorkTimeOut: 20,
+        lblLunchTimeIn: 5,
+        lblLunchTimeOut: 10,
+      }),
+    ).toEqual({ workIn: 15, workOut: 20, lunchIn: 5, lunchOut: 10 });
+  });
+
+  it("22b. sin configurar → 0, y Salida Jornada cae a toleranceCloseTime", () => {
+    expect(
+      getButtonVisibilityMinutes({ toleranceWorkTimeIn: 7, toleranceCloseTime: 3 }),
+    ).toEqual({ workIn: 0, workOut: 3, lunchIn: 0, lunchOut: 0 });
+    expect(getButtonVisibilityMinutes(undefined)).toEqual({
+      workIn: 0,
+      workOut: 0,
+      lunchIn: 0,
+      lunchOut: 0,
+    });
+  });
+
+  it("22c. acepta strings como el parseInt del webapp", () => {
+    expect(getButtonVisibilityMinutes({ lblLunchTimeOut: "10" }).lunchOut).toBe(10);
+    expect(getButtonVisibilityMinutes({ lblLunchTimeOut: "" }).lunchOut).toBe(0);
+  });
+});
+
+// ─── 23. Salida de Jornada con permiso de Salida posterior ───────────────────
+
+describe("23. Salida de Jornada — permiso de Salida posterior a la hora de salida", () => {
+  const posterior = [permiso("Salida", "18:00:00", "19:00:00")];
+
+  it("23a. la referencia pasa al fromTime del permiso, sin restar Ver Botón", () => {
+    // sin el permiso: visible desde 16:55
+    expect(verSalida(rd(16, 55), [])).toBe(true);
+    expect(verSalida(rd(16, 55), posterior)).toBe(false);
+    expect(verSalida(rd(17, 59), posterior)).toBe(false);
+    expect(verSalida(rd(18, 0), posterior)).toBe(true);
+    expect(verSalida(rd(20, 0), posterior)).toBe(true);
   });
 });
 

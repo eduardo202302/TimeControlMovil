@@ -99,6 +99,7 @@ import {
   formatLateDuration,
   getApprovedPermissionsToday,
   getBreakTagCategoryId,
+  getButtonVisibilityMinutes,
   getLateMinutes,
   getNewestPunch,
   getPendingOpenDayDate,
@@ -108,16 +109,20 @@ import {
   getRDDayIndex,
   getScheduleForDay,
   getStatusColor,
+  getWorkflowCategories,
   hasBlockingOpenDay,
   isAlmuerzoButtonVisible,
-  isAlmuerzoVisible,
+  // isAlmuerzoVisible, — la pestaña Almuerzo ya no la usa (ver visibleCategories)
+  isApplyFlagEnabled,
   isBreakVisible,
   isJornadaEndType,
   isJornadaStartType,
   isJornadaVisible,
+  isLunchExceeded,
   isNonWorkingHoliday,
   isOffScheduleStatus,
   isRejectedJornadaAttempt,
+  LUNCH_EXCEEDED_MESSAGE,
   OFF_SCHEDULE_STATUS,
   RD_UTC_OFFSET,
   resolvePunchTypeForApi,
@@ -605,25 +610,44 @@ export default function PunchInOut() {
   // Tardanza/Anticipada/A Tiempo ya la decide el backend). Campos
   // confirmados por consulta directa a la BD:
   // lblWorkTimeIn/lblWorkTimeOut/lblLunchTimeIn/lblLunchTimeOut.
-  // Si no está configurado, cae al valor de Tolerancia (comportamiento
-  // idéntico al actual — sin ventana "Anticipada" visible — para no
-  // romper cuentas que aún no configuraron "Ver Botón").
-  const btnVisWorkIn =
-    schoolUserSettings?.lblWorkTimeIn ??
-    schoolSettings?.lblWorkTimeIn ??
-    tolWorkIn;
-  const btnVisWorkOut =
-    schoolUserSettings?.lblWorkTimeOut ??
-    schoolSettings?.lblWorkTimeOut ??
-    tolWorkOut;
-  const btnVisLunchIn =
-    schoolUserSettings?.lblLunchTimeIn ??
-    schoolSettings?.lblLunchTimeIn ??
-    tolLunchIn;
-  const btnVisLunchOut =
-    schoolUserSettings?.lblLunchTimeOut ??
-    schoolSettings?.lblLunchTimeOut ??
-    tolLunchOut;
+  // Antes caía a schoolUser.settings y luego a la Tolerancia; ahora se lee
+  // como el webapp (ver getButtonVisibilityMinutes).
+  // const btnVisWorkIn =
+  //   schoolUserSettings?.lblWorkTimeIn ??
+  //   schoolSettings?.lblWorkTimeIn ??
+  //   tolWorkIn;
+  // const btnVisWorkOut =
+  //   schoolUserSettings?.lblWorkTimeOut ??
+  //   schoolSettings?.lblWorkTimeOut ??
+  //   tolWorkOut;
+  // const btnVisLunchIn =
+  //   schoolUserSettings?.lblLunchTimeIn ??
+  //   schoolSettings?.lblLunchTimeIn ??
+  //   tolLunchIn;
+  // const btnVisLunchOut =
+  //   schoolUserSettings?.lblLunchTimeOut ??
+  //   schoolSettings?.lblLunchTimeOut ??
+  //   tolLunchOut;
+  // Como el webapp: solo de la compañía, sin caer a la Tolerancia
+  // (getButtonVisibilityMinutes documenta los respaldos).
+  const {
+    workIn: btnVisWorkIn,
+    workOut: btnVisWorkOut,
+    lunchIn: btnVisLunchIn,
+    lunchOut: btnVisLunchOut,
+  } = getButtonVisibilityMinutes(schoolSettings);
+
+  // Almuerzo y Break habilitados: compañía Y usuario, como el webapp.
+  const applyLunch = isApplyFlagEnabled(
+    schoolSettings,
+    schoolUserSettings,
+    "isApplyLunch",
+  );
+  const applyBreak = isApplyFlagEnabled(
+    schoolSettings,
+    schoolUserSettings,
+    "isApplyBreak",
+  );
 
   // Geocerca: coordenadas de la sede y radio permitido (metros, default 200m)
   const schoolObj: School | undefined = schoolUser?.school ?? user?.school;
@@ -1689,25 +1713,32 @@ export default function PunchInOut() {
     }
   };
 
+  // Flujo del webapp: con almuerzo o break abierto solo queda esa categoría.
+  const workflowCategories = getWorkflowCategories(punches);
   const visibleCategories = (
     ["Jornada", "Break", "Almuerzo"] as Category[]
   ).filter((cat) => {
     if (!jornadaIniciada && (cat === "Almuerzo" || cat === "Break"))
       return false;
+    if (!workflowCategories.includes(cat)) return false;
     // La pestaña exige también el botón (mismos argumentos que su render):
     // con el almuerzo abierto fuera de la ventana de salida, la pestaña sola
     // dejaba la tarjeta Reg sin acción y evitaba el modo "noActions".
+    // isAlmuerzoVisible ya no se exige: su ventana (± Ver Botón alrededor del
+    // horario o del permiso) recortaba la del webapp, que ahora vive entera
+    // en isAlmuerzoButtonVisible.
     if (cat === "Almuerzo")
       return (
-        isAlmuerzoVisible(
-          now,
-          todaySchedule,
-          btnVisLunchIn,
-          btnVisLunchOut,
-          punches,
-          permissions,
-          todayHoliday,
-        ) &&
+        // isAlmuerzoVisible(
+        //   now,
+        //   todaySchedule,
+        //   btnVisLunchIn,
+        //   btnVisLunchOut,
+        //   punches,
+        //   permissions,
+        //   todayHoliday,
+        // ) &&
+        applyLunch &&
         isAlmuerzoButtonVisible(
           now,
           todaySchedule,
@@ -1720,11 +1751,14 @@ export default function PunchInOut() {
         )
       );
     if (cat === "Break")
-      return isBreakVisible(
-        punches,
-        now,
-        todaySchedule,
-        getBreakWindowConfig(schoolSettings),
+      return (
+        applyBreak &&
+        isBreakVisible(
+          punches,
+          now,
+          todaySchedule,
+          getBreakWindowConfig(schoolSettings),
+        )
       );
     if (cat === "Jornada")
       return isJornadaVisible(
@@ -1771,6 +1805,13 @@ export default function PunchInOut() {
       hasVisibleActions || !punchesLoaded || !permissionsLoaded,
   });
   const isNoSchedule = screenMode === "noSchedule";
+  const lunchExceeded = isLunchExceeded(
+    now,
+    todaySchedule,
+    punches,
+    permissions,
+    btnVisLunchOut,
+  );
   const showPunchActions = screenMode === "normal";
 
   // Los dos consumos de UI leen la MISMA pendingPunchDate que usa el payload.
@@ -2440,6 +2481,28 @@ export default function PunchInOut() {
           </View>
         )}
 
+        {/* ── Almuerzo excedido — fuera de la tarjeta Reg: pasado el límite no
+            queda ninguna acción y la pantalla está en "noActions" ── */}
+        {lunchExceeded && (
+          <View
+            style={[
+              styles.holidayNotice,
+              styles.lunchExceededNotice,
+              { marginTop: 8, marginBottom: 0 },
+            ]}
+          >
+            <Ionicons name="alert-circle-outline" size={18} color={ERROR_TEXT} />
+            <Text
+              style={[
+                styles.holidayNoticeText,
+                { color: ERROR_TEXT, fontSize: font(isTablet ? 14 : 12) },
+              ]}
+            >
+              {LUNCH_EXCEEDED_MESSAGE}
+            </Text>
+          </View>
+        )}
+
         {/* ── Categoría + Botón registrar (bloque unificado) ── */}
         {showPunchActions && (
           <View style={styles.floatCard}>
@@ -2531,7 +2594,8 @@ export default function PunchInOut() {
                 </View>
               )}
 
-            {((selectedCategory === "Break" && selectedIsVisible) ||
+            {selectedIsVisible &&
+              ((selectedCategory === "Break" && selectedIsVisible) ||
               (selectedCategory === "Jornada" &&
                 isJornadaVisible(
                   now,
@@ -3254,6 +3318,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     marginBottom: 12,
+  },
+  lunchExceededNotice: {
+    backgroundColor: DANGER_TINT_BACKGROUND,
+    borderColor: DANGER_TINT_BORDER,
   },
   holidayNoticeText: {
     flex: 1,

@@ -746,7 +746,6 @@ function hasJornadaStartToday(punches: PunchEvent[]): boolean {
  * Último ponche válido de CUALQUIER tipo (jornada, almuerzo o break), por
  * createdDate — el "último estado válido" del webapp (helpers.js:275-300).
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- la usa la regla del webapp comentada en isJornadaVisible; se guarda por si se reactiva
 function getLastValidPunch(punches: PunchEvent[]): PunchEvent | null {
   return getNewestPunch(punches.filter(isValidTimelinePunch));
 }
@@ -890,6 +889,173 @@ export function resolvePunchTypeForApi(
 
 // ─── Visibilidad de botones ───────────────────────────────────────────────────
 
+/**
+ * Minutos de un setting como los lee el webapp: parseInt(valor, 10); null si
+ * no es un número (vacío, null, texto).
+ */
+export function parseSettingMinutes(value: unknown): number | null {
+  const parsed = parseInt(String(value ?? ""), 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+export interface ButtonVisibilityMinutes {
+  workIn: number;
+  workOut: number;
+  lunchIn: number;
+  lunchOut: number;
+}
+
+/**
+ * "Ver Botón" leído como el webapp: solo de la compañía (company.settings,
+ * index.jsx:1412-1415), sin mirar schoolUser.settings. Respaldos del webapp:
+ * lblWorkTimeIn/lblLunchTimeIn/lblLunchTimeOut → 0 (index.jsx:475, 551, 656);
+ * lblWorkTimeOut → toleranceCloseTime → 0 (index.jsx:385-391).
+ */
+export function getButtonVisibilityMinutes(
+  companySettings: Record<string, unknown> | null | undefined,
+): ButtonVisibilityMinutes {
+  return {
+    workIn: parseSettingMinutes(companySettings?.lblWorkTimeIn) ?? 0,
+    workOut:
+      parseSettingMinutes(companySettings?.lblWorkTimeOut) ??
+      parseSettingMinutes(companySettings?.toleranceCloseTime) ??
+      0,
+    lunchIn: parseSettingMinutes(companySettings?.lblLunchTimeIn) ?? 0,
+    lunchOut: parseSettingMinutes(companySettings?.lblLunchTimeOut) ?? 0,
+  };
+}
+
+/**
+ * isApplyLunch / isApplyBreak como el webapp: compañía Y usuario, con la
+ * misma veracidad de JS (index.jsx:869, 877 y 1394-1397; sin valor = false).
+ */
+export function isApplyFlagEnabled(
+  companySettings: Record<string, unknown> | null | undefined,
+  userSettings: Record<string, unknown> | null | undefined,
+  key: "isApplyLunch" | "isApplyBreak",
+): boolean {
+  return Boolean(companySettings?.[key]) && Boolean(userSettings?.[key]);
+}
+
+export type PunchCategory = "Jornada" | "Break" | "Almuerzo";
+
+const ALL_CATEGORIES: PunchCategory[] = ["Almuerzo", "Break", "Jornada"];
+
+/**
+ * Categorías que permite el flujo según el último ponche válido de hoy —
+ * port de getVisibleRadioOptionsFromLastState (webapp index.jsx:254-296) con
+ * getLastValidStateFromTimeline (helpers.js:275-300). Con almuerzo abierto
+ * solo queda Almuerzo y con break abierto solo Break: la Jornada no se ofrece
+ * hasta cerrarlos. Se aplica ADEMÁS de las reglas de hora de cada categoría.
+ */
+export function getWorkflowCategories(punches: PunchEvent[]): PunchCategory[] {
+  const last = getLastValidPunch(punches);
+  if (!last) return ["Jornada"];
+  switch (last.type) {
+    case "InicioJornada":
+    case "InicioJornadaAdicional":
+    case "InicioJornadaFH":
+    case "FinBreak":
+      return ALL_CATEGORIES;
+    case "InicioAlmuerzo":
+      return ["Almuerzo"];
+    case "FinAlmuerzo":
+      return ["Break", "Jornada"];
+    case "InicioBreak":
+      return ["Break"];
+    default:
+      return ["Jornada"];
+  }
+}
+
+/**
+ * Hay un InicioAlmuerzo válido más reciente que cualquier FinAlmuerzo válido —
+ * port de hasActiveStartEntryForRadioType("almuerzo") (helpers.js:415-480).
+ */
+function hasActiveLunchStart(punches: PunchEvent[]): boolean {
+  const valid = punches.filter(isValidTimelinePunch);
+  const lastStart = getNewestPunch(
+    valid.filter((p) => p.type === "InicioAlmuerzo"),
+  );
+  if (!lastStart) return false;
+  const lastEnd = getNewestPunch(valid.filter((p) => p.type === "FinAlmuerzo"));
+  if (!lastEnd) return true;
+  const startAt = parseBackendDate(String(lastStart.createdDate))!.getTime();
+  const endAt = parseBackendDate(String(lastEnd.createdDate))!.getTime();
+  return startAt > endAt;
+}
+
+/** Duración del almuerzo según el horario (lunchExitTime − lunchEntryTime); null si no aplica. */
+function getScheduledLunchDurationMinutes(
+  schedule: UserSchedule | null,
+): number | null {
+  if (!schedule?.lunchEntryTime || !schedule?.lunchExitTime) return null;
+  const duration =
+    timeStrToMinutes(schedule.lunchExitTime) -
+    timeStrToMinutes(schedule.lunchEntryTime);
+  return Number.isNaN(duration) || duration <= 0 ? null : duration;
+}
+
+/**
+ * Ventana de la Salida de Almuerzo medida desde el ponche real — port de
+ * getLunchExitWindowMetrics (webapp index.jsx:493-561). La duración es SIEMPRE
+ * la del horario, también con permiso de Almuerzo (index.jsx:594-597). null
+ * si falta el horario de almuerzo o el InicioAlmuerzo válido.
+ */
+function getLunchExitWindowMetrics(
+  now: Date,
+  schedule: UserSchedule | null,
+  punches: PunchEvent[],
+  btnVisLunchOut: number,
+): { elapsedMinutes: number; windowStart: number; windowEnd: number } | null {
+  const duration = getScheduledLunchDurationMinutes(schedule);
+  if (duration === null) return null;
+  const lastStart = getNewestPunch(
+    punches.filter(
+      (p) => p.type === "InicioAlmuerzo" && isValidTimelinePunch(p),
+    ),
+  );
+  if (!lastStart) return null;
+  const startAt = parseBackendDate(String(lastStart.createdDate));
+  if (!startAt) return null;
+  return {
+    elapsedMinutes: (now.getTime() - startAt.getTime()) / 60000,
+    windowStart: Math.max(0, duration - btnVisLunchOut),
+    windowEnd: duration + btnVisLunchOut,
+  };
+}
+
+/** Texto exacto del webapp (index.jsx:975). */
+export const LUNCH_EXCEEDED_MESSAGE =
+  "Excedió su tiempo de almuerzo por favor contactarse con un administrador";
+
+/**
+ * Almuerzo abierto que ya pasó InicioAlmuerzo + duración + Ver Botón — port
+ * de isLunchTimeoutExceededForExit (webapp index.jsx:858-859, con
+ * hasExceededLunchExitLimit :563-573). El webapp no lo muestra con un permiso
+ * de Ausencia (index.jsx:1282).
+ */
+export function isLunchExceeded(
+  now: Date,
+  schedule: UserSchedule | null,
+  punches: PunchEvent[],
+  permissions: UserDayPermission[],
+  btnVisLunchOut: number,
+): boolean {
+  if (getApprovedPermission(permissions, PERMISSION_ACTION.AUSENCIA, now)) {
+    return false;
+  }
+  if (getLastValidPunch(punches)?.type !== "InicioAlmuerzo") return false;
+  if (!hasActiveLunchStart(punches)) return false;
+  const metrics = getLunchExitWindowMetrics(
+    now,
+    schedule,
+    punches,
+    btnVisLunchOut,
+  );
+  return metrics !== null && metrics.elapsedMinutes >= metrics.windowEnd;
+}
+
 export function isJornadaVisible(
   now: Date,
   schedule: UserSchedule | null,
@@ -934,7 +1100,9 @@ export function isJornadaVisible(
     // jornada ya es el margen). Webapp index.jsx:462-483.
     const entryStart = timeStrToMinutes(schedule.workEntryTime) - tolWorkIn;
     const entryEnd = timeStrToMinutes(schedule.workExitTime);
-    return current >= entryStart && current < entryEnd;
+    // El webapp incluye el minuto de salida (index.jsx:487: <=).
+    // return current >= entryStart && current < entryEnd;
+    return current >= entryStart && current <= entryEnd;
   } else {
     // Ya salio hoy -> ocultar
     if (lastJornada && isJornadaEndType(lastJornada.type)) return false;
@@ -976,7 +1144,22 @@ export function isJornadaVisible(
     // Sin horario -> ocultar siempre
     if (!schedule) return false;
     // Visible desde N min antes de salida, sin limite superior (horas extras)
-    const exitStart = timeStrToMinutes(schedule.workExitTime) - tolWorkOut;
+    // const exitStart = timeStrToMinutes(schedule.workExitTime) - tolWorkOut;
+    // return current >= exitStart;
+    // Webapp index.jsx:393-412: un permiso de Salida aprobado que empieza
+    // DESPUÉS de la hora de salida mueve la referencia a su fromTime, sin
+    // restar Ver Botón.
+    const exitScheduled = timeStrToMinutes(schedule.workExitTime);
+    const laterSalida = getApprovedPermissionsByAction(
+      permissions,
+      PERMISSION_ACTION.SALIDA,
+    ).find((permission) => {
+      const from = timeStrToMinutes(String(permission.fromTime ?? ""));
+      return !Number.isNaN(from) && from > exitScheduled;
+    });
+    const exitStart = laterSalida
+      ? timeStrToMinutes(laterSalida.fromTime)
+      : exitScheduled - tolWorkOut;
     return current >= exitStart;
   }
 }
@@ -1124,13 +1307,11 @@ export function isBreakVisible(
  * isAlmuerzoVisible (que solo decide si la PESTAÑA "Almuerzo" aparece en el
  * selector de categorías).
  *
- * Entrada: visible desde N min antes de lunchEntryTime hasta N min después
- * de lunchExitTime — es decir, todo el bloque de almuerzo con margen en
- * ambas puntas, no una ventana angosta alrededor de la hora de entrada. Así,
- * alguien que llega tarde a marcar su entrada todavía puede tomar el resto
- * de su almuerzo, en vez de perder el acceso a los pocos minutos.
- *
- * Salida: ventana simétrica alrededor de lunchExitTime (± Ver Botón).
+ * Copia del webapp (PunchInOutForm/index.jsx):
+ * - Entrada: [lunchEntryTime − Ver Botón, lunchExitTime], o con permiso de
+ *   Almuerzo [fromTime, fromTime + duración del horario].
+ * - Salida: desde el InicioAlmuerzo real, elapsed ∈ [max(0, duración − Ver
+ *   Botón), duración + Ver Botón). Pasado ese límite ver isLunchExceeded.
  *
  * La etiqueta de puntualidad (Tardanza/A Tiempo) se sigue calculando aparte
  * con Tolerancia (getPunctuality) — ensanchar esta ventana no ensancha esa
@@ -1151,60 +1332,130 @@ export function isAlmuerzoButtonVisible(
     return false;
   }
   if (!schedule) return false;
-
-  const current = getRDMinutes(now);
-  const lastAlmuerzo = [...punches]
-    .reverse()
-    .find((p) => p.type === "InicioAlmuerzo" || p.type === "FinAlmuerzo");
-
-  // Un permiso de almuerzo aprobado reemplaza la ventana del horario (mismo
-  // criterio que ya usa isAlmuerzoVisible), con el mismo margen simétrico.
-  const [almuerzoPermission] = getApprovedPermissionsByAction(
-    permissions,
-    PERMISSION_ACTION.ALMUERZO,
-  );
+  // El webapp exige el horario de almuerzo completo, también con permiso de
+  // Almuerzo (index.jsx:606-611, 671-676)
+  if (!schedule.lunchEntryTime || !schedule.lunchExitTime) return false;
+  // Ya cerró el almuerzo hoy (cualquier FinAlmuerzo) -> ni Entrada ni Salida
+  // (index.jsx:613-618, 678-683)
+  if (punches.some((p) => p.type === "FinAlmuerzo")) return false;
 
   if (isInicio) {
     // Feriado no laborable -> no se inicia almuerzo
     if (isNonWorkingHoliday(holiday, now)) return false;
-    // Ya entró o ya salió de almorzar hoy -> ocultar entrada
-    if (lastAlmuerzo) return false;
+    // Almuerzo abierto -> la acción es Salida, no Entrada
+    if (hasActiveLunchStart(punches)) return false;
 
-    // El límite superior de Entrada NO es "entrada + margen" — es
-    // "salida + margen de salida". Así alguien que llega tarde a marcar su
-    // entrada todavía puede tomar el resto de su bloque de almuerzo, en vez
-    // de quedar sin acceso apenas pasan los primeros minutos.
-    const entryTime = almuerzoPermission
+    // Webapp isAlmuerzoEntryAllowed (index.jsx:600-663): desde
+    // lunchEntryTime − Ver Botón hasta lunchEntryTime + duración (=
+    // lunchExitTime), ambos inclusive. Con permiso de Almuerzo: desde su
+    // fromTime (sin Ver Botón) hasta fromTime + duración del horario.
+    const duration = getScheduledLunchDurationMinutes(schedule);
+    if (duration === null) return false;
+    const almuerzoPermission = getApprovedPermissionsByAction(
+      permissions,
+      PERMISSION_ACTION.ALMUERZO,
+    ).find(
+      (permission) =>
+        !Number.isNaN(timeStrToMinutes(String(permission.fromTime ?? ""))),
+    );
+    const start = almuerzoPermission
       ? timeStrToMinutes(almuerzoPermission.fromTime)
-      : schedule.lunchEntryTime
-        ? timeStrToMinutes(schedule.lunchEntryTime)
-        : null;
-    const exitTime = almuerzoPermission
-      ? timeStrToMinutes(almuerzoPermission.toTime)
-      : schedule.lunchExitTime
-        ? timeStrToMinutes(schedule.lunchExitTime)
-        : null;
-    if (entryTime === null || exitTime === null) return false;
-    return (
-      current >= entryTime - btnVisLunchIn &&
-      current <= exitTime + btnVisLunchOut
-    );
-  } else {
-    // No inició almuerzo, o ya lo cerró -> ocultar salida
-    if (lastAlmuerzo?.type !== "InicioAlmuerzo") return false;
-
-    const exitTime = almuerzoPermission
-      ? timeStrToMinutes(almuerzoPermission.toTime)
-      : schedule.lunchExitTime
-        ? timeStrToMinutes(schedule.lunchExitTime)
-        : null;
-    if (exitTime === null) return false;
-    return (
-      current >= exitTime - btnVisLunchOut &&
-      current <= exitTime + btnVisLunchOut
-    );
+      : timeStrToMinutes(schedule.lunchEntryTime);
+    const end = start + duration;
+    const minutesBefore = almuerzoPermission ? 0 : btnVisLunchIn;
+    const current = getRDMinutes(now);
+    return current >= start - minutesBefore && current <= end;
   }
+
+  // Salida: requiere el almuerzo abierto (isExitAction del webapp)
+  if (!hasActiveLunchStart(punches)) return false;
+  // Webapp isWithinLunchExitWindow (index.jsx:575-585): medido desde el
+  // InicioAlmuerzo real, elapsed ∈ [max(0, duración − Ver Botón),
+  // duración + Ver Botón). Sin métricas el webapp no bloquea.
+  const metrics = getLunchExitWindowMetrics(
+    now,
+    schedule,
+    punches,
+    btnVisLunchOut,
+  );
+  if (metrics === null) return true;
+  return (
+    metrics.elapsedMinutes >= metrics.windowStart &&
+    metrics.elapsedMinutes < metrics.windowEnd
+  );
 }
+
+// Versión anterior (ventana fija alrededor del horario), reemplazada por la
+// regla del webapp:
+// export function isAlmuerzoButtonVisible(
+//   now: Date,
+//   schedule: UserSchedule | null,
+//   isInicio: boolean,
+//   btnVisLunchIn: number,
+//   btnVisLunchOut: number,
+//   punches: PunchEvent[],
+//   permissions: UserDayPermission[],
+//   holiday?: TodayHoliday | null,
+// ): boolean {
+//   // Ausencia aprobada -> nada disponible mientras dure el permiso
+//   if (getApprovedPermission(permissions, PERMISSION_ACTION.AUSENCIA, now)) {
+//     return false;
+//   }
+//   if (!schedule) return false;
+//
+//   const current = getRDMinutes(now);
+//   const lastAlmuerzo = [...punches]
+//     .reverse()
+//     .find((p) => p.type === "InicioAlmuerzo" || p.type === "FinAlmuerzo");
+//
+//   // Un permiso de almuerzo aprobado reemplaza la ventana del horario (mismo
+//   // criterio que ya usa isAlmuerzoVisible), con el mismo margen simétrico.
+//   const [almuerzoPermission] = getApprovedPermissionsByAction(
+//     permissions,
+//     PERMISSION_ACTION.ALMUERZO,
+//   );
+//
+//   if (isInicio) {
+//     // Feriado no laborable -> no se inicia almuerzo
+//     if (isNonWorkingHoliday(holiday, now)) return false;
+//     // Ya entró o ya salió de almorzar hoy -> ocultar entrada
+//     if (lastAlmuerzo) return false;
+//
+//     // El límite superior de Entrada NO es "entrada + margen" — es
+//     // "salida + margen de salida". Así alguien que llega tarde a marcar su
+//     // entrada todavía puede tomar el resto de su bloque de almuerzo, en vez
+//     // de quedar sin acceso apenas pasan los primeros minutos.
+//     const entryTime = almuerzoPermission
+//       ? timeStrToMinutes(almuerzoPermission.fromTime)
+//       : schedule.lunchEntryTime
+//         ? timeStrToMinutes(schedule.lunchEntryTime)
+//         : null;
+//     const exitTime = almuerzoPermission
+//       ? timeStrToMinutes(almuerzoPermission.toTime)
+//       : schedule.lunchExitTime
+//         ? timeStrToMinutes(schedule.lunchExitTime)
+//         : null;
+//     if (entryTime === null || exitTime === null) return false;
+//     return (
+//       current >= entryTime - btnVisLunchIn &&
+//       current <= exitTime + btnVisLunchOut
+//     );
+//   } else {
+//     // No inició almuerzo, o ya lo cerró -> ocultar salida
+//     if (lastAlmuerzo?.type !== "InicioAlmuerzo") return false;
+//
+//     const exitTime = almuerzoPermission
+//       ? timeStrToMinutes(almuerzoPermission.toTime)
+//       : schedule.lunchExitTime
+//         ? timeStrToMinutes(schedule.lunchExitTime)
+//         : null;
+//     if (exitTime === null) return false;
+//     return (
+//       current >= exitTime - btnVisLunchOut &&
+//       current <= exitTime + btnVisLunchOut
+//     );
+//   }
+// }
 
 // ─── Modo de la pantalla Registrar Acceso ─────────────────────────────────────
 

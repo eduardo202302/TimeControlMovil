@@ -180,8 +180,9 @@ describe("isJornadaVisible — Entrada tras una salida", () => {
     expect(verJornada(rd(7, 54), true, madrugada)).toBe(false);
   });
 
-  it("desde workExitTime → oculta", () => {
-    expect(verJornada(rd(17), true, cerrada())).toBe(false);
+  it("workExitTime incluido (como el webapp, index.jsx:487); después → oculta", () => {
+    expect(verJornada(rd(17), true, cerrada())).toBe(true);
+    expect(verJornada(rd(17, 1), true, cerrada())).toBe(false);
     expect(verJornada(rd(20), true, cerrada())).toBe(false);
   });
 

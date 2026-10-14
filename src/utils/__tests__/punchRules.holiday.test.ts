@@ -447,11 +447,14 @@ describe("Almuerzo en feriado no laborable", () => {
     expect(
       verBoton(rd(12, 30), true, PUNCHES.jornadaIniciada, NO_LABORABLE),
     ).toBe(false);
-    expect(verBoton(rd(13), false, PUNCHES.almuerzoIniciado, NO_LABORABLE)).toBe(
-      verBoton(rd(13), false, PUNCHES.almuerzoIniciado, null),
+    // La Salida se mide desde el InicioAlmuerzo real: almuerzo a las 12:00 RD
+    const almuerzoAlas12 = [
+      punch("InicioJornada"),
+      punch("InicioAlmuerzo", { createdDate: rd(12).toISOString() }),
+    ];
+    expect(verBoton(rd(13), false, almuerzoAlas12, NO_LABORABLE)).toBe(
+      verBoton(rd(13), false, almuerzoAlas12, null),
     );
-    expect(verBoton(rd(13), false, PUNCHES.almuerzoIniciado, NO_LABORABLE)).toBe(
-      true,
-    );
+    expect(verBoton(rd(13), false, almuerzoAlas12, NO_LABORABLE)).toBe(true);
   });
 });
