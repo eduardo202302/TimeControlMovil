@@ -1142,6 +1142,10 @@ export default function PunchInOut() {
     }
     const token = await getToken();
     if (!urlColegio || !token) return;
+    // El cierre pendiente es un ponche de OTRO día (no está en el historial de
+    // hoy): sin parpadeo. Se apaga una bandera que haya quedado colgada de un
+    // ponche anterior cuyo fetch falló, para que su refresco no la consuma.
+    blinkRequestedRef.current = false;
     setSubmittingExit(true);
     try {
       const [rawHour, rawMinute] = nextDayExitTime.trim().split(":");
@@ -1530,10 +1534,22 @@ export default function PunchInOut() {
         // Un inicio de jornada exitoso colapsa las tolerancias y resalta su
         // fila en el historial. La bandera se activa ANTES del fetch: el efecto
         // sobre [punches] la consume en cuanto fetchTodayPunches hace setPunches.
-        const isSuccessfulStart =
-          response.data?.success === true && isJornadaStartType(apiType);
-        if (isSuccessfulStart) {
-          setTolerancesExpanded(false);
+        // const isSuccessfulStart =
+        //   response.data?.success === true && isJornadaStartType(apiType);
+        // if (isSuccessfulStart) {
+        //   setTolerancesExpanded(false);
+        //   setHistoryExpanded(true);
+        //   blinkRequestedRef.current = true;
+        // }
+        //
+        // CUALQUIER ponche exitoso (break, almuerzo, fin de jornada y las
+        // variantes Adicional/FH) expande el Historial y resalta su fila —
+        // también el "Fuera de área", que llega con success true. Las
+        // tolerancias se siguen colapsando SOLO en los inicios de jornada.
+        // Los rechazos (success false / "Error de Imagen") no parpadean.
+        const isSuccessfulPunch = response.data?.success === true;
+        if (isSuccessfulPunch) {
+          if (isJornadaStartType(apiType)) setTolerancesExpanded(false);
           setHistoryExpanded(true);
           blinkRequestedRef.current = true;
         }
