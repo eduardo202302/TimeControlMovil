@@ -61,7 +61,8 @@ import {
   buildExcuseEditPayload,
   excuseEditSnapshot,
   excuseJustificationError,
-  excuseReporterName,
+  // excuseReporterName,
+  excuseRequester,
   getExcuseDateRange,
   isRejectionExcuseStateTag,
   resolveStateTagDefinition,
@@ -542,9 +543,18 @@ function CrudForm({
   const stateDotColor = targetTag?.color || excuse.stateTag?.color || null;
 
   // Quién Reporta — "Nombre - Relación" (fallback de relación del webapp).
-  const reporterName = excuseReporterName(excuse);
-  const relationship = excuse.parent?.relationship ?? "Madre/Padre";
-  const reporterLine = relationship ? `${reporterName} - ${relationship}` : reporterName;
+  // const reporterName = excuseReporterName(excuse);
+  // const relationship = excuse.parent?.relationship ?? "Madre/Padre";
+  // const reporterLine = relationship ? `${reporterName} - ${relationship}` : reporterName;
+  // Sin padre (excusa creada por un admin) el nombre sale del usuario
+  // solicitante y NO lleva el sufijo de relación: antes quedaba " - Madre/Padre".
+  const requester = excuseRequester(excuse);
+  const relationship = requester.fromParent
+    ? (excuse.parent?.relationship ?? "Madre/Padre")
+    : "";
+  const reporterLine = relationship
+    ? `${requester.name} - ${relationship}`
+    : requester.name || "—";
   const requestedAt = formatAuditStamp(excuse.createdDate);
   const parentPhone = text(excuse.parent?.phone);
   // El chip de Quién Reporta es el estado GUARDADO, no el que se está editando.

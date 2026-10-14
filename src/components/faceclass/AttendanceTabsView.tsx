@@ -29,6 +29,7 @@ import {
   FIELD_DISABLED_BACKGROUND,
   ON_PRIMARY,
   TEXT_MUTED,
+  LIST_NUMBER_BADGE,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import { RADIUS_MD, RADIUS_PILL, useResponsive } from "@/constants/responsive";
@@ -39,6 +40,8 @@ import {
   isRowLocked,
   shouldShowTardinessPicker,
   showEditIcon,
+  sortAttendanceStudents,
+  studentListNumber,
   subtabRowConfig,
   tardinessEntryTimeValue,
   type ListRowAction,
@@ -194,6 +197,11 @@ export interface AttendanceTabsViewProps {
    * sacar al usuario del tab en que estaba al guardar o al refrescar.
    */
   resetKey?: number | string | null;
+  /**
+   * `settings.showListNumber` de la escuela: pinta el Nº de lista a la
+   * izquierda del avatar y ordena las listas por él (webapp: AttendanceList).
+   */
+  showListNumber?: boolean;
 }
 
 export default function AttendanceTabsView({
@@ -210,6 +218,7 @@ export default function AttendanceTabsView({
   onReload,
   onBack,
   resetKey,
+  showListNumber = false,
 }: AttendanceTabsViewProps) {
   const { scale, verticalScale, font } = useResponsive();
   const styles = useMemo(
@@ -542,6 +551,19 @@ export default function AttendanceTabsView({
     );
   };
 
+  /** Círculo verde con el Nº de lista, a la izquierda del avatar (webapp:
+   * StudentAttendanceCard `listNumberText`). Sin flag o sin número: nada. */
+  const renderListNumber = (subject: AttendanceDetail) => {
+    if (!showListNumber) return null;
+    const listNumber = studentListNumber(subject);
+    if (listNumber == null) return null;
+    return (
+      <View style={styles.listNumberBadge}>
+        <Text style={styles.listNumberText}>{listNumber}</Text>
+      </View>
+    );
+  };
+
   const renderStudentRow = (detail: AttendanceDetail) => {
     const uri = photoUri(detail.student?.photourl);
     const meta = [
@@ -554,6 +576,7 @@ export default function AttendanceTabsView({
       .join(" · ");
     return (
       <View key={detail.id} style={styles.studentRow}>
+        {renderListNumber(detail)}
         <View style={styles.avatar}>
           {uri ? (
             <Image source={{ uri }} style={styles.avatarImage} resizeMode="cover" />
@@ -576,9 +599,10 @@ export default function AttendanceTabsView({
   };
 
   const renderStatusList = (title: string, variant: StatusVariant, details: AttendanceDetail[]) => {
-    const sorted = [...details].sort((a, b) =>
-      (a.student?.fullName ?? "").localeCompare(b.student?.fullName ?? ""),
-    );
+    // const sorted = [...details].sort((a, b) =>
+    //   (a.student?.fullName ?? "").localeCompare(b.student?.fullName ?? ""),
+    // );
+    const sorted = sortAttendanceStudents(details, showListNumber);
     return (
       <View style={styles.card}>
         {sorted.length === 0 ? (
@@ -616,6 +640,7 @@ export default function AttendanceTabsView({
     return (
       <View key={row.id} style={styles.listRow}>
         <View style={styles.listRowMain}>
+          {renderListNumber(row)}
           <View style={styles.avatar}>
             {uri ? (
               <Image source={{ uri }} style={styles.avatarImage} resizeMode="cover" />
@@ -703,8 +728,12 @@ export default function AttendanceTabsView({
 
   const renderList = () => {
     const { listDisabled, buttons } = subtabRowConfig(currentSubtab, cantUpdateManual);
-    const visible = filterDetailsBySubtab(rows, currentSubtab).sort((a, b) =>
-      (a.student?.fullName ?? "").localeCompare(b.student?.fullName ?? ""),
+    // const visible = filterDetailsBySubtab(rows, currentSubtab).sort((a, b) =>
+    //   (a.student?.fullName ?? "").localeCompare(b.student?.fullName ?? ""),
+    // );
+    const visible = sortAttendanceStudents(
+      filterDetailsBySubtab(rows, currentSubtab),
+      showListNumber,
     );
     return (
       <View style={styles.card}>
@@ -1107,6 +1136,17 @@ export function createAttendanceStyles(
       overflow: "hidden",
     },
     avatarImage: { width: scale(38), height: scale(38) },
+    /** Nº de lista — StudentAttendanceCard.listNumberText del webapp (1.5rem). */
+    listNumberBadge: {
+      minWidth: scale(24),
+      height: scale(24),
+      borderRadius: RADIUS_PILL,
+      paddingHorizontal: scale(5),
+      backgroundColor: LIST_NUMBER_BADGE,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    listNumberText: { fontSize: font(12), fontWeight: "600", color: ON_PRIMARY },
     studentInfo: { flex: 1 },
     studentName: { fontSize: font(14), fontWeight: "700", color: TEXT_PRIMARY },
     studentMeta: { fontSize: font(12), color: TEXT_MUTED, marginTop: verticalScale(1) },

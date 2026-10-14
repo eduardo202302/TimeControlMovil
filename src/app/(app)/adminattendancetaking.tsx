@@ -52,7 +52,13 @@ export default function AdminAttendanceTaking() {
     [scale, verticalScale, font],
   );
 
-  const { urlColegio, companySettings, user } = useSchoolStore();
+  const { urlColegio, companySettings, user, school } = useSchoolStore();
+
+  // Nº de lista (webapp: `get(company, "settings.showListNumber", false)`).
+  // companySettings puede ser de una sesión anterior sin la clave: se cae al
+  // `school.settings` crudo del store.
+  const showListNumber =
+    (companySettings?.showListNumber ?? school?.settings?.showListNumber) === true;
   const router = useRouter();
 
   /** Fórmula de handleAttendanceValidations del webapp (ver attendanceRules). */
@@ -253,6 +259,7 @@ export default function AdminAttendanceTaking() {
         refreshEnabled={!!course}
         resetKey={selectionSeq}
         onReload={handleRefresh}
+        showListNumber={showListNumber}
         onBack={() => router.back()}
       />
 

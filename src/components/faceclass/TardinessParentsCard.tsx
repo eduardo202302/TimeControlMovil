@@ -18,16 +18,22 @@ import {
   SECTION_ICON_COLOR,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
-import { RADIUS_PILL, useResponsive } from "@/constants/responsive";
-import type { StudentParent } from "../../utils/tardinessRules";
+import { RADIUS_PILL, RADIUS_SM, useResponsive } from "@/constants/responsive";
+import {
+  parentNotificationLabel,
+  type StudentParent,
+} from "../../utils/tardinessRules";
 import { CARD_FORM } from "@/styles/surfaces";
 
 /**
  * Tarjeta "Padres / Tutores" del panel de Tardanzas — replica el bloque de
  * representantes del StudentCard del webapp (parentsCount > 0 para el badge).
  *
- * Sin sistema de notificaciones en mobile: el badge de campana del webapp no
- * aplica y se omite. Colapsable con estado local (useState), sin persistencia.
+ * // Sin sistema de notificaciones en mobile: el badge de campana del webapp no
+ * // aplica y se omite.
+ * Badge de campana con el tipo de notificación de cada contacto, igual que
+ * ParentsCard del webapp (ver parentNotificationLabel). Colapsable con estado
+ * local (useState), sin persistencia.
  */
 export default function TardinessParentsCard({
   contacts,
@@ -90,6 +96,7 @@ export default function TardinessParentsCard({
               const relationship = contact.parentRelationship?.trim();
               const label = relationship ? `${name} - ${relationship}` : name;
               const phone = contact.phone?.trim() ?? "";
+              const notificationLabel = parentNotificationLabel(contact);
               return (
                 <View
                   key={typeof contact.id === "number" ? contact.id : index}
@@ -107,6 +114,20 @@ export default function TardinessParentsCard({
                     <Text style={styles.contactName} numberOfLines={2}>
                       {label}
                     </Text>
+                    {notificationLabel != null && (
+                      <View style={styles.notificationBadge}>
+                        <Ionicons
+                          name="notifications-outline"
+                          size={12}
+                          color={PRIMARY_COLOR}
+                        />
+                        {!!notificationLabel && (
+                          <Text style={styles.notificationText}>
+                            {notificationLabel}
+                          </Text>
+                        )}
+                      </View>
+                    )}
                     {phone ? (
                       <TouchableOpacity
                         style={styles.phoneRow}
@@ -240,6 +261,21 @@ function createStyles(
       fontSize: font(13),
       fontWeight: "600",
       color: TEXT_PRIMARY,
+    },
+    notificationBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      alignSelf: "flex-start",
+      gap: scale(4),
+      backgroundColor: PRIMARY_TINT_BACKGROUND,
+      borderRadius: RADIUS_SM,
+      paddingHorizontal: scale(6),
+      paddingVertical: verticalScale(2),
+    },
+    notificationText: {
+      fontSize: font(11),
+      fontWeight: "700",
+      color: PRIMARY_COLOR,
     },
     phoneRow: {
       flexDirection: "row",

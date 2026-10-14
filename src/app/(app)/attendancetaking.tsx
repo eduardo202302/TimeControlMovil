@@ -63,7 +63,13 @@ export default function AttendanceTaking() {
     [scale, verticalScale, font],
   );
 
-  const { urlColegio, companySettings, user, attendancesToday } = useSchoolStore();
+  const { urlColegio, companySettings, user, attendancesToday, school } = useSchoolStore();
+
+  // Nº de lista (webapp: `get(company, "settings.showListNumber", false)`).
+  // companySettings puede ser de una sesión anterior sin la clave: se cae al
+  // `school.settings` crudo del store.
+  const showListNumber =
+    (companySettings?.showListNumber ?? school?.settings?.showListNumber) === true;
 
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -220,6 +226,7 @@ export default function AttendanceTaking() {
       emptyText="No hay una clase en curso para tomar la asistencia."
       refreshEnabled={!!subjectId}
       onReload={loadAttendance}
+      showListNumber={showListNumber}
       onBack={() => setShowForm(false)}
     />
   );

@@ -33,6 +33,7 @@ import {
   ICON_SUBTLE,
   ON_PRIMARY,
   TEXT_MUTED,
+  LIST_NUMBER_BADGE,
 } from "@/constants/colors";
 import SectionIcon from "@/components/ui/SectionIcon";
 import {
@@ -52,6 +53,7 @@ import {
   identifyStudentByFace,
   pad2,
   searchStudents,
+  studentCourseListNumber,
   type StudentDetail,
   type StudentOption,
 } from "../../utils/tardinessRules";
@@ -328,6 +330,8 @@ export default function Tardanza() {
   const courseName = student?.course?.find((c) => c.fullName)?.fullName ?? null;
 
   const photo = student ? photoUri(student.photourl) : null;
+  // Nº de lista sobre la foto (webapp: StudentCard `course[0].listNumber`).
+  const listNumber = studentCourseListNumber(student);
 
   return (
     <View style={styles.screen}>
@@ -377,15 +381,24 @@ export default function Tardanza() {
             {student ? (
               <>
                 <View style={styles.employeeHeader}>
-                  <View style={styles.avatarContainer}>
-                    {photo ? (
-                      <Image
-                        source={{ uri: photo }}
-                        style={styles.avatarImage}
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <User size={30} color={TEXT_PLACEHOLDER} />
+                  {/* El contenedor de la foto recorta (overflow hidden): el
+                      badge va en un wrapper hermano para no quedar cortado. */}
+                  <View style={styles.avatarWrap}>
+                    <View style={styles.avatarContainer}>
+                      {photo ? (
+                        <Image
+                          source={{ uri: photo }}
+                          style={styles.avatarImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <User size={30} color={TEXT_PLACEHOLDER} />
+                      )}
+                    </View>
+                    {listNumber != null && (
+                      <View style={styles.listNumberBadge}>
+                        <Text style={styles.listNumberText}>{listNumber}</Text>
+                      </View>
                     )}
                   </View>
                   <View style={styles.employeeInfo}>
@@ -797,6 +810,23 @@ function createStyles(
       gap: scale(12),
       marginTop: verticalScale(12),
     },
+    avatarWrap: { position: "relative" },
+    /** Nº de lista sobre la foto — mismo badge que ExcuseCrudModal.listBadge. */
+    listNumberBadge: {
+      position: "absolute",
+      top: -scale(2),
+      left: -scale(2),
+      minWidth: scale(22),
+      height: scale(22),
+      borderRadius: RADIUS_PILL,
+      paddingHorizontal: scale(4),
+      backgroundColor: LIST_NUMBER_BADGE,
+      borderWidth: 2,
+      borderColor: CARD_BACKGROUND,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    listNumberText: { fontSize: font(11), fontWeight: "700", color: ON_PRIMARY },
     avatarContainer: {
       width: scale(56),
       height: scale(56),

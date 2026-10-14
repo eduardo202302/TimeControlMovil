@@ -243,6 +243,11 @@ export interface CompanySettings {
   serviceNameLabel: string;
   /** Si la Descripción es obligatoria en Reportar Avería. */
   isDescriptionRequired: boolean;
+  /**
+   * Muestra el Nº de lista en Asistencia y ordena por él — misma lectura que
+   * el webapp: `get(company, "settings.showListNumber", false)`.
+   */
+  showListNumber: boolean;
 }
 
 /**

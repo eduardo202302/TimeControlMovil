@@ -291,13 +291,17 @@ export default function ParentsExcusesScreen() {
     cargarEstudiantes();
   }, []);
 
-  // Auto-seleccionar el tipo de excusa marcado isUnique, si el usuario no eligió otro
-  useEffect(() => {
-    if (typeTagsLoading || typeTags.length === 0) return;
-    const uniqueTag = typeTags.find((t) => t.isUnique);
-    if (!uniqueTag) return;
-    setSelectedTagId((prev) => (prev != null ? prev : uniqueTag.id));
-  }, [typeTagsLoading, typeTags]);
+  // QA Face Class (punto 3): el Tipo debe arrancar VACÍO para obligar a
+  // elegirlo — se desactiva la autoselección del tag isUnique (el webapp sí la
+  // hace, ParentsExcusesForm:99). La validación "Debe seleccionar un tipo de
+  // excusa" de validateForm cubre el caso vacío.
+  // // Auto-seleccionar el tipo de excusa marcado isUnique, si el usuario no eligió otro
+  // useEffect(() => {
+  //   if (typeTagsLoading || typeTags.length === 0) return;
+  //   const uniqueTag = typeTags.find((t) => t.isUnique);
+  //   if (!uniqueTag) return;
+  //   setSelectedTagId((prev) => (prev != null ? prev : uniqueTag.id));
+  // }, [typeTagsLoading, typeTags]);
 
   // stateTagId de una excusa nueva: primero un tag marcado add, si no hay,
   // el que se llame "Pendiente" — mismo criterio que ParentsExcusesScreen del webapp.
@@ -326,8 +330,11 @@ export default function ParentsExcusesScreen() {
           if (typeof parsed.subject === "string") setSubject(parsed.subject);
           if (typeof parsed.description === "string")
             setDescription(parsed.description);
-          if (typeof parsed.selectedTagId === "number")
-            setSelectedTagId(parsed.selectedTagId);
+          // El tipo NO se restaura: los borradores viejos lo traen
+          // autoseleccionado (isUnique) y lo reinyectarían. Se sigue
+          // guardando en DraftData por compatibilidad, pero se ignora al leer.
+          // if (typeof parsed.selectedTagId === "number")
+          //   setSelectedTagId(parsed.selectedTagId);
           if (parsed.absenceRange) {
             const start = new Date(parsed.absenceRange.start);
             const end = new Date(parsed.absenceRange.end);

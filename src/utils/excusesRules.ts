@@ -209,6 +209,8 @@ export interface Excuse {
   } | null;
   modifiedByUser?: ExcuseUserRef | null;
   createdByUser?: ExcuseUserRef | null;
+  /** Usuario que solicitó (`schoolUsersId`); llega en el graph `schoolUsers.[user]`. */
+  schoolUsers?: ExcuseUserRef | null;
 
   stateTagId?: number | null;
   typeTagId?: number | null;
@@ -432,6 +434,34 @@ export function excuseReporterName(
   excuse: Pick<Excuse, "parent"> | null | undefined,
 ): string {
   return text(excuse?.parent?.fullName);
+}
+
+export interface ExcuseRequester {
+  /** "" si ninguna de las tres fuentes trae nombre. */
+  name: string;
+  /** true solo si el nombre salió del padre/tutor (`parent`). */
+  fromParent: boolean;
+}
+
+/**
+ * Quién solicitó la excusa, para "Quién Reporta". `parent` solo existe si la
+ * creó un padre/tutor: el POST guarda `parentId` del JWT, que es null para un
+ * admin (Excuses/handlers.js:209). En ese caso se cae al usuario solicitante
+ * (`schoolUsers`) y, por último, a quien la creó (`createdByUser`).
+ * `fromParent` decide si va el sufijo de relación ("- Madre/Padre"): sin
+ * padre no aplica.
+ */
+export function excuseRequester(
+  excuse: Pick<Excuse, "parent" | "schoolUsers" | "createdByUser"> | null | undefined,
+): ExcuseRequester {
+  const parentName = text(excuse?.parent?.fullName);
+  if (parentName) return { name: parentName, fromParent: true };
+  return {
+    name:
+      text(excuse?.schoolUsers?.user?.fullName) ||
+      text(excuse?.createdByUser?.user?.fullName),
+    fromParent: false,
+  };
 }
 
 /** Línea "Modificado por"/"Creado por" del detalle (igual que el webapp). */

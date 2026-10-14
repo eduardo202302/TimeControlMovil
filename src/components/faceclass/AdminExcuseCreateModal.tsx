@@ -305,7 +305,11 @@ function CreateForm({
     });
     const outcome = await createExcuse({ token, urlColegio, payload });
     setSubmitting(false);
-    if (outcome.ok) onCreated(outcome.message || "La excusa quedó registrada.");
+    // El `message` de éxito del backend viene en inglés ("Successfully Created
+    // Excuses.", Excuses/handlers.js:264) — en éxito se ignora y se usa un
+    // texto fijo. En error sí se muestra el del backend (vienen en español).
+    // if (outcome.ok) onCreated(outcome.message || "La excusa quedó registrada.");
+    if (outcome.ok) onCreated("Excusa creada exitosamente.");
     else setSubmitError(outcome.message || "No se pudo registrar la excusa.");
   }, [
     errors,

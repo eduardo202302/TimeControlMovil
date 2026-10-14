@@ -94,10 +94,15 @@ export default function ExcuseCard({
             <Ionicons name="chevron-down" size={12} color={state.color} />
           )}
         </TouchableOpacity>
-        <Text style={styles.cardDate}>
-          {range.from ? formatDisplayDate(range.from) : "—"}
-          {range.isRange && ` — ${formatDisplayDate(range.to)}`}
-        </Text>
+        {/* Id junto a la fecha — el webapp lo muestra como columna "ID"
+            (Excuses/index.jsx:326, MyExcuses/index.jsx:234). */}
+        <View style={styles.cardTopRight}>
+          <Text style={styles.cardId}>{`Id: ${item.id}`}</Text>
+          <Text style={styles.cardDate}>
+            {range.from ? formatDisplayDate(range.from) : "—"}
+            {range.isRange && ` — ${formatDisplayDate(range.to)}`}
+          </Text>
+        </View>
       </View>
 
       <Text style={styles.studentLabel}>Estudiante</Text>
@@ -196,6 +201,16 @@ function createStyles(
       paddingVertical: verticalScale(5),
     },
     stateChipText: { fontSize: font(12), fontWeight: "700" },
+    cardTopRight: {
+      flexShrink: 1,
+      alignItems: "flex-end",
+      gap: verticalScale(2),
+    },
+    cardId: {
+      fontSize: font(11),
+      color: TEXT_MUTED,
+      fontWeight: "700",
+    },
     cardDate: {
       fontSize: font(12),
       color: TEXT_SECONDARY,

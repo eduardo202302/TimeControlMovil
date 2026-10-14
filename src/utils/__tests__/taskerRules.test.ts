@@ -648,6 +648,7 @@ describe("resolveTaskerReportConfig", () => {
     attendanceMode: "",
     serviceNameLabel: TASKER_SERVICE_NAME_LABEL_FALLBACK,
     isDescriptionRequired: TASKER_DESCRIPTION_REQUIRED_FALLBACK,
+    showListNumber: false,
     ...over,
   });
 

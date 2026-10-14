@@ -9,6 +9,8 @@ import {
   isRowLocked,
   shouldShowTardinessPicker,
   showEditIcon,
+  sortAttendanceStudents,
+  studentListNumber,
   subtabRowConfig,
   tardinessEntryTimeValue,
 } from "../attendanceListRules";
@@ -184,5 +186,80 @@ describe("helpers", () => {
     expect(displayStatus({ status: "ausente", haveExcuse: "si" })).toBe("excusa");
     expect(displayStatus({ status: "ausente", haveExcuse: "no" })).toBe("ausente");
     expect(displayStatus({ status: "tardanza", haveExcuse: "si" })).toBe("tardanza");
+  });
+});
+
+// ─── Nº de lista (QA Face Class, punto 4) ─────────────────────────────────────
+
+describe("studentListNumber", () => {
+  const withNumber = (listNumber: unknown) => ({ student: { fullName: "X", listNumber } });
+
+  it("número positivo → ese número", () => {
+    expect(studentListNumber(withNumber(7))).toBe(7);
+  });
+
+  it("string numérico también cuenta", () => {
+    expect(studentListNumber(withNumber("12"))).toBe(12);
+  });
+
+  it.each([null, undefined, 0, -3, "", "abc", Number.NaN])("%p → null (sin badge)", (value) => {
+    expect(studentListNumber(withNumber(value))).toBeNull();
+  });
+
+  it("sin student → null", () => {
+    expect(studentListNumber({ student: null })).toBeNull();
+    expect(studentListNumber({})).toBeNull();
+  });
+});
+
+describe("sortAttendanceStudents", () => {
+  const s = (fullName: string, listNumber?: number | null) => ({
+    student: { fullName, listNumber },
+  });
+  const names = (items: { student: { fullName: string } }[]) =>
+    items.map((item) => item.student.fullName);
+
+  const items = [
+    s("Zoe", 3),
+    s("Ana", null),
+    s("Luis", 1),
+    s("Bea"),
+    s("Carla", 0),
+    s("Mario", 2),
+  ];
+
+  it("con el flag: por Nº asc y los sin número al final, por nombre", () => {
+    expect(names(sortAttendanceStudents(items, true))).toEqual([
+      "Luis",
+      "Mario",
+      "Zoe",
+      "Ana",
+      "Bea",
+      "Carla",
+    ]);
+  });
+
+  it("con el flag: Nº repetido desempata por nombre", () => {
+    expect(names(sortAttendanceStudents([s("Pedro", 4), s("Andrés", 4)], true))).toEqual([
+      "Andrés",
+      "Pedro",
+    ]);
+  });
+
+  it("sin el flag: solo por nombre (comportamiento anterior)", () => {
+    expect(names(sortAttendanceStudents(items, false))).toEqual([
+      "Ana",
+      "Bea",
+      "Carla",
+      "Luis",
+      "Mario",
+      "Zoe",
+    ]);
+  });
+
+  it("no muta el arreglo recibido", () => {
+    const original = [...items];
+    sortAttendanceStudents(items, true);
+    expect(items).toEqual(original);
   });
 });

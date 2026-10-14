@@ -120,6 +120,8 @@ export const WARNING_TINT_50 = "#FFFBEB";
 export const OUTCOME_OK_BACKGROUND = "#ECFDF5";
 /** Punto "en línea" / jornada iniciada y badge de conteo — verde más vivo que SUCCESS_ACCENT. */
 export const ONLINE_DOT = "#22C55E";
+/** Círculo del Nº de lista (Asistencia/Tardanzas) — el verde del webapp (#21ba45). */
+export const LIST_NUMBER_BADGE = "#21BA45";
 /** Chip índigo (categorías y "+N" de Usuarios). */
 export const INDIGO_TINT_BACKGROUND = "#E0E7FF";
 export const INDIGO_TEXT = "#3730A3";

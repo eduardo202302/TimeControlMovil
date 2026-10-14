@@ -104,6 +104,16 @@ describe("buildCompanySettings — claves de Reportar Avería (Tasker)", () => {
       attendanceMode: "Docente",
       serviceNameLabel: "Área",
       isDescriptionRequired: false,
+      showListNumber: false,
     });
+  });
+});
+
+describe("buildCompanySettings — showListNumber (Nº de lista en Asistencia)", () => {
+  it("solo un true real lo activa; default false como el webapp", () => {
+    expect(buildCompanySettings({ showListNumber: true })?.showListNumber).toBe(true);
+    expect(buildCompanySettings({ showListNumber: false })?.showListNumber).toBe(false);
+    expect(buildCompanySettings({})?.showListNumber).toBe(false);
+    expect(buildCompanySettings({ showListNumber: "true" })?.showListNumber).toBe(false);
   });
 });

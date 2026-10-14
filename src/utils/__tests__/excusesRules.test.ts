@@ -24,6 +24,7 @@ import {
   excuseEditSnapshot,
   excuseJustificationError,
   excuseReporterName,
+  excuseRequester,
   fetchAdminExcusesPage,
   fetchExcuseDetail,
   fetchExcusesh,
@@ -966,5 +967,40 @@ describe("mutaciones", () => {
 describe("sanity", () => {
   it("el anchor de la suite es 2026-09-10 16:00 UTC", () => {
     expect(NOW.toISOString()).toBe("2026-09-10T16:00:00.000Z");
+  });
+});
+// ─── Solicitante (QA Face Class, punto 8b) ────────────────────────────────────
+
+describe("excuseRequester", () => {
+  const userRef = (fullName: string | null) => ({ user: { fullName } });
+
+  it("con padre → su nombre y fromParent (lleva sufijo de relación)", () => {
+    expect(
+      excuseRequester({
+        parent: { fullName: "Juan Pérez" },
+        schoolUsers: userRef("Admin Uno"),
+      }),
+    ).toEqual({ name: "Juan Pérez", fromParent: true });
+  });
+
+  it("sin padre (creada por admin) → usuario solicitante, sin sufijo", () => {
+    expect(
+      excuseRequester({
+        parent: null,
+        schoolUsers: userRef("Admin Uno"),
+        createdByUser: userRef("Admin Dos"),
+      }),
+    ).toEqual({ name: "Admin Uno", fromParent: false });
+  });
+
+  it("padre sin nombre y sin schoolUsers → createdByUser", () => {
+    expect(
+      excuseRequester({ parent: { fullName: "  " }, createdByUser: userRef("Admin Dos") }),
+    ).toEqual({ name: "Admin Dos", fromParent: false });
+  });
+
+  it("nada → nombre vacío", () => {
+    expect(excuseRequester({})).toEqual({ name: "", fromParent: false });
+    expect(excuseRequester(null)).toEqual({ name: "", fromParent: false });
   });
 });

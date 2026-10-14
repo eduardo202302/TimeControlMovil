@@ -62,6 +62,9 @@ export function buildCompanySettings(raw: unknown): CompanySettings | null {
       typeof settings.isDescriptionRequired === "boolean"
         ? settings.isDescriptionRequired
         : TASKER_DESCRIPTION_REQUIRED_FALLBACK,
+    // Nº de lista en Asistencia. Default false como el webapp
+    // (AttendanceForm/AdminAttendanceForm); solo un `true` real lo activa.
+    showListNumber: settings.showListNumber === true,
   };
 }
 

@@ -10,7 +10,9 @@ import {
   extractTableRows,
   getStudentTardiness,
   identifyStudentByFace,
+  parentNotificationLabel,
   searchStudents,
+  studentCourseListNumber,
   STUDENT_SEARCH_FIELDS,
   tardinessColorAt,
   tardinessLightOrder,
@@ -95,7 +97,7 @@ describe("toStudentOption", () => {
       fullName: "María Pérez",
       code: "S-042",
       photourl: "/photos/s42.jpg",
-      course: [{ fullName: "2do B", listNumber: 5 }],
+      course: [{ fullName: "2do B", listNumber: 5, status: null }],
       parents: [],
     } satisfies StudentOption | null);
   });
@@ -118,8 +120,16 @@ describe("toStudentOption", () => {
         fullName: "Juan Pérez",
         parentRelationship: "Padre",
         phone: "8091234567",
+        notification: false,
+        notificationType: null,
       },
-      { fullName: "Ana Gómez", parentRelationship: "Madre", phone: null },
+      {
+        fullName: "Ana Gómez",
+        parentRelationship: "Madre",
+        phone: null,
+        notification: false,
+        notificationType: null,
+      },
     ]);
   });
 
@@ -137,7 +147,7 @@ describe("toStudentOption", () => {
     const option = toStudentOption(
       studentRow({ course: { fullName: "3ro A" } }),
     );
-    expect(option?.course).toEqual([{ fullName: "3ro A", listNumber: null }]);
+    expect(option?.course).toEqual([{ fullName: "3ro A", listNumber: null, status: null }]);
   });
 });
 
@@ -340,5 +350,95 @@ describe("createTardiness", () => {
       { token: TOKEN, urlColegio: URL },
     );
     expect(result).toEqual({ ok: false, message: "Error de conexión." });
+  });
+});
+// ─── Notificación de contactos (QA Face Class, punto 7) ───────────────────────
+
+describe("toParent — notification / notificationType", () => {
+  const parentsOf = (parents: unknown[]) =>
+    toStudentOption(studentRow({ parents }))?.parents ?? [];
+
+  test("conserva notification y notificationType del backend", () => {
+    expect(
+      parentsOf([{ fullName: "Ana", notification: true, notificationType: "email" }])[0],
+    ).toMatchObject({ notification: true, notificationType: "email" });
+  });
+
+  test("notification como 1/0 (boolean de MySQL)", () => {
+    const [on, off] = parentsOf([
+      { fullName: "A", notification: 1, notificationType: "whatsapp" },
+      { fullName: "B", notification: 0, notificationType: "ambos" },
+    ]);
+    expect(on.notification).toBe(true);
+    expect(off.notification).toBe(false);
+  });
+
+  test("sin los campos → notification false y tipo null", () => {
+    expect(parentsOf([{ fullName: "C" }])[0]).toMatchObject({
+      notification: false,
+      notificationType: null,
+    });
+  });
+});
+
+describe("parentNotificationLabel (webapp ParentsCard:58-66)", () => {
+  test("sin notification → sin badge", () => {
+    expect(parentNotificationLabel({ notification: false, notificationType: "email" })).toBeNull();
+    expect(parentNotificationLabel({})).toBeNull();
+  });
+
+  test("email → 'Email'", () => {
+    expect(parentNotificationLabel({ notification: true, notificationType: "email" })).toBe("Email");
+  });
+
+  test("resto de valores → en mayúsculas", () => {
+    expect(parentNotificationLabel({ notification: true, notificationType: "whatsapp" })).toBe(
+      "WHATSAPP",
+    );
+    expect(parentNotificationLabel({ notification: true, notificationType: "ambos" })).toBe("AMBOS");
+  });
+
+  test("notification sin tipo → '' (campana sola, como el webapp)", () => {
+    expect(parentNotificationLabel({ notification: true, notificationType: null })).toBe("");
+  });
+});
+
+// ─── Nº de lista sobre la foto (QA Face Class, punto 6) ───────────────────────
+
+describe("studentCourseListNumber", () => {
+  test("toCourse conserva el status de la matrícula", () => {
+    const option = toStudentOption(
+      studentRow({ course: [{ fullName: "2do B", listNumber: 5, status: "active" }] }),
+    );
+    expect(option?.course?.[0]?.status).toBe("active");
+  });
+
+  test("prefiere la matrícula activa aunque no sea la primera", () => {
+    expect(
+      studentCourseListNumber({
+        course: [
+          { fullName: "1ro A", listNumber: 9, status: "inactive" },
+          { fullName: "2do B", listNumber: 4, status: "active" },
+        ],
+      }),
+    ).toBe(4);
+  });
+
+  test("sin matrícula activa → course[0], como el webapp", () => {
+    expect(
+      studentCourseListNumber({
+        course: [
+          { fullName: "1ro A", listNumber: 9, status: "inactive" },
+          { fullName: "2do B", listNumber: 4, status: null },
+        ],
+      }),
+    ).toBe(9);
+  });
+
+  test("null / 0 / sin cursos / sin estudiante → null", () => {
+    expect(studentCourseListNumber({ course: [{ listNumber: null, status: "active" }] })).toBeNull();
+    expect(studentCourseListNumber({ course: [{ listNumber: 0 }] })).toBeNull();
+    expect(studentCourseListNumber({ course: [] })).toBeNull();
+    expect(studentCourseListNumber(null)).toBeNull();
   });
 });

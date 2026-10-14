@@ -141,3 +141,49 @@ export function displayStatus(
 ): AttendanceStatus | "excusa" {
   return row.status === "ausente" && row.haveExcuse === "si" ? "excusa" : row.status;
 }
+
+// ─── Número de lista ─────────────────────────────────────────────────────────
+
+/** Lo mínimo que necesitan el badge y el orden: el `student` del detalle. */
+type ListNumberSubject = {
+  student?: { fullName?: string | null; listNumber?: unknown } | null;
+};
+
+/**
+ * Nº de lista del estudiante, o null si no tiene. Lo agrega el backend
+ * (`addListNumbersToStudents`, que ya lo omite si es 0/null); acá también se
+ * descarta cualquier valor no positivo para no pintar un badge "0".
+ */
+export function studentListNumber(subject: ListNumberSubject): number | null {
+  const raw = subject.student?.listNumber;
+  const value = typeof raw === "string" && raw.trim() !== "" ? Number(raw) : raw;
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function byFullName(a: ListNumberSubject, b: ListNumberSubject): number {
+  return (a.student?.fullName ?? "").localeCompare(b.student?.fullName ?? "");
+}
+
+/**
+ * Orden de las listas de Asistencia — mismo criterio que AttendanceList del
+ * webapp (`orderBy(students, ["student.listNumber"])` solo si la escuela
+ * tiene `settings.showListNumber`):
+ *   - con el flag: por Nº de lista ascendente; los que no tienen número van
+ *     al final, por nombre (empates también por nombre);
+ *   - sin el flag: por nombre, como hasta ahora.
+ * Devuelve una copia; no muta el arreglo recibido.
+ */
+export function sortAttendanceStudents<T extends ListNumberSubject>(
+  items: readonly T[],
+  byListNumber: boolean,
+): T[] {
+  if (!byListNumber) return [...items].sort(byFullName);
+  return [...items].sort((a, b) => {
+    const na = studentListNumber(a);
+    const nb = studentListNumber(b);
+    if (na != null && nb != null && na !== nb) return na - nb;
+    if (na != null && nb == null) return -1;
+    if (na == null && nb != null) return 1;
+    return byFullName(a, b);
+  });
+}

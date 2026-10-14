@@ -24,6 +24,8 @@ import axios from "axios";
 export interface StudentCourse {
   fullName?: string | null;
   listNumber?: number | null;
+  /** `enrollments.status` ("active" | "inactive") — extra del ManyToMany. */
+  status?: string | null;
   [key: string]: unknown;
 }
 
@@ -32,6 +34,10 @@ export interface StudentParent {
   fullName?: string | null;
   parentRelationship?: string | null;
   phone?: string | null;
+  /** `parents.notification` — si el contacto recibe notificaciones. */
+  notification?: boolean;
+  /** `parents.notificationType`: "whatsapp" | "email" | "ambos" (enum del backend). */
+  notificationType?: string | null;
   [key: string]: unknown;
 }
 
@@ -102,6 +108,7 @@ function toCourse(raw: unknown): StudentCourse {
   return {
     fullName: readText(row.fullName),
     listNumber: typeof row.listNumber === "number" ? row.listNumber : null,
+    status: readText(row.status),
   };
 }
 
@@ -121,7 +128,39 @@ function toParent(raw: unknown): StudentParent {
     parentRelationship:
       readText(row.parentRelationship) ?? readText(row.relationship) ?? null,
     phone: readText(row.phone) ?? readText(row.telephone) ?? null,
+    // Columna boolean de MySQL: puede llegar como true/false o 1/0.
+    notification: row.notification === true || row.notification === 1,
+    notificationType: readText(row.notificationType),
   };
+}
+
+/**
+ * Texto del badge de notificación del contacto, o null si no lleva badge —
+ * calcado de ParentsCard del webapp (Tardiness, :58-66): solo con
+ * `notification`; "Email" si el tipo es email, si no el valor en mayúsculas
+ * ("WHATSAPP", "AMBOS"). Sin tipo queda "" (la campana sola, como el webapp).
+ */
+export function parentNotificationLabel(
+  parent: Pick<StudentParent, "notification" | "notificationType">,
+): string | null {
+  if (!parent.notification) return null;
+  if (parent.notificationType === "email") return "Email";
+  return String(parent.notificationType ?? "").toUpperCase();
+}
+
+/**
+ * Nº de lista para el badge de la foto. El webapp lee `course[0].listNumber`
+ * (StudentCard:90), pero `course` trae TODAS las matrículas (el ManyToMany no
+ * filtra por status): se prefiere la activa y, si ninguna lo está, se cae a
+ * `course[0]` como el webapp. null/0 → sin badge.
+ */
+export function studentCourseListNumber(
+  student: Pick<StudentOption, "course"> | null | undefined,
+): number | null {
+  const courses = student?.course ?? [];
+  const active = courses.find((course) => course.status === "active");
+  const value = (active ?? courses[0])?.listNumber;
+  return typeof value === "number" && value > 0 ? value : null;
 }
 
 function normalizeParents(raw: unknown): StudentParent[] {
