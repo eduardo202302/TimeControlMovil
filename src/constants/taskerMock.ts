@@ -158,23 +158,7 @@ export function getTaskerOpenTask(now: number = Date.now()): TaskerOpenTaskRespo
         whoReceives: "Recepción",
         restrictions: "",
       },
-      comments: [
-        {
-          id: 1,
-          addUser: { name: "Jeremy Domínguez" },
-          createdDate: at("10:55:00"),
-          comment:
-            "Contacto establecido con el supervisor en planta. Se coordinó inspección de rutina en el tablero secundario.",
-          images: ["comentarios/4045/adjunto-1.jpg"],
-        },
-        {
-          id: 2,
-          addUser: { name: "Jeremy Móvil" },
-          createdDate: at("09:55:00"),
-          comment: "Se recibió el reporte. Técnico asignado para la visita.",
-          images: [],
-        },
-      ],
+      comments: [],
       activities: [
         {
           id: 4,

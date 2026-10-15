@@ -1,15 +1,28 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useMemo, useState } from "react";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { ON_PRIMARY, TEXT_MUTED } from "@/constants/colors";
 import { useResponsive } from "@/constants/responsive";
 import { getTaskerOpenTask } from "@/constants/taskerMock";
 import {
   getStateActivities,
-  sortComments,
+  removeTaskerComment,
+  updateTaskerComment,
   type CommentOrder,
 } from "../../utils/taskerRules";
-import type { TaskerComment } from "../../../types/typesTasker/TaskerTypes";
+import { useSchoolStore } from "../../../store/useSchoolStore";
+import type {
+  TaskerComment,
+  TaskerCommentAuthor,
+  TaskerCommentDraft,
+} from "../../../types/typesTasker/TaskerTypes";
 import FollowUpActionsTab from "./FollowUpActionsTab";
 import FollowUpAddressTab from "./FollowUpAddressTab";
 import { StateChip } from "./FollowUpParts";
@@ -27,7 +40,7 @@ const TABS: { key: FollowUpTab; label: string; icon: keyof typeof Ionicons.glyph
 /**
  * Seguimiento de un ticket de Tasker — FASE B: con los datos fijos de
  * taskerMock.ts. Las tres pestañas son estado local de esta pantalla; los
- * comentarios se agregan en local (todavía no se envían).
+ * comentarios se agregan, editan y borran en local (todavía no se envían).
  */
 export default function FollowUpView() {
   const { scale, verticalScale, font, isTablet } = useResponsive();
@@ -43,25 +56,35 @@ export default function FollowUpView() {
   const stateActivities = useMemo(() => getStateActivities(task.activities), [task]);
 
   const [tab, setTab] = useState<FollowUpTab>("ticket");
-  // Viven acá y no en la pestaña: orden y comentarios agregados se conservan
-  // al cambiar de pestaña.
+  /** El formulario de comentarios se lleva a la vista (y sobre el teclado). */
+  const scrollRef = useRef<ScrollView>(null);
+  // Viven acá y no en la pestaña: orden y cambios a los comentarios se
+  // conservan al cambiar de pestaña. TaskerCommentsCard ordena al pintar.
   const [commentOrder, setCommentOrder] = useState<CommentOrder>("desc");
-  /**
-   * Lista tal como se pinta (como Tasker): ordenar reordena TODA la lista por
-   * createdDate; un comentario nuevo entra SIEMPRE arriba, sea cual sea el orden.
-   */
-  const [comments, setComments] = useState<TaskerComment[]>(() =>
-    sortComments(task.comments, "desc"),
-  );
+  const [comments, setComments] = useState<TaskerComment[]>(() => task.comments);
 
-  const handleToggleCommentOrder = useCallback(() => {
-    const next: CommentOrder = commentOrder === "desc" ? "asc" : "desc";
-    setCommentOrder(next);
-    setComments((prev) => sortComments(prev, next));
-  }, [commentOrder]);
+  // Quién puede editar y borrar: ver canEditTaskerComment.
+  const sessionUser = useSchoolStore((state) => state.user);
+  const currentUser = useMemo<TaskerCommentAuthor | null>(
+    () =>
+      sessionUser?.user
+        ? { id: sessionUser.user.id, name: sessionUser.user.fullName }
+        : null,
+    [sessionUser],
+  );
 
   const handleAddComment = useCallback((comment: TaskerComment) => {
     setComments((prev) => [comment, ...prev]);
+  }, []);
+
+  // TODO(puente): Tasker no tiene ruta para editar ni borrar comentarios; por
+  // ahora estos dos cambios solo viven en esta pantalla.
+  const handleUpdateComment = useCallback((id: number, draft: TaskerCommentDraft) => {
+    setComments((prev) => updateTaskerComment(prev, id, draft));
+  }, []);
+
+  const handleRemoveComment = useCallback((id: number) => {
+    setComments((prev) => removeTaskerComment(prev, id));
   }, []);
 
   return (
@@ -99,46 +122,58 @@ export default function FollowUpView() {
         </View>
       </View>
 
-      {/* key = pestaña: cada una arranca desde arriba. */}
-      <ScrollView
-        key={tab}
+      {/* Mismo criterio que ReportFaultForm: en iOS el teclado achica el área de scroll. */}
+      <KeyboardAvoidingView
         style={styles.flex}
-        contentContainerStyle={[styles.content, isTablet && styles.contentTablet]}
-        showsVerticalScrollIndicator={false}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {tab !== "ticket" && (
-          <View style={styles.strip}>
-            <View style={styles.stripBody}>
-              <Text style={styles.stripTitle}>Ticket #{task.id}</Text>
-              <Text style={styles.stripClient} numberOfLines={1}>
-                {task.client.name}
-              </Text>
+        {/* key = pestaña: cada una arranca desde arriba. */}
+        <ScrollView
+          key={tab}
+          ref={scrollRef}
+          style={styles.flex}
+          contentContainerStyle={[styles.content, isTablet && styles.contentTablet]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {tab !== "ticket" && (
+            <View style={styles.strip}>
+              <View style={styles.stripBody}>
+                <Text style={styles.stripTitle}>Ticket #{task.id}</Text>
+                <Text style={styles.stripClient} numberOfLines={1}>
+                  {task.client.name}
+                </Text>
+              </View>
+              <StateChip state={task.state} styles={styles} />
             </View>
-            <StateChip state={task.state} styles={styles} />
-          </View>
-        )}
+          )}
 
-        {tab === "ticket" && (
-          <FollowUpTicketTab
-            task={task}
-            styles={styles}
-            nowMs={nowMs}
-            comments={comments}
-            commentOrder={commentOrder}
-            onToggleCommentOrder={handleToggleCommentOrder}
-            onAddComment={handleAddComment}
-          />
-        )}
-        {tab === "address" && <FollowUpAddressTab address={task.address} styles={styles} />}
-        {tab === "actions" && (
-          <FollowUpActionsTab
-            activities={stateActivities}
-            stateId={task.stateId}
-            nowMs={nowMs}
-            styles={styles}
-          />
-        )}
-      </ScrollView>
+          {tab === "ticket" && (
+            <FollowUpTicketTab
+              task={task}
+              styles={styles}
+              nowMs={nowMs}
+              comments={comments}
+              commentOrder={commentOrder}
+              onCommentOrderChange={setCommentOrder}
+              currentUser={currentUser}
+              onAddComment={handleAddComment}
+              onUpdateComment={handleUpdateComment}
+              onRemoveComment={handleRemoveComment}
+              scrollRef={scrollRef}
+            />
+          )}
+          {tab === "address" && <FollowUpAddressTab address={task.address} styles={styles} />}
+          {tab === "actions" && (
+            <FollowUpActionsTab
+              activities={stateActivities}
+              stateId={task.stateId}
+              nowMs={nowMs}
+              styles={styles}
+            />
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

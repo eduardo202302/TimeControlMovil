@@ -10,7 +10,6 @@ import {
   PRIMARY_700,
   PRIMARY_COLOR,
   PRIMARY_TINT_50,
-  PRIMARY_TINT_BACKGROUND,
   PRIMARY_TINT_BORDER,
   TEXT_MUTED,
   TEXT_PLACEHOLDER,
@@ -20,7 +19,6 @@ import {
 import {
   MAX_CONTENT_WIDTH,
   RADIUS_LG,
-  RADIUS_MD,
   RADIUS_PILL,
   RADIUS_SM,
 } from "@/constants/responsive";
@@ -28,9 +26,6 @@ import { SHADOW_SM } from "@/constants/shadows";
 import {
   CARD_FORM,
   CARD_ROW,
-  FIELD_SURFACE,
-  FOOTER_BTN_SAVE,
-  ROW_ACTION_BTN,
   SEGMENTED_SURFACE,
   SEGMENT_ACTIVE,
 } from "@/styles/surfaces";
@@ -201,112 +196,6 @@ export function createFollowUpStyles(
       backgroundColor: FIELD_DISABLED_BACKGROUND,
     },
     descriptionText: { fontSize: font(14), lineHeight: font(20), color: TEXT_SECONDARY },
-    // Botón de ícono cuadrado: 40×40 fijo (área táctil).
-    iconBtn: {
-      ...ROW_ACTION_BTN,
-      width: 40,
-      height: 40,
-      borderRadius: RADIUS_LG,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    addCommentBtn: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: scale(6),
-      minHeight: verticalScale(40),
-      paddingHorizontal: scale(12),
-      borderWidth: 1,
-      borderColor: PRIMARY_TINT_BORDER,
-      borderRadius: RADIUS_LG,
-      backgroundColor: PRIMARY_TINT_50,
-    },
-    addCommentText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_700 },
-    commentList: { gap: verticalScale(8) },
-    comment: {
-      padding: scale(12),
-      borderRadius: RADIUS_LG,
-      backgroundColor: FIELD_BACKGROUND,
-    },
-    commentHeader: { flexDirection: "row", alignItems: "center", gap: scale(10) },
-    // Avatar circular de iniciales: 32×32 fijo.
-    avatar: {
-      width: 32,
-      height: 32,
-      borderRadius: RADIUS_PILL,
-      backgroundColor: PRIMARY_TINT_BACKGROUND,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    avatarText: { fontSize: font(12), fontWeight: "700", color: PRIMARY_700 },
-    commentMeta: { flex: 1 },
-    commentAuthor: { fontSize: font(14), fontWeight: "700", color: TEXT_PRIMARY },
-    commentDate: { fontSize: font(12), color: TEXT_MUTED, fontVariant: ["tabular-nums"] },
-    commentText: {
-      marginTop: verticalScale(8),
-      fontSize: font(14),
-      lineHeight: font(20),
-      color: TEXT_SECONDARY,
-    },
-    commentImages: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: scale(8),
-      marginTop: verticalScale(10),
-    },
-    // Miniatura de adjunto: 56×56 fijo, igual que el mockup.
-    commentImage: {
-      width: 56,
-      height: 56,
-      borderWidth: 1,
-      borderColor: CARD_BORDER,
-      borderRadius: RADIUS_MD,
-      backgroundColor: PRIMARY_TINT_BACKGROUND,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    // Adjunto de imagen en local (data-URI): la imagen real llena la miniatura.
-    commentImageFill: { width: "100%", height: "100%", borderRadius: RADIUS_MD },
-    emptyText: { fontSize: font(13), color: TEXT_PLACEHOLDER, fontStyle: "italic" },
-
-    /* ── Formulario "Agregar comentario" ── */
-    commentForm: { gap: verticalScale(10), marginBottom: verticalScale(12) },
-    commentInput: {
-      ...FIELD_SURFACE,
-      minHeight: verticalScale(88),
-      padding: scale(12),
-      fontSize: font(14),
-      lineHeight: font(20),
-      color: TEXT_PRIMARY,
-    },
-    commentFormThumb: { position: "relative" },
-    // Botón de quitar sobre la miniatura: 24×24 fijo (área táctil del ícono).
-    commentFormRemove: {
-      position: "absolute",
-      top: -6,
-      right: -6,
-      width: 24,
-      height: 24,
-      borderWidth: 1,
-      borderColor: CARD_BORDER,
-      borderRadius: RADIUS_PILL,
-      backgroundColor: CARD_BACKGROUND,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    commentFormActions: { flexDirection: "row", alignItems: "center", gap: scale(8) },
-    commentSubmitBtn: {
-      ...FOOTER_BTN_SAVE,
-      flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: scale(6),
-      minHeight: verticalScale(40),
-    },
-    commentSubmitBtnDisabled: { opacity: 0.5, shadowColor: "transparent", elevation: 0 },
-    commentSubmitText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
-
     /* ── Pestaña Dirección ── */
     addressGrid: {
       flexDirection: "row",

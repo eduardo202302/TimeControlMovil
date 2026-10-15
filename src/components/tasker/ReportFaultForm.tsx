@@ -1,9 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -23,7 +21,6 @@ import {
   PRIMARY_700,
   PRIMARY_COLOR,
   PRIMARY_TINT_50,
-  PRIMARY_TINT_BACKGROUND,
   PRIMARY_TINT_BORDER,
   SECTION_ICON_COLOR,
   TAG_DOT_FALLBACK,
@@ -31,8 +28,6 @@ import {
   TEXT_PLACEHOLDER,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
-  WARNING_TEXT_STRONG,
-  WARNING_TINT_BACKGROUND,
 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
@@ -41,9 +36,9 @@ import {
   useResponsive,
 } from "@/constants/responsive";
 import { getTaskerReportContext, getTaskerTypeTags } from "@/constants/taskerMock";
-import ImageViewerModal from "@/components/ui/ImageViewerModal";
 import SectionIcon from "@/components/ui/SectionIcon";
 import TagOptionSheet from "@/components/permissions/TagOptionSheet";
+import { MAX_PAYLOAD_BYTES } from "@/components/permissions/pickAttachments";
 import {
   ADD_FILE_BTN,
   CARD_FORM,
@@ -51,36 +46,40 @@ import {
   FOOTER_BAR,
   FOOTER_BTN_CANCEL,
   FOOTER_BTN_SAVE,
-  ROW_ACTION_BTN,
-  THUMB_TILE,
 } from "@/styles/surfaces";
 import {
   addTaskerAddress,
+  addTaskerComment,
   getTagChipTone,
+  isTaskerCommentsOverPayloadLimit,
   removeTaskerAddress,
+  removeTaskerComment,
   resolveTaskerReportConfig,
   toggleTaskerAddressSelected,
   updateTaskerAddress,
+  updateTaskerComment,
   validateReport,
 } from "../../utils/taskerRules";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import type {
   TaskerAddress,
-  TaskerAttachment,
+  TaskerComment,
+  TaskerCommentAuthor,
+  TaskerCommentDraft,
   TaskerReportAddress,
   TaskerReportErrors,
 } from "../../../types/typesTasker/TaskerTypes";
 import { showPendingAction } from "./pendingAction";
 import TaskerAddressModal from "./TaskerAddressModal";
 import TaskerAddressSummary from "./TaskerAddressSummary";
-import { useTaskerAttachmentPicker } from "./useTaskerAttachmentPicker";
+import TaskerCommentsCard from "./TaskerCommentsCard";
 
 type Styles = ReturnType<typeof createStyles>;
 
 /**
  * Reportar Avería (Tasker) — FASE B: con los datos fijos de taskerMock.ts.
- * Adjuntos y direcciones se agregan, editan, borran y marcan en local; solo
- * el envío final llama a showPendingAction().
+ * Comentarios (con sus imágenes y PDF) y direcciones se agregan, editan,
+ * borran y marcan en local; solo el envío final llama a showPendingAction().
  */
 export default function ReportFaultForm() {
   const { scale, verticalScale, font, isTablet } = useResponsive();
@@ -95,11 +94,15 @@ export default function ReportFaultForm() {
   // Fijos durante la vida de la pantalla: hoy vienen del mock.
   const typeTags = useMemo(() => getTaskerTypeTags(), []);
   const context = useMemo(() => getTaskerReportContext(), []);
+  // Autor de los comentarios: el usuario en sesión.
+  const sessionUser = useSchoolStore((state) => state.user);
+  const commentAuthor = useMemo<TaskerCommentAuthor>(
+    () => ({ id: sessionUser?.user?.id ?? null, name: sessionUser?.user?.fullName ?? "Usuario" }),
+    [sessionUser],
+  );
 
   const [typeId, setTypeId] = useState<number | null>(null);
   const [description, setDescription] = useState("");
-  const [attachments, setAttachments] = useState<TaskerAttachment[]>([]);
-  const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [errors, setErrors] = useState<TaskerReportErrors>({});
   const [typeSheetVisible, setTypeSheetVisible] = useState(false);
   const [addresses, setAddresses] = useState<TaskerReportAddress[]>(context.addresses);
@@ -107,21 +110,15 @@ export default function ReportFaultForm() {
   const [addressEditor, setAddressEditor] = useState<{
     target: TaskerReportAddress | null;
   } | null>(null);
+  const [comments, setComments] = useState<TaskerComment[]>([]);
+  /** La tarjeta de comentarios lleva su formulario a la vista (y sobre el teclado). */
+  const scrollRef = useRef<ScrollView>(null);
 
   const selectedType = typeTags.find((t) => t.id === typeId) ?? null;
 
   const handleDescriptionChange = useCallback((text: string) => {
     setDescription(text);
     setErrors((prev) => (prev.description ? { ...prev, description: undefined } : prev));
-  }, []);
-
-  const handleAddAttachments = useCallback((added: TaskerAttachment[]) => {
-    setAttachments((prev) => [...prev, ...added]);
-  }, []);
-  const picker = useTaskerAttachmentPicker(attachments, handleAddAttachments);
-
-  const handleRemoveAttachment = useCallback((id: string) => {
-    setAttachments((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
   const handleAddressSelected = useCallback(
@@ -157,10 +154,25 @@ export default function ReportFaultForm() {
     setAddresses((prev) => toggleTaskerAddressSelected(prev, id));
   }, []);
 
+  const handleAddComment = useCallback(
+    (draft: TaskerCommentDraft) => {
+      setComments((prev) => addTaskerComment(prev, draft, commentAuthor, new Date()));
+    },
+    [commentAuthor],
+  );
+
+  const handleEditComment = useCallback((id: number, draft: TaskerCommentDraft) => {
+    setComments((prev) => updateTaskerComment(prev, id, draft));
+  }, []);
+
+  const handleRemoveComment = useCallback((id: number) => {
+    setComments((prev) => removeTaskerComment(prev, id));
+  }, []);
+
   const handleCancel = useCallback(() => {
     setTypeId(null);
     setDescription("");
-    setAttachments([]);
+    setComments([]);
     setAddresses(context.addresses);
     setErrors({});
   }, [context.addresses]);
@@ -168,9 +180,20 @@ export default function ReportFaultForm() {
   const handleSubmit = useCallback(() => {
     const result = validateReport({ typeId, description }, config);
     setErrors(result);
-    // TODO(puente): enviar el reporte (tipo, descripción, adjuntos y direcciones).
-    if (Object.keys(result).length === 0) showPendingAction();
-  }, [typeId, description, config]);
+    if (Object.keys(result).length > 0) return;
+    // Un solo envío: el tope suma los adjuntos de todos los comentarios.
+    if (isTaskerCommentsOverPayloadLimit(comments, MAX_PAYLOAD_BYTES)) {
+      Alert.alert(
+        "Adjuntos",
+        "Los adjuntos de los comentarios superan el límite total de 20MB. Quita alguno para enviar.",
+      );
+      return;
+    }
+    // TODO(puente): enviar el reporte (tipo, descripción y direcciones). Cada
+    // comentario va como un elemento de taskComments ({ comment, images }), con
+    // comment "" si solo trae adjuntos.
+    showPendingAction();
+  }, [typeId, description, config, comments]);
 
   const clientTone = getTagChipTone(0);
 
@@ -180,6 +203,7 @@ export default function ReportFaultForm() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
+        ref={scrollRef}
         style={styles.flex}
         contentContainerStyle={[styles.content, isTablet && styles.contentTablet]}
         keyboardShouldPersistTaps="handled"
@@ -244,45 +268,16 @@ export default function ReportFaultForm() {
           )}
         </View>
 
-        {/* ── Imágenes ── */}
-        <View style={styles.card}>
-          <CardHeader styles={styles} tone="amber" icon="images-outline" title="Imágenes">
-            {attachments.length > 0 && (
-              <View style={styles.countChip}>
-                <Text style={styles.countChipText}>
-                  {attachments.length} {attachments.length === 1 ? "archivo" : "archivos"}
-                </Text>
-              </View>
-            )}
-          </CardHeader>
-          {attachments.length > 0 && (
-            <View style={styles.thumbGrid}>
-              {attachments.map((file) => (
-                <AttachmentTile
-                  key={file.id}
-                  file={file}
-                  styles={styles}
-                  onOpen={setViewerUri}
-                  onRemove={handleRemoveAttachment}
-                />
-              ))}
-            </View>
-          )}
-          <TouchableOpacity
-            style={[styles.addBtn, attachments.length > 0 && styles.addBtnSpaced]}
-            onPress={picker.openPicker}
-            disabled={picker.busy}
-            activeOpacity={0.75}
-          >
-            {picker.busy ? (
-              <ActivityIndicator size="small" color={PRIMARY_700} />
-            ) : (
-              <Ionicons name="camera-outline" size={18} color={PRIMARY_700} />
-            )}
-            <Text style={styles.addBtnText}>Tomar foto o adjuntar archivo</Text>
-          </TouchableOpacity>
-          <Text style={styles.helper}>Imágenes o PDF.</Text>
-        </View>
+        {/* ── Comentarios: texto, imágenes/PDF o ambos (todos del usuario en sesión: editables) ── */}
+        <TaskerCommentsCard
+          comments={comments}
+          canEdit={() => true}
+          onAdd={handleAddComment}
+          onEdit={handleEditComment}
+          onDelete={handleRemoveComment}
+          sharedAttachmentLimit
+          scrollRef={scrollRef}
+        />
 
         {/* ── Cliente (solo lectura) ── */}
         <View style={styles.card}>
@@ -373,8 +368,6 @@ export default function ReportFaultForm() {
         onClose={() => setAddressEditor(null)}
         onSelect={handleAddressSelected}
       />
-
-      <ImageViewerModal uri={viewerUri} onClose={() => setViewerUri(null)} />
     </KeyboardAvoidingView>
   );
 }
@@ -396,50 +389,6 @@ function CardHeader({ styles, tone, icon, title, children }: CardHeaderProps) {
       </SectionIcon>
       <Text style={styles.cardTitle}>{title}</Text>
       {children}
-    </View>
-  );
-}
-
-interface AttachmentTileProps {
-  file: TaskerAttachment;
-  styles: Styles;
-  /** Abre la imagen en el visor (los PDF no se abren). */
-  onOpen: (uri: string) => void;
-  onRemove: (id: string) => void;
-}
-
-function AttachmentTile({ file, styles, onOpen, onRemove }: AttachmentTileProps) {
-  const isImage = file.mimeType.startsWith("image/");
-  return (
-    <View style={styles.thumbTile}>
-      {isImage ? (
-        <TouchableOpacity
-          style={styles.thumbPreview}
-          onPress={() => onOpen(file.dataUri)}
-          accessibilityLabel={`Ver ${file.name}`}
-          activeOpacity={0.8}
-        >
-          <Image source={{ uri: file.dataUri }} style={styles.thumbImage} resizeMode="cover" />
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.thumbPreview}>
-          <Ionicons name="document-outline" size={26} color={PRIMARY_700} />
-          <Text style={styles.thumbLabel}>PDF</Text>
-        </View>
-      )}
-      <View style={styles.thumbFooter}>
-        <Text style={styles.thumbName} numberOfLines={1}>
-          {file.name}
-        </Text>
-        <TouchableOpacity
-          style={styles.thumbRemove}
-          onPress={() => onRemove(file.id)}
-          accessibilityLabel={`Quitar ${file.name}`}
-          activeOpacity={0.75}
-        >
-          <Ionicons name="trash-outline" size={16} color={DANGER_ICON} />
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -562,46 +511,6 @@ function createStyles(
     },
     fieldInvalid: { borderColor: ERROR_COLOR },
     fieldError: { fontSize: font(12), color: ERROR_COLOR, marginTop: verticalScale(4) },
-    countChip: {
-      paddingHorizontal: scale(10),
-      paddingVertical: verticalScale(3),
-      borderRadius: RADIUS_PILL,
-      backgroundColor: WARNING_TINT_BACKGROUND,
-    },
-    countChipText: { fontSize: font(11), fontWeight: "700", color: WARNING_TEXT_STRONG },
-    // Dos columnas: cada tile ocupa 48% y space-between deja el hueco.
-    thumbGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      justifyContent: "space-between",
-      rowGap: verticalScale(10),
-    },
-    thumbTile: { ...THUMB_TILE, width: "48%", padding: scale(6) },
-    thumbPreview: {
-      height: verticalScale(104),
-      borderRadius: RADIUS_SM,
-      backgroundColor: PRIMARY_TINT_BACKGROUND,
-      alignItems: "center",
-      justifyContent: "center",
-      gap: verticalScale(4),
-    },
-    thumbImage: { width: "100%", height: "100%", borderRadius: RADIUS_SM },
-    thumbLabel: { fontSize: font(11), fontWeight: "600", color: PRIMARY_700 },
-    thumbFooter: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: scale(4),
-      marginTop: verticalScale(6),
-    },
-    thumbName: { flex: 1, fontSize: font(12), fontWeight: "600", color: TEXT_SECONDARY },
-    // Botón de ícono cuadrado: 32×32 fijo (área táctil del ícono).
-    thumbRemove: {
-      ...ROW_ACTION_BTN,
-      width: 32,
-      height: 32,
-      alignItems: "center",
-      justifyContent: "center",
-    },
     addBtn: {
       ...ADD_FILE_BTN,
       flexDirection: "row",
@@ -612,7 +521,6 @@ function createStyles(
     },
     addBtnSpaced: { marginTop: verticalScale(12) },
     addBtnText: { fontSize: font(14), fontWeight: "600", color: PRIMARY_700 },
-    helper: { fontSize: font(12), color: TEXT_MUTED, marginTop: verticalScale(8) },
     clientRow: {
       flexDirection: "row",
       alignItems: "center",

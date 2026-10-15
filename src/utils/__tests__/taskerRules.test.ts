@@ -1,15 +1,28 @@
 import {
   addTaskerAddress,
+  addTaskerComment,
   applyTaskerGeocode,
   buildCommentPayload,
   buildLocalComment,
   buildMapsUrl,
   buildTaskerAddress,
+  canEditTaskerComment,
+  canSaveTaskerComment,
   canSubmitComment,
+  commentImagesToAttachments,
   getCommentAttachmentKind,
+  getCommentComposerTransition,
+  isTaskerCommentDraftChanged,
+  isTaskerCommentTextValid,
+  removeTaskerComment,
+  TASKER_COMMENT_MAX_LENGTH,
+  taskerCommentDraftFrom,
+  updateTaskerComment,
   emptyTaskerAddressDraft,
   formatTaskerAddress,
   getSelectedTaskerAddress,
+  getTaskerCommentsAttachmentBytes,
+  isTaskerCommentsOverPayloadLimit,
   isTaskerAddressComplete,
   nextTaskerAddressId,
   removeTaskerAddress,
@@ -53,6 +66,8 @@ import type {
   TaskerAddressDraft,
   TaskerAttachment,
   TaskerComment,
+  TaskerCommentAuthor,
+  TaskerCommentDraft,
   TaskerReportAddress,
 } from "../../../types/typesTasker/TaskerTypes";
 
@@ -208,9 +223,10 @@ describe("historial de ejemplo (taskerMock)", () => {
     ]);
     const assigned = task.activities.find((a) => a.type === "assignedUser");
     expect(assigned?.beginDate).toBe(localIso(2026, 9, 7, 9, 50, 20));
-    const byAuthor = Object.fromEntries(task.comments.map((c) => [c.addUser.name, c.createdDate]));
-    expect(byAuthor["Jeremy Móvil"]).toBe(localIso(2026, 9, 7, 9, 55));
-    expect(byAuthor["Jeremy Domínguez"]).toBe(localIso(2026, 9, 7, 10, 55));
+  });
+  it("el ticket de ejemplo llega sin comentarios", () => {
+    expect(task.comments).toEqual([]);
+    expect(getTaskerOpenTask().task.comments).toEqual([]);
   });
   it("todas las fechas caen en el mismo día", () => {
     const days = new Set(allDates(task).map((d) => d.slice(0, 10)));
@@ -343,6 +359,23 @@ describe("sortComments", () => {
 });
 
 describe("comentarios de Seguimiento", () => {
+  /** Dos comentarios "del servidor" (sin id de autor ni isLocal), con fechas distintas. */
+  const SERVER_COMMENTS: TaskerComment[] = [
+    {
+      id: 1,
+      addUser: { name: "Jeremy Domínguez" },
+      createdDate: localIso(2026, 9, 7, 10, 55),
+      comment: "Contacto establecido con el supervisor en planta.",
+      images: ["comentarios/4045/adjunto-1.jpg"],
+    },
+    {
+      id: 2,
+      addUser: { name: "Jeremy Móvil" },
+      createdDate: localIso(2026, 9, 7, 9, 55),
+      comment: "Se recibió el reporte. Técnico asignado para la visita.",
+      images: [],
+    },
+  ];
   const PNG = "data:image/jpeg;base64,AAAA";
   const PDF = "data:application/pdf;base64,BBBB";
   const file = (id: string, dataUri: string): TaskerAttachment => ({
@@ -364,6 +397,12 @@ describe("comentarios de Seguimiento", () => {
     });
     it("sin texto pero con adjuntos → true", () => {
       expect(canSubmitComment("   ", [file("a", PNG)])).toBe(true);
+    });
+    it("solo adjunto, texto vacío → true", () => {
+      expect(canSubmitComment("", [file("a", PDF)])).toBe(true);
+    });
+    it("texto + adjuntos → true", () => {
+      expect(canSubmitComment("hola", [file("a", PNG), file("b", PDF)])).toBe(true);
     });
   });
 
@@ -397,9 +436,14 @@ describe("comentarios de Seguimiento", () => {
       const c = buildLocalComment({ text: "x", attachments: [], task, now });
       expect(c.id).toBeLessThan(0);
     });
-    it("queda más reciente que los del ejemplo al ordenar desc", () => {
+    it("marcado isLocal (lo deja editar y borrar sin id de autor)", () => {
+      const c = buildLocalComment({ text: "x", attachments: [], task, now });
+      expect(c.isLocal).toBe(true);
+      expect(c.addUser.id).toBeUndefined();
+    });
+    it("queda más reciente que los del servidor al ordenar desc", () => {
       const local = buildLocalComment({ text: "x", attachments: [], task, now });
-      const sorted = sortComments([...getTaskerOpenTask(MOCK_NOW).task.comments, local], "desc");
+      const sorted = sortComments([...SERVER_COMMENTS, local], "desc");
       expect(sorted[0]).toBe(local);
     });
   });
@@ -430,12 +474,298 @@ describe("comentarios de Seguimiento", () => {
     });
   });
 
-  describe("comentarios de ejemplo", () => {
-    it("hay dos, con fechas distintas, para que el orden se note", () => {
-      const { comments } = getTaskerOpenTask(MOCK_NOW).task;
-      expect(comments).toHaveLength(2);
-      expect(sortComments(comments, "desc").map((c) => c.id)).toEqual([1, 2]);
-      expect(sortComments(comments, "asc").map((c) => c.id)).toEqual([2, 1]);
+  describe("validación del texto (1000 caracteres)", () => {
+    it("el tope es 1000", () => {
+      expect(TASKER_COMMENT_MAX_LENGTH).toBe(1000);
+    });
+    it("exactamente 1000 → válido; 1001 → no", () => {
+      expect(isTaskerCommentTextValid("a".repeat(1000))).toBe(true);
+      expect(isTaskerCommentTextValid("a".repeat(1001))).toBe(false);
+    });
+    it("cuenta el texto recortado: espacios de los bordes no suman", () => {
+      expect(isTaskerCommentTextValid(`   ${"a".repeat(1000)}  \n`)).toBe(true);
+    });
+    it("vacío es válido para el tope (lo frena canSubmitComment)", () => {
+      expect(isTaskerCommentTextValid("")).toBe(true);
+    });
+  });
+
+  describe("canSaveTaskerComment", () => {
+    it("sin texto ni adjuntos → false", () => {
+      expect(canSaveTaskerComment({ text: "  ", attachments: [] })).toBe(false);
+    });
+    it("solo adjuntos → true", () => {
+      expect(canSaveTaskerComment({ text: "", attachments: [file("a", PNG)] })).toBe(true);
+    });
+    it("texto de más de 1000 → false, aunque tenga adjuntos", () => {
+      expect(
+        canSaveTaskerComment({ text: "a".repeat(1001), attachments: [file("a", PNG)] }),
+      ).toBe(false);
+    });
+  });
+
+  describe("commentImagesToAttachments / taskerCommentDraftFrom", () => {
+    const SERVER = "comentarios/4045/adjunto-1.jpg";
+    it("conserva cada valor tal cual en dataUri, en orden", () => {
+      const list = commentImagesToAttachments([PNG, PDF, SERVER]);
+      expect(list.map((a) => a.dataUri)).toEqual([PNG, PDF, SERVER]);
+    });
+    it("mimeType sale del data-URI; ruta del servidor → vacío", () => {
+      const list = commentImagesToAttachments([PNG, PDF, SERVER]);
+      expect(list.map((a) => a.mimeType)).toEqual(["image/jpeg", "application/pdf", ""]);
+    });
+    it("ids únicos", () => {
+      const list = commentImagesToAttachments([PNG, PNG]);
+      expect(new Set(list.map((a) => a.id)).size).toBe(2);
+    });
+    it("borrador de un comentario nuevo: vacío", () => {
+      expect(taskerCommentDraftFrom(null)).toEqual({ text: "", attachments: [] });
+    });
+    it("borrador al editar: texto y adjuntos que ya tenía", () => {
+      const c: TaskerComment = {
+        id: 3,
+        addUser: { name: "Ana" },
+        createdDate: localIso(2026, 9, 9, 10),
+        comment: "hola",
+        images: [PNG, SERVER],
+      };
+      const draft = taskerCommentDraftFrom(c);
+      expect(draft.text).toBe("hola");
+      expect(draft.attachments.map((a) => a.dataUri)).toEqual([PNG, SERVER]);
+    });
+  });
+
+  describe("isTaskerCommentDraftChanged", () => {
+    const base: TaskerCommentDraft = { text: "hola", attachments: [file("a", PNG)] };
+    it("igual → false", () => {
+      expect(isTaskerCommentDraftChanged(base, { ...base })).toBe(false);
+    });
+    it("cambia el texto → true", () => {
+      expect(isTaskerCommentDraftChanged(base, { ...base, text: "hola!" })).toBe(true);
+    });
+    it("quita un adjunto → true", () => {
+      expect(isTaskerCommentDraftChanged(base, { ...base, attachments: [] })).toBe(true);
+    });
+    it("cambia un adjunto por otro → true", () => {
+      expect(isTaskerCommentDraftChanged(base, { ...base, attachments: [file("b", PDF)] })).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("getCommentComposerTransition (formulario abierto en la tarjeta)", () => {
+    const add = { mode: "add" } as const;
+    const edit = (id: number) => ({ mode: "edit", id }) as const;
+
+    it("ninguno abierto → se abre sin preguntar", () => {
+      expect(getCommentComposerTransition(null, add, false)).toBe("apply");
+      expect(getCommentComposerTransition(null, edit(1), false)).toBe("apply");
+    });
+    it("abierto sin cambios → se cambia o se cierra sin preguntar", () => {
+      expect(getCommentComposerTransition(add, null, false)).toBe("apply");
+      expect(getCommentComposerTransition(add, edit(1), false)).toBe("apply");
+      expect(getCommentComposerTransition(edit(1), edit(2), false)).toBe("apply");
+    });
+    it("abierto con cambios → pide confirmar (Ocultar, Cancelar u otro formulario)", () => {
+      expect(getCommentComposerTransition(add, null, true)).toBe("confirm");
+      expect(getCommentComposerTransition(edit(1), null, true)).toBe("confirm");
+      expect(getCommentComposerTransition(add, edit(1), true)).toBe("confirm");
+      expect(getCommentComposerTransition(edit(1), add, true)).toBe("confirm");
+      expect(getCommentComposerTransition(edit(1), edit(2), true)).toBe("confirm");
+    });
+    it("el mismo formulario → nada, aunque tenga cambios", () => {
+      expect(getCommentComposerTransition(add, add, true)).toBe("none");
+      expect(getCommentComposerTransition(edit(3), edit(3), true)).toBe("none");
+      expect(getCommentComposerTransition(null, null, false)).toBe("none");
+    });
+  });
+
+  describe("lista de comentarios", () => {
+    const now = new Date(2026, 9, 9, 14, 5, 7);
+    const me: TaskerCommentAuthor = { id: 7, name: "Ana Pérez" };
+    const draft = (text: string, attachments: TaskerAttachment[] = []): TaskerCommentDraft => ({
+      text,
+      attachments,
+    });
+    const existing = (id: number, over: Partial<TaskerComment> = {}): TaskerComment => ({
+      id,
+      addUser: { name: "Otro" },
+      createdDate: localIso(2026, 9, 6, 10),
+      comment: `c${id}`,
+      images: [],
+      ...over,
+    });
+
+    describe("addTaskerComment", () => {
+      it("lista vacía → id 1 (E1)", () => {
+        const list = addTaskerComment([], draft("hola"), me, now);
+        expect(list).toHaveLength(1);
+        expect(list[0].id).toBe(1);
+      });
+      it("id = el mayor + 1, aunque haya huecos (E1)", () => {
+        const list = addTaskerComment([existing(2), existing(9), existing(4)], draft("x"), me, now);
+        expect(list[3].id).toBe(10);
+      });
+      it("ids negativos (locales de Seguimiento) no bajan del 1", () => {
+        const list = addTaskerComment([existing(-500)], draft("x"), me, now);
+        expect(list[1].id).toBe(1);
+      });
+      it("autor = usuario en sesión, fecha de ese momento, isLocal", () => {
+        const [c] = addTaskerComment([], draft("hola"), me, now);
+        expect(c.addUser).toEqual({ id: 7, name: "Ana Pérez" });
+        expect(c.addUser).not.toBe(me);
+        expect(c.createdDate).toBe(localIso(2026, 9, 9, 14, 5, 7));
+        expect(c.isLocal).toBe(true);
+      });
+      it("texto recortado e images = dataUri de los adjuntos, en orden", () => {
+        const [c] = addTaskerComment([], draft("  hola \n", [file("a", PNG), file("b", PDF)]), me, now);
+        expect(c.comment).toBe("hola");
+        expect(c.images).toEqual([PNG, PDF]);
+      });
+      it("entra al final y no muta la lista recibida", () => {
+        const prev = [existing(1)];
+        const next = addTaskerComment(prev, draft("x"), me, now);
+        expect(next[0]).toBe(prev[0]);
+        expect(prev).toHaveLength(1);
+      });
+      it("borrador vacío o de más de 1000 → lista igual", () => {
+        const prev = [existing(1)];
+        expect(addTaskerComment(prev, draft("   "), me, now)).toBe(prev);
+        expect(addTaskerComment(prev, draft("a".repeat(1001)), me, now)).toBe(prev);
+      });
+    });
+
+    describe("updateTaskerComment", () => {
+      const original = existing(2, {
+        addUser: { id: 7, name: "Ana Pérez" },
+        images: ["comentarios/1/a.jpg"],
+        isLocal: true,
+      });
+      const list = [existing(1), original, existing(3)];
+
+      it("cambia texto y adjuntos", () => {
+        const next = updateTaskerComment(list, 2, draft(" nuevo ", [file("b", PDF)]));
+        expect(next[1].comment).toBe("nuevo");
+        expect(next[1].images).toEqual([PDF]);
+      });
+      it("no cambia autor, fecha de creación, id ni isLocal", () => {
+        const next = updateTaskerComment(list, 2, draft("nuevo"));
+        expect(next[1].id).toBe(2);
+        expect(next[1].addUser).toEqual(original.addUser);
+        expect(next[1].createdDate).toBe(original.createdDate);
+        expect(next[1].isLocal).toBe(true);
+      });
+      it("conserva los adjuntos que ya tenía si siguen en el borrador", () => {
+        const kept = taskerCommentDraftFrom(original);
+        const next = updateTaskerComment(list, 2, { ...kept, text: "otro" });
+        expect(next[1].images).toEqual(["comentarios/1/a.jpg"]);
+      });
+      it("los demás quedan iguales y en su lugar", () => {
+        const next = updateTaskerComment(list, 2, draft("nuevo"));
+        expect(next[0]).toBe(list[0]);
+        expect(next[2]).toBe(list[2]);
+      });
+      it("id inexistente → lista igual", () => {
+        expect(updateTaskerComment(list, 99, draft("nuevo"))).toBe(list);
+      });
+      it("lista vacía → lista vacía", () => {
+        expect(updateTaskerComment([], 1, draft("nuevo"))).toEqual([]);
+      });
+      it("borrador que no se puede guardar → lista igual", () => {
+        expect(updateTaskerComment(list, 2, draft(""))).toBe(list);
+        expect(updateTaskerComment(list, 2, draft("a".repeat(1001)))).toBe(list);
+      });
+    });
+
+    describe("removeTaskerComment", () => {
+      const list = [existing(1), existing(2), existing(3)];
+      it("quita por id", () => {
+        expect(removeTaskerComment(list, 2).map((c) => c.id)).toEqual([1, 3]);
+      });
+      it("id inexistente → mismos comentarios", () => {
+        expect(removeTaskerComment(list, 99)).toEqual(list);
+      });
+      it("lista vacía → vacía", () => {
+        expect(removeTaskerComment([], 1)).toEqual([]);
+      });
+      it("no muta la lista recibida", () => {
+        removeTaskerComment(list, 1);
+        expect(list).toHaveLength(3);
+      });
+    });
+
+    describe("tope de adjuntos sumando todos los comentarios", () => {
+      const withImages = (id: number, ...images: string[]) => existing(id, { images });
+      const list = [
+        withImages(1, "a".repeat(40)),
+        withImages(2, "b".repeat(30), "c".repeat(20)),
+        withImages(3),
+      ];
+
+      it("suma el largo de los adjuntos de todos los comentarios", () => {
+        expect(getTaskerCommentsAttachmentBytes(list)).toBe(90);
+      });
+      it("excludeId deja fuera el comentario que se edita", () => {
+        expect(getTaskerCommentsAttachmentBytes(list, 2)).toBe(40);
+        expect(getTaskerCommentsAttachmentBytes(list, 99)).toBe(90);
+      });
+      it("lista vacía → 0", () => {
+        expect(getTaskerCommentsAttachmentBytes([])).toBe(0);
+      });
+      it("ninguno pasa el tope solo, pero repartidos en varios comentarios sí", () => {
+        expect(list.every((c) => !isTaskerCommentsOverPayloadLimit([c], 60))).toBe(true);
+        expect(isTaskerCommentsOverPayloadLimit(list, 60)).toBe(true);
+      });
+      it("justo en el tope → no pasa", () => {
+        expect(isTaskerCommentsOverPayloadLimit(list, 90)).toBe(false);
+      });
+    });
+
+    describe("canEditTaskerComment", () => {
+      it("con id de autor: el mismo usuario → true", () => {
+        expect(canEditTaskerComment(existing(1, { addUser: { id: 7, name: "Ana" } }), me)).toBe(
+          true,
+        );
+      });
+      it("con id de autor: autor ajeno → false, aunque sea local", () => {
+        const c = existing(1, { addUser: { id: 8, name: "Ana Pérez" }, isLocal: true });
+        expect(canEditTaskerComment(c, me)).toBe(false);
+      });
+      it("con id de autor pero sin usuario en sesión → false", () => {
+        expect(canEditTaskerComment(existing(1, { addUser: { id: 7, name: "Ana" } }), null)).toBe(
+          false,
+        );
+        expect(
+          canEditTaskerComment(existing(1, { addUser: { id: 7, name: "Ana" } }), { name: "Ana" }),
+        ).toBe(false);
+      });
+      it("sin id de autor: solo los creados en local", () => {
+        expect(canEditTaskerComment(existing(1, { isLocal: true }), me)).toBe(true);
+        expect(canEditTaskerComment(existing(1), me)).toBe(false);
+      });
+      it("sin id de autor: el mismo nombre no alcanza", () => {
+        expect(canEditTaskerComment(existing(1, { addUser: { name: "Ana Pérez" } }), me)).toBe(
+          false,
+        );
+      });
+      it("los del servidor son de solo lectura", () => {
+        expect(SERVER_COMMENTS.every((c) => !canEditTaskerComment(c, me))).toBe(true);
+      });
+      it("los de buildLocalComment (Seguimiento) y addTaskerComment (Reportar) se editan", () => {
+        const task = { addUser: { id: 21, name: "Jeremy Domínguez" } };
+        const local = buildLocalComment({ text: "x", attachments: [], task, now });
+        const [reported] = addTaskerComment([], draft("x"), me, now);
+        expect(canEditTaskerComment(local, me)).toBe(true);
+        expect(canEditTaskerComment(reported, me)).toBe(true);
+      });
+    });
+  });
+
+  describe("comentarios del servidor (datos de prueba)", () => {
+    it("dos con fechas distintas: el orden se nota", () => {
+      expect(SERVER_COMMENTS).toHaveLength(2);
+      expect(sortComments(SERVER_COMMENTS, "desc").map((c) => c.id)).toEqual([1, 2]);
+      expect(sortComments(SERVER_COMMENTS, "asc").map((c) => c.id)).toEqual([2, 1]);
     });
   });
 });

@@ -13,6 +13,8 @@ import type {
   TaskerAddressConfig,
   TaskerAddressDraft,
   TaskerComment,
+  TaskerCommentAuthor,
+  TaskerCommentDraft,
   TaskerCommentPayload,
   TaskerReportAddress,
   TaskerReportConfig,
@@ -137,7 +139,8 @@ function toTaskerLocalIso(date: Date): string {
 /**
  * Comentario que se pinta al momento, sin esperar al servidor. Como Tasker,
  * el autor es task.addUser (el solicitante), no quien escribe. El id es
- * negativo para no chocar con los del servidor.
+ * negativo para no chocar con los del servidor. Va marcado isLocal: es lo que
+ * lo deja editar y borrar (ver canEditTaskerComment).
  */
 export function buildLocalComment({
   text,
@@ -156,7 +159,166 @@ export function buildLocalComment({
     createdDate: toTaskerLocalIso(now),
     comment: text.trim(),
     images: attachments.map((a) => a.dataUri),
+    isLocal: true,
   };
+}
+
+/** Tope del texto de un comentario (maxLength del campo y validación). */
+export const TASKER_COMMENT_MAX_LENGTH = 1000;
+
+/** Texto recortado dentro del tope. */
+export function isTaskerCommentTextValid(text: string): boolean {
+  return text.trim().length <= TASKER_COMMENT_MAX_LENGTH;
+}
+
+/** "Guardar" de la ventana: canSubmitComment y texto dentro del tope. */
+export function canSaveTaskerComment(draft: TaskerCommentDraft): boolean {
+  return canSubmitComment(draft.text, draft.attachments) && isTaskerCommentTextValid(draft.text);
+}
+
+/**
+ * Adjuntos que ya tenía un comentario, como TaskerAttachment para que la
+ * ventana los muestre y quite igual que los nuevos. `dataUri` guarda el valor
+ * tal cual (data-URI local o ruta del servidor) y es lo que vuelve a `images`.
+ */
+export function commentImagesToAttachments(images: string[]): TaskerAttachment[] {
+  return images.map((value, index) => {
+    const mime = /^data:([^;,]+)/i.exec(value)?.[1] ?? "";
+    return {
+      id: `existente-${index}`,
+      name: `adjunto ${index + 1}`,
+      mimeType: mime,
+      dataUri: value,
+    };
+  });
+}
+
+/** Borrador inicial de la ventana: vacío (agregar) o el del comentario (editar). */
+export function taskerCommentDraftFrom(comment: TaskerComment | null): TaskerCommentDraft {
+  return comment
+    ? { text: comment.comment, attachments: commentImagesToAttachments(comment.images) }
+    : { text: "", attachments: [] };
+}
+
+/** ¿Cambió algo respecto del borrador inicial? (pide confirmar al cerrar). */
+export function isTaskerCommentDraftChanged(
+  initial: TaskerCommentDraft,
+  current: TaskerCommentDraft,
+): boolean {
+  if (initial.text !== current.text) return true;
+  if (initial.attachments.length !== current.attachments.length) return true;
+  return initial.attachments.some((a, index) => a.dataUri !== current.attachments[index].dataUri);
+}
+
+/** Qué formulario de comentario está abierto en la tarjeta. null = ninguno. */
+export type CommentComposerTarget = { mode: "add" } | { mode: "edit"; id: number } | null;
+
+function isSameComposerTarget(a: CommentComposerTarget, b: CommentComposerTarget): boolean {
+  if (a === null || b === null) return a === b;
+  if (a.mode === "add" || b.mode === "add") return a.mode === b.mode;
+  return a.id === b.id;
+}
+
+/**
+ * Pasar de un formulario a otro (o cerrarlo): "none" si ya es ese, "confirm"
+ * si el abierto tiene cambios sin guardar ("¿Descartar cambios?"), si no "apply".
+ */
+export function getCommentComposerTransition(
+  current: CommentComposerTarget,
+  next: CommentComposerTarget,
+  currentChanged: boolean,
+): "none" | "apply" | "confirm" {
+  if (isSameComposerTarget(current, next)) return "none";
+  return current !== null && currentChanged ? "confirm" : "apply";
+}
+
+/**
+ * Agrega al final con el usuario en sesión como autor (Reportar Avería).
+ * EXCEPCIÓN E1, como en las direcciones: id = el mayor + 1 (lista vacía → 1).
+ * Un borrador que no se puede guardar deja la lista igual.
+ */
+export function addTaskerComment(
+  list: TaskerComment[],
+  draft: TaskerCommentDraft,
+  author: TaskerCommentAuthor,
+  now: Date,
+): TaskerComment[] {
+  if (!canSaveTaskerComment(draft)) return list;
+  const id = list.reduce((max, c) => Math.max(max, c.id), 0) + 1;
+  return [
+    ...list,
+    {
+      id,
+      addUser: { ...author },
+      createdDate: toTaskerLocalIso(now),
+      comment: draft.text.trim(),
+      images: draft.attachments.map((a) => a.dataUri),
+      isLocal: true,
+    },
+  ];
+}
+
+/**
+ * Cambia texto y adjuntos; autor, fecha de creación e id quedan. Id
+ * inexistente o borrador que no se puede guardar → lista igual.
+ */
+export function updateTaskerComment(
+  list: TaskerComment[],
+  id: number,
+  draft: TaskerCommentDraft,
+): TaskerComment[] {
+  if (!canSaveTaskerComment(draft) || !list.some((c) => c.id === id)) return list;
+  return list.map((c) =>
+    c.id === id
+      ? { ...c, comment: draft.text.trim(), images: draft.attachments.map((a) => a.dataUri) }
+      : c,
+  );
+}
+
+export function removeTaskerComment(list: TaskerComment[], id: number): TaskerComment[] {
+  return list.filter((c) => c.id !== id);
+}
+
+/**
+ * Lo que pesan los adjuntos de los comentarios (largo de cada valor de
+ * `images`, mismo criterio que pickAttachments). `excludeId`: el comentario
+ * que se está editando, cuyos adjuntos ya cuenta la ventana.
+ */
+export function getTaskerCommentsAttachmentBytes(
+  comments: TaskerComment[],
+  excludeId?: number,
+): number {
+  return comments.reduce(
+    (sum, c) =>
+      c.id === excludeId ? sum : sum + c.images.reduce((acc, value) => acc + value.length, 0),
+    0,
+  );
+}
+
+/**
+ * Reportar Avería manda todos los comentarios en un solo cuerpo: la suma de
+ * sus adjuntos no puede pasar `maxBytes` (MAX_PAYLOAD_BYTES de pickAttachments).
+ */
+export function isTaskerCommentsOverPayloadLimit(
+  comments: TaskerComment[],
+  maxBytes: number,
+): boolean {
+  return getTaskerCommentsAttachmentBytes(comments) > maxBytes;
+}
+
+/**
+ * ¿Lo escribió quien está en sesión? Con id del autor, se compara por id; sin
+ * él (Tasker hoy no lo devuelve), solo los creados en este dispositivo.
+ * TODO(puente): cuando Tasker devuelva addUserId en los comentarios, llenar
+ * addUser.id con él y comparar siempre por id.
+ */
+export function canEditTaskerComment(
+  comment: TaskerComment,
+  currentUser: TaskerCommentAuthor | null,
+): boolean {
+  const authorId = comment.addUser.id;
+  if (authorId != null) return currentUser?.id != null && authorId === currentUser.id;
+  return comment.isLocal === true;
 }
 
 /** Cuerpo que Tasker manda al agregar un comentario. */

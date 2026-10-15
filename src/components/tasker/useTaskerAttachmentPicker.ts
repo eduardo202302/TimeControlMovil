@@ -13,9 +13,12 @@ const OPTIONS: { source: AttachmentSource; label: string }[] = [
 ];
 
 /**
- * Menú "Tomar foto / Galería / Archivo PDF" compartido por Reportar Avería y
- * el formulario de comentarios. Los avisos de permiso y de error son los
+ * Menú "Tomar foto / Galería / Archivo PDF" de la ventana de comentarios
+ * (Reportar Avería y Seguimiento). Los avisos de permiso y de error son los
  * mismos de la foto de Usuarios (UserBasicInfoTab).
+ *
+ * `extraUsedBytes`: lo que ya pesan adjuntos que no están en `attachments`
+ * pero van en el mismo envío (los otros comentarios de Reportar Avería).
  *
  * En iOS es un ActionSheet con "Cancelar"; en Android, un Alert de tres
  * botones (el máximo de Android) que se cierra tocando fuera.
@@ -23,6 +26,7 @@ const OPTIONS: { source: AttachmentSource; label: string }[] = [
 export function useTaskerAttachmentPicker(
   attachments: TaskerAttachment[],
   onAdd: (added: TaskerAttachment[]) => void,
+  extraUsedBytes = 0,
 ) {
   const [busy, setBusy] = useState(false);
 
@@ -31,7 +35,8 @@ export function useTaskerAttachmentPicker(
       setBusy(true);
       try {
         if (source === "pdf") {
-          const usedBytes = attachments.reduce((sum, a) => sum + a.dataUri.length, 0);
+          const usedBytes =
+            extraUsedBytes + attachments.reduce((sum, a) => sum + a.dataUri.length, 0);
           const result = await pickTaskerPdf(usedBytes);
           if (result.canceled) return;
           if (result.accepted.length > 0) onAdd(result.accepted);
@@ -59,7 +64,7 @@ export function useTaskerAttachmentPicker(
         setBusy(false);
       }
     },
-    [attachments, onAdd],
+    [attachments, onAdd, extraUsedBytes],
   );
 
   const openPicker = useCallback(() => {

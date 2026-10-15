@@ -87,9 +87,15 @@ export interface TaskerAddressConfig {
   showRestrictions: boolean;
 }
 
+/** Autor de un comentario. Tasker hoy no devuelve el id (ver canEditTaskerComment). */
+export interface TaskerCommentAuthor {
+  id?: number | null;
+  name: string;
+}
+
 export interface TaskerComment {
   id: number;
-  addUser: { name: string };
+  addUser: TaskerCommentAuthor;
   createdDate: string;
   comment: string;
   /**
@@ -97,6 +103,18 @@ export interface TaskerComment {
    * comentario recién agregado en local, data-URIs.
    */
   images: string[];
+  /** Creado en este dispositivo y todavía sin enviar. */
+  isLocal?: boolean;
+}
+
+/** Lo que devuelve la ventana "Agregar / Editar comentario". */
+export interface TaskerCommentDraft {
+  text: string;
+  /**
+   * Adjuntos nuevos y, al editar, los que ya tenía el comentario (ver
+   * commentImagesToAttachments). Al guardar se manda `dataUri` de cada uno.
+   */
+  attachments: TaskerAttachment[];
 }
 
 /** Cuerpo de "Agregar comentario" de Tasker (buildCommentPayload). */
@@ -165,7 +183,7 @@ export interface TaskerReportConfig {
 }
 
 /**
- * Adjunto local (Reportar Avería y comentarios de Seguimiento), todavía sin
+ * Adjunto local de un comentario (Reportar Avería y Seguimiento), todavía sin
  * subir. Tasker acepta solo imágenes (comprimidas a JPEG) y PDF.
  */
 export interface TaskerAttachment {
