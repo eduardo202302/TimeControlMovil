@@ -69,7 +69,9 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  AppState,
   Image,
+  Linking,
   Modal,
   Platform,
   RefreshControl,
@@ -140,8 +142,14 @@ import { getActiveSchoolId } from "../../utils/chooseCompany";
 import { expoLocationApi } from "../../utils/locationApi";
 import {
   getBestEffortCoordinates,
+  isApproximateLocationPermission,
   promptLocationPermission,
+  readWithAccuracyRetry,
+  resolveLocationCardStatus,
   startOptionalPunchCoordinates,
+  toAccurateCoordinates,
+  type AccurateCoordinates,
+  type LocationCardStatus,
 } from "../../utils/punchLocation";
 
 type Category = "Jornada" | "Almuerzo" | "Break";
@@ -346,15 +354,45 @@ const getDistanceInMeters = (
   return R * c;
 };
 
+/** Tope total de una lectura para la geocerca, reintento por precisión incluido. */
+const LOCATION_TIMEOUT_MS = 10_000;
+
+/** Color del estado de la card de ubicación; imprecisa va en gris. */
+const LOCATION_STATUS_COLOR: Record<LocationCardStatus, string> = {
+  within: SUCCESS_ACCENT,
+  outside: ERROR_COLOR,
+  imprecise: TEXT_MUTED,
+};
+
+/**
+ * Posición nueva con precisión High; si llega con un error mayor a 100 m
+ * (estimación por Wi-Fi/antenas), un reintento con Highest dentro del mismo
+ * tope de 10 s, y se queda la más precisa.
+ */
+const readFreshCoordinates = (): Promise<AccurateCoordinates | null> =>
+  readWithAccuracyRetry(
+    async () =>
+      toAccurateCoordinates(
+        await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        }),
+      ),
+    async () =>
+      toAccurateCoordinates(
+        await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Highest,
+        }),
+      ),
+    LOCATION_TIMEOUT_MS,
+  );
+
 /**
  * Obtiene las coordenadas actuales con un timeout de 10s.
  * Si el GPS no responde a tiempo, se aborta (null) en lugar de
  * dejar la promesa colgada y el botón en carga infinita.
+ * Una lectura imprecisa NO aborta: el ponche sale igual y el backend decide.
  */
-const getCurrentCoordinates = async (): Promise<{
-  latitude: number;
-  longitude: number;
-} | null> => {
+const getCurrentCoordinates = async (): Promise<AccurateCoordinates | null> => {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== "granted") {
@@ -365,12 +403,7 @@ const getCurrentCoordinates = async (): Promise<{
       return null;
     }
 
-    const location = await Promise.race([
-      Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      }),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
-    ]);
+    const location = await readFreshCoordinates();
 
     if (!location) {
       Alert.alert(
@@ -380,10 +413,7 @@ const getCurrentCoordinates = async (): Promise<{
       return null;
     }
 
-    return {
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
-    };
+    return location;
   } catch (error) {
     Alert.alert(
       "Error de Ubicación",
@@ -398,27 +428,21 @@ const getCurrentCoordinates = async (): Promise<{
  * lectura (ej. bloque "Ubicación" de la card de Perfil). No pide permiso
  * (solo lo lee) ni muestra Alert — si algo falla, simplemente no hay
  * coordenadas y el bloque que las consume no se muestra.
+ * `approximate`: el usuario concedió solo la ubicación "Aproximada" (Android).
  */
-const getCurrentCoordinatesSilent = async (): Promise<{
-  latitude: number;
-  longitude: number;
-} | null> => {
+const getCurrentCoordinatesSilent = async (): Promise<
+  (AccurateCoordinates & { approximate: boolean }) | null
+> => {
   try {
-    const { status } = await Location.getForegroundPermissionsAsync();
-    if (status !== "granted") return null;
+    const permission = await Location.getForegroundPermissionsAsync();
+    if (permission.status !== "granted") return null;
 
-    const location = await Promise.race([
-      Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      }),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 10_000)),
-    ]);
-
+    const location = await readFreshCoordinates();
     if (!location) return null;
 
     return {
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
+      ...location,
+      approximate: isApproximateLocationPermission(permission),
     };
   } catch {
     return null;
@@ -528,10 +552,11 @@ export default function PunchInOut() {
   const [breakTagModalVisible, setBreakTagModalVisible] = useState(false);
   const [permissions, setPermissions] = useState<UserDayPermission[]>([]);
   const [permissionInfoModal, setPermissionInfoModal] = useState(false);
-  const [currentLocationInfo, setCurrentLocationInfo] = useState<{
-    address: string;
-    withinArea: boolean;
-  } | null>(null);
+  // Lectura de la card de ubicación; el veredicto Dentro/Fuera se deriva en
+  // render (currentLocationStatus) para usar siempre la geocerca vigente.
+  const [currentLocationInfo, setCurrentLocationInfo] = useState<
+    (AccurateCoordinates & { address: string; approximate: boolean }) | null
+  >(null);
 
   const {
     user,
@@ -1055,72 +1080,116 @@ export default function PunchInOut() {
     loadTodayPermissions();
   }, [loadTodayPermissions]);
 
-  // Permiso de ubicación (primer plano) cada vez que se entra al ponchador,
-  // mientras el sistema deje preguntar. No se espera: nunca frena la pantalla.
-  useFocusEffect(
-    useCallback(() => {
-      void promptLocationPermission(expoLocationApi);
-    }, []),
-  );
-
   // Ubicación EN VIVO del dispositivo (card de Perfil) — solo lectura, no
   // forma parte del flujo de ponchar. Independiente de las coordenadas del
   // último ponche: el webapp muestra la posición actual evaluada contra la
   // geocerca, no la de un ponche histórico (que puede no tener coords si se
   // hizo desde canal Web). Silenciosa: si el permiso de foreground no está
   // ya otorgado, no se pide (nada de Alert) y el bloque no aparece.
-  // Se re-evalúa con isValidLocation y con cada refresh de `punches` (mismo
-  // trigger que fetchTodayPunches ya usa tras ponchar / pull-to-refresh /
-  // montaje) para no agregar un poll dedicado nuevo.
+  // Se re-evalúa con isValidLocation, con cada refresh de `punches` (tras
+  // ponchar / pull-to-refresh / montaje), al volver a la pantalla (foco) y al
+  // volver la app a primer plano: una lectura tomada antes de pasar a segundo
+  // plano podía quedarse mostrando un lugar donde el usuario ya no estaba.
+  // Solo se aplica la última petición: una anterior que termine tarde no
+  // pisa a la nueva.
+  const locationRequestIdRef = useRef(0);
+
+  const refreshCurrentLocation = useCallback(async () => {
+    const requestId = ++locationRequestIdRef.current;
+    const isStale = () => requestId !== locationRequestIdRef.current;
+
+    if (!isValidLocation) {
+      setCurrentLocationInfo(null);
+      return;
+    }
+
+    const coords = await getCurrentCoordinatesSilent();
+    if (isStale()) return;
+    if (!coords) {
+      setCurrentLocationInfo(null);
+      return;
+    }
+
+    try {
+      const [geocoded] = await Location.reverseGeocodeAsync({
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+      });
+      if (isStale()) return;
+
+      const street =
+        geocoded?.street ?? geocoded?.name ?? "Ubicación desconocida";
+      const city = geocoded?.city ?? geocoded?.subregion ?? geocoded?.region;
+      const address = city ? `${street}, ${city}` : street;
+
+      setCurrentLocationInfo({ ...coords, address });
+    } catch {
+      if (!isStale()) setCurrentLocationInfo(null);
+    }
+  }, [isValidLocation]);
+
+  /** Descarta la lectura en pantalla y cualquier petición en curso. */
+  const clearCurrentLocation = useCallback(() => {
+    locationRequestIdRef.current++;
+    setCurrentLocationInfo(null);
+  }, []);
+
   useEffect(() => {
-    let cancelled = false;
+    void refreshCurrentLocation();
+  }, [refreshCurrentLocation, punches]);
 
-    const resolveCurrentLocation = async () => {
-      if (!isValidLocation) {
-        setCurrentLocationInfo(null);
+  // Permiso de ubicación (primer plano) cada vez que se entra al ponchador,
+  // mientras el sistema deje preguntar. No se espera: nunca frena la pantalla.
+  // Resuelto el permiso se relee la card, que así aparece en cuanto se concede.
+  useFocusEffect(
+    useCallback(() => {
+      void promptLocationPermission(expoLocationApi).then(
+        refreshCurrentLocation,
+      );
+    }, [refreshCurrentLocation]),
+  );
+
+  // Al ir a segundo plano la lectura deja de valer (el usuario puede moverse):
+  // se oculta, y al volver a primer plano se pide una nueva.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") void refreshCurrentLocation();
+      else if (nextState === "background") clearCurrentLocation();
+    });
+    return () => subscription.remove();
+  }, [refreshCurrentLocation, clearCurrentLocation]);
+
+  // Permiso "Aproximada" (Android 12+): se vuelve a pedir la ubicación
+  // precisa; si no se concede (o el sistema ya no muestra el diálogo) se
+  // abren los ajustes de la app. Al volver, el listener de AppState relee la
+  // ubicación y el aviso desaparece solo. Nunca bloquea el ponche.
+  const handleEnablePreciseLocation = async () => {
+    try {
+      const permission = await Location.requestForegroundPermissionsAsync();
+      if (!isApproximateLocationPermission(permission)) {
+        void refreshCurrentLocation();
         return;
       }
+    } catch {
+      // Sin diálogo disponible: se cae a los ajustes.
+    }
+    void Linking.openSettings();
+  };
 
-      const coords = await getCurrentCoordinatesSilent();
-      if (cancelled) return;
-      if (!coords) {
-        setCurrentLocationInfo(null);
-        return;
-      }
-
-      try {
-        const [geocoded] = await Location.reverseGeocodeAsync(coords);
-        if (cancelled) return;
-
-        const street =
-          geocoded?.street ?? geocoded?.name ?? "Ubicación desconocida";
-        const city = geocoded?.city ?? geocoded?.subregion ?? geocoded?.region;
-        const address = city ? `${street}, ${city}` : street;
-
-        const target = getTargetGeofenceLocation();
-        const distance = getDistanceInMeters(
-          coords.latitude,
-          coords.longitude,
-          target.targetLatitude,
-          target.targetLongitude,
-        );
-
-        setCurrentLocationInfo({
-          address,
-          withinArea: distance <= target.radius,
-        });
-      } catch {
-        if (!cancelled) setCurrentLocationInfo(null);
-      }
-    };
-
-    resolveCurrentLocation();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isValidLocation, punches]);
+  const currentLocationStatus: LocationCardStatus | null = (() => {
+    if (!currentLocationInfo) return null;
+    const target = getTargetGeofenceLocation();
+    return resolveLocationCardStatus(
+      currentLocationInfo.accuracy,
+      getDistanceInMeters(
+        currentLocationInfo.latitude,
+        currentLocationInfo.longitude,
+        target.targetLatitude,
+        target.targetLongitude,
+      ),
+      target.radius,
+    );
+  })();
 
   const getNextPunchType = (category: Category): "inicio" | "fin" => {
     if (category === "Jornada") {
@@ -2308,13 +2377,15 @@ export default function PunchInOut() {
             </View>
           </View>
 
-          {isValidLocation && currentLocationInfo && (
+          {isValidLocation && currentLocationInfo && currentLocationStatus && (
             <View
               style={[
                 styles.locationBlock,
-                currentLocationInfo.withinArea
+                currentLocationStatus === "within"
                   ? styles.locationBlockWithin
-                  : styles.locationBlockOutside,
+                  : currentLocationStatus === "outside"
+                    ? styles.locationBlockOutside
+                    : styles.locationBlockImprecise,
               ]}
             >
               <View style={styles.locationHeaderRow}>
@@ -2332,27 +2403,39 @@ export default function PunchInOut() {
                 <Ionicons
                   name="location-outline"
                   size={13}
-                  color={
-                    currentLocationInfo.withinArea
-                      ? SUCCESS_ACCENT
-                      : ERROR_COLOR
-                  }
+                  color={LOCATION_STATUS_COLOR[currentLocationStatus]}
                 />
                 <Text
                   style={[
                     styles.locationStatusText,
-                    {
-                      color: currentLocationInfo.withinArea
-                        ? SUCCESS_ACCENT
-                        : ERROR_COLOR,
-                    },
+                    { color: LOCATION_STATUS_COLOR[currentLocationStatus] },
                   ]}
                 >
-                  {currentLocationInfo.withinArea
+                  {currentLocationStatus === "within"
                     ? "Dentro de área"
-                    : "Fuera de área"}
+                    : currentLocationStatus === "outside"
+                      ? "Fuera de área"
+                      : `Ubicación imprecisa (±${Math.round(currentLocationInfo.accuracy ?? 0)} m)`}
                 </Text>
               </View>
+              {currentLocationInfo.approximate && (
+                <View style={styles.locationApproxNotice}>
+                  <Text style={styles.locationApproxText}>
+                    Tu teléfono comparte solo tu ubicación aproximada. Puedes
+                    ponchar igual, pero activa la ubicación precisa para
+                    validar tu área correctamente.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.locationApproxBtn}
+                    onPress={handleEnablePreciseLocation}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.locationApproxBtnText}>
+                      Activar ubicación precisa
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           )}
 
@@ -3160,6 +3243,28 @@ const styles = StyleSheet.create({
     backgroundColor: DANGER_TINT_BACKGROUND,
     borderColor: DANGER_TINT_BORDER,
   },
+  locationBlockImprecise: {
+    backgroundColor: FIELD_DISABLED_BACKGROUND,
+    borderColor: CARD_BORDER,
+  },
+  locationApproxNotice: {
+    marginTop: 4,
+    gap: 6,
+    padding: 8,
+    borderRadius: RADIUS_MD,
+    borderWidth: 1,
+    backgroundColor: WARNING_TINT_BACKGROUND,
+    borderColor: WARNING_TINT_BORDER,
+  },
+  locationApproxText: { fontSize: 12, color: WARNING_TEXT_STRONG },
+  locationApproxBtn: {
+    alignSelf: "flex-start",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: RADIUS_SM,
+    backgroundColor: WARNING_ACCENT,
+  },
+  locationApproxBtnText: { fontSize: 12, fontWeight: "700", color: ON_PRIMARY },
   locationHeaderRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   locationHeaderText: { fontSize: 12, fontWeight: "700", color: TEXT_MUTED },
   locationAddressText: { fontSize: 13, color: TEXT_SECONDARY },
