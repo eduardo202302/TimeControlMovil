@@ -11,6 +11,7 @@ import {
   setupAxiosInterceptors,
 } from "../utils/session";
 import * as Storage from "../utils/storage";
+import { clearTaskerSession, restoreTaskerSession } from "../utils/taskerSession";
 import { toRDDateString } from "../utils/punchRules";
 import {
   LAST_COMPANY_STORAGE_KEY,
@@ -82,6 +83,8 @@ export default function RootLayout() {
         const user = JSON.parse(userRaw);
         console.log("User from storage:", user);
         const menuItems = JSON.parse(menuItemsRaw);
+        // Tasker guardado (AsyncStorage); ausente o corrupto → se recarga.
+        useSchoolStore.getState().setTaskerSession(await restoreTaskerSession());
         setMenuResolution(user, menuItems);
         initialLoadDone.current = true;
         const { role } = useSchoolStore.getState();
@@ -108,6 +111,7 @@ export default function RootLayout() {
           Storage.deleteItemAsync("token"),
           Storage.deleteItemAsync("user"),
           Storage.deleteItemAsync("menuItems"),
+          clearTaskerSession(),
           // isAuthorized NO se borra — es la autorización del dispositivo físico,
           // no de la sesión del usuario. Solo se borra si el dispositivo se revocan.
         ]);

@@ -76,11 +76,11 @@ export default function AppLayout() {
   }, []);
 
   const pathname = usePathname();
-  // Reportar Avería toma el nombre de la compañía (school.settings), igual que su tarjeta.
-  const companySettings = useSchoolStore((state) => state.companySettings);
+  // Reportar toma el failureReportMenuLabel de Tasker, igual que su opción del menú.
+  const taskerConfig = useSchoolStore((state) => state.taskerConfig);
   const title =
     pathname === TASKER_REPORT_PATH
-      ? getTaskerReportTitle(companySettings)
+      ? getTaskerReportTitle(taskerConfig)
       : (ROUTE_TITLES[pathname] ?? "Time Flow");
 
   // Empresa activa. Es el `key` del Slot: al cambiar de empresa TODAS las

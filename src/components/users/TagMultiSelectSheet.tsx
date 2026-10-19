@@ -250,10 +250,12 @@ function createStyles(
       textAlign: "center",
       paddingVertical: verticalScale(20),
     },
+    // minHeight fijo de 44: área táctil mínima, no se escala.
     option: {
       flexDirection: "row",
       alignItems: "center",
       gap: scale(10),
+      minHeight: 44,
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(11),
       borderRadius: RADIUS_MD,

@@ -16,6 +16,7 @@ import { resolveMobilePath } from "../constants/mobileRoutes";
 import { buildLastCompany } from "./lastCompany";
 import { buildOpenDayFromChooseSchool, buildTodayHoliday } from "./punchRules";
 import * as Storage from "./storage";
+import { loadAndPersistTaskerSession } from "./taskerSession";
 
 /**
  * Elegir / cambiar de empresa — lo comparten el login (FormLogin) y la opción
@@ -351,8 +352,8 @@ export interface CommitSessionInput {
 
 /**
  * Persiste la sesión de la empresa elegida: SecureStore (token, user, menú,
- * foto, urlColegio), la marca lastCompany del login y, AL FINAL y de un solo
- * golpe síncrono, el store.
+ * foto, urlColegio), la marca lastCompany del login, Tasker (AsyncStorage) y,
+ * AL FINAL y de un solo golpe síncrono, el store.
  *
  * Ese orden importa al cambiar de empresa con la app abierta: cuando el
  * store cambia de empresa, (app)/_layout remonta las pantallas, y estas leen
@@ -406,10 +407,14 @@ export async function commitSession({
     await Storage.deleteItemAsync("s3Photo");
   }
 
+  // Tasker de la empresa elegida (AsyncStorage): pisa lo de la anterior.
+  const tasker = await loadAndPersistTaskerSession();
+
   // ── Store: todo junto, sin awaits en el medio ──
   const store = useSchoolStore.getState();
   if (storeToken) store.setToken(token);
   if (chooseSchoolData) applyChooseSchoolSnapshot(chooseSchoolData);
+  store.setTaskerSession(tasker);
   // Resuelve app + ruta + árbol de menú con el rol de la empresa elegida.
   store.setMenuResolution(user, menuItems);
 }

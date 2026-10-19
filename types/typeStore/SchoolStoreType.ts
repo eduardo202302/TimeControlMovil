@@ -1,5 +1,9 @@
 import type { LastCompany } from "../../src/utils/lastCompany";
 import type { PunchEvent } from "../../src/utils/punchRules";
+import type {
+  TaskerCompanyConfig,
+  TaskerUserClient,
+} from "../typesTasker/TaskerTypes";
 import { AppType, MenuTree } from "../../utils/resolveRoute";
 import { MenuItem, RoleItem } from "../typesMenu/MenuTypes";
 
@@ -239,10 +243,6 @@ export interface CompanySettings {
    * que en `resolveAttendanceGating` cae al caso por defecto (foto + manual).
    */
   attendanceMode: string;
-  /** Título de la tarjeta de Servicio en Reportar Avería (Tasker). */
-  serviceNameLabel: string;
-  /** Si la Descripción es obligatoria en Reportar Avería. */
-  isDescriptionRequired: boolean;
   /**
    * Muestra el Nº de lista en Asistencia y ordena por él — misma lectura que
    * el webapp: `get(company, "settings.showListNumber", false)`.
@@ -372,6 +372,13 @@ export interface SchoolStore {
   // tocan — es lo que pinta el login después de cerrar sesión.
   lastCompany: LastCompany | null;
 
+  // Tasker de la compañía activa (getTaskerCompanyConfig / getTaskerUserClients).
+  // Se cargan al armar la sesión, se guardan en AsyncStorage (ver
+  // src/utils/taskerSession.ts) y logout()/clear() los vacían. null/[] = sin
+  // cargar o sin clientes.
+  taskerConfig: TaskerCompanyConfig | null;
+  taskerClients: TaskerUserClient[];
+
   // Acciones existentes
   setSchool: (school: School) => void;
   setUrlColegio: (url: string) => void;
@@ -388,6 +395,10 @@ export interface SchoolStore {
   setTodayHoliday: (h: TodayHoliday | null) => void;
   setPendingOpenDay: (p: PunchEvent | null) => void;
   setClosedOpenDayKey: (key: string | null) => void;
+  setTaskerSession: (session: {
+    config: TaskerCompanyConfig;
+    clients: TaskerUserClient[];
+  }) => void;
   /** Actualiza el store y la persiste en SecureStore. */
   setLastCompany: (lastCompany: LastCompany) => Promise<void>;
   /** La saca del store y la borra de SecureStore. */

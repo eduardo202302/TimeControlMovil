@@ -15,6 +15,9 @@ import {
   switchCompany,
 } from "../chooseCompany";
 import * as Storage from "../storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getTaskerCompanyConfig, getTaskerUserClients } from "../../constants/taskerMock";
+import { TASKER_CLIENTS_STORAGE_KEY, TASKER_CONFIG_STORAGE_KEY } from "../taskerSession";
 
 // SecureStore en memoria — el real necesita react-native.
 jest.mock("../storage", () => {
@@ -31,8 +34,26 @@ jest.mock("../storage", () => {
   };
 });
 jest.mock("axios");
+// AsyncStorage en memoria (Tasker) — el real necesita react-native.
+jest.mock("@react-native-async-storage/async-storage", () => {
+  const asyncMem = new Map<string, string>();
+  return {
+    __esModule: true,
+    default: {
+      __mem: asyncMem,
+      getItem: jest.fn(async (key: string) => asyncMem.get(key) ?? null),
+      setItem: jest.fn(async (key: string, value: string) => {
+        asyncMem.set(key, value);
+      }),
+      removeItem: jest.fn(async (key: string) => {
+        asyncMem.delete(key);
+      }),
+    },
+  };
+});
 
 const mem = (Storage as unknown as { __mem: Map<string, string> }).__mem;
+const asyncMem = (AsyncStorage as unknown as { __mem: Map<string, string> }).__mem;
 const mockedGet = axios.get as unknown as jest.Mock;
 const mockedCreate = axios.create as unknown as jest.Mock;
 const mockedRawPost = jest.fn();
@@ -169,6 +190,7 @@ function legacyFullUser(schoolUser: any, loginDataArg: any, storeSchool: any) {
 
 function resetSession() {
   mem.clear();
+  asyncMem.clear();
   useSchoolStore.getState().clear();
   useSchoolStore.setState({ lastCompany: null });
   useSchoolStore.getState().setUrlColegio(URL);
@@ -421,6 +443,41 @@ describe("login — commitSession deja la sesión igual que completeLogin", () =
     expect(state.attendancesToday).toEqual([{ id: 1 }]);
     expect(state.lastCompany).toMatchObject({ schoolId: 1, name: "Empresa A" });
     expect(mem.get("token")).toBe(LOGIN_TOKEN);
+  });
+});
+
+describe("Tasker en la sesión", () => {
+  test("login: config y clientes al store y a AsyncStorage (no a SecureStore)", async () => {
+    await loginIntoA();
+    const state = useSchoolStore.getState();
+    expect(state.taskerConfig).toEqual(getTaskerCompanyConfig());
+    expect(state.taskerClients).toEqual(getTaskerUserClients());
+    expect(JSON.parse(asyncMem.get(TASKER_CONFIG_STORAGE_KEY)!)).toEqual(getTaskerCompanyConfig());
+    expect(JSON.parse(asyncMem.get(TASKER_CLIENTS_STORAGE_KEY)!)).toEqual(getTaskerUserClients());
+    expect(mem.has(TASKER_CONFIG_STORAGE_KEY)).toBe(false);
+    expect(mem.has(TASKER_CLIENTS_STORAGE_KEY)).toBe(false);
+  });
+
+  test("cambiar de empresa reescribe lo de la anterior", async () => {
+    await loginIntoA();
+    asyncMem.set(TASKER_CLIENTS_STORAGE_KEY, "[]");
+    useSchoolStore.setState({ taskerClients: [] });
+    mockedRawPost.mockResolvedValue({ data: chooseSchoolOk() });
+
+    expect((await switchCompany(2)).ok).toBe(true);
+    expect(useSchoolStore.getState().taskerClients).toEqual(getTaskerUserClients());
+    expect(JSON.parse(asyncMem.get(TASKER_CLIENTS_STORAGE_KEY)!)).toEqual(getTaskerUserClients());
+  });
+
+  test("logout() y clear() los vacían", async () => {
+    await loginIntoA();
+    useSchoolStore.getState().logout();
+    expect(useSchoolStore.getState().taskerConfig).toBeNull();
+    expect(useSchoolStore.getState().taskerClients).toEqual([]);
+    await loginIntoA();
+    useSchoolStore.getState().clear();
+    expect(useSchoolStore.getState().taskerConfig).toBeNull();
+    expect(useSchoolStore.getState().taskerClients).toEqual([]);
   });
 });
 

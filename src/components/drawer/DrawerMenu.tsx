@@ -32,8 +32,13 @@ import Animated, {
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { MenuTree } from "../../../utils/resolveRoute";
 import { canChangeCompany } from "../../utils/chooseCompany";
-import { getTaskerReportTitle, TASKER_REPORT_PATH } from "../../utils/taskerRules";
-import type { CompanySettings } from "../../../types/typeStore/SchoolStoreType";
+import {
+  filterTaskerMenu,
+  getTaskerReportTitle,
+  isTaskerEnabled,
+  TASKER_REPORT_PATH,
+} from "../../utils/taskerRules";
+import type { TaskerCompanyConfig } from "../../../types/typesTasker/TaskerTypes";
 import {
   CARD_BACKGROUND,
   ERROR_COLOR,
@@ -109,15 +114,15 @@ function getLabel(name: string): string {
 }
 
 /**
- * Etiqueta de una opción. Reportar Avería (temporal o del backend, padre o
- * hijo) muestra el serviceNameLabel de la compañía, como su pantalla.
+ * Etiqueta de una opción. Reportar (temporal o del backend, padre o hijo)
+ * muestra el failureReportMenuLabel de Tasker, como su pantalla.
  */
 function getItemLabel(
   item: { name: string; path: string },
-  companySettings: CompanySettings | null,
+  taskerConfig: TaskerCompanyConfig | null,
 ): string {
   return item.path === TASKER_REPORT_PATH
-    ? getTaskerReportTitle(companySettings)
+    ? getTaskerReportTitle(taskerConfig)
     : getLabel(item.name);
 }
 
@@ -436,7 +441,7 @@ interface SectionProps {
   onNavigate: (path: string) => void;
   pathname: string;
   styles: DrawerStyles;
-  companySettings: CompanySettings | null;
+  taskerConfig: TaskerCompanyConfig | null;
 }
 
 function MenuSection({
@@ -444,7 +449,7 @@ function MenuSection({
   onNavigate,
   pathname,
   styles,
-  companySettings,
+  taskerConfig,
 }: SectionProps) {
   const [expanded, setExpanded] = useState(false);
   const { scale } = useResponsive();
@@ -473,7 +478,7 @@ function MenuSection({
           <Text
             style={[styles.sectionTitle, isActive && styles.sectionTitleActive]}
           >
-            {getItemLabel(section.parent, companySettings)}
+            {getItemLabel(section.parent, taskerConfig)}
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -489,7 +494,7 @@ function MenuSection({
       >
         <Ionicons name={sectionIcon} size={20} color={PRIMARY_COLOR} />
         <Text style={styles.sectionTitle}>
-          {getItemLabel(section.parent, companySettings)}
+          {getItemLabel(section.parent, taskerConfig)}
         </Text>
         <Animated.View style={chevronStyle}>
           <Ionicons name="chevron-forward" size={16} color={TEXT_PLACEHOLDER} />
@@ -522,7 +527,7 @@ function MenuSection({
                 <Text
                   style={[styles.childText, isActive && styles.activeChildText]}
                 >
-                  {getItemLabel(child, companySettings)}
+                  {getItemLabel(child, taskerConfig)}
                 </Text>
               </TouchableOpacity>
             );
@@ -550,8 +555,14 @@ export default function DrawerMenu({
 }: DrawerMenuProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, menuTree, app, logout, school, urlColegio, companySettings } =
+  const { user, menuTree, app, logout, school, urlColegio, taskerConfig } =
     useSchoolStore();
+  // Sin Tasker conectado no hay Reportar ni Seguimiento (backend ni temporales).
+  const taskerEnabled = isTaskerEnabled(taskerConfig);
+  const visibleMenuTree = useMemo(
+    () => filterTaskerMenu(menuTree as MenuTree[], taskerEnabled),
+    [menuTree, taskerEnabled],
+  );
   const schoolUser = user?.user?.schoolUsers?.[0];
   const activeSchool = schoolUser?.school ?? school;
   // Mismo criterio que punchinout.tsx para el id del usuario.
@@ -707,20 +718,21 @@ const confirmLogout = useCallback(async () => {
             paddingHorizontal: scale(8),
           }}
         >
-          {(menuTree as MenuTree[]).map((section) => (
+          {visibleMenuTree.map((section) => (
             <MenuSection
               key={section.parent.id}
               section={section}
               onNavigate={handleNavigate}
               pathname={pathname}
               styles={styles}
-              companySettings={companySettings}
+              taskerConfig={taskerConfig}
             />
           ))}
 
           {/* TEMPORAL (Tasker): entradas fijas hasta que el backend registre
               las rutas. Se omiten en cuanto el menú real trae el mismo path. */}
           {TASKER_TEMP_MENU_ENABLED &&
+            taskerEnabled &&
             TASKER_TEMP_MENU.filter(
               (temp) =>
                 !(menuTree as MenuTree[]).some(
@@ -735,7 +747,7 @@ const confirmLogout = useCallback(async () => {
                 onNavigate={handleNavigate}
                 pathname={pathname}
                 styles={styles}
-                companySettings={companySettings}
+                taskerConfig={taskerConfig}
               />
             ))}
 

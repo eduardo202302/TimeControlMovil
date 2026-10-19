@@ -11,10 +11,6 @@ import {
   serializeLastCompany,
 } from "../src/utils/lastCompany";
 import * as Storage from "../src/utils/storage";
-import {
-  TASKER_DESCRIPTION_REQUIRED_FALLBACK,
-  TASKER_SERVICE_NAME_LABEL_FALLBACK,
-} from "../src/utils/taskerRules";
 
 /**
  * `raw` es `school.settings` tal cual llega de chooseschool (objeto grande,
@@ -51,17 +47,6 @@ export function buildCompanySettings(raw: unknown): CompanySettings | null {
     // en AdminAttendanceForm — "" cae al `default` del switch (foto + manual).
     attendanceMode:
       typeof settings.attendanceMode === "string" ? settings.attendanceMode : "",
-    // Reportar Avería (Tasker). El backend no les pone default: en muchas
-    // compañías no vienen, y ahí aplican los respaldos de taskerRules.
-    serviceNameLabel:
-      typeof settings.serviceNameLabel === "string" &&
-      settings.serviceNameLabel.trim() !== ""
-        ? settings.serviceNameLabel
-        : TASKER_SERVICE_NAME_LABEL_FALLBACK,
-    isDescriptionRequired:
-      typeof settings.isDescriptionRequired === "boolean"
-        ? settings.isDescriptionRequired
-        : TASKER_DESCRIPTION_REQUIRED_FALLBACK,
     // Nº de lista en Asistencia. Default false como el webapp
     // (AttendanceForm/AdminAttendanceForm); solo un `true` real lo activa.
     showListNumber: settings.showListNumber === true,
@@ -115,6 +100,8 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   pendingOpenDay: null,
   closedOpenDayKey: null,
   lastCompany: null,
+  taskerConfig: null,
+  taskerClients: [],
 
   // ─── Acciones existentes (sin cambios) ──────────────────────────────────────
   setSchool: (school) => set({ school }),
@@ -140,6 +127,8 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       todayHoliday: null,
       pendingOpenDay: null,
       closedOpenDayKey: null,
+      taskerConfig: null,
+      taskerClients: [],
     }),
 
   // ─── Cerrar sesión — conserva urlColegio y school para poder volver a login ─
@@ -158,6 +147,8 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       todayHoliday: null,
       pendingOpenDay: null,
       closedOpenDayKey: null,
+      taskerConfig: null,
+      taskerClients: [],
     }),
 
   // ─── Acción nueva: resuelve app + ruta + menú tras el login ─────────────────
@@ -183,6 +174,8 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   setTodayHoliday: (todayHoliday) => set({ todayHoliday }),
   setPendingOpenDay: (pendingOpenDay) => set({ pendingOpenDay }),
   setClosedOpenDayKey: (closedOpenDayKey) => set({ closedOpenDayKey }),
+  setTaskerSession: ({ config, clients }) =>
+    set({ taskerConfig: config, taskerClients: clients }),
 
   // ─── Última compañía — fuera de clear()/logout() a propósito ────────────────
   setLastCompany: async (lastCompany) => {

@@ -17,17 +17,22 @@ import {
   DANGER_ICON,
   ERROR_COLOR,
   ICON_EDIT,
+  INDIGO_TEXT,
+  INDIGO_TINT_BACKGROUND,
   ON_PRIMARY,
   PRIMARY_700,
   PRIMARY_COLOR,
   PRIMARY_TINT_50,
   PRIMARY_TINT_BORDER,
   SECTION_ICON_COLOR,
-  TAG_DOT_FALLBACK,
+  SUCCESS_COLOR,
+  SUCCESS_TINT_BACKGROUND,
   TEXT_MUTED,
   TEXT_PLACEHOLDER,
   TEXT_PRIMARY,
   TEXT_SECONDARY,
+  WARNING_TEXT_STRONG,
+  WARNING_TINT_BACKGROUND,
 } from "@/constants/colors";
 import {
   MAX_CONTENT_WIDTH,
@@ -35,9 +40,10 @@ import {
   RADIUS_SM,
   useResponsive,
 } from "@/constants/responsive";
-import { getTaskerReportContext, getTaskerTypeTags } from "@/constants/taskerMock";
+import { getTaskerFaultActions } from "@/constants/taskerMock";
 import SectionIcon from "@/components/ui/SectionIcon";
 import TagOptionSheet from "@/components/permissions/TagOptionSheet";
+import TagMultiSelectSheet from "@/components/users/TagMultiSelectSheet";
 import { MAX_PAYLOAD_BYTES } from "@/components/permissions/pickAttachments";
 import {
   ADD_FILE_BTN,
@@ -50,11 +56,21 @@ import {
 import {
   addTaskerAddress,
   addTaskerComment,
-  getTagChipTone,
+  buildReportAddresses,
+  filterFaultActionsForClient,
+  formatSelectedFaultsSummary,
+  getClientAddressHint,
+  getRemovedFaultsNotice,
+  getSelectedFaultNames,
+  getTaskerAddressLines,
+  getTaskerClientLabel,
+  getTaskerFaultLabel,
+  getTaskerFormRules,
   isTaskerCommentsOverPayloadLimit,
+  pickNearestClientAddress,
+  pruneSelectedFaults,
   removeTaskerAddress,
   removeTaskerComment,
-  resolveTaskerReportConfig,
   toggleTaskerAddressSelected,
   updateTaskerAddress,
   updateTaskerComment,
@@ -66,8 +82,10 @@ import type {
   TaskerComment,
   TaskerCommentAuthor,
   TaskerCommentDraft,
+  TaskerCompanyConfig,
   TaskerReportAddress,
   TaskerReportErrors,
+  TaskerUserClient,
 } from "../../../types/typesTasker/TaskerTypes";
 import { showPendingAction } from "./pendingAction";
 import TaskerAddressModal from "./TaskerAddressModal";
@@ -76,36 +94,60 @@ import TaskerCommentsCard from "./TaskerCommentsCard";
 
 type Styles = ReturnType<typeof createStyles>;
 
+interface ReportFaultFormProps {
+  config: TaskerCompanyConfig;
+  /** Nunca vacío: ReportFaultGate no monta el formulario sin clientes. */
+  clients: TaskerUserClient[];
+  /** Posición del teléfono al abrir (decide la dirección más cercana). */
+  coords: { latitude: number; longitude: number };
+}
+
+/** Cliente, dirección marcada y "Más cercana" de arranque (o tras Cancelar). */
+function initialSelection(
+  clients: TaskerUserClient[],
+  coords: ReportFaultFormProps["coords"],
+) {
+  const nearest = pickNearestClientAddress(clients, coords);
+  const client = clients.find((c) => c.id === nearest?.clientId) ?? clients[0];
+  return { client, addresses: buildReportAddresses(client, [], nearest?.addressId ?? null) };
+}
+
 /**
- * Reportar Avería (Tasker) — FASE B: con los datos fijos de taskerMock.ts.
- * Comentarios (con sus imágenes y PDF) y direcciones se agregan, editan,
- * borran y marcan en local; solo el envío final llama a showPendingAction().
+ * Reportar (Tasker) — FASE B: con los datos de prueba de taskerMock.ts. Solo
+ * se monta con la compañía conectada, clientes y la posición del teléfono
+ * (ver ReportFaultGate). Comentarios (con sus imágenes y PDF) y direcciones
+ * se agregan, editan, borran y marcan en local; solo el envío final llama a
+ * showPendingAction().
  */
-export default function ReportFaultForm() {
+export default function ReportFaultForm({ config, clients, coords }: ReportFaultFormProps) {
   const { scale, verticalScale, font, isTablet } = useResponsive();
   const styles = useMemo(
     () => createStyles(scale, verticalScale, font),
     [scale, verticalScale, font],
   );
 
-  // Config de la compañía (school.settings); sin las claves, los respaldos.
-  const companySettings = useSchoolStore((state) => state.companySettings);
-  const config = useMemo(() => resolveTaskerReportConfig(companySettings), [companySettings]);
-  // Fijos durante la vida de la pantalla: hoy vienen del mock.
-  const typeTags = useMemo(() => getTaskerTypeTags(), []);
-  const context = useMemo(() => getTaskerReportContext(), []);
-  // Autor de los comentarios: el usuario en sesión.
+  const rules = useMemo(() => getTaskerFormRules(config), [config]);
+  const faultLabel = getTaskerFaultLabel(config);
+  // Fijo durante la vida de la pantalla: hoy viene del mock.
+  const faultActions = useMemo(() => getTaskerFaultActions(), []);
+  // "Reporta:" y autor de los comentarios: el usuario en sesión.
   const sessionUser = useSchoolStore((state) => state.user);
   const commentAuthor = useMemo<TaskerCommentAuthor>(
     () => ({ id: sessionUser?.user?.id ?? null, name: sessionUser?.user?.fullName ?? "Usuario" }),
     [sessionUser],
   );
 
-  const [typeId, setTypeId] = useState<number | null>(null);
+  const [initial] = useState(() => initialSelection(clients, coords));
+  const [clientId, setClientId] = useState<number>(initial.client.id);
+  const client = clients.find((c) => c.id === clientId) ?? initial.client;
+  const [faultIds, setFaultIds] = useState<number[]>([]);
+  /** Averías que se quitaron en el último cambio de cliente (0 = sin aviso). */
+  const [removedFaults, setRemovedFaults] = useState(0);
   const [description, setDescription] = useState("");
   const [errors, setErrors] = useState<TaskerReportErrors>({});
-  const [typeSheetVisible, setTypeSheetVisible] = useState(false);
-  const [addresses, setAddresses] = useState<TaskerReportAddress[]>(context.addresses);
+  const [clientSheetVisible, setClientSheetVisible] = useState(false);
+  const [faultSheetVisible, setFaultSheetVisible] = useState(false);
+  const [addresses, setAddresses] = useState<TaskerReportAddress[]>(initial.addresses);
   /** null = ventana cerrada; target null = dirección nueva. */
   const [addressEditor, setAddressEditor] = useState<{
     target: TaskerReportAddress | null;
@@ -114,12 +156,69 @@ export default function ReportFaultForm() {
   /** La tarjeta de comentarios lleva su formulario a la vista (y sobre el teclado). */
   const scrollRef = useRef<ScrollView>(null);
 
-  const selectedType = typeTags.find((t) => t.id === typeId) ?? null;
+  const availableFaults = useMemo(
+    () => filterFaultActionsForClient(faultActions, client),
+    [faultActions, client],
+  );
+  const faultOptions = useMemo(
+    () => availableFaults.map((a) => ({ id: a.id, name: a.name })),
+    [availableFaults],
+  );
+  const faultsSummary = formatSelectedFaultsSummary(getSelectedFaultNames(faultIds, faultActions));
+  /** Recomendada del cliente elegido según la posición del teléfono. */
+  const recommended = useMemo(() => pickNearestClientAddress([client], coords), [client, coords]);
+  /** "Más cercana" en Direcciones; sin coordenadas en sus direcciones, ninguna. */
+  const nearestAddressId = recommended?.distanceMeters != null ? recommended.addressId : null;
+  /** Línea bajo el cliente: la dirección marcada, con su distancia. */
+  const addressHint = getClientAddressHint(addresses, recommended, coords);
+  const addressHintLines = addressHint ? getTaskerAddressLines(addressHint.address) : null;
+  const clientLabel = getTaskerClientLabel(config);
+  const removedFaultsNotice = getRemovedFaultsNotice(removedFaults);
+  const clientOptions = useMemo(() => clients.map((c) => ({ id: c.id, name: c.name })), [clients]);
 
-  const handleDescriptionChange = useCallback((text: string) => {
-    setDescription(text);
-    setErrors((prev) => (prev.description ? { ...prev, description: undefined } : prev));
+  const clearError = useCallback((key: keyof TaskerReportErrors) => {
+    setErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
   }, []);
+
+  const handleDescriptionChange = useCallback(
+    (text: string) => {
+      setDescription(text);
+      clearError("description");
+    },
+    [clearError],
+  );
+
+  /** Cada toque en la hoja se aplica al momento: cerrarla (Listo o fuera) conserva lo marcado. */
+  const handleFaultsChange = useCallback(
+    (ids: number[]) => {
+      setFaultIds(ids);
+      setRemovedFaults(0);
+      clearError("faults");
+    },
+    [clearError],
+  );
+
+  /**
+   * Otro cliente: sus direcciones con la más cercana marcada (o la primera),
+   * las agregadas por el usuario se conservan y se quitan las averías que ya
+   * no le aplican (con aviso de cuántas).
+   */
+  const handleSelectClient = useCallback(
+    (nextId: number) => {
+      setClientSheetVisible(false);
+      if (nextId === clientId) return;
+      const next = clients.find((c) => c.id === nextId);
+      if (!next) return;
+      const nearest = pickNearestClientAddress([next], coords);
+      setClientId(next.id);
+      setAddresses((prev) => buildReportAddresses(next, prev, nearest?.addressId ?? null));
+      const kept = pruneSelectedFaults(faultIds, filterFaultActionsForClient(faultActions, next));
+      setFaultIds(kept);
+      setRemovedFaults(faultIds.length - kept.length);
+      clearError("address");
+    },
+    [clientId, clients, coords, faultActions, faultIds, clearError],
+  );
 
   const handleAddressSelected = useCallback(
     (built: TaskerAddress) => {
@@ -131,12 +230,15 @@ export default function ReportFaultForm() {
               id: target.id,
               order: target.order,
               selected: target.selected,
+              locked: false,
+              fromClient: target.fromClient,
             })
           : addTaskerAddress(prev, built),
       );
+      if (!target) clearError("address");
       setAddressEditor(null);
     },
-    [addressEditor],
+    [addressEditor, clearError],
   );
 
   const handleRemoveAddress = useCallback((address: TaskerReportAddress) => {
@@ -150,9 +252,13 @@ export default function ReportFaultForm() {
     ]);
   }, []);
 
-  const handleToggleAddress = useCallback((id: number) => {
-    setAddresses((prev) => toggleTaskerAddressSelected(prev, id));
-  }, []);
+  const handleToggleAddress = useCallback(
+    (id: number) => {
+      setAddresses((prev) => toggleTaskerAddressSelected(prev, id));
+      clearError("address");
+    },
+    [clearError],
+  );
 
   const handleAddComment = useCallback(
     (draft: TaskerCommentDraft) => {
@@ -170,17 +276,19 @@ export default function ReportFaultForm() {
   }, []);
 
   const handleCancel = useCallback(() => {
-    setTypeId(null);
+    setClientId(initial.client.id);
+    setFaultIds([]);
+    setRemovedFaults(0);
     setDescription("");
     setComments([]);
-    setAddresses(context.addresses);
+    setAddresses(initial.addresses);
     setErrors({});
-  }, [context.addresses]);
+  }, [initial]);
 
   const handleSubmit = useCallback(() => {
-    const result = validateReport({ typeId, description }, config);
+    const result = validateReport({ faultIds, description, addresses }, rules);
     setErrors(result);
-    if (Object.keys(result).length > 0) return;
+    if (Object.values(result).some(Boolean)) return;
     // Un solo envío: el tope suma los adjuntos de todos los comentarios.
     if (isTaskerCommentsOverPayloadLimit(comments, MAX_PAYLOAD_BYTES)) {
       Alert.alert(
@@ -189,13 +297,19 @@ export default function ReportFaultForm() {
       );
       return;
     }
-    // TODO(puente): enviar el reporte (tipo, descripción y direcciones). Cada
-    // comentario va como un elemento de taskComments ({ comment, images }), con
-    // comment "" si solo trae adjuntos.
+    // TODO(puente): enviar el reporte a Tasker como una tarea nueva:
+    //   - quién reporta: el usuario en sesión (commentAuthor.name / id);
+    //   - averías elegidas (faultIds) → acciones de la tarea;
+    //   - descripción → info de la tarea;
+    //   - cliente elegido (client.id) y la dirección marcada
+    //     (getSelectedTaskerAddress(addresses));
+    //   - direcciones agregadas por el usuario (fromClient: false) y las del
+    //     cliente editadas o quitadas: solo en la tarea, nunca se guardan en
+    //     el cliente;
+    //   - cada comentario como un elemento de taskComments ({ comment, images }),
+    //     con comment "" si solo trae adjuntos.
     showPendingAction();
-  }, [typeId, description, config, comments]);
-
-  const clientTone = getTagChipTone(0);
+  }, [faultIds, description, addresses, rules, comments]);
 
   return (
     <KeyboardAvoidingView
@@ -209,40 +323,40 @@ export default function ReportFaultForm() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Servicio ── */}
-        <View style={styles.card}>
-          <CardHeader
-            styles={styles}
-            tone="violet"
-            icon="construct-outline"
-            title={config.serviceNameLabel}
-          />
-          <Text style={styles.label}>
-            Tipo <Text style={styles.required}>*</Text>
-          </Text>
-          <TouchableOpacity
-            style={[styles.select, !!errors.typeId && styles.fieldInvalid]}
-            onPress={() => setTypeSheetVisible(true)}
-            activeOpacity={0.75}
-          >
-            {selectedType && (
-              <View
-                style={[
-                  styles.typeDot,
-                  { backgroundColor: selectedType.color || TAG_DOT_FALLBACK },
-                ]}
-              />
-            )}
-            <Text
-              style={selectedType ? styles.selectValue : styles.selectPlaceholder}
-              numberOfLines={1}
+        {/* ── Averías (selección múltiple, filtradas por el cliente) ── */}
+        {rules.showFaults && (
+          <View style={styles.card}>
+            <CardHeader
+              styles={styles}
+              tone="violet"
+              icon="construct-outline"
+              title={faultLabel}
+              required={rules.faultsRequired}
+            />
+            <TouchableOpacity
+              style={[styles.select, !!errors.faults && styles.fieldInvalid]}
+              onPress={() => setFaultSheetVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`${faultLabel}: ${faultsSummary ?? "ninguna elegida"}`}
+              activeOpacity={0.75}
             >
-              {selectedType?.name ?? "Seleccione un tipo"}
-            </Text>
-            <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
-          </TouchableOpacity>
-          {!!errors.typeId && <Text style={styles.fieldError}>{errors.typeId}</Text>}
-        </View>
+              <Text
+                style={faultsSummary ? styles.selectValue : styles.selectPlaceholder}
+                numberOfLines={2}
+              >
+                {faultsSummary ?? "Seleccionar averías"}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
+            </TouchableOpacity>
+            {!!errors.faults && <Text style={styles.fieldError}>{errors.faults}</Text>}
+            {removedFaultsNotice && (
+              <View style={styles.noticeRow} accessibilityLiveRegion="polite">
+                <Ionicons name="information-circle-outline" size={16} color={WARNING_TEXT_STRONG} />
+                <Text style={styles.noticeText}>{removedFaultsNotice}</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* ── Descripción ── */}
         <View style={styles.card}>
@@ -254,7 +368,7 @@ export default function ReportFaultForm() {
           />
           <Text style={styles.label}>
             Detalle(s)
-            {config.isDescriptionRequired && <Text style={styles.required}> *</Text>}
+            {rules.descriptionRequired && <Text style={styles.required}> *</Text>}
           </Text>
           <TextInput
             style={[styles.textarea, !!errors.description && styles.fieldInvalid]}
@@ -279,26 +393,64 @@ export default function ReportFaultForm() {
           scrollRef={scrollRef}
         />
 
-        {/* ── Cliente (solo lectura) ── */}
+        {/* ── Cliente: fijo con uno solo; con 2 o más, selector ── */}
         <View style={styles.card}>
-          <CardHeader styles={styles} tone="blue" icon="business-outline" title="Cliente" />
-          <View style={styles.clientRow}>
-            <Text style={styles.clientName}>{context.client.name}</Text>
-            <View style={[styles.tagChip, { backgroundColor: clientTone.background }]}>
-              <Text style={[styles.tagChipText, { color: clientTone.text }]}>
-                {context.client.typeName}
+          <CardHeader styles={styles} tone="blue" icon="business-outline" title={clientLabel} />
+          {clients.length > 1 ? (
+            <TouchableOpacity
+              style={styles.select}
+              onPress={() => setClientSheetVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`${clientLabel}: ${client.name}. Cambiar`}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.selectValue} numberOfLines={1}>
+                {client.name}
               </Text>
+              <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.clientName}>{client.name}</Text>
+          )}
+          {addressHint && addressHintLines && (
+            <View style={styles.hintRow}>
+              <Ionicons
+                name="location-outline"
+                size={18}
+                color={addressHint.caption === "Más cercana" ? SUCCESS_COLOR : PRIMARY_700}
+              />
+              <View style={styles.hintBody}>
+                <Text
+                  style={[
+                    styles.hintCaption,
+                    addressHint.caption === "Más cercana" && styles.hintCaptionNearest,
+                  ]}
+                >
+                  {addressHint.caption}
+                </Text>
+                <Text style={styles.hintTitle} numberOfLines={1}>
+                  {addressHintLines.title || addressHintLines.streetLine}
+                  {!!addressHint.distanceLabel && (
+                    <Text style={styles.hintDistance}> · {addressHint.distanceLabel}</Text>
+                  )}
+                </Text>
+                {!!addressHintLines.title && !!addressHintLines.streetLine && (
+                  <Text style={styles.hintStreet} numberOfLines={1}>
+                    {addressHintLines.streetLine}
+                  </Text>
+                )}
+              </View>
             </View>
-          </View>
+          )}
           <View style={styles.reporterRow}>
             <Ionicons name="person-outline" size={14} color={TEXT_MUTED} />
             <Text style={styles.reporterText}>
-              Reporta: <Text style={styles.reporterName}>{context.reporter.name}</Text>
+              Reporta: <Text style={styles.reporterName}>{commentAuthor.name}</Text>
             </Text>
           </View>
         </View>
 
-        {/* ── Direcciones ── */}
+        {/* ── Direcciones: las del cliente (la predeterminada solo se elige) + las agregadas ── */}
         <View style={styles.card}>
           <CardHeader
             styles={styles}
@@ -311,12 +463,14 @@ export default function ReportFaultForm() {
             <AddressRow
               key={address.id}
               address={address}
+              nearest={address.fromClient && address.id === nearestAddressId}
               styles={styles}
               onEdit={() => setAddressEditor({ target: address })}
               onRemove={() => handleRemoveAddress(address)}
               onToggleSelected={() => handleToggleAddress(address.id)}
             />
           ))}
+          {!!errors.address && <Text style={styles.fieldError}>{errors.address}</Text>}
           <TouchableOpacity
             style={[styles.addBtn, addresses.length > 0 && styles.addBtnSpaced]}
             onPress={() => setAddressEditor({ target: null })}
@@ -349,17 +503,24 @@ export default function ReportFaultForm() {
         </View>
       </View>
 
+      <TagMultiSelectSheet
+        visible={faultSheetVisible}
+        title={faultLabel}
+        options={faultOptions}
+        selectedIds={faultIds}
+        emptyText="Sin opciones para este cliente"
+        onChange={handleFaultsChange}
+        onClose={() => setFaultSheetVisible(false)}
+      />
+
       <TagOptionSheet
-        visible={typeSheetVisible}
-        title="Tipo"
-        options={typeTags}
-        selectedId={typeId}
-        onSelect={(tag) => {
-          setTypeId(tag.id ?? null);
-          setErrors((prev) => (prev.typeId ? { ...prev, typeId: undefined } : prev));
-          setTypeSheetVisible(false);
-        }}
-        onClose={() => setTypeSheetVisible(false)}
+        visible={clientSheetVisible}
+        title={clientLabel}
+        options={clientOptions}
+        selectedId={clientId}
+        hideColorDot
+        onSelect={(option) => option.id != null && handleSelectClient(option.id)}
+        onClose={() => setClientSheetVisible(false)}
       />
 
       <TaskerAddressModal
@@ -377,17 +538,22 @@ interface CardHeaderProps {
   tone: React.ComponentProps<typeof SectionIcon>["tone"];
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
+  /** Asterisco rojo después del título. */
+  required?: boolean;
   /** Contenido a la derecha del título (chip, botones). */
   children?: React.ReactNode;
 }
 
-function CardHeader({ styles, tone, icon, title, children }: CardHeaderProps) {
+function CardHeader({ styles, tone, icon, title, required, children }: CardHeaderProps) {
   return (
     <View style={styles.cardHeader}>
       <SectionIcon tone={tone}>
         <Ionicons name={icon} size={18} color={SECTION_ICON_COLOR} />
       </SectionIcon>
-      <Text style={styles.cardTitle}>{title}</Text>
+      <Text style={styles.cardTitle}>
+        {title}
+        {required && <Text style={styles.required}> *</Text>}
+      </Text>
       {children}
     </View>
   );
@@ -395,58 +561,88 @@ function CardHeader({ styles, tone, icon, title, children }: CardHeaderProps) {
 
 interface AddressRowProps {
   address: TaskerReportAddress;
+  /** Etiqueta "Más cercana" (solo direcciones del cliente con coordenadas). */
+  nearest: boolean;
   styles: Styles;
   onEdit: () => void;
   onRemove: () => void;
   onToggleSelected: () => void;
 }
 
-function AddressRow({ address, styles, onEdit, onRemove, onToggleSelected }: AddressRowProps) {
+/**
+ * La predeterminada del cliente (locked) solo se elige: sin lápiz ni papelera
+ * y con la etiqueta "Predeterminada". Las demás del cliente y las agregadas se
+ * editan y borran (solo en este reporte).
+ */
+function AddressRow({
+  address,
+  nearest,
+  styles,
+  onEdit,
+  onRemove,
+  onToggleSelected,
+}: AddressRowProps) {
   return (
     <TaskerAddressSummary
       address={address}
       style={styles.addressRow}
       actions={
-        <>
-          <TouchableOpacity
-            style={styles.addressBtn}
-            onPress={onEdit}
-            accessibilityLabel="Editar dirección"
-            activeOpacity={0.75}
-          >
-            <Ionicons name="create-outline" size={18} color={ICON_EDIT} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.addressBtn}
-            onPress={onRemove}
-            accessibilityLabel="Eliminar dirección"
-            activeOpacity={0.75}
-          >
-            <Ionicons name="trash-outline" size={18} color={DANGER_ICON} />
-          </TouchableOpacity>
-        </>
+        address.locked ? undefined : (
+          <>
+            <TouchableOpacity
+              style={styles.addressBtn}
+              onPress={onEdit}
+              accessibilityLabel="Editar dirección"
+              activeOpacity={0.75}
+            >
+              <Ionicons name="create-outline" size={18} color={ICON_EDIT} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.addressBtn}
+              onPress={onRemove}
+              accessibilityLabel="Eliminar dirección"
+              activeOpacity={0.75}
+            >
+              <Ionicons name="trash-outline" size={18} color={DANGER_ICON} />
+            </TouchableOpacity>
+          </>
+        )
       }
     >
-      <TouchableOpacity
-        style={[styles.selectAddressBtn, address.selected && styles.selectAddressBtnActive]}
-        onPress={onToggleSelected}
-        accessibilityState={{ selected: address.selected }}
-        activeOpacity={0.75}
-      >
-        <Ionicons
-          name={address.selected ? "checkmark-circle" : "ellipse-outline"}
-          size={16}
-          color={address.selected ? ON_PRIMARY : PRIMARY_700}
-        />
-        <Text
-          style={[
-            styles.selectAddressText,
-            address.selected && styles.selectAddressTextActive,
-          ]}
+      <View style={styles.addressChips}>
+        <TouchableOpacity
+          style={[styles.selectAddressBtn, address.selected && styles.selectAddressBtnActive]}
+          onPress={onToggleSelected}
+          accessibilityState={{ selected: address.selected }}
+          activeOpacity={0.75}
         >
-          {address.selected ? "Seleccionada" : "Seleccionar"}
-        </Text>
-      </TouchableOpacity>
+          <Ionicons
+            name={address.selected ? "checkmark-circle" : "ellipse-outline"}
+            size={16}
+            color={address.selected ? ON_PRIMARY : PRIMARY_700}
+          />
+          <Text
+            style={[
+              styles.selectAddressText,
+              address.selected && styles.selectAddressTextActive,
+            ]}
+          >
+            {address.selected ? "Seleccionada" : "Seleccionar"}
+          </Text>
+        </TouchableOpacity>
+        {address.locked && (
+          <View style={styles.defaultChip}>
+            <Ionicons name="lock-closed-outline" size={12} color={INDIGO_TEXT} />
+            <Text style={styles.defaultChipText}>Predeterminada</Text>
+          </View>
+        )}
+        {nearest && (
+          <View style={styles.nearestChip}>
+            <Ionicons name="navigate-outline" size={12} color={SUCCESS_COLOR} />
+            <Text style={styles.nearestChipText}>Más cercana</Text>
+          </View>
+        )}
+      </View>
     </TaskerAddressSummary>
   );
 }
@@ -497,10 +693,19 @@ function createStyles(
       minHeight: verticalScale(48),
       paddingHorizontal: scale(12),
     },
-    // Punto de color del tipo: 10×10 fijo, igual que en el mockup.
-    typeDot: { width: 10, height: 10, borderRadius: RADIUS_PILL },
     selectValue: { flex: 1, fontSize: font(14), color: TEXT_PRIMARY },
     selectPlaceholder: { flex: 1, fontSize: font(14), color: TEXT_PLACEHOLDER },
+    noticeRow: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: scale(6),
+      marginTop: verticalScale(8),
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(8),
+      borderRadius: RADIUS_SM,
+      backgroundColor: WARNING_TINT_BACKGROUND,
+    },
+    noticeText: { flex: 1, fontSize: font(12), lineHeight: font(17), color: WARNING_TEXT_STRONG },
     textarea: {
       ...FIELD_SURFACE,
       minHeight: verticalScale(96),
@@ -521,19 +726,28 @@ function createStyles(
     },
     addBtnSpaced: { marginTop: verticalScale(12) },
     addBtnText: { fontSize: font(14), fontWeight: "600", color: PRIMARY_700 },
-    clientRow: {
+    clientName: { fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
+    hintRow: {
       flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
+      alignItems: "flex-start",
       gap: scale(8),
+      marginTop: verticalScale(10),
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(10),
+      borderRadius: RADIUS_SM,
+      backgroundColor: PRIMARY_TINT_50,
     },
-    clientName: { flexShrink: 1, fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
-    tagChip: {
-      paddingHorizontal: scale(10),
-      paddingVertical: verticalScale(3),
-      borderRadius: RADIUS_PILL,
+    hintBody: { flex: 1 },
+    hintCaption: { fontSize: font(11), fontWeight: "700", color: PRIMARY_700 },
+    hintCaptionNearest: { color: SUCCESS_COLOR },
+    hintTitle: {
+      fontSize: font(14),
+      fontWeight: "600",
+      color: TEXT_PRIMARY,
+      marginTop: verticalScale(2),
     },
-    tagChipText: { fontSize: font(11), fontWeight: "700" },
+    hintDistance: { fontWeight: "400", color: TEXT_MUTED },
+    hintStreet: { fontSize: font(12), color: TEXT_MUTED, marginTop: verticalScale(1) },
     reporterRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -544,12 +758,17 @@ function createStyles(
     reporterName: { fontWeight: "600", color: TEXT_SECONDARY },
     // El resto de la fila vive en TaskerAddressSummary.
     addressRow: { marginBottom: verticalScale(8) },
+    addressChips: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: scale(8),
+      marginTop: verticalScale(10),
+    },
     selectAddressBtn: {
       flexDirection: "row",
       alignItems: "center",
-      alignSelf: "flex-start",
       gap: scale(6),
-      marginTop: verticalScale(10),
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(6),
       borderRadius: RADIUS_PILL,
@@ -560,6 +779,26 @@ function createStyles(
     selectAddressBtnActive: { borderColor: PRIMARY_COLOR, backgroundColor: PRIMARY_COLOR },
     selectAddressText: { fontSize: font(12), fontWeight: "700", color: PRIMARY_700 },
     selectAddressTextActive: { color: ON_PRIMARY },
+    nearestChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(4),
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(4),
+      borderRadius: RADIUS_PILL,
+      backgroundColor: SUCCESS_TINT_BACKGROUND,
+    },
+    defaultChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(4),
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(4),
+      borderRadius: RADIUS_PILL,
+      backgroundColor: INDIGO_TINT_BACKGROUND,
+    },
+    defaultChipText: { fontSize: font(11), fontWeight: "700", color: INDIGO_TEXT },
+    nearestChipText: { fontSize: font(11), fontWeight: "700", color: SUCCESS_COLOR },
     // Botón de ícono cuadrado: 36×36 fijo (área táctil del ícono).
     addressBtn: {
       width: 36,

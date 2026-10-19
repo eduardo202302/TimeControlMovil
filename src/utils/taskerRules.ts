@@ -1,6 +1,6 @@
 /**
- * Reglas de presentación de Tasker (Reportar Avería y Seguimiento), calcadas
- * del producto original. Funciones puras: no importan react-native ni expo-*,
+ * Reglas de presentación de Tasker (Reportar y Seguimiento), calcadas del
+ * producto original. Funciones puras: no importan react-native ni expo-*,
  * así que se testean con jest sin emulador.
  *
  * Los imports son relativos (no `@/`) porque jest no resuelve ese alias.
@@ -12,16 +12,20 @@ import type {
   TaskerAttachment,
   TaskerAddressConfig,
   TaskerAddressDraft,
+  TaskerClientAddress,
   TaskerComment,
   TaskerCommentAuthor,
   TaskerCommentDraft,
   TaskerCommentPayload,
+  TaskerCompanyConfig,
+  TaskerFaultAction,
+  TaskerFormRules,
   TaskerReportAddress,
-  TaskerReportConfig,
   TaskerReportErrors,
   TaskerTask,
+  TaskerUserClient,
 } from "../../types/typesTasker/TaskerTypes";
-import type { CompanySettings } from "../../types/typeStore/SchoolStoreType";
+import type { MenuTree } from "../../utils/resolveRoute";
 import {
   ACCENT_VIOLET,
   DANGER_TINT_BACKGROUND,
@@ -463,53 +467,370 @@ export function getInitials(name: string | null | undefined): string {
     .join("");
 }
 
-/**
- * Respaldos de la config de Reportar Avería cuando la compañía no trae las
- * claves en school.settings (el backend no les pone default). Los usa
- * buildCompanySettings (store/useSchoolStore.ts) y resolveTaskerReportConfig.
- * El nombre también es el título de la pantalla y la opción del menú.
- */
-export const TASKER_SERVICE_NAME_LABEL_FALLBACK = "Reportar Servicio";
-export const TASKER_DESCRIPTION_REQUIRED_FALLBACK = true;
+// ─── Compañía conectada, títulos y reglas del formulario de Reportar ────────
 
-/** Config de Reportar Avería a partir de companySettings (null → respaldos). */
-export function resolveTaskerReportConfig(
-  companySettings: CompanySettings | null,
-): TaskerReportConfig {
-  if (!companySettings) {
-    return {
-      serviceNameLabel: TASKER_SERVICE_NAME_LABEL_FALLBACK,
-      isDescriptionRequired: TASKER_DESCRIPTION_REQUIRED_FALLBACK,
-    };
-  }
+/** Ruta de Reportar (encabezado y menú la reconocen por esta ruta). */
+export const TASKER_REPORT_PATH = "/reportfault";
+/** Ruta de Seguimiento. */
+export const TASKER_FOLLOWUP_PATH = "/followup";
+const TASKER_PATHS = [TASKER_REPORT_PATH, TASKER_FOLLOWUP_PATH];
+
+export const TASKER_REPORT_TITLE_FALLBACK = "Reportar Servicio";
+export const TASKER_FAULT_LABEL_FALLBACK = "Averías";
+export const TASKER_CLIENT_LABEL_FALLBACK = "Cliente";
+
+/** Textos de los estados de pantalla completa de Reportar. */
+export const TASKER_UNAVAILABLE_MESSAGE = "No disponible para su compañía";
+export const TASKER_NO_CLIENTS_MESSAGE =
+  "No es posible generar el reporte, el usuario no tiene clientes asignados, por favor comuníquese con administración.";
+export const TASKER_NO_LOCATION_MESSAGE =
+  "Active la ubicación de su teléfono e intente nuevamente, si el problema persiste contacte a tecnología.";
+
+/** ¿La compañía activa está conectada a Tasker? Sin config → no. */
+export function isTaskerEnabled(config: TaskerCompanyConfig | null | undefined): boolean {
+  return config?.connected === true;
+}
+
+export function isTaskerPath(path: string | null | undefined): boolean {
+  return path != null && TASKER_PATHS.includes(path);
+}
+
+/**
+ * Menú sin Reportar ni Seguimiento cuando la compañía no está conectada:
+ * quita padres e hijos con esas rutas, y el grupo que se queda sin hijos.
+ * Conectada → el árbol tal cual.
+ */
+export function filterTaskerMenu(menuTree: MenuTree[], enabled: boolean): MenuTree[] {
+  if (enabled) return menuTree;
+  return menuTree.flatMap((section) => {
+    if (isTaskerPath(section.parent.path)) return [];
+    const children = section.children.filter((child) => !isTaskerPath(child.path));
+    if (section.children.length > 0 && children.length === 0) return [];
+    return [children.length === section.children.length ? section : { ...section, children }];
+  });
+}
+
+function trimmedLabel(value: string | null | undefined, fallback: string): string {
+  const label = typeof value === "string" ? value.trim() : "";
+  return label || fallback;
+}
+
+/** Título de Reportar en el menú y el encabezado: failureReportMenuLabel o "Reportar Servicio". */
+export function getTaskerReportTitle(config: TaskerCompanyConfig | null | undefined): string {
+  return trimmedLabel(config?.failureReportMenuLabel, TASKER_REPORT_TITLE_FALLBACK);
+}
+
+/** Título del bloque de averías: failureReportLabel o "Averías". */
+export function getTaskerFaultLabel(config: TaskerCompanyConfig | null | undefined): string {
+  return trimmedLabel(config?.failureReportLabel, TASKER_FAULT_LABEL_FALLBACK);
+}
+
+/** Título de la tarjeta del cliente (provisional): clientLabel o "Cliente". */
+export function getTaskerClientLabel(config: TaskerCompanyConfig | null | undefined): string {
+  return trimmedLabel(config?.clientLabel, TASKER_CLIENT_LABEL_FALLBACK);
+}
+
+/**
+ * Resumen del campo de averías ya cerrado, en el orden en que se eligieron:
+ * 1 o 2 → los nombres con coma; 3 o más → "A, B y N más". Ninguna → null
+ * (el campo muestra el placeholder).
+ */
+export function formatSelectedFaultsSummary(names: string[]): string | null {
+  if (names.length === 0) return null;
+  if (names.length <= 2) return names.join(", ");
+  return `${names[0]}, ${names[1]} y ${names.length - 2} más`;
+}
+
+/** Nombres de las averías elegidas, en el orden de selección (ids sin catálogo se omiten). */
+export function getSelectedFaultNames(
+  selectedIds: number[],
+  actions: TaskerFaultAction[],
+): string[] {
+  const byId = new Map(actions.map((a) => [a.id, a.name]));
+  return selectedIds.flatMap((id) => {
+    const name = byId.get(id);
+    return name ? [name] : [];
+  });
+}
+
+/**
+ * Con averías, estas son obligatorias y la descripción opcional; sin averías,
+ * la descripción pasa a ser obligatoria. Sin config se trata como sin averías.
+ */
+export function getTaskerFormRules(config: TaskerCompanyConfig | null | undefined): TaskerFormRules {
+  const appliesFault = config?.appliesFault === true;
   return {
-    serviceNameLabel: companySettings.serviceNameLabel,
-    isDescriptionRequired: companySettings.isDescriptionRequired,
+    showFaults: appliesFault,
+    faultsRequired: appliesFault,
+    descriptionRequired: !appliesFault,
   };
 }
 
-/** Ruta de Reportar Avería (encabezado y menú la reconocen por esta ruta). */
-export const TASKER_REPORT_PATH = "/reportfault";
-
 /**
- * Título de Reportar Avería en el encabezado y en el menú: el mismo
- * serviceNameLabel que muestra la tarjeta de la pantalla.
+ * Averías que puede elegir el cliente: las de su categoría y las sin
+ * categoría. Cliente sin categoría (o sin cliente) → todas.
  */
-export function getTaskerReportTitle(companySettings: CompanySettings | null): string {
-  return resolveTaskerReportConfig(companySettings).serviceNameLabel;
+export function filterFaultActionsForClient(
+  actions: TaskerFaultAction[],
+  client: Pick<TaskerUserClient, "categoryId"> | null | undefined,
+): TaskerFaultAction[] {
+  const categoryId = client?.categoryId;
+  if (categoryId == null) return actions;
+  return actions.filter((a) => a.categoryId == null || a.categoryId === categoryId);
 }
 
-/** Validación de "Guardar y enviar", con los textos de Tasker. */
+/** Deja solo las averías elegidas que siguen en `available` (al cambiar de cliente). */
+export function pruneSelectedFaults(
+  selectedIds: number[],
+  available: TaskerFaultAction[],
+): number[] {
+  const allowed = new Set(available.map((a) => a.id));
+  return selectedIds.filter((id) => allowed.has(id));
+}
+
+/**
+ * Aviso debajo de las averías cuando un cambio de cliente quitó algunas ya
+ * marcadas. 0 (o menos) → null, sin aviso.
+ */
+export function getRemovedFaultsNotice(count: number): string | null {
+  if (!(count > 0)) return null;
+  return count === 1
+    ? "Se quitó 1 avería que no aplica al cliente seleccionado."
+    : `Se quitaron ${count} averías que no aplican al cliente seleccionado.`;
+}
+
+/** Marca o desmarca una avería (selección múltiple). */
+export function toggleFaultSelection(selectedIds: number[], id: number): number[] {
+  return selectedIds.includes(id)
+    ? selectedIds.filter((x) => x !== id)
+    : [...selectedIds, id];
+}
+
+// ─── Dirección más cercana ──────────────────────────────────────────────────
+
+const EARTH_RADIUS_M = 6_371_000;
+
+/** Distancia en metros entre dos puntos (haversine). */
+export function haversineMeters(
+  a: { latitude: number; longitude: number },
+  b: { latitude: number; longitude: number },
+): number {
+  const rad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = rad(b.latitude - a.latitude);
+  const dLng = rad(b.longitude - a.longitude);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(a.latitude)) * Math.cos(rad(b.latitude)) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** lat/lng de una dirección si son números válidos (o texto numérico) y en rango. */
+function addressPoint(
+  address: Pick<TaskerAddress, "latitude" | "longitude">,
+): { latitude: number; longitude: number } | null {
+  const latitude = toCoordinate(address.latitude);
+  const longitude = toCoordinate(address.longitude);
+  if (latitude === null || longitude === null) return null;
+  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  return { latitude, longitude };
+}
+
+export interface NearestClientAddress {
+  clientId: number;
+  /** null solo si el cliente elegido no tiene ninguna dirección. */
+  addressId: number | null;
+  /** null = ninguna dirección tenía coordenadas (no hay "Más cercana"). */
+  distanceMeters: number | null;
+}
+
+/**
+ * Dirección más cercana a `coords` entre todas las de todos los clientes. En
+ * empate gana la primera (orden de clientes y de direcciones). Si ninguna
+ * tiene coordenadas (o no hay coords) → primer cliente y su primera dirección,
+ * sin distancia. Sin clientes → null.
+ */
+export function pickNearestClientAddress(
+  clients: TaskerUserClient[],
+  coords: { latitude: number; longitude: number } | null | undefined,
+): NearestClientAddress | null {
+  if (clients.length === 0) return null;
+  let best: NearestClientAddress | null = null;
+  if (coords) {
+    for (const client of clients) {
+      for (const address of client.addresses) {
+        const point = addressPoint(address);
+        if (!point) continue;
+        const distanceMeters = haversineMeters(coords, point);
+        if (best === null || distanceMeters < (best.distanceMeters as number)) {
+          best = { clientId: client.id, addressId: address.id, distanceMeters };
+        }
+      }
+    }
+  }
+  if (best) return best;
+  const first = clients[0];
+  return { clientId: first.id, addressId: first.addresses[0]?.id ?? null, distanceMeters: null };
+}
+
+/**
+ * Distancia para la línea bajo el cliente: menos de 1 km → "a 350 m" (metros
+ * redondeados); desde 1 km → "a 1.2 km" (un decimal). Inválida → null.
+ */
+export function formatDistanceAway(meters: number | null | undefined): string | null {
+  if (meters == null || !Number.isFinite(meters) || meters < 0) return null;
+  const rounded = Math.round(meters);
+  if (rounded < 1000) return `a ${rounded} m`;
+  return `a ${(meters / 1000).toFixed(1)} km`;
+}
+
+export interface ClientAddressHint {
+  /** "Más cercana" si la elegida es la recomendada (con distancia); si no, "Dirección seleccionada". */
+  caption: "Más cercana" | "Dirección seleccionada";
+  address: TaskerReportAddress;
+  /** null si la dirección no tiene coordenadas o no hay posición. */
+  distanceLabel: string | null;
+}
+
+/**
+ * Línea bajo el cliente: la dirección marcada en la tarjeta Direcciones (al
+ * abrir y al cambiar de cliente es la recomendada por pickNearestClientAddress
+ * para ese cliente), con su distancia al teléfono. Sin ninguna marcada → null.
+ */
+export function getClientAddressHint(
+  addresses: TaskerReportAddress[],
+  recommended: NearestClientAddress | null,
+  coords: { latitude: number; longitude: number } | null | undefined,
+): ClientAddressHint | null {
+  const address = getSelectedTaskerAddress(addresses);
+  if (!address) return null;
+  const point = addressPoint(address);
+  const distanceLabel = coords && point ? formatDistanceAway(haversineMeters(coords, point)) : null;
+  const isRecommended =
+    address.fromClient &&
+    recommended?.distanceMeters != null &&
+    recommended.addressId === address.id;
+  return {
+    caption: isRecommended ? "Más cercana" : "Dirección seleccionada",
+    address,
+    distanceLabel,
+  };
+}
+
+// ─── Orden de arranque de Reportar ──────────────────────────────────────────
+
+/** Estado de la búsqueda de la posición del teléfono. */
+export type ReportLocationState =
+  | { status: "pending" }
+  | { status: "failed"; canAskAgain: boolean }
+  | { status: "ok"; coords: { latitude: number; longitude: number } };
+
+export type ReportGate = "unavailable" | "noClients" | "locating" | "noLocation" | "ready";
+
+/**
+ * Qué muestra Reportar, en este orden estricto: compañía no conectada →
+ * usuario sin clientes → buscando la posición → sin posición → formulario.
+ */
+export function getReportGate({
+  config,
+  clients,
+  location,
+}: {
+  config: TaskerCompanyConfig | null | undefined;
+  clients: TaskerUserClient[];
+  location: ReportLocationState;
+}): ReportGate {
+  if (!isTaskerEnabled(config)) return "unavailable";
+  if (clients.length === 0) return "noClients";
+  if (location.status === "pending") return "locating";
+  if (location.status === "failed") return "noLocation";
+  return "ready";
+}
+
+// ─── Validación de "Guardar y enviar" ───────────────────────────────────────
+
+export const TASKER_FAULTS_REQUIRED_ERROR = "Seleccione al menos una avería";
+export const TASKER_DESCRIPTION_REQUIRED_ERROR = "La descripción es un campo requerido";
+export const TASKER_ADDRESS_REQUIRED_ERROR = "Seleccione una dirección";
+
 export function validateReport(
-  values: { typeId: number | null | undefined; description: string },
-  config: TaskerReportConfig,
+  values: {
+    faultIds: number[];
+    description: string;
+    addresses: TaskerReportAddress[];
+  },
+  rules: TaskerFormRules,
 ): TaskerReportErrors {
   const errors: TaskerReportErrors = {};
-  if (values.typeId == null) errors.typeId = "Tipo es un campo requerido";
-  if (config.isDescriptionRequired && !values.description.trim()) {
-    errors.description = "La descripción es un campo requerido";
+  if (rules.faultsRequired && values.faultIds.length === 0) {
+    errors.faults = TASKER_FAULTS_REQUIRED_ERROR;
+  }
+  if (rules.descriptionRequired && !values.description.trim()) {
+    errors.description = TASKER_DESCRIPTION_REQUIRED_ERROR;
+  }
+  if (!getSelectedTaskerAddress(values.addresses)) {
+    errors.address = TASKER_ADDRESS_REQUIRED_ERROR;
   }
   return errors;
+}
+
+// ─── Lectura de lo guardado en el teléfono (arranque en frío) ───────────────
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function parseJson(raw: string | null | undefined): unknown {
+  if (raw == null) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+const STORED_CONFIG_LABELS = ["failureReportMenuLabel", "failureReportLabel", "clientLabel"] as const;
+
+/**
+ * Config guardada; ausente, JSON inválido o forma rara → null (se recarga).
+ * Cada label tiene que estar presente (texto o null): lo guardado con nombres
+ * viejos (serviceLabel / faultLabel) o sin alguna clave se descarta.
+ */
+export function parseStoredTaskerConfig(raw: string | null | undefined): TaskerCompanyConfig | null {
+  const value = parseJson(raw);
+  if (!isRecord(value)) return null;
+  if (typeof value.connected !== "boolean" || typeof value.appliesFault !== "boolean") return null;
+  const labelsOk = STORED_CONFIG_LABELS.every(
+    (key) => key in value && (value[key] === null || typeof value[key] === "string"),
+  );
+  if (!labelsOk) return null;
+  return {
+    connected: value.connected,
+    appliesFault: value.appliesFault,
+    failureReportMenuLabel: value.failureReportMenuLabel as string | null,
+    failureReportLabel: value.failureReportLabel as string | null,
+    clientLabel: value.clientLabel as string | null,
+  };
+}
+
+function isStoredClient(value: unknown): value is TaskerUserClient {
+  return (
+    isRecord(value) &&
+    typeof value.id === "number" &&
+    typeof value.name === "string" &&
+    (value.categoryId === null || typeof value.categoryId === "number") &&
+    Array.isArray(value.addresses) &&
+    value.addresses.every((a) => isRecord(a) && typeof a.id === "number")
+  );
+}
+
+/**
+ * Clientes guardados; ausente, JSON inválido o algún cliente con forma rara →
+ * null (se recarga). `[]` guardado es válido: el usuario no tiene clientes.
+ */
+export function parseStoredTaskerClients(raw: string | null | undefined): TaskerUserClient[] | null {
+  const value = parseJson(raw);
+  if (!Array.isArray(value) || !value.every(isStoredClient)) return null;
+  return value;
 }
 
 // ─── Direcciones de Reportar Avería (MapAddressSelector de Tasker) ──────────
@@ -674,7 +995,62 @@ export function nextTaskerAddressId(list: TaskerReportAddress[]): number {
   return list.reduce((max, a) => Math.max(max, a.id), 0) + 1;
 }
 
-/** La nueva entra al final, marcada; las demás quedan sin marcar. */
+/**
+ * Id de la dirección predeterminada: la primera con `isDefault: true`; sin
+ * ninguna marcada, la primera de la lista. Sin direcciones → null.
+ */
+export function getDefaultClientAddressId(addresses: TaskerClientAddress[]): number | null {
+  return (addresses.find((a) => a.isDefault === true) ?? addresses[0])?.id ?? null;
+}
+
+/**
+ * Las direcciones del cliente, para la lista del reporte: en su orden, sin
+ * marcar y con `fromClient`. Solo la predeterminada va bloqueada (se elige,
+ * no se edita ni se borra).
+ */
+export function clientAddressesToReport(addresses: TaskerClientAddress[]): TaskerReportAddress[] {
+  const defaultId = getDefaultClientAddressId(addresses);
+  return addresses.map((address, index) => ({
+    ...address,
+    order: index + 1,
+    selected: false,
+    locked: address.id === defaultId,
+    fromClient: true,
+  }));
+}
+
+/**
+ * Lista del reporte al elegir cliente: sus direcciones tal como están en el
+ * cliente (lo editado o borrado de otro cliente no se arrastra: al volver, sus
+ * direcciones vuelven al original) y después las que agregó el usuario, que se
+ * conservan. Las agregadas se renumeran (id y order) detrás de las del cliente
+ * para no chocar con sus ids. Queda marcada `selectedId` si es del cliente (si
+ * no, ninguna).
+ */
+export function buildReportAddresses(
+  client: Pick<TaskerUserClient, "addresses"> | null | undefined,
+  previous: TaskerReportAddress[],
+  selectedId: number | null,
+): TaskerReportAddress[] {
+  const fromClient = clientAddressesToReport(client?.addresses ?? []);
+  let nextId = nextTaskerAddressId(fromClient);
+  const added = previous
+    .filter((a) => !a.fromClient)
+    .map((a, index) => ({
+      ...a,
+      id: nextId++,
+      order: fromClient.length + index + 1,
+    }));
+  return [...fromClient, ...added].map((a) => ({
+    ...a,
+    selected: a.fromClient && a.id === selectedId,
+  }));
+}
+
+/**
+ * La nueva entra al final, marcada y desbloqueada (solo vive en el reporte,
+ * nunca se guarda en el cliente); las demás quedan sin marcar.
+ */
 export function addTaskerAddress(
   list: TaskerReportAddress[],
   address: TaskerAddress,
@@ -684,24 +1060,50 @@ export function addTaskerAddress(
     id: nextTaskerAddressId(list),
     order: list.length + 1,
     selected: true,
+    locked: false,
+    fromClient: false,
   };
   return [...list.map((a) => ({ ...a, selected: false })), added];
 }
 
-/** Reemplaza por id y ordena por order. */
+function isLockedAddress(list: TaskerReportAddress[], id: number): boolean {
+  return list.some((a) => a.id === id && a.locked);
+}
+
+/**
+ * Reemplaza por id y ordena por order. La predeterminada (locked) no cambia.
+ * Se conserva el origen (`fromClient`) de la que estaba en la lista.
+ */
 export function updateTaskerAddress(
   list: TaskerReportAddress[],
   address: TaskerReportAddress,
 ): TaskerReportAddress[] {
-  return list.map((a) => (a.id === address.id ? address : a)).sort((a, b) => a.order - b.order);
+  if (isLockedAddress(list, address.id)) return list;
+  return list
+    .map((a) =>
+      a.id === address.id ? { ...address, locked: false, fromClient: a.fromClient } : a,
+    )
+    .sort((a, b) => a.order - b.order);
 }
 
-/** Quita por id y renumera order 1..N. Si era la principal, no queda ninguna. */
+/**
+ * Quita por id y renumera order 1..N. La predeterminada (locked) no se quita.
+ * Si la quitada era la seleccionada, la selección pasa a la predeterminada
+ * (sin predeterminada en la lista, no queda ninguna).
+ */
 export function removeTaskerAddress(
   list: TaskerReportAddress[],
   id: number,
 ): TaskerReportAddress[] {
-  return list.filter((a) => a.id !== id).map((a, index) => ({ ...a, order: index + 1 }));
+  if (isLockedAddress(list, id)) return list;
+  const removedSelected = list.some((a) => a.id === id && a.selected);
+  return list
+    .filter((a) => a.id !== id)
+    .map((a, index) => ({
+      ...a,
+      order: index + 1,
+      selected: removedSelected ? a.locked : a.selected,
+    }));
 }
 
 /** Marca esa y desmarca las demás; si ya estaba marcada, no queda ninguna. */

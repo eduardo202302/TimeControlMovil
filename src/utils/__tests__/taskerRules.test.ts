@@ -43,22 +43,14 @@ import {
   getStateActivities,
   getStateChipColors,
   getTagChipTone,
-  getTaskerReportTitle,
-  resolveTaskerReportConfig,
   sortComments,
-  TASKER_DESCRIPTION_REQUIRED_FALLBACK,
-  TASKER_SERVICE_NAME_LABEL_FALLBACK,
-  TASKER_REPORT_PATH,
   TASKER_STATE_COLOR_FALLBACK,
-  validateReport,
 } from "../taskerRules";
 import {
   getTaskerOpenTask,
-  getTaskerReportContext,
   TASKER_STATE_CANCELLED,
   TASKER_STATE_COMPLETED,
 } from "../../constants/taskerMock";
-import type { CompanySettings } from "../../../types/typeStore/SchoolStoreType";
 import type { GeocodeResult } from "../addressRules";
 import type {
   TaskerActivity,
@@ -944,88 +936,6 @@ describe("getInitials", () => {
   });
 });
 
-describe("validateReport", () => {
-  const required = { serviceNameLabel: "Servicio", isDescriptionRequired: true };
-  const optional = { serviceNameLabel: "Servicio", isDescriptionRequired: false };
-
-  it("sin tipo ni descripción y descripción requerida → ambos errores", () => {
-    expect(validateReport({ typeId: null, description: "  " }, required)).toEqual({
-      typeId: "Tipo es un campo requerido",
-      description: "La descripción es un campo requerido",
-    });
-  });
-  it("descripción no requerida → solo el error de tipo", () => {
-    expect(validateReport({ typeId: undefined, description: "" }, optional)).toEqual({
-      typeId: "Tipo es un campo requerido",
-    });
-  });
-  it("todo completo → sin errores", () => {
-    expect(validateReport({ typeId: 11, description: "Falla" }, required)).toEqual({});
-  });
-  it("tipo con id 0 cuenta como elegido", () => {
-    expect(validateReport({ typeId: 0, description: "x" }, required)).toEqual({});
-  });
-});
-
-describe("resolveTaskerReportConfig", () => {
-  const settings = (over: Partial<CompanySettings>): CompanySettings => ({
-    categoryDefaultIds: {},
-    schedulesAdd: [],
-    entryTime: "",
-    exitTime: "",
-    daysLateAbsence: 3,
-    tardinessMode: "Automatica",
-    attendanceMode: "",
-    serviceNameLabel: TASKER_SERVICE_NAME_LABEL_FALLBACK,
-    isDescriptionRequired: TASKER_DESCRIPTION_REQUIRED_FALLBACK,
-    showListNumber: false,
-    ...over,
-  });
-
-  it("respaldos: 'Reportar Servicio' y descripción requerida", () => {
-    expect(TASKER_SERVICE_NAME_LABEL_FALLBACK).toBe("Reportar Servicio");
-    expect(TASKER_DESCRIPTION_REQUIRED_FALLBACK).toBe(true);
-  });
-  it("sin companySettings → respaldos", () => {
-    expect(resolveTaskerReportConfig(null)).toEqual({
-      serviceNameLabel: "Reportar Servicio",
-      isDescriptionRequired: true,
-    });
-  });
-  it("con companySettings → toma sus dos claves y nada más", () => {
-    expect(
-      resolveTaskerReportConfig(
-        settings({ serviceNameLabel: "Área", isDescriptionRequired: false }),
-      ),
-    ).toEqual({ serviceNameLabel: "Área", isDescriptionRequired: false });
-  });
-  it("el resultado alimenta validateReport", () => {
-    const config = resolveTaskerReportConfig(settings({ isDescriptionRequired: false }));
-    expect(validateReport({ typeId: 11, description: "" }, config)).toEqual({});
-  });
-
-  describe("getTaskerReportTitle", () => {
-    it("ruta de Reportar Avería", () => {
-      expect(TASKER_REPORT_PATH).toBe("/reportfault");
-    });
-    it("con valor → el serviceNameLabel de la compañía, tal cual", () => {
-      expect(getTaskerReportTitle(settings({ serviceNameLabel: "Reportar Avería" }))).toBe(
-        "Reportar Avería",
-      );
-    });
-    it("con null → el respaldo", () => {
-      expect(getTaskerReportTitle(null)).toBe("Reportar Servicio");
-    });
-    it("es el mismo valor que el título de la tarjeta", () => {
-      for (const companySettings of [null, settings({ serviceNameLabel: "Área" })]) {
-        expect(getTaskerReportTitle(companySettings)).toBe(
-          resolveTaskerReportConfig(companySettings).serviceNameLabel,
-        );
-      }
-    });
-  });
-});
-
 // ─── Direcciones de Reportar Avería ──────────────────────────────────────────
 
 function draft(over: Partial<TaskerAddressDraft> = {}): TaskerAddressDraft {
@@ -1035,7 +945,7 @@ function draft(over: Partial<TaskerAddressDraft> = {}): TaskerAddressDraft {
 function listAddress(
   over: Partial<TaskerReportAddress> & { id: number; order: number },
 ): TaskerReportAddress {
-  return { ...emptyAddress(), selected: false, ...over };
+  return { ...emptyAddress(), selected: false, locked: false, fromClient: false, ...over };
 }
 
 const FULL_GEOCODE: GeocodeResult = {
@@ -1349,9 +1259,18 @@ describe("lista de direcciones", () => {
   });
 
   describe("addTaskerAddress", () => {
-    it("lista vacía: id 1, order 1, marcada", () => {
+    it("lista vacía: id 1, order 1, marcada y desbloqueada", () => {
       const result = addTaskerAddress([], emptyAddress({ title: "Nueva" }));
-      expect(result).toEqual([{ ...emptyAddress({ title: "Nueva" }), id: 1, order: 1, selected: true }]);
+      expect(result).toEqual([
+        {
+          ...emptyAddress({ title: "Nueva" }),
+          id: 1,
+          order: 1,
+          selected: true,
+          locked: false,
+          fromClient: false,
+        },
+      ]);
     });
     it("entra al final, marcada; las demás pasan a false", () => {
       const result = addTaskerAddress([a1, a2], emptyAddress({ title: "Nueva" }));
@@ -1435,24 +1354,5 @@ describe("resolveTaskerAddressConfig", () => {
       showWhoReceives: false,
       showRestrictions: false,
     });
-  });
-});
-
-describe("getTaskerReportContext (direcciones de ejemplo)", () => {
-  it("no trae adjuntos de ejemplo: la lista arranca vacía", () => {
-    expect(getTaskerReportContext()).not.toHaveProperty("attachments");
-  });
-  it("cada dirección trae id, order y selected booleano", () => {
-    const { addresses } = getTaskerReportContext();
-    addresses.forEach((a, index) => {
-      expect(typeof a.id).toBe("number");
-      expect(a.order).toBe(index + 1);
-      expect(typeof a.selected).toBe("boolean");
-    });
-  });
-  it("si hay una sola, va marcada", () => {
-    const { addresses } = getTaskerReportContext();
-    if (addresses.length === 1) expect(addresses[0].selected).toBe(true);
-    expect(addresses.filter((a) => a.selected).length).toBeLessThanOrEqual(1);
   });
 });

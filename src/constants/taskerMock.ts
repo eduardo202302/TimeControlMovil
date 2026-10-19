@@ -1,26 +1,21 @@
 // TEMPORAL (9-oct): datos fijos hasta que exista el puente en face-class-api.
 // Único archivo a reemplazar al conectar.
 //
-// Las pantallas de Tasker (Reportar Avería y Seguimiento) leen SOLO a través
-// de las funciones de abajo, con la misma forma que devuelve Tasker hoy. Al
-// conectar, cada función pasa a llamar al puente y nada más cambia.
+// Las pantallas de Tasker (Reportar y Seguimiento) leen SOLO a través de las
+// funciones de abajo, con la misma forma que devuelve Tasker hoy. Al conectar,
+// cada función marcada TODO(puente) pasa a llamar al puente y nada más cambia.
 //
-// La config de Reportar Avería (serviceNameLabel / isDescriptionRequired) ya
-// NO es dato fijo: sale de school.settings vía companySettings
-// (resolveTaskerReportConfig en src/utils/taskerRules.ts).
+// Config y clientes se leen al armar la sesión (login / cambio de empresa) y
+// quedan en useSchoolStore + AsyncStorage (ver src/utils/taskerSession.ts).
 
 import type { MenuTree } from "../../utils/resolveRoute";
 import type {
+  TaskerCompanyConfig,
+  TaskerFaultAction,
   TaskerOpenTaskResponse,
-  TaskerReportContext,
-  TaskerTypeTag,
+  TaskerUserClient,
 } from "../../types/typesTasker/TaskerTypes";
-import {
-  ACCENT_SKY,
-  ACCENT_TEAL,
-  ACCENT_VIOLET,
-  WARNING_ACCENT,
-} from "./colors";
+import { WARNING_ACCENT } from "./colors";
 
 /** Estados terminales de Tasker: no se calcula tiempo en vivo. Confirmar al conectar. */
 export const TASKER_STATE_COMPLETED = 5;
@@ -28,7 +23,8 @@ export const TASKER_STATE_CANCELLED = 6;
 
 /**
  * Entradas del drawer mientras el backend no registre las rutas. El drawer
- * las omite en cuanto el menú real trae el mismo path.
+ * las omite en cuanto el menú real trae el mismo path, y las oculta (como las
+ * del backend) si la compañía no está conectada a Tasker.
  */
 export const TASKER_TEMP_MENU_ENABLED = true;
 
@@ -38,7 +34,7 @@ export const TASKER_TEMP_MENU: MenuTree[] = [
       id: -9001,
       parentId: null,
       order: 9001,
-      name: "Reportar Avería",
+      name: "Reportar Servicio",
       icon: "warning sign",
       path: "/reportfault",
       type: "menu",
@@ -59,36 +55,54 @@ export const TASKER_TEMP_MENU: MenuTree[] = [
   },
 ];
 
-// Los colores de tipos y estados llegan del backend como hex; acá se toman de
-// los tokens que tienen ese mismo valor.
-export function getTaskerTypeTags(): TaskerTypeTag[] {
-  return [
-    { id: 11, name: "Climatización", color: ACCENT_SKY },
-    { id: 12, name: "Electricidad", color: WARNING_ACCENT },
-    { id: 13, name: "Plomería", color: ACCENT_TEAL },
-    { id: 14, name: "Equipos médicos", color: ACCENT_VIOLET },
-  ];
+// ─── Reportar (FASE B) ──────────────────────────────────────────────────────
+// Interruptores para probar cada caso sin tocar nada más.
+
+/** "Conectar Tasker" de la compañía. false = sin menú ni pantallas de Tasker. */
+export const TASKER_MOCK_CONNECTED = true;
+/** true = averías obligatorias y descripción opcional; false = al revés. */
+export const TASKER_MOCK_APPLIES_FAULT = true;
+/** Cuántos clientes tiene el usuario (0 = no puede reportar). */
+export const TASKER_MOCK_CLIENT_COUNT: 0 | 1 | 2 = 2;
+/** false = labels en null (se ven los títulos por defecto). */
+export const TASKER_MOCK_LABELS_FILLED = false;
+
+/**
+ * Config de Tasker de la compañía activa.
+ * Los labels usan los nombres de company.settings de Tasker:
+ * failureReportMenuLabel, failureReportLabel y clientLabel.
+ * TODO(puente): `connected` vendrá de face-class ("Conectar Tasker" de la
+ * compañía) y `appliesFault` de Tasker; falta confirmar el nombre real de
+ * ambos.
+ * TODO(puente): `clientLabel` pendiente de confirmar en qué variable de Tasker
+ * vive.
+ */
+export function getTaskerCompanyConfig(): TaskerCompanyConfig {
+  return {
+    connected: TASKER_MOCK_CONNECTED,
+    appliesFault: TASKER_MOCK_APPLIES_FAULT,
+    failureReportMenuLabel: TASKER_MOCK_LABELS_FILLED ? "Reportar Avería" : null,
+    failureReportLabel: TASKER_MOCK_LABELS_FILLED ? "Tipo de avería" : null,
+    clientLabel: TASKER_MOCK_LABELS_FILLED ? "Cliente atendido" : null,
+  };
 }
 
-export function getTaskerReportContext(): TaskerReportContext {
-  return {
-    client: {
-      id: 301,
-      name: "Clínica Las Marías",
-      phone: "8095550100",
-      typeName: "Clínica",
-    },
-    reporter: { id: 21, name: "Jeremy Domínguez" },
+/** Categorías de cliente del ejemplo (los ids son de Tasker). */
+const CATEGORY_CLINICS = 1;
+const CATEGORY_RETAIL = 2;
+
+const MOCK_CLIENTS: TaskerUserClient[] = [
+  {
+    id: 301,
+    name: "Clínica Las Marías",
+    categoryId: CATEGORY_CLINICS,
     addresses: [
       {
-        id: 1,
-        order: 1,
-        // Única dirección de ejemplo: va marcada como principal.
-        selected: true,
-        title: "El Millón",
+        id: 3011,
+        title: "Sede El Millón",
         province: "D.N.",
         city: "Santo Domingo de Guzmán",
-        sector: "Sector El Millón",
+        sector: "El Millón",
         zone: "",
         street: "Calle Luis F. Thomén",
         streetNumber: "412",
@@ -100,8 +114,115 @@ export function getTaskerReportContext(): TaskerReportContext {
         whoReceives: "",
         restrictions: "",
       },
+      {
+        // Predeterminada del cliente (no es la primera a propósito).
+        id: 3012,
+        isDefault: true,
+        title: "Sede Naco",
+        province: "D.N.",
+        city: "Santo Domingo de Guzmán",
+        sector: "Naco",
+        zone: "",
+        street: "Av. Tiradentes",
+        streetNumber: "25",
+        building: "Torre Médica Naco",
+        apartmentNumber: "",
+        latitude: 18.4775,
+        longitude: -69.9273,
+        referenceToArrive: "Frente a la plaza",
+        whoReceives: "",
+        restrictions: "",
+      },
+      {
+        // Sin coordenadas: nunca puede salir como la más cercana.
+        id: 3013,
+        title: "Almacén Villa Juana",
+        province: "D.N.",
+        city: "Santo Domingo de Guzmán",
+        sector: "Villa Juana",
+        zone: "",
+        street: "Calle Josefa Brea",
+        streetNumber: "118",
+        building: "",
+        apartmentNumber: "",
+        latitude: null,
+        longitude: null,
+        referenceToArrive: "",
+        whoReceives: "",
+        restrictions: "",
+      },
     ],
-  };
+  },
+  {
+    id: 302,
+    name: "Supermercado Bravo Este",
+    categoryId: null,
+    addresses: [
+      {
+        id: 3021,
+        title: "Sucursal Av. España",
+        province: "Santo Domingo",
+        city: "Santo Domingo Este",
+        sector: "Ensanche Isabelita",
+        zone: "",
+        street: "Av. España",
+        streetNumber: "80",
+        building: "",
+        apartmentNumber: "",
+        latitude: 18.4752,
+        longitude: -69.8608,
+        referenceToArrive: "",
+        whoReceives: "",
+        restrictions: "",
+      },
+      {
+        id: 3022,
+        title: "Sucursal Los Mina",
+        province: "Santo Domingo",
+        city: "Santo Domingo Este",
+        sector: "Los Mina",
+        zone: "",
+        street: "Av. San Vicente de Paúl",
+        streetNumber: "15",
+        building: "",
+        apartmentNumber: "",
+        latitude: 18.5005,
+        longitude: -69.8597,
+        referenceToArrive: "",
+        whoReceives: "",
+        restrictions: "",
+      },
+    ],
+  },
+];
+
+/**
+ * Clientes asignados al usuario en sesión, con sus direcciones. La
+ * predeterminada va con `isDefault: true`; el segundo cliente no marca
+ * ninguna (cae en su primera).
+ * TODO(puente): vendrá de Tasker (clientes del usuario en la compañía activa).
+ * TODO(puente): confirmar con Tasker cómo viene la predeterminada
+ * (defaultAddress del cliente) y mapearla a `isDefault`.
+ */
+export function getTaskerUserClients(): TaskerUserClient[] {
+  return MOCK_CLIENTS.slice(0, TASKER_MOCK_CLIENT_COUNT);
+}
+
+/**
+ * Catálogo de averías (acciones de la tarea en Tasker). categoryId null =
+ * aplica a cualquier cliente.
+ * TODO(puente): vendrá de Tasker.
+ */
+export function getTaskerFaultActions(): TaskerFaultAction[] {
+  return [
+    { id: 501, name: "Equipo médico no enciende", categoryId: CATEGORY_CLINICS },
+    { id: 502, name: "Fuga de gases medicinales", categoryId: CATEGORY_CLINICS },
+    { id: 503, name: "Refrigerador de góndola sin frío", categoryId: CATEGORY_RETAIL },
+    { id: 504, name: "Puerta automática atascada", categoryId: CATEGORY_RETAIL },
+    { id: 505, name: "Falla eléctrica", categoryId: null },
+    { id: 506, name: "Fuga de agua", categoryId: null },
+    { id: 507, name: "Aire acondicionado no enfría", categoryId: null },
+  ];
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");

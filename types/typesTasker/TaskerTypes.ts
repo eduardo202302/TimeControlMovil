@@ -56,12 +56,63 @@ export interface TaskerAddress {
   location?: { lat: number; lng: number };
 }
 
-/** Dirección de la lista de Reportar Avería: siempre con id, order y selected. */
+/**
+ * Dirección de la lista de Reportar: siempre con id, order y selected.
+ * `locked`: es la predeterminada del cliente (se elige, no se edita ni se
+ * borra). `fromClient`: vino del cliente (false = la agregó el usuario). Las
+ * del cliente que no son la predeterminada se editan y borran como las
+ * agregadas, pero solo en este reporte: nada se guarda en el cliente.
+ */
 export type TaskerReportAddress = TaskerAddress & {
   id: number;
   order: number;
   selected: boolean;
+  locked: boolean;
+  fromClient: boolean;
 };
+
+/**
+ * Dirección registrada de un cliente de Tasker. `isDefault`: la predeterminada
+ * (una sola; sin ninguna marcada, lo es la primera).
+ */
+export type TaskerClientAddress = TaskerAddress & { id: number; isDefault?: boolean };
+
+/**
+ * Config de Tasker de la compañía activa (ver getTaskerCompanyConfig). Los
+ * labels llevan los nombres de company.settings de Tasker.
+ */
+export interface TaskerCompanyConfig {
+  /** "Conectar Tasker" de la compañía en face-class (nombre real por confirmar). */
+  connected: boolean;
+  /**
+   * true = el reporte lleva averías (obligatorias) y la descripción es
+   * opcional (nombre real por confirmar).
+   */
+  appliesFault: boolean;
+  /** Título de la opción y la pantalla; null o vacío → "Reportar Servicio". */
+  failureReportMenuLabel: string | null;
+  /** Título del bloque de averías; null o vacío → "Averías". */
+  failureReportLabel: string | null;
+  /** Título de la tarjeta del cliente; null o vacío → "Cliente". Provisional. */
+  clientLabel: string | null;
+}
+
+/** Cliente asignado al usuario en Tasker. */
+export interface TaskerUserClient {
+  id: number;
+  name: string;
+  /** Categoría del cliente: filtra las averías. null = ve todas. */
+  categoryId: number | null;
+  addresses: TaskerClientAddress[];
+}
+
+/** Avería del catálogo (acción de la tarea en Tasker). */
+export interface TaskerFaultAction {
+  id: number;
+  name: string;
+  /** null = aplica a cualquier cliente. */
+  categoryId: number | null;
+}
 
 /** Borrador de la ventana "Seleccionar Ubicación": todo texto. */
 export interface TaskerAddressDraft {
@@ -170,16 +221,11 @@ export interface TaskerOpenTaskResponse {
   settings: TaskerSettings;
 }
 
-/** Tipo de servicio elegible al reportar una avería. */
-export interface TaskerTypeTag {
-  id: number;
-  name: string;
-  color?: string;
-}
-
-export interface TaskerReportConfig {
-  serviceNameLabel: string;
-  isDescriptionRequired: boolean;
+/** Qué pide el formulario de Reportar según la compañía (getTaskerFormRules). */
+export interface TaskerFormRules {
+  showFaults: boolean;
+  faultsRequired: boolean;
+  descriptionRequired: boolean;
 }
 
 /**
@@ -195,14 +241,8 @@ export interface TaskerAttachment {
   size?: number;
 }
 
-/** Datos de solo lectura que acompañan el formulario de reporte. */
-export interface TaskerReportContext {
-  client: TaskerClient & { typeName: string };
-  reporter: TaskerUserRef;
-  addresses: TaskerReportAddress[];
-}
-
 export interface TaskerReportErrors {
-  typeId?: string;
+  faults?: string;
   description?: string;
+  address?: string;
 }

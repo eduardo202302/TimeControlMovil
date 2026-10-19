@@ -1,6 +1,6 @@
 import React from "react";
-import ReportFaultForm from "../../components/tasker/ReportFaultForm";
+import ReportFaultGate from "../../components/tasker/ReportFaultGate";
 
 export default function ReportFaultScreen() {
-  return <ReportFaultForm />;
+  return <ReportFaultGate />;
 }

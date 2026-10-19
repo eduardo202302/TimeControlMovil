@@ -2,6 +2,7 @@ import axios from "axios";
 import { router } from "expo-router";
 import { useSchoolStore } from "../../store/useSchoolStore";
 import * as Storage from "./storage";
+import { clearTaskerSession } from "./taskerSession";
 
 /**
  * Decodifica el payload de un JWT (sin verificar firma). Útil para leer
@@ -33,7 +34,8 @@ export function isTokenExpired(token: string): boolean {
 }
 
 /**
- * Limpia TODAS las credenciales de sesión del SecureStore y del store.
+ * Limpia TODAS las credenciales de sesión del SecureStore y lo de Tasker
+ * guardado en AsyncStorage.
  * `isAuthorized` NO se borra (es la autorización física del dispositivo,
  * no de la sesión del usuario).
  */
@@ -44,6 +46,7 @@ export async function clearSession(): Promise<void> {
     Storage.deleteItemAsync("menuItems"),
     Storage.deleteItemAsync("photourl"),
     Storage.deleteItemAsync("s3Photo"),
+    clearTaskerSession(),
   ]);
 }
 
