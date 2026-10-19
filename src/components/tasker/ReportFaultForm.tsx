@@ -63,6 +63,7 @@ import {
   getRemovedFaultsNotice,
   getSelectedFaultNames,
   getTaskerAddressLines,
+  getNearestListAddressId,
   getTaskerClientLabel,
   getTaskerFaultLabel,
   getTaskerFormRules,
@@ -71,6 +72,7 @@ import {
   pruneSelectedFaults,
   removeTaskerAddress,
   removeTaskerComment,
+  sortTaskerAddresses,
   toggleTaskerAddressSelected,
   updateTaskerAddress,
   updateTaskerComment,
@@ -167,8 +169,17 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
   const faultsSummary = formatSelectedFaultsSummary(getSelectedFaultNames(faultIds, faultActions));
   /** Recomendada del cliente elegido según la posición del teléfono. */
   const recommended = useMemo(() => pickNearestClientAddress([client], coords), [client, coords]);
-  /** "Más cercana" en Direcciones; sin coordenadas en sus direcciones, ninguna. */
-  const nearestAddressId = recommended?.distanceMeters != null ? recommended.addressId : null;
+  /** Lista a mostrar: la predeterminada siempre primero. */
+  const sortedAddresses = useMemo(() => sortTaskerAddresses(addresses), [addresses]);
+  /**
+   * "Más cercana" en Direcciones: sobre TODA la lista con coordenadas (se
+   * recalcula al agregar, editar o borrar). Independiente de "Predeterminada"
+   * y de la selección.
+   */
+  const nearestAddressId = useMemo(
+    () => getNearestListAddressId(addresses, coords),
+    [addresses, coords],
+  );
   /** Línea bajo el cliente: la dirección marcada, con su distancia. */
   const addressHint = getClientAddressHint(addresses, recommended, coords);
   const addressHintLines = addressHint ? getTaskerAddressLines(addressHint.address) : null;
@@ -235,6 +246,7 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
             })
           : addTaskerAddress(prev, built),
       );
+      // La nueva queda seleccionada: ya hay dirección.
       if (!target) clearError("address");
       setAddressEditor(null);
     },
@@ -456,14 +468,14 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
             styles={styles}
             tone="teal"
             icon="location-outline"
-            title={`Direcciones (${addresses.length})`}
+            title={`Direcciones (${sortedAddresses.length})`}
           />
           {/* EXCEPCIÓN E3: Tasker reordena arrastrando las filas; aquí no (falta la librería). */}
-          {addresses.map((address) => (
+          {sortedAddresses.map((address) => (
             <AddressRow
               key={address.id}
               address={address}
-              nearest={address.fromClient && address.id === nearestAddressId}
+              nearest={address.id === nearestAddressId}
               styles={styles}
               onEdit={() => setAddressEditor({ target: address })}
               onRemove={() => handleRemoveAddress(address)}
@@ -561,7 +573,7 @@ function CardHeader({ styles, tone, icon, title, required, children }: CardHeade
 
 interface AddressRowProps {
   address: TaskerReportAddress;
-  /** Etiqueta "Más cercana" (solo direcciones del cliente con coordenadas). */
+  /** Etiqueta "Más cercana" (la más cercana de toda la lista con coordenadas). */
   nearest: boolean;
   styles: Styles;
   onEdit: () => void;

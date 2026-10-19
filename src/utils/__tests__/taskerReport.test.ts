@@ -5,6 +5,7 @@ import {
   filterFaultActionsForClient,
   filterTaskerMenu,
   getDefaultClientAddressId,
+  getNearestListAddressId,
   getRemovedFaultsNotice,
   getReportGate,
   getSelectedTaskerAddress,
@@ -24,6 +25,7 @@ import {
   pickNearestClientAddress,
   pruneSelectedFaults,
   removeTaskerAddress,
+  sortTaskerAddresses,
   TASKER_ADDRESS_REQUIRED_ERROR,
   TASKER_DESCRIPTION_REQUIRED_ERROR,
   TASKER_FAULTS_REQUIRED_ERROR,
@@ -564,20 +566,21 @@ describe("getDefaultClientAddressId", () => {
 });
 
 describe("direcciones del cliente y agregadas", () => {
-  // Cliente A: predeterminada = 12 (marcada). Cliente B: sin marca → 21.
+  // Cliente A: predeterminada = 12 (marcada, segunda en el cliente). Cliente B: sin marca → 21.
   const clientA = client(1, [
     address(11, 18.4, -69.9),
     withDefault(address(12, null, null)),
     address(13, 18.45, -69.95),
   ]);
   const clientB = client(2, [address(21, 18.5, -69.8), address(22, 18.5, -69.8)]);
+  const ids = (list: TaskerReportAddress[]) => list.map((a) => a.id);
 
-  it("solo la predeterminada es locked; todas fromClient, en orden y sin marcar", () => {
+  it("solo la predeterminada es locked y va primero; todas fromClient y sin marcar", () => {
     expect(
-      clientAddressesToReport(clientA.addresses).map((a) => [a.id, a.order, a.selected, a.locked, a.fromClient]),
+      buildReportAddresses(clientA, [], null).map((a) => [a.id, a.order, a.selected, a.locked, a.fromClient]),
     ).toEqual([
-      [11, 1, false, false, true],
-      [12, 2, false, true, true],
+      [12, 1, false, true, true],
+      [11, 2, false, false, true],
       [13, 3, false, false, true],
     ]);
   });
@@ -589,45 +592,63 @@ describe("direcciones del cliente y agregadas", () => {
     expect(getSelectedTaskerAddress(list)?.id).toBe(13);
     expect(buildReportAddresses(clientA, [], null).some((a) => a.selected)).toBe(false);
   });
-  it("addTaskerAddress crea locked: false y fromClient: false", () => {
+  it("addTaskerAddress: al final, locked: false, fromClient: false y marcada", () => {
     const list = addTaskerAddress(buildReportAddresses(clientA, [], 11), address(0, null, null));
-    const added = list[list.length - 1];
-    expect(added).toMatchObject({ id: 14, selected: true, locked: false, fromClient: false });
+    expect(list[list.length - 1]).toMatchObject({
+      id: 14,
+      order: 4,
+      selected: true,
+      locked: false,
+      fromClient: false,
+    });
+  });
+
+  it("agregar selecciona la nueva (y solo esa); la predeterminada sigue arriba", () => {
+    const list = buildReportAddresses(clientA, [], 11);
+    const added = addTaskerAddress(list, address(0, 18.47, -69.94));
+    expect(getSelectedTaskerAddress(added)?.id).toBe(14);
+    expect(added.filter((a) => a.selected)).toHaveLength(1);
+    expect(added[0]).toMatchObject({ id: 12, locked: true });
+  });
+  it("editar NO cambia la selección (aunque el borrador traiga otra cosa)", () => {
+    const list = buildReportAddresses(clientA, [], 11);
+    const updated = updateTaskerAddress(list, { ...list[2], title: "X", selected: true });
+    expect(getSelectedTaskerAddress(updated)?.id).toBe(11);
+    expect(updated.filter((a) => a.selected)).toHaveLength(1);
   });
 
   it("la predeterminada no se edita ni se borra (misma referencia)", () => {
     const list = buildReportAddresses(clientA, [], 11);
-    expect(updateTaskerAddress(list, { ...list[1], title: "Editada" })).toBe(list);
+    expect(updateTaskerAddress(list, { ...list[0], title: "Editada" })).toBe(list);
     expect(removeTaskerAddress(list, 12)).toBe(list);
   });
   it("update no puede desbloquear la predeterminada haciéndose pasar por otra", () => {
     const list = buildReportAddresses(clientA, [], 11);
-    const forged: TaskerReportAddress = { ...list[1], title: "X", locked: false };
+    const forged: TaskerReportAddress = { ...list[0], title: "X", locked: false };
     expect(updateTaskerAddress(list, forged)).toBe(list);
   });
-  it("una no predeterminada del cliente se edita: sigue fromClient y desbloqueada", () => {
+  it("una no predeterminada del cliente se edita: sigue fromClient, desbloqueada y en su lugar", () => {
     const list = buildReportAddresses(clientA, [], 11);
     const updated = updateTaskerAddress(list, { ...list[2], title: "Bodega", fromClient: false });
     expect(updated[2]).toMatchObject({ id: 13, title: "Bodega", locked: false, fromClient: true });
+    expect(ids(updated)).toEqual([12, 11, 13]);
   });
   it("una no predeterminada del cliente se borra y se renumera", () => {
     const list = buildReportAddresses(clientA, [], 11);
     expect(removeTaskerAddress(list, 13).map((a) => [a.id, a.order])).toEqual([
-      [11, 1],
-      [12, 2],
+      [12, 1],
+      [11, 2],
     ]);
   });
   it("una agregada se edita y se borra como siempre", () => {
     const list = addTaskerAddress(buildReportAddresses(clientA, [], 11), address(0, null, null));
-    const added = list[3];
-    const updated = updateTaskerAddress(list, { ...added, title: "Mía" });
-    expect(updated[3]).toMatchObject({ title: "Mía", locked: false, fromClient: false });
-    expect(removeTaskerAddress(list, added.id).map((a) => a.id)).toEqual([11, 12, 13]);
+    const updated = updateTaskerAddress(list, { ...list[3], title: "Mía" });
+    expect(updated[3]).toMatchObject({ id: 14, title: "Mía", locked: false, fromClient: false });
+    expect(ids(removeTaskerAddress(list, 14))).toEqual([12, 11, 13]);
   });
 
   it("borrar la seleccionada → la selección pasa a la predeterminada", () => {
-    const list = buildReportAddresses(clientA, [], 13);
-    const result = removeTaskerAddress(list, 13);
+    const result = removeTaskerAddress(buildReportAddresses(clientA, [], 13), 13);
     expect(getSelectedTaskerAddress(result)?.id).toBe(12);
     expect(result.filter((a) => a.selected)).toHaveLength(1);
   });
@@ -640,7 +661,7 @@ describe("direcciones del cliente y agregadas", () => {
     expect(getSelectedTaskerAddress(removeTaskerAddress(list, 13))?.id).toBe(11);
   });
 
-  it("cambio de cliente: las agregadas se conservan (renumeradas) y se marca la pedida", () => {
+  it("cambio de cliente: las agregadas se conservan (renumeradas, debajo) y se marca la pedida", () => {
     const withAdded = addTaskerAddress(
       buildReportAddresses(clientA, [], 11),
       address(0, null, null, "Agregada"),
@@ -652,17 +673,17 @@ describe("direcciones del cliente y agregadas", () => {
       [23, 3, false, false, "Agregada"],
     ]);
     expect(getSelectedTaskerAddress(switched)?.id).toBe(22);
-    expect(new Set(switched.map((a) => a.id)).size).toBe(switched.length);
+    expect(new Set(ids(switched)).size).toBe(switched.length);
   });
   it("volver a un cliente: sus direcciones editadas o borradas vuelven al original", () => {
     let list = buildReportAddresses(clientA, [], 11);
-    list = updateTaskerAddress(list, { ...list[0], title: "Editada" });
+    list = updateTaskerAddress(list, { ...list[1], title: "Editada" });
     list = removeTaskerAddress(list, 13);
     list = addTaskerAddress(list, address(0, null, null, "Agregada"));
     const back = buildReportAddresses(clientA, buildReportAddresses(clientB, list, 21), 11);
     expect(back.map((a) => [a.id, a.title, a.fromClient])).toEqual([
-      [11, "Dirección 11", true],
       [12, "Dirección 12", true],
+      [11, "Dirección 11", true],
       [13, "Dirección 13", true],
       [14, "Agregada", false],
     ]);
@@ -670,7 +691,7 @@ describe("direcciones del cliente y agregadas", () => {
   it("nada se guarda en el cliente", () => {
     const before = JSON.stringify(clientA);
     let list = buildReportAddresses(clientA, [], 11);
-    list = updateTaskerAddress(list, { ...list[0], title: "Editada" });
+    list = updateTaskerAddress(list, { ...list[1], title: "Editada" });
     list = removeTaskerAddress(list, 13);
     addTaskerAddress(list, address(0, null, null));
     expect(JSON.stringify(clientA)).toBe(before);
@@ -678,6 +699,101 @@ describe("direcciones del cliente y agregadas", () => {
   it("toggle sigue funcionando", () => {
     const list = buildReportAddresses(clientA, [], 11);
     expect(getSelectedTaskerAddress(toggleTaskerAddressSelected(list, 12))?.id).toBe(12);
+  });
+});
+
+describe("sortTaskerAddresses", () => {
+  const report = (
+    id: number,
+    order: number,
+    over: Partial<TaskerReportAddress> = {},
+  ): TaskerReportAddress => ({
+    ...address(id, null, null),
+    order,
+    selected: false,
+    locked: false,
+    fromClient: false,
+    ...over,
+  });
+
+  it("predeterminada primero; las demás en el orden en que entraron; order 1..N", () => {
+    const list = [
+      report(5, 1),
+      report(6, 2),
+      report(1, 3, { locked: true, fromClient: true }),
+      report(7, 4),
+    ];
+    expect(sortTaskerAddresses(list).map((a) => [a.id, a.order])).toEqual([
+      [1, 1],
+      [5, 2],
+      [6, 3],
+      [7, 4],
+    ]);
+  });
+  it("agregar varias no desplaza a la predeterminada", () => {
+    const c = client(1, [withDefault(address(1, 18.4, -69.9))]);
+    let list = buildReportAddresses(c, [], 1);
+    for (let i = 0; i < 3; i += 1) list = addTaskerAddress(list, address(0, null, null, `Nueva ${i}`));
+    expect(list.map((a) => a.title)).toEqual(["Dirección 1", "Nueva 0", "Nueva 1", "Nueva 2"]);
+    expect(list[0].locked).toBe(true);
+  });
+  it("sin predeterminada marcada en el cliente → la primera, y queda arriba", () => {
+    const c = client(1, [address(1, null, null), address(2, null, null)]);
+    const list = addTaskerAddress(buildReportAddresses(c, [], null), address(0, null, null));
+    expect(list.map((a) => [a.id, a.locked])).toEqual([
+      [1, true],
+      [2, false],
+      [3, false],
+    ]);
+  });
+  it("ya ordenada → mismas referencias", () => {
+    const list = [report(1, 1, { locked: true }), report(2, 2)];
+    const sorted = sortTaskerAddresses(list);
+    expect(sorted[0]).toBe(list[0]);
+    expect(sorted[1]).toBe(list[1]);
+  });
+  it("sin predeterminada en la lista → solo por order", () => {
+    expect(sortTaskerAddresses([report(2, 2), report(1, 1)]).map((a) => a.id)).toEqual([1, 2]);
+  });
+});
+
+describe("getNearestListAddressId ('Más cercana' sobre toda la lista)", () => {
+  const c = client(1, [withDefault(address(1, EL_MILLON.latitude, EL_MILLON.longitude, "Predet."))]);
+
+  it("una agregada más cercana que la predeterminada se lleva 'Más cercana'; la predeterminada sigue locked", () => {
+    const list = addTaskerAddress(
+      buildReportAddresses(c, [], 1),
+      address(0, PIANTINI.latitude + 0.001, PIANTINI.longitude, "Agregada"),
+    );
+    expect(getNearestListAddressId(list, PIANTINI)).toBe(2);
+    expect(list.find((a) => a.id === 1)?.locked).toBe(true);
+    // La agregada queda seleccionada (por agregarla, no por ser la más cercana).
+    expect(getSelectedTaskerAddress(list)?.id).toBe(2);
+  });
+  it("la predeterminada más cercana → coinciden las dos etiquetas", () => {
+    const list = addTaskerAddress(
+      buildReportAddresses(c, [], 1),
+      address(0, LOS_MINA.latitude, LOS_MINA.longitude),
+    );
+    expect(getNearestListAddressId(list, EL_MILLON)).toBe(1);
+  });
+  it("se recalcula al cambiar la lista (borrar la más cercana)", () => {
+    const list = addTaskerAddress(
+      buildReportAddresses(c, [], 1),
+      address(0, PIANTINI.latitude, PIANTINI.longitude),
+    );
+    expect(getNearestListAddressId(list, PIANTINI)).toBe(2);
+    expect(getNearestListAddressId(removeTaskerAddress(list, 2), PIANTINI)).toBe(1);
+  });
+  it("sin coordenadas en la lista o sin posición → null; empate → la primera", () => {
+    const noCoords = buildReportAddresses(client(2, [address(1, null, null)]), [], 1);
+    expect(getNearestListAddressId(noCoords, PIANTINI)).toBeNull();
+    expect(getNearestListAddressId(buildReportAddresses(c, [], 1), null)).toBeNull();
+    const tie = addTaskerAddress(
+      buildReportAddresses(c, [], 1),
+      address(0, EL_MILLON.latitude, EL_MILLON.longitude),
+    );
+    expect(getNearestListAddressId(tie, PIANTINI)).toBe(1);
   });
 });
 
@@ -804,26 +920,29 @@ describe("taskerMock (datos de prueba de Reportar)", () => {
     expect(typeof c.connected).toBe("boolean");
     expect(typeof c.appliesFault).toBe("boolean");
   });
-  it("clientes: lugares distintos, uno con categoría y otro sin ella, alguna dirección sin coordenadas", () => {
+  it("clientes: lugares distintos, uno con categoría y otro sin ella", () => {
     const clients = getTaskerUserClients();
     if (clients.length < 2) return; // TASKER_MOCK_CLIENT_COUNT alternado a 0 o 1.
     expect(clients.some((c) => c.categoryId != null)).toBe(true);
     expect(clients.some((c) => c.categoryId == null)).toBe(true);
-    const addresses = clients.flatMap((c) => c.addresses);
-    expect(addresses.some((a) => a.latitude == null || a.longitude == null)).toBe(true);
     const cities = new Set(clients.map((c) => c.addresses[0].city));
     expect(cities.size).toBeGreaterThan(1);
-    // Los ids de dirección no se repiten entre clientes.
-    expect(new Set(addresses.map((a) => a.id)).size).toBe(addresses.length);
+    // La cercanía se puede probar: la más cercana cambia según el punto.
+    const [first, second] = clients;
+    const at = (c: TaskerUserClient) => ({
+      latitude: Number(c.addresses[0].latitude),
+      longitude: Number(c.addresses[0].longitude),
+    });
+    expect(pickNearestClientAddress(clients, at(first))?.clientId).toBe(first.id);
+    expect(pickNearestClientAddress(clients, at(second))?.clientId).toBe(second.id);
   });
-  it("al menos un cliente con 2+ direcciones y una predeterminada marcada (solo una)", () => {
-    const clients = getTaskerUserClients();
-    if (clients.length === 0) return; // TASKER_MOCK_CLIENT_COUNT alternado a 0.
-    const marked = clients.filter(
-      (c) => c.addresses.length >= 2 && c.addresses.filter((a) => a.isDefault).length === 1,
-    );
-    expect(marked.length).toBeGreaterThanOrEqual(1);
-    clients.forEach((c) => expect(c.addresses.filter((a) => a.isDefault).length).toBeLessThanOrEqual(1));
+  it("cada cliente: una sola dirección, predeterminada y con coordenadas", () => {
+    for (const c of getTaskerUserClients()) {
+      expect(c.addresses).toHaveLength(1);
+      expect(c.addresses[0].isDefault).toBe(true);
+      expect(typeof c.addresses[0].latitude).toBe("number");
+      expect(typeof c.addresses[0].longitude).toBe("number");
+    }
   });
   it("averías: al menos 6, con y sin categoría", () => {
     const actions = getTaskerFaultActions();

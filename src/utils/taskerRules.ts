@@ -1020,6 +1020,42 @@ export function clientAddressesToReport(addresses: TaskerClientAddress[]): Taske
 }
 
 /**
+ * Orden de la lista del reporte: la predeterminada (locked) SIEMPRE primero;
+ * las demás debajo, en el orden en que entraron (`order`, estable). Renumera
+ * `order` 1..N. Las que no cambian de lugar conservan la referencia. Sin
+ * predeterminada en la lista, solo se ordena por `order`.
+ */
+export function sortTaskerAddresses(list: TaskerReportAddress[]): TaskerReportAddress[] {
+  const byOrder = (a: TaskerReportAddress, b: TaskerReportAddress) => a.order - b.order;
+  const locked = list.filter((a) => a.locked).sort(byOrder);
+  const rest = list.filter((a) => !a.locked).sort(byOrder);
+  return [...locked, ...rest].map((a, index) =>
+    a.order === index + 1 ? a : { ...a, order: index + 1 },
+  );
+}
+
+/**
+ * Dirección con coordenadas más cercana a `coords` entre TODAS las de la lista
+ * (la predeterminada, las demás del cliente y las agregadas): la etiqueta "Más
+ * cercana". Empate → la primera de la lista. Sin coords o ninguna con
+ * coordenadas → null. Independiente de la predeterminada y de la selección.
+ */
+export function getNearestListAddressId(
+  list: TaskerReportAddress[],
+  coords: { latitude: number; longitude: number } | null | undefined,
+): number | null {
+  if (!coords) return null;
+  let best: { id: number; distance: number } | null = null;
+  for (const address of list) {
+    const point = addressPoint(address);
+    if (!point) continue;
+    const distance = haversineMeters(coords, point);
+    if (best === null || distance < best.distance) best = { id: address.id, distance };
+  }
+  return best?.id ?? null;
+}
+
+/**
  * Lista del reporte al elegir cliente: sus direcciones tal como están en el
  * cliente (lo editado o borrado de otro cliente no se arrastra: al volver, sus
  * direcciones vuelven al original) y después las que agregó el usuario, que se
@@ -1041,15 +1077,18 @@ export function buildReportAddresses(
       id: nextId++,
       order: fromClient.length + index + 1,
     }));
-  return [...fromClient, ...added].map((a) => ({
-    ...a,
-    selected: a.fromClient && a.id === selectedId,
-  }));
+  return sortTaskerAddresses(
+    [...fromClient, ...added].map((a) => ({
+      ...a,
+      selected: a.fromClient && a.id === selectedId,
+    })),
+  );
 }
 
 /**
- * La nueva entra al final, marcada y desbloqueada (solo vive en el reporte,
- * nunca se guarda en el cliente); las demás quedan sin marcar.
+ * La nueva entra al final (nunca encima de la predeterminada), desbloqueada y
+ * marcada, como en Tasker; las demás quedan sin marcar. Solo vive en el
+ * reporte, nunca se guarda en el cliente.
  */
 export function addTaskerAddress(
   list: TaskerReportAddress[],
@@ -1058,12 +1097,12 @@ export function addTaskerAddress(
   const added: TaskerReportAddress = {
     ...address,
     id: nextTaskerAddressId(list),
-    order: list.length + 1,
+    order: list.reduce((max, a) => Math.max(max, a.order), 0) + 1,
     selected: true,
     locked: false,
     fromClient: false,
   };
-  return [...list.map((a) => ({ ...a, selected: false })), added];
+  return sortTaskerAddresses([...list.map((a) => (a.selected ? { ...a, selected: false } : a)), added]);
 }
 
 function isLockedAddress(list: TaskerReportAddress[], id: number): boolean {
@@ -1071,25 +1110,29 @@ function isLockedAddress(list: TaskerReportAddress[], id: number): boolean {
 }
 
 /**
- * Reemplaza por id y ordena por order. La predeterminada (locked) no cambia.
- * Se conserva el origen (`fromClient`) de la que estaba en la lista.
+ * Reemplaza por id y reordena (sortTaskerAddresses). La predeterminada
+ * (locked) no cambia. Se conservan el origen (`fromClient`) y la selección de
+ * la que estaba en la lista: editar no cambia la selección.
  */
 export function updateTaskerAddress(
   list: TaskerReportAddress[],
   address: TaskerReportAddress,
 ): TaskerReportAddress[] {
   if (isLockedAddress(list, address.id)) return list;
-  return list
-    .map((a) =>
-      a.id === address.id ? { ...address, locked: false, fromClient: a.fromClient } : a,
-    )
-    .sort((a, b) => a.order - b.order);
+  return sortTaskerAddresses(
+    list.map((a) =>
+      a.id === address.id
+        ? { ...address, locked: false, fromClient: a.fromClient, selected: a.selected }
+        : a,
+    ),
+  );
 }
 
 /**
- * Quita por id y renumera order 1..N. La predeterminada (locked) no se quita.
- * Si la quitada era la seleccionada, la selección pasa a la predeterminada
- * (sin predeterminada en la lista, no queda ninguna).
+ * Quita por id y reordena (sortTaskerAddresses, renumera order 1..N). La
+ * predeterminada (locked) no se quita. Si la quitada era la seleccionada, la
+ * selección pasa a la predeterminada (sin predeterminada, no queda ninguna);
+ * si no, la selección no cambia.
  */
 export function removeTaskerAddress(
   list: TaskerReportAddress[],
@@ -1097,13 +1140,11 @@ export function removeTaskerAddress(
 ): TaskerReportAddress[] {
   if (isLockedAddress(list, id)) return list;
   const removedSelected = list.some((a) => a.id === id && a.selected);
-  return list
-    .filter((a) => a.id !== id)
-    .map((a, index) => ({
-      ...a,
-      order: index + 1,
-      selected: removedSelected ? a.locked : a.selected,
-    }));
+  return sortTaskerAddresses(
+    list
+      .filter((a) => a.id !== id)
+      .map((a) => (removedSelected ? { ...a, selected: a.locked } : a)),
+  );
 }
 
 /** Marca esa y desmarca las demás; si ya estaba marcada, no queda ninguna. */

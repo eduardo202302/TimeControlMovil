@@ -11,7 +11,11 @@ import {
   setupAxiosInterceptors,
 } from "../utils/session";
 import * as Storage from "../utils/storage";
-import { clearTaskerSession, restoreTaskerSession } from "../utils/taskerSession";
+import {
+  clearTaskerSession,
+  removeLegacyTaskerStorage,
+  restoreTaskerSession,
+} from "../utils/taskerSession";
 import { toRDDateString } from "../utils/punchRules";
 import {
   LAST_COMPANY_STORAGE_KEY,
@@ -35,6 +39,9 @@ export default function RootLayout() {
   // ── Carga inicial: hidratar store desde SecureStore ──────────────────────────
   useEffect(() => {
     const checkAuthorization = async () => {
+      // Tasker guardado antes de versionar las claves: se borra siempre al
+      // arrancar, haya sesión o no.
+      await removeLegacyTaskerStorage();
       const isAuthorized = await Storage.getItemAsync("isAuthorized");
       const schoolDataRaw = await Storage.getItemAsync("dataSchool");
       const urlColegio = await Storage.getItemAsync("urlColegio");

@@ -91,6 +91,8 @@ export function getTaskerCompanyConfig(): TaskerCompanyConfig {
 const CATEGORY_CLINICS = 1;
 const CATEGORY_RETAIL = 2;
 
+// Una sola dirección por cliente (su predeterminada), en zonas distintas de
+// Santo Domingo para que el cálculo de cercanía siga probándose.
 const MOCK_CLIENTS: TaskerUserClient[] = [
   {
     id: 301,
@@ -98,24 +100,6 @@ const MOCK_CLIENTS: TaskerUserClient[] = [
     categoryId: CATEGORY_CLINICS,
     addresses: [
       {
-        id: 3011,
-        title: "Sede El Millón",
-        province: "D.N.",
-        city: "Santo Domingo de Guzmán",
-        sector: "El Millón",
-        zone: "",
-        street: "Calle Luis F. Thomén",
-        streetNumber: "412",
-        building: "",
-        apartmentNumber: "",
-        latitude: 18.4571092,
-        longitude: -69.9524086,
-        referenceToArrive: "",
-        whoReceives: "",
-        restrictions: "",
-      },
-      {
-        // Predeterminada del cliente (no es la primera a propósito).
         id: 3012,
         isDefault: true,
         title: "Sede Naco",
@@ -133,24 +117,6 @@ const MOCK_CLIENTS: TaskerUserClient[] = [
         whoReceives: "",
         restrictions: "",
       },
-      {
-        // Sin coordenadas: nunca puede salir como la más cercana.
-        id: 3013,
-        title: "Almacén Villa Juana",
-        province: "D.N.",
-        city: "Santo Domingo de Guzmán",
-        sector: "Villa Juana",
-        zone: "",
-        street: "Calle Josefa Brea",
-        streetNumber: "118",
-        building: "",
-        apartmentNumber: "",
-        latitude: null,
-        longitude: null,
-        referenceToArrive: "",
-        whoReceives: "",
-        restrictions: "",
-      },
     ],
   },
   {
@@ -160,6 +126,7 @@ const MOCK_CLIENTS: TaskerUserClient[] = [
     addresses: [
       {
         id: 3021,
+        isDefault: true,
         title: "Sucursal Av. España",
         province: "Santo Domingo",
         city: "Santo Domingo Este",
@@ -175,31 +142,14 @@ const MOCK_CLIENTS: TaskerUserClient[] = [
         whoReceives: "",
         restrictions: "",
       },
-      {
-        id: 3022,
-        title: "Sucursal Los Mina",
-        province: "Santo Domingo",
-        city: "Santo Domingo Este",
-        sector: "Los Mina",
-        zone: "",
-        street: "Av. San Vicente de Paúl",
-        streetNumber: "15",
-        building: "",
-        apartmentNumber: "",
-        latitude: 18.5005,
-        longitude: -69.8597,
-        referenceToArrive: "",
-        whoReceives: "",
-        restrictions: "",
-      },
     ],
   },
 ];
 
 /**
  * Clientes asignados al usuario en sesión, con sus direcciones. La
- * predeterminada va con `isDefault: true`; el segundo cliente no marca
- * ninguna (cae en su primera).
+ * predeterminada va con `isDefault: true` (sin ninguna marcada, lo es la
+ * primera).
  * TODO(puente): vendrá de Tasker (clientes del usuario en la compañía activa).
  * TODO(puente): confirmar con Tasker cómo viene la predeterminada
  * (defaultAddress del cliente) y mapearla a `isDefault`.

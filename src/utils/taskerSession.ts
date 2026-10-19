@@ -12,9 +12,16 @@ import { parseStoredTaskerClients, parseStoredTaskerConfig } from "./taskerRules
  * teléfono junto al resto de la sesión. Van en AsyncStorage y NO en
  * SecureStore: la lista de clientes con direcciones puede pasar de ~2 KB (el
  * tope de SecureStore en Android) y no contiene secretos.
+ *
+ * Las claves llevan versión: se sube cuando cambia la forma o los datos de
+ * ejemplo, así lo de una versión anterior nunca se lee (queda en claves que
+ * ya no se consultan y se borran al arrancar).
  */
-export const TASKER_CONFIG_STORAGE_KEY = "taskerConfig";
-export const TASKER_CLIENTS_STORAGE_KEY = "taskerClients";
+export const TASKER_STORAGE_VERSION = "v2";
+export const TASKER_CONFIG_STORAGE_KEY = `taskerConfig:${TASKER_STORAGE_VERSION}`;
+export const TASKER_CLIENTS_STORAGE_KEY = `taskerClients:${TASKER_STORAGE_VERSION}`;
+/** Claves de antes de versionar (sin sufijo). */
+export const TASKER_LEGACY_STORAGE_KEYS = ["taskerConfig", "taskerClients"] as const;
 
 export interface TaskerSession {
   config: TaskerCompanyConfig;
@@ -65,7 +72,19 @@ export async function restoreTaskerSession(): Promise<TaskerSession> {
   return loadAndPersistTaskerSession();
 }
 
-/** Limpieza de cierre de sesión. Nunca lanza. */
+/**
+ * Arranque: borra las claves sin versión si quedaron de una instalación
+ * anterior. Nunca lanza (si no se puede, igual nadie las lee).
+ */
+export async function removeLegacyTaskerStorage(): Promise<void> {
+  try {
+    await Promise.all(TASKER_LEGACY_STORAGE_KEYS.map((key) => AsyncStorage.removeItem(key)));
+  } catch {
+    // Se reintenta en el próximo arranque.
+  }
+}
+
+/** Limpieza de cierre de sesión (claves con versión). Nunca lanza. */
 export async function clearTaskerSession(): Promise<void> {
   try {
     await Promise.all([

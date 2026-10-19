@@ -4,10 +4,22 @@ import { getTaskerCompanyConfig, getTaskerUserClients } from "../../constants/ta
 import {
   clearTaskerSession,
   loadAndPersistTaskerSession,
+  removeLegacyTaskerStorage,
   restoreTaskerSession,
   TASKER_CLIENTS_STORAGE_KEY,
   TASKER_CONFIG_STORAGE_KEY,
+  TASKER_LEGACY_STORAGE_KEYS,
+  TASKER_STORAGE_VERSION,
 } from "../taskerSession";
+import { clearSession } from "../session";
+
+// session.ts importa expo-router y el store (que importa ../storage): sin RN en node.
+jest.mock("expo-router", () => ({ router: { replace: jest.fn() } }));
+jest.mock("../storage", () => ({
+  getItemAsync: jest.fn(async () => null),
+  setItemAsync: jest.fn(async () => undefined),
+  deleteItemAsync: jest.fn(async () => undefined),
+}));
 
 // AsyncStorage en memoria — el real necesita react-native.
 jest.mock("@react-native-async-storage/async-storage", () => {
@@ -38,9 +50,13 @@ beforeEach(() => {
 });
 
 describe("claves", () => {
-  it("taskerConfig y taskerClients", () => {
-    expect(TASKER_CONFIG_STORAGE_KEY).toBe("taskerConfig");
-    expect(TASKER_CLIENTS_STORAGE_KEY).toBe("taskerClients");
+  it("con versión: taskerConfig:v2 y taskerClients:v2", () => {
+    expect(TASKER_STORAGE_VERSION).toBe("v2");
+    expect(TASKER_CONFIG_STORAGE_KEY).toBe("taskerConfig:v2");
+    expect(TASKER_CLIENTS_STORAGE_KEY).toBe("taskerClients:v2");
+  });
+  it("las viejas, sin versión: taskerConfig y taskerClients", () => {
+    expect(TASKER_LEGACY_STORAGE_KEYS).toEqual(["taskerConfig", "taskerClients"]);
   });
 });
 
@@ -118,6 +134,48 @@ describe("restoreTaskerSession (arranque en frío)", () => {
   it("si la lectura falla → se vuelve a cargar", async () => {
     (AsyncStorage.getItem as jest.Mock).mockRejectedValueOnce(new Error("x"));
     await expect(restoreTaskerSession()).resolves.toEqual(fresh());
+  });
+});
+
+describe("claves viejas sin versión", () => {
+  const seedLegacy = () => {
+    // Forma válida a propósito: si se leyera, se usaría.
+    mem.set("taskerConfig", JSON.stringify({ ...getTaskerCompanyConfig(), connected: false }));
+    mem.set("taskerClients", JSON.stringify([]));
+  };
+
+  it("la lectura las ignora: sin claves v2 → se recarga del mock", async () => {
+    seedLegacy();
+    await expect(restoreTaskerSession()).resolves.toEqual(fresh());
+    expect(AsyncStorage.getItem).not.toHaveBeenCalledWith("taskerConfig");
+    expect(AsyncStorage.getItem).not.toHaveBeenCalledWith("taskerClients");
+  });
+  it("guardar escribe solo las v2", async () => {
+    await loadAndPersistTaskerSession();
+    expect([...mem.keys()].sort()).toEqual([TASKER_CLIENTS_STORAGE_KEY, TASKER_CONFIG_STORAGE_KEY].sort());
+  });
+  it("removeLegacyTaskerStorage (arranque) las borra y no toca las v2", async () => {
+    seedLegacy();
+    await loadAndPersistTaskerSession();
+    await removeLegacyTaskerStorage();
+    expect(mem.has("taskerConfig")).toBe(false);
+    expect(mem.has("taskerClients")).toBe(false);
+    expect(mem.has(TASKER_CONFIG_STORAGE_KEY)).toBe(true);
+    expect(mem.has(TASKER_CLIENTS_STORAGE_KEY)).toBe(true);
+  });
+  it("removeLegacyTaskerStorage sin claves viejas o con error → no lanza", async () => {
+    await expect(removeLegacyTaskerStorage()).resolves.toBeUndefined();
+    (AsyncStorage.removeItem as jest.Mock).mockRejectedValueOnce(new Error("x"));
+    await expect(removeLegacyTaskerStorage()).resolves.toBeUndefined();
+  });
+});
+
+describe("clearSession (cierre de sesión de la app)", () => {
+  it("borra las dos claves v2 de Tasker", async () => {
+    await loadAndPersistTaskerSession();
+    await clearSession();
+    expect(mem.has(TASKER_CONFIG_STORAGE_KEY)).toBe(false);
+    expect(mem.has(TASKER_CLIENTS_STORAGE_KEY)).toBe(false);
   });
 });
 
