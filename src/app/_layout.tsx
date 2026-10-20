@@ -39,8 +39,8 @@ export default function RootLayout() {
   // ── Carga inicial: hidratar store desde SecureStore ──────────────────────────
   useEffect(() => {
     const checkAuthorization = async () => {
-      // Tasker guardado antes de versionar las claves: se borra siempre al
-      // arrancar, haya sesión o no.
+      // Tasker guardado con claves de versiones anteriores: se borra siempre
+      // al arrancar, haya sesión o no.
       await removeLegacyTaskerStorage();
       const isAuthorized = await Storage.getItemAsync("isAuthorized");
       const schoolDataRaw = await Storage.getItemAsync("dataSchool");
@@ -90,7 +90,8 @@ export default function RootLayout() {
         const user = JSON.parse(userRaw);
         console.log("User from storage:", user);
         const menuItems = JSON.parse(menuItemsRaw);
-        // Tasker guardado (AsyncStorage); ausente o corrupto → se recarga.
+        // Tasker guardado (AsyncStorage); ausente o corrupto → no conectada
+        // hasta el próximo chooseschool.
         useSchoolStore.getState().setTaskerSession(await restoreTaskerSession());
         setMenuResolution(user, menuItems);
         initialLoadDone.current = true;

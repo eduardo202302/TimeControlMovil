@@ -78,40 +78,51 @@ export type TaskerReportAddress = TaskerAddress & {
 export type TaskerClientAddress = TaskerAddress & { id: number; isDefault?: boolean };
 
 /**
- * Config de Tasker de la compañía activa (ver getTaskerCompanyConfig). Los
- * labels llevan los nombres de company.settings de Tasker.
+ * Config de Tasker de la compañía activa, sacada de `data.taskrCompany` de
+ * chooseschool (ver mapTaskerCompanyConfig). Los labels llevan los nombres de
+ * company.settings de Tasker.
  */
 export interface TaskerCompanyConfig {
-  /** "Conectar Tasker" de la compañía en face-class (nombre real por confirmar). */
+  /** taskrCompany presente en chooseschool (null = escuela no conectada). */
   connected: boolean;
   /**
-   * true = el reporte lleva averías (obligatorias) y la descripción es
-   * opcional (nombre real por confirmar).
+   * settings.isFailureReport: el reporte lleva averías (obligatorias) y la
+   * descripción es opcional.
    */
   appliesFault: boolean;
   /** Título de la opción y la pantalla; null o vacío → "Reportar Servicio". */
   failureReportMenuLabel: string | null;
   /** Título del bloque de averías; null o vacío → "Averías". */
   failureReportLabel: string | null;
-  /** Título de la tarjeta del cliente; null o vacío → "Cliente". Provisional. */
+  /** Título de la tarjeta del cliente; null o vacío → "Cliente". */
   clientLabel: string | null;
 }
 
-/** Cliente asignado al usuario en Tasker. */
+/** Cliente asignado al usuario en Tasker (`data.taskrClients` de chooseschool). */
 export interface TaskerUserClient {
   id: number;
   name: string;
-  /** Categoría del cliente: filtra las averías. null = ve todas. */
-  categoryId: number | null;
+  /**
+   * La predeterminada ya resuelta: defaultAddress del cliente o, si viene
+   * null o vacía, la primera de addresses. Es la misma que va primera en
+   * `addresses` con `isDefault: true`. null = el cliente no tiene direcciones.
+   */
+  defaultAddress: TaskerClientAddress | null;
   addresses: TaskerClientAddress[];
 }
 
-/** Avería del catálogo (acción de la tarea en Tasker). */
+/** Config y clientes de Tasker de la sesión (store + AsyncStorage). */
+export interface TaskerSession {
+  config: TaskerCompanyConfig;
+  clients: TaskerUserClient[];
+}
+
+/** Avería del catálogo (acción de GET /taskr/actions). */
 export interface TaskerFaultAction {
   id: number;
   name: string;
   /** null = aplica a cualquier cliente. */
-  categoryId: number | null;
+  clientId: number | null;
 }
 
 /** Borrador de la ventana "Seleccionar Ubicación": todo texto. */
@@ -245,4 +256,44 @@ export interface TaskerReportErrors {
   faults?: string;
   description?: string;
   address?: string;
+}
+
+/** Dirección del cuerpo de POST /taskr/tasks: solo estos campos. */
+export interface TaskrTaskAddress {
+  title: string;
+  province: string;
+  city: string;
+  zone: string;
+  sector: string;
+  street: string;
+  streetNumber: string;
+  building: string;
+  apartmentNumber: string;
+  postalCode: string;
+  address: string;
+  formattedAddress: string;
+  referenceToArrive: string;
+  whoReceives: string;
+  restrictions: string;
+  /** Las tres van juntas o no van (un null cancela la tarea en Taskr). */
+  latitude?: number;
+  longitude?: number;
+  location?: { lat: number; lng: number };
+}
+
+export interface TaskrTaskComment {
+  /** Siempre presente ("" si solo trae adjuntos): sin ella Taskr cancela todo. */
+  comment: string;
+  /** Data URIs completos ("data:<mime>;base64,…"). */
+  images: string[];
+  taskListId: null;
+}
+
+/** Cuerpo de POST /taskr/tasks (buildTaskrTaskBody). */
+export interface TaskrTaskBody {
+  clientId: number;
+  action: string;
+  actionIds?: number[];
+  address?: TaskrTaskAddress;
+  taskComments?: TaskrTaskComment[];
 }

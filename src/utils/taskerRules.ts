@@ -224,6 +224,21 @@ function isSameComposerTarget(a: CommentComposerTarget, b: CommentComposerTarget
 }
 
 /**
+ * Formulario que de verdad está abierto: ninguno si se pidió reiniciar la
+ * tarjeta (`resetKey` distinto del último visto, p. ej. tras enviar el
+ * reporte) o si el comentario en edición ya no existe.
+ */
+export function resolveCommentComposer(
+  openTarget: CommentComposerTarget,
+  commentIds: number[],
+  reset: { key: number; seenKey: number } = { key: 0, seenKey: 0 },
+): CommentComposerTarget {
+  if (reset.key !== reset.seenKey) return null;
+  if (openTarget?.mode === "edit" && !commentIds.includes(openTarget.id)) return null;
+  return openTarget;
+}
+
+/**
  * Pasar de un formulario a otro (o cerrarlo): "none" si ya es ese, "confirm"
  * si el abierto tiene cambios sin guardar ("¿Descartar cambios?"), si no "apply".
  */
@@ -284,9 +299,29 @@ export function removeTaskerComment(list: TaskerComment[], id: number): TaskerCo
 }
 
 /**
- * Lo que pesan los adjuntos de los comentarios (largo de cada valor de
- * `images`, mismo criterio que pickAttachments). `excludeId`: el comentario
- * que se está editando, cuyos adjuntos ya cuenta la ventana.
+ * Tope de Reportar: archivos reales (no su base64) sumando TODOS los
+ * comentarios. El base64 pesa ~33 % más, así 7 MB de archivos caben en el
+ * cuerpo de 9.5 MB que se valida al enviar (TASKR_TASK_MAX_BYTES).
+ */
+export const TASKER_REPORT_ATTACHMENTS_MAX_BYTES = 7 * 1024 * 1024;
+
+/**
+ * Bytes del archivo dentro de un data-URI ("data:<mime>;base64,…"): lo que
+ * mide decodificado, sin el encabezado. Sin ";base64" → el largo del contenido.
+ */
+export function getDataUriFileBytes(dataUri: string): number {
+  const comma = dataUri.indexOf(",");
+  if (comma < 0) return dataUri.length;
+  const payload = dataUri.slice(comma + 1);
+  if (!/;base64$/i.test(dataUri.slice(0, comma))) return payload.length;
+  const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((payload.length * 3) / 4) - padding);
+}
+
+/**
+ * Lo que pesan (en archivos reales) los adjuntos de los comentarios.
+ * `excludeId`: el comentario que se está editando, cuyos adjuntos ya cuenta
+ * la ventana.
  */
 export function getTaskerCommentsAttachmentBytes(
   comments: TaskerComment[],
@@ -294,20 +329,45 @@ export function getTaskerCommentsAttachmentBytes(
 ): number {
   return comments.reduce(
     (sum, c) =>
-      c.id === excludeId ? sum : sum + c.images.reduce((acc, value) => acc + value.length, 0),
+      c.id === excludeId
+        ? sum
+        : sum + c.images.reduce((acc, value) => acc + getDataUriFileBytes(value), 0),
     0,
   );
 }
 
+/** Tope de adjuntos compartido por todo un envío (Reportar). */
+export interface TaskerAttachmentLimit {
+  maxBytes: number;
+  /** Lo que ya pesan los adjuntos de los OTROS comentarios del envío. */
+  usedElsewhere: number;
+}
+
 /**
- * Reportar Avería manda todos los comentarios en un solo cuerpo: la suma de
- * sus adjuntos no puede pasar `maxBytes` (MAX_PAYLOAD_BYTES de pickAttachments).
+ * Deja entrar, en orden, los adjuntos nuevos que caben en el tope (`usedBytes`
+ * = lo ya adjuntado en todo el envío); los que desbordan van a `rejected` con
+ * el mismo texto que pickAttachments ("<nombre> (supera el límite total de
+ * N MB)").
  */
-export function isTaskerCommentsOverPayloadLimit(
-  comments: TaskerComment[],
+export function fitTaskerAttachments(
+  added: TaskerAttachment[],
+  usedBytes: number,
   maxBytes: number,
-): boolean {
-  return getTaskerCommentsAttachmentBytes(comments) > maxBytes;
+): { accepted: TaskerAttachment[]; rejected: string[] } {
+  const label = `${Math.round((maxBytes / (1024 * 1024)) * 10) / 10}MB`;
+  const accepted: TaskerAttachment[] = [];
+  const rejected: string[] = [];
+  let budget = usedBytes;
+  for (const attachment of added) {
+    const bytes = getDataUriFileBytes(attachment.dataUri);
+    if (budget + bytes > maxBytes) {
+      rejected.push(`${attachment.name} (supera el límite total de ${label})`);
+      continue;
+    }
+    budget += bytes;
+    accepted.push(attachment);
+  }
+  return { accepted, rejected };
 }
 
 /**
@@ -567,16 +627,15 @@ export function getTaskerFormRules(config: TaskerCompanyConfig | null | undefine
 }
 
 /**
- * Averías que puede elegir el cliente: las de su categoría y las sin
- * categoría. Cliente sin categoría (o sin cliente) → todas.
+ * Averías que puede elegir el cliente: las sin cliente (clientId null, aplican
+ * a todos) y las de ese cliente. Sin cliente → solo las generales. categoryId
+ * de Taskr se ignora por ahora.
  */
 export function filterFaultActionsForClient(
   actions: TaskerFaultAction[],
-  client: Pick<TaskerUserClient, "categoryId"> | null | undefined,
+  clientId: number | null | undefined,
 ): TaskerFaultAction[] {
-  const categoryId = client?.categoryId;
-  if (categoryId == null) return actions;
-  return actions.filter((a) => a.categoryId == null || a.categoryId === categoryId);
+  return actions.filter((a) => a.clientId == null || a.clientId === clientId);
 }
 
 /** Deja solo las averías elegidas que siguen en `available` (al cambiar de cliente). */
@@ -791,7 +850,7 @@ function parseJson(raw: string | null | undefined): unknown {
 const STORED_CONFIG_LABELS = ["failureReportMenuLabel", "failureReportLabel", "clientLabel"] as const;
 
 /**
- * Config guardada; ausente, JSON inválido o forma rara → null (se recarga).
+ * Config guardada; ausente, JSON inválido o forma rara → null (se descarta).
  * Cada label tiene que estar presente (texto o null): lo guardado con nombres
  * viejos (serviceLabel / faultLabel) o sin alguna clave se descarta.
  */
@@ -812,20 +871,24 @@ export function parseStoredTaskerConfig(raw: string | null | undefined): TaskerC
   };
 }
 
+function isStoredAddress(value: unknown): boolean {
+  return isRecord(value) && typeof value.id === "number";
+}
+
 function isStoredClient(value: unknown): value is TaskerUserClient {
   return (
     isRecord(value) &&
     typeof value.id === "number" &&
     typeof value.name === "string" &&
-    (value.categoryId === null || typeof value.categoryId === "number") &&
+    (value.defaultAddress === null || isStoredAddress(value.defaultAddress)) &&
     Array.isArray(value.addresses) &&
-    value.addresses.every((a) => isRecord(a) && typeof a.id === "number")
+    value.addresses.every(isStoredAddress)
   );
 }
 
 /**
  * Clientes guardados; ausente, JSON inválido o algún cliente con forma rara →
- * null (se recarga). `[]` guardado es válido: el usuario no tiene clientes.
+ * null (se descarta). `[]` guardado es válido: el usuario no tiene clientes.
  */
 export function parseStoredTaskerClients(raw: string | null | undefined): TaskerUserClient[] | null {
   const value = parseJson(raw);

@@ -16,7 +16,7 @@ import { resolveMobilePath } from "../constants/mobileRoutes";
 import { buildLastCompany } from "./lastCompany";
 import { buildOpenDayFromChooseSchool, buildTodayHoliday } from "./punchRules";
 import * as Storage from "./storage";
-import { loadAndPersistTaskerSession } from "./taskerSession";
+import { persistTaskerSession } from "./taskerSession";
 
 /**
  * Elegir / cambiar de empresa — lo comparten el login (FormLogin) y la opción
@@ -407,8 +407,9 @@ export async function commitSession({
     await Storage.deleteItemAsync("s3Photo");
   }
 
-  // Tasker de la empresa elegida (AsyncStorage): pisa lo de la anterior.
-  const tasker = await loadAndPersistTaskerSession();
+  // Tasker de la empresa elegida (de chooseschool, a AsyncStorage): pisa lo
+  // de la anterior. Sin chooseSchoolData → no conectada.
+  const tasker = await persistTaskerSession(chooseSchoolData);
 
   // ── Store: todo junto, sin awaits en el medio ──
   const store = useSchoolStore.getState();

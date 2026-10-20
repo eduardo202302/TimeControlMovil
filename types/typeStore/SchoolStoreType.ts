@@ -2,6 +2,7 @@ import type { LastCompany } from "../../src/utils/lastCompany";
 import type { PunchEvent } from "../../src/utils/punchRules";
 import type {
   TaskerCompanyConfig,
+  TaskerSession,
   TaskerUserClient,
 } from "../typesTasker/TaskerTypes";
 import { AppType, MenuTree } from "../../utils/resolveRoute";
@@ -372,7 +373,7 @@ export interface SchoolStore {
   // tocan — es lo que pinta el login después de cerrar sesión.
   lastCompany: LastCompany | null;
 
-  // Tasker de la compañía activa (getTaskerCompanyConfig / getTaskerUserClients).
+  // Tasker de la compañía activa (de chooseschool, ver mapTaskerSession).
   // Se cargan al armar la sesión, se guardan en AsyncStorage (ver
   // src/utils/taskerSession.ts) y logout()/clear() los vacían. null/[] = sin
   // cargar o sin clientes.
@@ -395,10 +396,7 @@ export interface SchoolStore {
   setTodayHoliday: (h: TodayHoliday | null) => void;
   setPendingOpenDay: (p: PunchEvent | null) => void;
   setClosedOpenDayKey: (key: string | null) => void;
-  setTaskerSession: (session: {
-    config: TaskerCompanyConfig;
-    clients: TaskerUserClient[];
-  }) => void;
+  setTaskerSession: (session: TaskerSession) => void;
   /** Actualiza el store y la persiste en SecureStore. */
   setLastCompany: (lastCompany: LastCompany) => Promise<void>;
   /** La saca del store y la borra de SecureStore. */

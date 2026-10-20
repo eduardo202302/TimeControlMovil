@@ -37,13 +37,7 @@ import {
   validateReport,
   type ReportLocationState,
 } from "../taskerRules";
-import {
-  getTaskerCompanyConfig,
-  getTaskerFaultActions,
-  getTaskerUserClients,
-  TASKER_MOCK_LABELS_FILLED,
-  TASKER_TEMP_MENU,
-} from "../../constants/taskerMock";
+import { TASKER_TEMP_MENU } from "../../constants/taskerMock";
 import type { MenuTree } from "../../../utils/resolveRoute";
 import type {
   TaskerClientAddress,
@@ -89,12 +83,8 @@ function address(
   };
 }
 
-function client(
-  id: number,
-  addresses: TaskerClientAddress[],
-  categoryId: number | null = null,
-): TaskerUserClient {
-  return { id, name: `Cliente ${id}`, categoryId, addresses };
+function client(id: number, addresses: TaskerClientAddress[]): TaskerUserClient {
+  return { id, name: `Cliente ${id}`, defaultAddress: addresses[0] ?? null, addresses };
 }
 
 // Puntos reales de Santo Domingo.
@@ -208,16 +198,6 @@ describe("getTaskerClientLabel", () => {
   });
 });
 
-describe("mock: labels por defecto en null", () => {
-  it("se ven los respaldos", () => {
-    const c = getTaskerCompanyConfig();
-    expect(TASKER_MOCK_LABELS_FILLED).toBe(false);
-    expect(getTaskerReportTitle(c)).toBe("Reportar Servicio");
-    expect(getTaskerFaultLabel(c)).toBe("Averías");
-    expect(getTaskerClientLabel(c)).toBe("Cliente");
-  });
-});
-
 // ─── Campo de averías ───────────────────────────────────────────────────────
 
 describe("formatSelectedFaultsSummary", () => {
@@ -240,9 +220,9 @@ describe("formatSelectedFaultsSummary", () => {
 
 describe("getSelectedFaultNames", () => {
   const actions: TaskerFaultAction[] = [
-    { id: 1, name: "Uno", categoryId: null },
-    { id: 2, name: "Dos", categoryId: null },
-    { id: 3, name: "Tres", categoryId: 1 },
+    { id: 1, name: "Uno", clientId: null },
+    { id: 2, name: "Dos", clientId: null },
+    { id: 3, name: "Tres", clientId: 1 },
   ];
   it("en el orden de selección, no el del catálogo", () => {
     expect(getSelectedFaultNames([3, 1], actions)).toEqual(["Tres", "Uno"]);
@@ -271,27 +251,33 @@ describe("getTaskerFormRules", () => {
 
 // ─── Averías ────────────────────────────────────────────────────────────────
 
-describe("filterFaultActionsForClient", () => {
+describe("filterFaultActionsForClient (por clientId)", () => {
   const actions: TaskerFaultAction[] = [
-    { id: 1, name: "Cat 1 A", categoryId: 1 },
-    { id: 2, name: "Cat 2 A", categoryId: 2 },
-    { id: 3, name: "General", categoryId: null },
-    { id: 4, name: "Cat 1 B", categoryId: 1 },
+    { id: 1, name: "Cliente 301 A", clientId: 301 },
+    { id: 2, name: "Cliente 302", clientId: 302 },
+    { id: 3, name: "General", clientId: null },
+    { id: 4, name: "Cliente 301 B", clientId: 301 },
   ];
 
-  it("cliente con categoría → las de su categoría y las sin categoría", () => {
-    expect(filterFaultActionsForClient(actions, { categoryId: 1 }).map((a) => a.id)).toEqual([
-      1, 3, 4,
-    ]);
+  it("las del cliente elegido y las generales (clientId null), en su orden", () => {
+    expect(filterFaultActionsForClient(actions, 301).map((a) => a.id)).toEqual([1, 3, 4]);
+    expect(filterFaultActionsForClient(actions, 302).map((a) => a.id)).toEqual([2, 3]);
   });
-  it("categoría sin acciones propias → solo las sin categoría", () => {
-    expect(filterFaultActionsForClient(actions, { categoryId: 9 }).map((a) => a.id)).toEqual([3]);
+  it("cliente sin acciones propias → solo las generales", () => {
+    expect(filterFaultActionsForClient(actions, 999).map((a) => a.id)).toEqual([3]);
   });
-  it("cliente sin categoría → todas", () => {
-    expect(filterFaultActionsForClient(actions, { categoryId: null })).toEqual(actions);
+  it("sin cliente → solo las generales", () => {
+    expect(filterFaultActionsForClient(actions, null).map((a) => a.id)).toEqual([3]);
+    expect(filterFaultActionsForClient(actions, undefined).map((a) => a.id)).toEqual([3]);
   });
-  it("sin cliente → todas", () => {
-    expect(filterFaultActionsForClient(actions, null)).toEqual(actions);
+  it("catálogo vacío → vacío", () => {
+    expect(filterFaultActionsForClient([], 301)).toEqual([]);
+  });
+  it("no usa categoryId aunque venga en el objeto", () => {
+    const withCategory = [
+      { id: 7, name: "Con categoría", clientId: null, categoryId: 5 },
+    ] as unknown as TaskerFaultAction[];
+    expect(filterFaultActionsForClient(withCategory, 301).map((a) => a.id)).toEqual([7]);
   });
 });
 
@@ -302,8 +288,8 @@ describe("selección de averías", () => {
   });
   it("pruneSelectedFaults deja solo las que siguen disponibles", () => {
     const available: TaskerFaultAction[] = [
-      { id: 2, name: "B", categoryId: null },
-      { id: 3, name: "C", categoryId: 1 },
+      { id: 2, name: "B", clientId: null },
+      { id: 3, name: "C", clientId: 1 },
     ];
     expect(pruneSelectedFaults([1, 2, 3], available)).toEqual([2, 3]);
     expect(pruneSelectedFaults([1], available)).toEqual([]);
@@ -328,12 +314,12 @@ describe("getRemovedFaultsNotice", () => {
   });
   it("cuenta lo que quita pruneSelectedFaults al cambiar de cliente", () => {
     const actions: TaskerFaultAction[] = [
-      { id: 1, name: "Cat 1", categoryId: 1 },
-      { id: 2, name: "Cat 2", categoryId: 2 },
-      { id: 3, name: "General", categoryId: null },
+      { id: 1, name: "Cliente 1", clientId: 1 },
+      { id: 2, name: "Cliente 2", clientId: 2 },
+      { id: 3, name: "General", clientId: null },
     ];
     const selected = [1, 2, 3];
-    const kept = pruneSelectedFaults(selected, filterFaultActionsForClient(actions, { categoryId: 2 }));
+    const kept = pruneSelectedFaults(selected, filterFaultActionsForClient(actions, 2));
     expect(getRemovedFaultsNotice(selected.length - kept.length)).toBe(
       "Se quitó 1 avería que no aplica al cliente seleccionado.",
     );
@@ -892,7 +878,7 @@ describe("parseStoredTaskerConfig", () => {
 
 describe("parseStoredTaskerClients", () => {
   it("válido → los clientes", () => {
-    const clients = getTaskerUserClients();
+    const clients = [client(1, [address(1, 18.47, -69.93)]), client(2, [])];
     expect(parseStoredTaskerClients(JSON.stringify(clients))).toEqual(clients);
   });
   it("[] guardado es válido (usuario sin clientes)", () => {
@@ -907,47 +893,21 @@ describe("parseStoredTaskerClients", () => {
   it("algún cliente con forma rara → null", () => {
     expect(parseStoredTaskerClients(JSON.stringify({ id: 1 }))).toBeNull();
     expect(
-      parseStoredTaskerClients(JSON.stringify([{ id: 1, name: "X", categoryId: null, addresses: [{}] }])),
+      parseStoredTaskerClients(JSON.stringify([{ id: 1, name: "X", defaultAddress: null, addresses: [{}] }])),
     ).toBeNull();
   });
-});
-
-// ─── Datos de prueba ────────────────────────────────────────────────────────
-
-describe("taskerMock (datos de prueba de Reportar)", () => {
-  it("config con la forma pedida", () => {
-    const c = getTaskerCompanyConfig();
-    expect(typeof c.connected).toBe("boolean");
-    expect(typeof c.appliesFault).toBe("boolean");
+  it("forma de v2 (con categoryId y sin defaultAddress) → null", () => {
+    expect(
+      parseStoredTaskerClients(
+        JSON.stringify([{ id: 1, name: "X", categoryId: null, addresses: [address(1, 1, 1)] }]),
+      ),
+    ).toBeNull();
   });
-  it("clientes: lugares distintos, uno con categoría y otro sin ella", () => {
-    const clients = getTaskerUserClients();
-    if (clients.length < 2) return; // TASKER_MOCK_CLIENT_COUNT alternado a 0 o 1.
-    expect(clients.some((c) => c.categoryId != null)).toBe(true);
-    expect(clients.some((c) => c.categoryId == null)).toBe(true);
-    const cities = new Set(clients.map((c) => c.addresses[0].city));
-    expect(cities.size).toBeGreaterThan(1);
-    // La cercanía se puede probar: la más cercana cambia según el punto.
-    const [first, second] = clients;
-    const at = (c: TaskerUserClient) => ({
-      latitude: Number(c.addresses[0].latitude),
-      longitude: Number(c.addresses[0].longitude),
-    });
-    expect(pickNearestClientAddress(clients, at(first))?.clientId).toBe(first.id);
-    expect(pickNearestClientAddress(clients, at(second))?.clientId).toBe(second.id);
-  });
-  it("cada cliente: una sola dirección, predeterminada y con coordenadas", () => {
-    for (const c of getTaskerUserClients()) {
-      expect(c.addresses).toHaveLength(1);
-      expect(c.addresses[0].isDefault).toBe(true);
-      expect(typeof c.addresses[0].latitude).toBe("number");
-      expect(typeof c.addresses[0].longitude).toBe("number");
-    }
-  });
-  it("averías: al menos 6, con y sin categoría", () => {
-    const actions = getTaskerFaultActions();
-    expect(actions.length).toBeGreaterThanOrEqual(6);
-    expect(actions.some((a) => a.categoryId == null)).toBe(true);
-    expect(new Set(actions.filter((a) => a.categoryId != null).map((a) => a.categoryId)).size).toBeGreaterThan(1);
+  it("defaultAddress sin id → null", () => {
+    expect(
+      parseStoredTaskerClients(
+        JSON.stringify([{ id: 1, name: "X", defaultAddress: { title: "A" }, addresses: [] }]),
+      ),
+    ).toBeNull();
   });
 });

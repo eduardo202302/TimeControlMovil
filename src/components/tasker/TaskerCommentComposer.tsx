@@ -34,6 +34,7 @@ import {
   canSaveTaskerComment,
   isTaskerCommentDraftChanged,
   TASKER_COMMENT_MAX_LENGTH,
+  type TaskerAttachmentLimit,
 } from "../../utils/taskerRules";
 import type {
   TaskerAttachment,
@@ -56,10 +57,10 @@ interface TaskerCommentComposerProps {
   /** Avisa a la tarjeta si hay cambios sin guardar. */
   onChangedChange?: (changed: boolean) => void;
   /**
-   * Lo que ya pesan los adjuntos de los OTROS comentarios del mismo envío
-   * (Reportar Avería); entra en el tope de pickAttachments. Por defecto 0.
+   * Tope de adjuntos de todo el envío, con lo que ya pesan los OTROS
+   * comentarios (Reportar Avería). Sin él, solo los topes del selector.
    */
-  usedBytesElsewhere?: number;
+  attachmentLimit?: TaskerAttachmentLimit;
   onOpenImage: (uri: string) => void;
   /** ScrollView de la pantalla: al abrir y al enfocar el texto se desplaza hasta acá. */
   scrollRef?: RefObject<ScrollView | null>;
@@ -76,7 +77,7 @@ export default function TaskerCommentComposer({
   onSave,
   onCancel,
   onChangedChange,
-  usedBytesElsewhere = 0,
+  attachmentLimit,
   onOpenImage,
   scrollRef,
 }: TaskerCommentComposerProps) {
@@ -94,7 +95,7 @@ export default function TaskerCommentComposer({
   const handleAddAttachments = useCallback((added: TaskerAttachment[]) => {
     setAttachments((prev) => [...prev, ...added]);
   }, []);
-  const picker = useTaskerAttachmentPicker(attachments, handleAddAttachments, usedBytesElsewhere);
+  const picker = useTaskerAttachmentPicker(attachments, handleAddAttachments, attachmentLimit);
 
   const draft: TaskerCommentDraft = { text, attachments };
   const canSave = canSaveTaskerComment(draft);

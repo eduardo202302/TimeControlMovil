@@ -2,6 +2,11 @@ import { useCallback, useState } from "react";
 import { ActionSheetIOS, Alert, Platform } from "react-native";
 import type { UserPhotoSource } from "../users/pickUserPhoto";
 import type { TaskerAttachment } from "../../../types/typesTasker/TaskerTypes";
+import {
+  fitTaskerAttachments,
+  getDataUriFileBytes,
+  type TaskerAttachmentLimit,
+} from "../../utils/taskerRules";
 import { pickTaskerPdf, pickTaskerPhoto } from "./pickTaskerAttachment";
 
 type AttachmentSource = UserPhotoSource | "pdf";
@@ -17,8 +22,10 @@ const OPTIONS: { source: AttachmentSource; label: string }[] = [
  * (Reportar Avería y Seguimiento). Los avisos de permiso y de error son los
  * mismos de la foto de Usuarios (UserBasicInfoTab).
  *
- * `extraUsedBytes`: lo que ya pesan adjuntos que no están en `attachments`
- * pero van en el mismo envío (los otros comentarios de Reportar Avería).
+ * `limit`: tope de archivos reales de todo el envío (Reportar Avería), con lo
+ * que ya pesan los otros comentarios. Aplica a fotos y PDF; los que no caben
+ * se avisan como los rechazos del selector. Sin `limit` (Seguimiento), solo
+ * los topes de pickAttachments.
  *
  * En iOS es un ActionSheet con "Cancelar"; en Android, un Alert de tres
  * botones (el máximo de Android) que se cierra tocando fuera.
@@ -26,27 +33,41 @@ const OPTIONS: { source: AttachmentSource; label: string }[] = [
 export function useTaskerAttachmentPicker(
   attachments: TaskerAttachment[],
   onAdd: (added: TaskerAttachment[]) => void,
-  extraUsedBytes = 0,
+  limit?: TaskerAttachmentLimit,
 ) {
   const [busy, setBusy] = useState(false);
 
   const pick = useCallback(
     async (source: AttachmentSource) => {
+      /** Aplica el tope del envío (si hay) y avisa lo que no entró. */
+      const addWithinLimit = (added: TaskerAttachment[], rejected: string[] = []) => {
+        let accepted = added;
+        const notAdded = [...rejected];
+        if (limit) {
+          const used =
+            limit.usedElsewhere +
+            attachments.reduce((sum, a) => sum + getDataUriFileBytes(a.dataUri), 0);
+          const fit = fitTaskerAttachments(added, used, limit.maxBytes);
+          accepted = fit.accepted;
+          notAdded.push(...fit.rejected);
+        }
+        if (accepted.length > 0) onAdd(accepted);
+        if (notAdded.length > 0) {
+          Alert.alert("Adjuntos", `No se adjuntaron: ${notAdded.join(", ")}`);
+        }
+      };
+
       setBusy(true);
       try {
         if (source === "pdf") {
-          const usedBytes =
-            extraUsedBytes + attachments.reduce((sum, a) => sum + a.dataUri.length, 0);
+          const usedBytes = attachments.reduce((sum, a) => sum + a.dataUri.length, 0);
           const result = await pickTaskerPdf(usedBytes);
           if (result.canceled) return;
-          if (result.accepted.length > 0) onAdd(result.accepted);
-          if (result.rejected.length > 0) {
-            Alert.alert("Adjuntos", `No se adjuntaron: ${result.rejected.join(", ")}`);
-          }
+          addWithinLimit(result.accepted, result.rejected);
           return;
         }
         const result = await pickTaskerPhoto(source);
-        if (result.status === "ok") onAdd([result.attachment]);
+        if (result.status === "ok") addWithinLimit([result.attachment]);
         else if (result.status === "denied") {
           Alert.alert(
             "Permiso requerido",
@@ -64,7 +85,7 @@ export function useTaskerAttachmentPicker(
         setBusy(false);
       }
     },
-    [attachments, onAdd, extraUsedBytes],
+    [attachments, onAdd, limit],
   );
 
   const openPicker = useCallback(() => {

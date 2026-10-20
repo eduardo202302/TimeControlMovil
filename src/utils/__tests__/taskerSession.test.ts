@@ -1,9 +1,9 @@
 /// <reference types="jest" />
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getTaskerCompanyConfig, getTaskerUserClients } from "../../constants/taskerMock";
+import { mapTaskerSession, TASKER_DISCONNECTED_CONFIG } from "../taskerApi";
 import {
   clearTaskerSession,
-  loadAndPersistTaskerSession,
+  persistTaskerSession,
   removeLegacyTaskerStorage,
   restoreTaskerSession,
   TASKER_CLIENTS_STORAGE_KEY,
@@ -42,7 +42,44 @@ jest.mock("@react-native-async-storage/async-storage", () => {
 const mem = (AsyncStorage as unknown as { __mem: Map<string, string> }).__mem;
 const setItem = AsyncStorage.setItem as jest.Mock;
 
-const fresh = () => ({ config: getTaskerCompanyConfig(), clients: getTaskerUserClients() });
+/** `data` de chooseschool con Tasker conectado (y campos que NO se guardan). */
+const CHOOSE_SCHOOL_DATA = {
+  token: "scoped.token.secret",
+  school: { id: 1, settings: { taskerApiKey: "nunca-se-guarda" } },
+  taskrCompany: {
+    id: 9,
+    name: "Empresa Taskr",
+    channel: "canal-secreto",
+    settings: {
+      isFailureReport: true,
+      failureReportMenuLabel: "Reportar Avería",
+      failureReportLabel: null,
+      clientLabel: "Sucursal",
+      otherSetting: "x",
+    },
+  },
+  taskrClients: [
+    {
+      id: 301,
+      name: "Clínica Las Marías",
+      token: "token-del-cliente",
+      faceClassUsers: [{ id: 1, faceClassId: 55 }],
+      defaultAddress: {
+        title: "Sede Naco",
+        province: "D.N.",
+        city: "Santo Domingo",
+        street: "Av. Tiradentes",
+        streetNumber: "25",
+        latitude: 18.4775,
+        longitude: -69.9273,
+      },
+      addresses: [],
+    },
+  ],
+};
+
+const DISCONNECTED = { config: TASKER_DISCONNECTED_CONFIG, clients: [] };
+const fresh = () => mapTaskerSession(CHOOSE_SCHOOL_DATA);
 
 beforeEach(() => {
   mem.clear();
@@ -50,71 +87,83 @@ beforeEach(() => {
 });
 
 describe("claves", () => {
-  it("con versión: taskerConfig:v2 y taskerClients:v2", () => {
-    expect(TASKER_STORAGE_VERSION).toBe("v2");
-    expect(TASKER_CONFIG_STORAGE_KEY).toBe("taskerConfig:v2");
-    expect(TASKER_CLIENTS_STORAGE_KEY).toBe("taskerClients:v2");
+  it("con versión: taskerConfig:v3 y taskerClients:v3", () => {
+    expect(TASKER_STORAGE_VERSION).toBe("v3");
+    expect(TASKER_CONFIG_STORAGE_KEY).toBe("taskerConfig:v3");
+    expect(TASKER_CLIENTS_STORAGE_KEY).toBe("taskerClients:v3");
   });
-  it("las viejas, sin versión: taskerConfig y taskerClients", () => {
-    expect(TASKER_LEGACY_STORAGE_KEYS).toEqual(["taskerConfig", "taskerClients"]);
+  it("las viejas: sin versión y v2 (datos de ejemplo)", () => {
+    expect(TASKER_LEGACY_STORAGE_KEYS).toEqual([
+      "taskerConfig",
+      "taskerClients",
+      "taskerConfig:v2",
+      "taskerClients:v2",
+    ]);
   });
 });
 
-describe("loadAndPersistTaskerSession (login / cambio de empresa)", () => {
-  it("devuelve lo del mock y lo guarda en las dos claves", async () => {
-    const session = await loadAndPersistTaskerSession();
+describe("persistTaskerSession (login / cambio de empresa)", () => {
+  it("mapea chooseschool y lo guarda en las dos claves", async () => {
+    const session = await persistTaskerSession(CHOOSE_SCHOOL_DATA);
     expect(session).toEqual(fresh());
+    expect(session.config.connected).toBe(true);
+    expect(session.clients.map((c) => c.id)).toEqual([301]);
     expect(JSON.parse(mem.get(TASKER_CONFIG_STORAGE_KEY)!)).toEqual(session.config);
     expect(JSON.parse(mem.get(TASKER_CLIENTS_STORAGE_KEY)!)).toEqual(session.clients);
+  });
+  it("en el teléfono no queda nada fuera de lo mapeado (ni tokens, ni channel, ni faceClassUsers)", async () => {
+    await persistTaskerSession(CHOOSE_SCHOOL_DATA);
+    const stored = [...mem.values()].join("\n");
+    for (const secret of ["token", "secret", "nunca-se-guarda", "canal", "channel", "faceClassUsers", "otherSetting"]) {
+      expect(stored).not.toContain(secret);
+    }
   });
   it("reescribe lo que había (otra empresa)", async () => {
     mem.set(TASKER_CONFIG_STORAGE_KEY, JSON.stringify({ connected: false, appliesFault: false }));
     mem.set(TASKER_CLIENTS_STORAGE_KEY, "[]");
-    await loadAndPersistTaskerSession();
-    expect(JSON.parse(mem.get(TASKER_CONFIG_STORAGE_KEY)!)).toEqual(getTaskerCompanyConfig());
-    expect(JSON.parse(mem.get(TASKER_CLIENTS_STORAGE_KEY)!)).toEqual(getTaskerUserClients());
+    await persistTaskerSession(CHOOSE_SCHOOL_DATA);
+    expect(JSON.parse(mem.get(TASKER_CONFIG_STORAGE_KEY)!)).toEqual(fresh().config);
+    expect(JSON.parse(mem.get(TASKER_CLIENTS_STORAGE_KEY)!)).toEqual(fresh().clients);
+  });
+  it("escuela no conectada (taskrCompany null) → no conectada y sin clientes, y se guarda así", async () => {
+    const session = await persistTaskerSession({ ...CHOOSE_SCHOOL_DATA, taskrCompany: null });
+    expect(session).toEqual(DISCONNECTED);
+    expect(JSON.parse(mem.get(TASKER_CONFIG_STORAGE_KEY)!)).toEqual(TASKER_DISCONNECTED_CONFIG);
+    expect(JSON.parse(mem.get(TASKER_CLIENTS_STORAGE_KEY)!)).toEqual([]);
+  });
+  it("sin data de chooseschool (falló) → no conectada", async () => {
+    await expect(persistTaskerSession(undefined)).resolves.toEqual(DISCONNECTED);
   });
   it("si no se puede guardar, igual devuelve los datos", async () => {
     setItem.mockRejectedValueOnce(new Error("disco lleno"));
     const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
-    await expect(loadAndPersistTaskerSession()).resolves.toEqual(fresh());
+    await expect(persistTaskerSession(CHOOSE_SCHOOL_DATA)).resolves.toEqual(fresh());
     warn.mockRestore();
   });
 });
 
 describe("restoreTaskerSession (arranque en frío)", () => {
   it("válido → lo guardado, sin volver a escribir", async () => {
-    const stored = {
-      config: {
-        connected: false,
-        appliesFault: false,
-        failureReportMenuLabel: "X",
-        failureReportLabel: null,
-        clientLabel: null,
-      },
-      clients: [],
-    };
-    mem.set(TASKER_CONFIG_STORAGE_KEY, JSON.stringify(stored.config));
-    mem.set(TASKER_CLIENTS_STORAGE_KEY, JSON.stringify(stored.clients));
-    await expect(restoreTaskerSession()).resolves.toEqual(stored);
+    await persistTaskerSession(CHOOSE_SCHOOL_DATA);
+    setItem.mockClear();
+    await expect(restoreTaskerSession()).resolves.toEqual(fresh());
     expect(setItem).not.toHaveBeenCalled();
   });
-  it("ausente → se vuelve a cargar y se guarda", async () => {
-    await expect(restoreTaskerSession()).resolves.toEqual(fresh());
-    expect(mem.has(TASKER_CONFIG_STORAGE_KEY)).toBe(true);
-    expect(mem.has(TASKER_CLIENTS_STORAGE_KEY)).toBe(true);
+  it("ausente → no conectada, sin escribir nada (solo chooseschool trae los datos)", async () => {
+    await expect(restoreTaskerSession()).resolves.toEqual(DISCONNECTED);
+    expect(setItem).not.toHaveBeenCalled();
+    expect(mem.size).toBe(0);
   });
-  it("solo una de las dos claves → se recarga todo", async () => {
-    mem.set(TASKER_CONFIG_STORAGE_KEY, JSON.stringify(getTaskerCompanyConfig()));
-    await expect(restoreTaskerSession()).resolves.toEqual(fresh());
+  it("solo una de las dos claves → no conectada", async () => {
+    mem.set(TASKER_CONFIG_STORAGE_KEY, JSON.stringify(fresh().config));
+    await expect(restoreTaskerSession()).resolves.toEqual(DISCONNECTED);
   });
-  it("JSON corrupto → se ignora y se vuelve a cargar", async () => {
+  it("JSON corrupto → no conectada", async () => {
     mem.set(TASKER_CONFIG_STORAGE_KEY, "{connected:");
     mem.set(TASKER_CLIENTS_STORAGE_KEY, "[{");
-    await expect(restoreTaskerSession()).resolves.toEqual(fresh());
-    expect(JSON.parse(mem.get(TASKER_CONFIG_STORAGE_KEY)!)).toEqual(getTaskerCompanyConfig());
+    await expect(restoreTaskerSession()).resolves.toEqual(DISCONNECTED);
   });
-  it("config guardada con los nombres viejos (serviceLabel / faultLabel) → se recarga y se reescribe", async () => {
+  it("config guardada con los nombres viejos (serviceLabel / faultLabel) → no conectada", async () => {
     mem.set(
       TASKER_CONFIG_STORAGE_KEY,
       JSON.stringify({
@@ -125,41 +174,42 @@ describe("restoreTaskerSession (arranque en frío)", () => {
         clientLabel: null,
       }),
     );
-    mem.set(TASKER_CLIENTS_STORAGE_KEY, JSON.stringify(getTaskerUserClients()));
-    await expect(restoreTaskerSession()).resolves.toEqual(fresh());
-    const rewritten = JSON.parse(mem.get(TASKER_CONFIG_STORAGE_KEY)!);
-    expect(rewritten).toEqual(getTaskerCompanyConfig());
-    expect(rewritten).not.toHaveProperty("serviceLabel");
+    mem.set(TASKER_CLIENTS_STORAGE_KEY, JSON.stringify(fresh().clients));
+    await expect(restoreTaskerSession()).resolves.toEqual(DISCONNECTED);
   });
-  it("si la lectura falla → se vuelve a cargar", async () => {
+  it("si la lectura falla → no conectada", async () => {
     (AsyncStorage.getItem as jest.Mock).mockRejectedValueOnce(new Error("x"));
-    await expect(restoreTaskerSession()).resolves.toEqual(fresh());
+    await expect(restoreTaskerSession()).resolves.toEqual(DISCONNECTED);
   });
 });
 
-describe("claves viejas sin versión", () => {
+describe("claves de versiones anteriores", () => {
   const seedLegacy = () => {
-    // Forma válida a propósito: si se leyera, se usaría.
-    mem.set("taskerConfig", JSON.stringify({ ...getTaskerCompanyConfig(), connected: false }));
-    mem.set("taskerClients", JSON.stringify([]));
+    // Forma válida a propósito: si se leyeran, se usarían.
+    const config = JSON.stringify({ ...fresh().config });
+    const clients = JSON.stringify(fresh().clients);
+    for (const suffix of ["", ":v2"]) {
+      mem.set(`taskerConfig${suffix}`, config);
+      mem.set(`taskerClients${suffix}`, clients);
+    }
   };
 
-  it("la lectura las ignora: sin claves v2 → se recarga del mock", async () => {
+  it("la lectura las ignora: sin claves v3 → no conectada", async () => {
     seedLegacy();
-    await expect(restoreTaskerSession()).resolves.toEqual(fresh());
-    expect(AsyncStorage.getItem).not.toHaveBeenCalledWith("taskerConfig");
-    expect(AsyncStorage.getItem).not.toHaveBeenCalledWith("taskerClients");
+    await expect(restoreTaskerSession()).resolves.toEqual(DISCONNECTED);
+    for (const key of TASKER_LEGACY_STORAGE_KEYS) {
+      expect(AsyncStorage.getItem).not.toHaveBeenCalledWith(key);
+    }
   });
-  it("guardar escribe solo las v2", async () => {
-    await loadAndPersistTaskerSession();
+  it("guardar escribe solo las v3", async () => {
+    await persistTaskerSession(CHOOSE_SCHOOL_DATA);
     expect([...mem.keys()].sort()).toEqual([TASKER_CLIENTS_STORAGE_KEY, TASKER_CONFIG_STORAGE_KEY].sort());
   });
-  it("removeLegacyTaskerStorage (arranque) las borra y no toca las v2", async () => {
+  it("removeLegacyTaskerStorage (arranque) borra las sin versión y las v2, y no toca las v3", async () => {
     seedLegacy();
-    await loadAndPersistTaskerSession();
+    await persistTaskerSession(CHOOSE_SCHOOL_DATA);
     await removeLegacyTaskerStorage();
-    expect(mem.has("taskerConfig")).toBe(false);
-    expect(mem.has("taskerClients")).toBe(false);
+    for (const key of TASKER_LEGACY_STORAGE_KEYS) expect(mem.has(key)).toBe(false);
     expect(mem.has(TASKER_CONFIG_STORAGE_KEY)).toBe(true);
     expect(mem.has(TASKER_CLIENTS_STORAGE_KEY)).toBe(true);
   });
@@ -171,8 +221,8 @@ describe("claves viejas sin versión", () => {
 });
 
 describe("clearSession (cierre de sesión de la app)", () => {
-  it("borra las dos claves v2 de Tasker", async () => {
-    await loadAndPersistTaskerSession();
+  it("borra las dos claves v3 de Tasker", async () => {
+    await persistTaskerSession(CHOOSE_SCHOOL_DATA);
     await clearSession();
     expect(mem.has(TASKER_CONFIG_STORAGE_KEY)).toBe(false);
     expect(mem.has(TASKER_CLIENTS_STORAGE_KEY)).toBe(false);
@@ -181,7 +231,7 @@ describe("clearSession (cierre de sesión de la app)", () => {
 
 describe("clearTaskerSession (cierre de sesión)", () => {
   it("borra las dos claves", async () => {
-    await loadAndPersistTaskerSession();
+    await persistTaskerSession(CHOOSE_SCHOOL_DATA);
     await clearTaskerSession();
     expect(mem.has(TASKER_CONFIG_STORAGE_KEY)).toBe(false);
     expect(mem.has(TASKER_CLIENTS_STORAGE_KEY)).toBe(false);

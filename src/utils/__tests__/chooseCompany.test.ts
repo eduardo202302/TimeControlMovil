@@ -16,7 +16,7 @@ import {
 } from "../chooseCompany";
 import * as Storage from "../storage";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getTaskerCompanyConfig, getTaskerUserClients } from "../../constants/taskerMock";
+import { mapTaskerSession, TASKER_DISCONNECTED_CONFIG } from "../taskerApi";
 import { TASKER_CLIENTS_STORAGE_KEY, TASKER_CONFIG_STORAGE_KEY } from "../taskerSession";
 
 // SecureStore en memoria — el real necesita react-native.
@@ -447,26 +447,64 @@ describe("login — commitSession deja la sesión igual que completeLogin", () =
 });
 
 describe("Tasker en la sesión", () => {
-  test("login: config y clientes al store y a AsyncStorage (no a SecureStore)", async () => {
-    await loginIntoA();
+  const TASKR = {
+    taskrCompany: { id: 9, settings: { isFailureReport: false, clientLabel: "Sucursal" } },
+    taskrClients: [
+      {
+        id: 301,
+        name: "Clínica",
+        defaultAddress: null,
+        addresses: [{ title: "Sede", street: "Calle", latitude: 18.4, longitude: -69.9 }],
+      },
+    ],
+  };
+
+  test("login: config y clientes de chooseschool al store y a AsyncStorage (no a SecureStore)", async () => {
+    const login = loginData([schoolUserA]);
+    const { user, selected } = buildSessionUser(schoolUserA as any, login, null);
+    const chooseSchoolData = { token: "scoped.token.a", school: schoolA, ...TASKR };
+    await commitSession({
+      user,
+      selected,
+      menuItems: MENU_ITEMS as any,
+      token: "scoped.token.a",
+      urlColegio: URL,
+      chooseSchoolData,
+      storeToken: true,
+    });
+    const expected = mapTaskerSession(chooseSchoolData);
+    expect(expected.config.connected).toBe(true);
     const state = useSchoolStore.getState();
-    expect(state.taskerConfig).toEqual(getTaskerCompanyConfig());
-    expect(state.taskerClients).toEqual(getTaskerUserClients());
-    expect(JSON.parse(asyncMem.get(TASKER_CONFIG_STORAGE_KEY)!)).toEqual(getTaskerCompanyConfig());
-    expect(JSON.parse(asyncMem.get(TASKER_CLIENTS_STORAGE_KEY)!)).toEqual(getTaskerUserClients());
+    expect(state.taskerConfig).toEqual(expected.config);
+    expect(state.taskerClients).toEqual(expected.clients);
+    expect(JSON.parse(asyncMem.get(TASKER_CONFIG_STORAGE_KEY)!)).toEqual(expected.config);
+    expect(JSON.parse(asyncMem.get(TASKER_CLIENTS_STORAGE_KEY)!)).toEqual(expected.clients);
     expect(mem.has(TASKER_CONFIG_STORAGE_KEY)).toBe(false);
     expect(mem.has(TASKER_CLIENTS_STORAGE_KEY)).toBe(false);
   });
 
+  test("chooseschool sin taskrCompany → no conectada (Reportar se oculta)", async () => {
+    await loginIntoA();
+    expect(useSchoolStore.getState().taskerConfig).toEqual(TASKER_DISCONNECTED_CONFIG);
+    expect(useSchoolStore.getState().taskerClients).toEqual([]);
+  });
+
+  test("chooseschool falló (sin data) → no conectada", async () => {
+    const login = loginData([schoolUserA]);
+    const { user, selected } = buildSessionUser(schoolUserA as any, login, null);
+    await commitSession({ user, selected, menuItems: MENU_ITEMS as any, token: LOGIN_TOKEN, urlColegio: URL });
+    expect(useSchoolStore.getState().taskerConfig).toEqual(TASKER_DISCONNECTED_CONFIG);
+  });
+
   test("cambiar de empresa reescribe lo de la anterior", async () => {
     await loginIntoA();
-    asyncMem.set(TASKER_CLIENTS_STORAGE_KEY, "[]");
-    useSchoolStore.setState({ taskerClients: [] });
-    mockedRawPost.mockResolvedValue({ data: chooseSchoolOk() });
+    mockedRawPost.mockResolvedValue({ data: chooseSchoolOk(TASKR) });
 
     expect((await switchCompany(2)).ok).toBe(true);
-    expect(useSchoolStore.getState().taskerClients).toEqual(getTaskerUserClients());
-    expect(JSON.parse(asyncMem.get(TASKER_CLIENTS_STORAGE_KEY)!)).toEqual(getTaskerUserClients());
+    const expected = mapTaskerSession(TASKR);
+    expect(useSchoolStore.getState().taskerConfig).toEqual(expected.config);
+    expect(useSchoolStore.getState().taskerClients).toEqual(expected.clients);
+    expect(JSON.parse(asyncMem.get(TASKER_CLIENTS_STORAGE_KEY)!)).toEqual(expected.clients);
   });
 
   test("logout() y clear() los vacían", async () => {

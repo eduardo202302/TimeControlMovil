@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -40,11 +41,9 @@ import {
   RADIUS_SM,
   useResponsive,
 } from "@/constants/responsive";
-import { getTaskerFaultActions } from "@/constants/taskerMock";
 import SectionIcon from "@/components/ui/SectionIcon";
 import TagOptionSheet from "@/components/permissions/TagOptionSheet";
 import TagMultiSelectSheet from "@/components/users/TagMultiSelectSheet";
-import { MAX_PAYLOAD_BYTES } from "@/components/permissions/pickAttachments";
 import {
   ADD_FILE_BTN,
   CARD_FORM,
@@ -67,7 +66,7 @@ import {
   getTaskerClientLabel,
   getTaskerFaultLabel,
   getTaskerFormRules,
-  isTaskerCommentsOverPayloadLimit,
+  getSelectedTaskerAddress,
   pickNearestClientAddress,
   pruneSelectedFaults,
   removeTaskerAddress,
@@ -78,6 +77,14 @@ import {
   updateTaskerComment,
   validateReport,
 } from "../../utils/taskerRules";
+import {
+  buildTaskrTaskBody,
+  createTaskerTask,
+  fetchTaskerFaultActions,
+  TASKER_ACTIONS_ERROR,
+  TASKER_SEND_ERROR,
+} from "../../utils/taskerApi";
+import * as Storage from "../../utils/storage";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import type {
   TaskerAddress,
@@ -85,16 +92,34 @@ import type {
   TaskerCommentAuthor,
   TaskerCommentDraft,
   TaskerCompanyConfig,
+  TaskerFaultAction,
   TaskerReportAddress,
   TaskerReportErrors,
   TaskerUserClient,
 } from "../../../types/typesTasker/TaskerTypes";
-import { showPendingAction } from "./pendingAction";
 import TaskerAddressModal from "./TaskerAddressModal";
 import TaskerAddressSummary from "./TaskerAddressSummary";
 import TaskerCommentsCard from "./TaskerCommentsCard";
 
 type Styles = ReturnType<typeof createStyles>;
+
+/** Catálogo de averías (GET /taskr/actions), cargado al abrir. */
+type FaultActionsState =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "ready"; actions: TaskerFaultAction[] };
+
+/** Token y servidor de la sesión, como las demás llamadas a FaceClass. Nunca lanza. */
+async function sessionCredentials(): Promise<{ token: string; urlColegio: string } | null> {
+  try {
+    const state = useSchoolStore.getState();
+    const token = state.token ?? (await Storage.getItemAsync("token"));
+    const urlColegio = state.urlColegio ?? (await Storage.getItemAsync("urlColegio"));
+    return token && urlColegio ? { token, urlColegio } : null;
+  } catch {
+    return null;
+  }
+}
 
 interface ReportFaultFormProps {
   config: TaskerCompanyConfig;
@@ -115,11 +140,11 @@ function initialSelection(
 }
 
 /**
- * Reportar (Tasker) — FASE B: con los datos de prueba de taskerMock.ts. Solo
- * se monta con la compañía conectada, clientes y la posición del teléfono
- * (ver ReportFaultGate). Comentarios (con sus imágenes y PDF) y direcciones
- * se agregan, editan, borran y marcan en local; solo el envío final llama a
- * showPendingAction().
+ * Reportar (Tasker) — FASE B: config y clientes de chooseschool, averías de
+ * GET /taskr/actions y envío a POST /taskr/tasks. Solo se monta con la
+ * compañía conectada, clientes y la posición del teléfono (ver
+ * ReportFaultGate). Comentarios (con sus imágenes y PDF) y direcciones se
+ * agregan, editan, borran y marcan en local; todo viaja junto en el envío.
  */
 export default function ReportFaultForm({ config, clients, coords }: ReportFaultFormProps) {
   const { scale, verticalScale, font, isTablet } = useResponsive();
@@ -130,8 +155,13 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
 
   const rules = useMemo(() => getTaskerFormRules(config), [config]);
   const faultLabel = getTaskerFaultLabel(config);
-  // Fijo durante la vida de la pantalla: hoy viene del mock.
-  const faultActions = useMemo(() => getTaskerFaultActions(), []);
+  const [faultActionsState, setFaultActionsState] = useState<FaultActionsState>({
+    status: "loading",
+  });
+  const faultActions = useMemo(
+    () => (faultActionsState.status === "ready" ? faultActionsState.actions : []),
+    [faultActionsState],
+  );
   // "Reporta:" y autor de los comentarios: el usuario en sesión.
   const sessionUser = useSchoolStore((state) => state.user);
   const commentAuthor = useMemo<TaskerCommentAuthor>(
@@ -155,12 +185,54 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
     target: TaskerReportAddress | null;
   } | null>(null);
   const [comments, setComments] = useState<TaskerComment[]>([]);
+  /** Sube en cada reinicio (Cancelar o envío exitoso): la tarjeta cierra el comentario a medias. */
+  const [commentsResetKey, setCommentsResetKey] = useState(0);
+  /** Envío en curso: el ref bloquea un segundo toque antes del re-render. */
+  const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
+  /** Las respuestas que llegan tras desmontar no tocan el estado. */
+  const mountedRef = useRef(true);
+  const faultsRequestRef = useRef(0);
   /** La tarjeta de comentarios lleva su formulario a la vista (y sobre el teclado). */
   const scrollRef = useRef<ScrollView>(null);
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  /**
+   * Carga el catálogo; el estado solo cambia cuando llega la respuesta (una
+   * vieja no pisa la actual).
+   */
+  const loadFaultActions = useCallback(async () => {
+    const id = ++faultsRequestRef.current;
+    const credentials = await sessionCredentials();
+    const result = credentials
+      ? await fetchTaskerFaultActions(credentials)
+      : { ok: false as const, actions: [], message: TASKER_ACTIONS_ERROR };
+    if (!mountedRef.current || id !== faultsRequestRef.current) return;
+    setFaultActionsState(
+      result.ok ? { status: "ready", actions: result.actions } : { status: "error" },
+    );
+  }, []);
+
+  /** "Reintentar": vuelve al indicador de carga y pide de nuevo. */
+  const retryFaultActions = useCallback(() => {
+    setFaultActionsState({ status: "loading" });
+    void loadFaultActions();
+  }, [loadFaultActions]);
+
+  // Solo si la compañía usa averías. Arranca en "loading": no hace falta marcarlo.
+  useEffect(() => {
+    if (rules.showFaults) void loadFaultActions();
+  }, [rules.showFaults, loadFaultActions]);
+
   const availableFaults = useMemo(
-    () => filterFaultActionsForClient(faultActions, client),
-    [faultActions, client],
+    () => filterFaultActionsForClient(faultActions, client.id),
+    [faultActions, client.id],
   );
   const faultOptions = useMemo(
     () => availableFaults.map((a) => ({ id: a.id, name: a.name })),
@@ -223,7 +295,7 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
       const nearest = pickNearestClientAddress([next], coords);
       setClientId(next.id);
       setAddresses((prev) => buildReportAddresses(next, prev, nearest?.addressId ?? null));
-      const kept = pruneSelectedFaults(faultIds, filterFaultActionsForClient(faultActions, next));
+      const kept = pruneSelectedFaults(faultIds, filterFaultActionsForClient(faultActions, next.id));
       setFaultIds(kept);
       setRemovedFaults(faultIds.length - kept.length);
       clearError("address");
@@ -287,7 +359,12 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
     setComments((prev) => removeTaskerComment(prev, id));
   }, []);
 
-  const handleCancel = useCallback(() => {
+  /**
+   * Cancelar y envío exitoso: todo vacío, cliente y dirección a la recomendada,
+   * y el comentario a medias (agregar o editar) cerrado y descartado sin
+   * preguntar. Ese borrador nunca viaja: solo cuenta lo guardado en `comments`.
+   */
+  const resetForm = useCallback(() => {
     setClientId(initial.client.id);
     setFaultIds([]);
     setRemovedFaults(0);
@@ -295,33 +372,43 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
     setComments([]);
     setAddresses(initial.addresses);
     setErrors({});
+    setCommentsResetKey((key) => key + 1);
   }, [initial]);
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
+    if (sendingRef.current) return;
     const result = validateReport({ faultIds, description, addresses }, rules);
     setErrors(result);
     if (Object.values(result).some(Boolean)) return;
-    // Un solo envío: el tope suma los adjuntos de todos los comentarios.
-    if (isTaskerCommentsOverPayloadLimit(comments, MAX_PAYLOAD_BYTES)) {
-      Alert.alert(
-        "Adjuntos",
-        "Los adjuntos de los comentarios superan el límite total de 20MB. Quita alguno para enviar.",
-      );
-      return;
+
+    const body = buildTaskrTaskBody({
+      appliesFault: config.appliesFault === true,
+      clientId: client.id,
+      faultIds,
+      description,
+      address: getSelectedTaskerAddress(addresses),
+      comments,
+    });
+    sendingRef.current = true;
+    setSending(true);
+    try {
+      const credentials = await sessionCredentials();
+      const response = credentials
+        ? await createTaskerTask({ ...credentials, body })
+        : { ok: false as const, message: TASKER_SEND_ERROR };
+      if (!mountedRef.current) return;
+      if (response.ok) {
+        Alert.alert("Reporte enviado", response.id != null ? `Ticket #${response.id}` : undefined);
+        resetForm();
+      } else {
+        // Nada se limpia: el usuario puede corregir y reintentar.
+        Alert.alert("Reporte no enviado", response.message);
+      }
+    } finally {
+      sendingRef.current = false;
+      if (mountedRef.current) setSending(false);
     }
-    // TODO(puente): enviar el reporte a Tasker como una tarea nueva:
-    //   - quién reporta: el usuario en sesión (commentAuthor.name / id);
-    //   - averías elegidas (faultIds) → acciones de la tarea;
-    //   - descripción → info de la tarea;
-    //   - cliente elegido (client.id) y la dirección marcada
-    //     (getSelectedTaskerAddress(addresses));
-    //   - direcciones agregadas por el usuario (fromClient: false) y las del
-    //     cliente editadas o quitadas: solo en la tarea, nunca se guardan en
-    //     el cliente;
-    //   - cada comentario como un elemento de taskComments ({ comment, images }),
-    //     con comment "" si solo trae adjuntos.
-    showPendingAction();
-  }, [faultIds, description, addresses, rules, comments]);
+  }, [faultIds, description, addresses, rules, comments, config.appliesFault, client.id, resetForm]);
 
   return (
     <KeyboardAvoidingView
@@ -345,21 +432,48 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
               title={faultLabel}
               required={rules.faultsRequired}
             />
-            <TouchableOpacity
-              style={[styles.select, !!errors.faults && styles.fieldInvalid]}
-              onPress={() => setFaultSheetVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`${faultLabel}: ${faultsSummary ?? "ninguna elegida"}`}
-              activeOpacity={0.75}
-            >
-              <Text
-                style={faultsSummary ? styles.selectValue : styles.selectPlaceholder}
-                numberOfLines={2}
+            {faultActionsState.status === "loading" ? (
+              <View style={[styles.select, styles.selectDisabled]} accessibilityLabel="Cargando averías">
+                <ActivityIndicator size="small" color={PRIMARY_700} />
+                <Text style={styles.selectPlaceholder}>Cargando averías…</Text>
+              </View>
+            ) : faultActionsState.status === "error" ? (
+              <View style={[styles.select, !!errors.faults && styles.fieldInvalid]}>
+                <Ionicons name="alert-circle-outline" size={18} color={ERROR_COLOR} />
+                <Text style={styles.selectPlaceholder} numberOfLines={2}>
+                  {TASKER_ACTIONS_ERROR}
+                </Text>
+                <TouchableOpacity
+                  style={styles.retryBtn}
+                  onPress={retryFaultActions}
+                  accessibilityRole="button"
+                  activeOpacity={0.75}
+                >
+                  <Ionicons name="refresh-outline" size={16} color={PRIMARY_700} />
+                  <Text style={styles.retryText}>Reintentar</Text>
+                </TouchableOpacity>
+              </View>
+            ) : availableFaults.length === 0 ? (
+              <View style={[styles.select, styles.selectDisabled, !!errors.faults && styles.fieldInvalid]}>
+                <Text style={styles.selectPlaceholder}>No hay averías configuradas</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.select, !!errors.faults && styles.fieldInvalid]}
+                onPress={() => setFaultSheetVisible(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`${faultLabel}: ${faultsSummary ?? "ninguna elegida"}`}
+                activeOpacity={0.75}
               >
-                {faultsSummary ?? "Seleccionar averías"}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
-            </TouchableOpacity>
+                <Text
+                  style={faultsSummary ? styles.selectValue : styles.selectPlaceholder}
+                  numberOfLines={2}
+                >
+                  {faultsSummary ?? "Seleccionar averías"}
+                </Text>
+                <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
+              </TouchableOpacity>
+            )}
             {!!errors.faults && <Text style={styles.fieldError}>{errors.faults}</Text>}
             {removedFaultsNotice && (
               <View style={styles.noticeRow} accessibilityLiveRegion="polite">
@@ -403,6 +517,7 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
           onDelete={handleRemoveComment}
           sharedAttachmentLimit
           scrollRef={scrollRef}
+          resetKey={commentsResetKey}
         />
 
         {/* ── Cliente: fijo con uno solo; con 2 o más, selector ── */}
@@ -498,19 +613,26 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
       <View style={styles.footer}>
         <View style={[styles.footerRow, isTablet && styles.contentTablet]}>
           <TouchableOpacity
-            style={[styles.footerBtn, styles.cancelBtn]}
-            onPress={handleCancel}
+            style={[styles.footerBtn, styles.cancelBtn, sending && styles.footerBtnDisabled]}
+            onPress={resetForm}
+            disabled={sending}
             activeOpacity={0.8}
           >
             <Text style={styles.cancelText}>Cancelar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.footerBtn, styles.saveBtn]}
-            onPress={handleSubmit}
+            style={[styles.footerBtn, styles.saveBtn, sending && styles.footerBtnDisabled]}
+            onPress={() => void handleSubmit()}
+            disabled={sending}
+            accessibilityState={{ disabled: sending, busy: sending }}
             activeOpacity={0.8}
           >
-            <Ionicons name="send-outline" size={18} color={ON_PRIMARY} />
-            <Text style={styles.saveText}>Guardar y enviar</Text>
+            {sending ? (
+              <ActivityIndicator size="small" color={ON_PRIMARY} />
+            ) : (
+              <Ionicons name="send-outline" size={18} color={ON_PRIMARY} />
+            )}
+            <Text style={styles.saveText}>{sending ? "Enviando…" : "Guardar y enviar"}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -707,6 +829,17 @@ function createStyles(
     },
     selectValue: { flex: 1, fontSize: font(14), color: TEXT_PRIMARY },
     selectPlaceholder: { flex: 1, fontSize: font(14), color: TEXT_PLACEHOLDER },
+    selectDisabled: { opacity: 0.7 },
+    retryBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(4),
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(6),
+      borderRadius: RADIUS_PILL,
+      backgroundColor: PRIMARY_TINT_50,
+    },
+    retryText: { fontSize: font(12), fontWeight: "700", color: PRIMARY_700 },
     noticeRow: {
       flexDirection: "row",
       alignItems: "flex-start",
@@ -837,5 +970,6 @@ function createStyles(
     cancelText: { fontSize: font(15), fontWeight: "600", color: TEXT_SECONDARY },
     saveBtn: { ...FOOTER_BTN_SAVE, flex: 2 },
     saveText: { fontSize: font(15), fontWeight: "700", color: ON_PRIMARY },
+    footerBtnDisabled: { opacity: 0.6 },
   });
 }

@@ -1,11 +1,10 @@
 // Imports relativos (no "@/"): tsconfig.jest.json no declara el alias.
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getTaskerCompanyConfig, getTaskerUserClients } from "../constants/taskerMock";
-import type {
-  TaskerCompanyConfig,
-  TaskerUserClient,
-} from "../../types/typesTasker/TaskerTypes";
+import type { TaskerSession } from "../../types/typesTasker/TaskerTypes";
+import { mapTaskerSession, TASKER_DISCONNECTED_CONFIG } from "./taskerApi";
 import { parseStoredTaskerClients, parseStoredTaskerConfig } from "./taskerRules";
+
+export type { TaskerSession };
 
 /**
  * Config de Tasker de la compañía y clientes del usuario, guardados en el
@@ -13,32 +12,36 @@ import { parseStoredTaskerClients, parseStoredTaskerConfig } from "./taskerRules
  * SecureStore: la lista de clientes con direcciones puede pasar de ~2 KB (el
  * tope de SecureStore en Android) y no contiene secretos.
  *
- * Las claves llevan versión: se sube cuando cambia la forma o los datos de
- * ejemplo, así lo de una versión anterior nunca se lee (queda en claves que
- * ya no se consultan y se borran al arrancar).
+ * Las claves llevan versión: se sube cuando cambia la forma o los datos, así
+ * lo de una versión anterior nunca se lee (queda en claves que ya no se
+ * consultan y se borran al arrancar). v3: datos reales de chooseschool (v2
+ * eran los de ejemplo).
  */
-export const TASKER_STORAGE_VERSION = "v2";
+export const TASKER_STORAGE_VERSION = "v3";
 export const TASKER_CONFIG_STORAGE_KEY = `taskerConfig:${TASKER_STORAGE_VERSION}`;
 export const TASKER_CLIENTS_STORAGE_KEY = `taskerClients:${TASKER_STORAGE_VERSION}`;
-/** Claves de antes de versionar (sin sufijo). */
-export const TASKER_LEGACY_STORAGE_KEYS = ["taskerConfig", "taskerClients"] as const;
+/** Claves de versiones anteriores: sin sufijo y v2 (datos de ejemplo). */
+export const TASKER_LEGACY_STORAGE_KEYS = [
+  "taskerConfig",
+  "taskerClients",
+  "taskerConfig:v2",
+  "taskerClients:v2",
+] as const;
 
-export interface TaskerSession {
-  config: TaskerCompanyConfig;
-  clients: TaskerUserClient[];
+/** Sin datos de Tasker: no conectada y sin clientes (Reportar se oculta). */
+function disconnectedSession(): TaskerSession {
+  return { config: { ...TASKER_DISCONNECTED_CONFIG }, clients: [] };
 }
 
 /**
- * Lee config y clientes de Tasker (hoy, del mock) y los guarda en el
- * teléfono. Al iniciar sesión y al cambiar de empresa. No toca el store: lo
- * hace quien arma la sesión, junto con lo demás. Si no se puede guardar, igual
- * devuelve los datos (el próximo arranque en frío los vuelve a cargar).
+ * Saca config y clientes de Tasker del `data` de chooseschool
+ * (mapTaskerSession) y los guarda en el teléfono. Al iniciar sesión y al
+ * cambiar de empresa. Sin `data` (chooseschool falló) → no conectada. No toca
+ * el store: lo hace quien arma la sesión, junto con lo demás. Si no se puede
+ * guardar, igual devuelve los datos.
  */
-export async function loadAndPersistTaskerSession(): Promise<TaskerSession> {
-  const session: TaskerSession = {
-    config: getTaskerCompanyConfig(),
-    clients: getTaskerUserClients(),
-  };
+export async function persistTaskerSession(chooseSchoolData: unknown): Promise<TaskerSession> {
+  const session = mapTaskerSession(chooseSchoolData);
   try {
     await Promise.all([
       AsyncStorage.setItem(TASKER_CONFIG_STORAGE_KEY, JSON.stringify(session.config)),
@@ -54,8 +57,10 @@ export async function loadAndPersistTaskerSession(): Promise<TaskerSession> {
 }
 
 /**
- * Arranque en frío: lo guardado si las dos claves son válidas; si falta alguna
- * o está corrupta (JSON inválido), se ignora y se vuelve a cargar.
+ * Arranque en frío: lo guardado si las dos claves son válidas. Si falta alguna
+ * o está corrupta, no hay de dónde volver a leerlo (solo viene en
+ * chooseschool): queda no conectada hasta el próximo inicio de sesión o
+ * cambio de empresa. No escribe nada.
  */
 export async function restoreTaskerSession(): Promise<TaskerSession> {
   try {
@@ -67,14 +72,14 @@ export async function restoreTaskerSession(): Promise<TaskerSession> {
     const clients = parseStoredTaskerClients(clientsRaw);
     if (config && clients) return { config, clients };
   } catch {
-    // Sin lectura posible: se recarga.
+    // Sin lectura posible: igual que sin datos.
   }
-  return loadAndPersistTaskerSession();
+  return disconnectedSession();
 }
 
 /**
- * Arranque: borra las claves sin versión si quedaron de una instalación
- * anterior. Nunca lanza (si no se puede, igual nadie las lee).
+ * Arranque: borra las claves de versiones anteriores si quedaron de una
+ * instalación anterior. Nunca lanza (si no se puede, igual nadie las lee).
  */
 export async function removeLegacyTaskerStorage(): Promise<void> {
   try {

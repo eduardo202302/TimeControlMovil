@@ -23,8 +23,10 @@ import { CARD_FORM, ROW_ACTION_BTN } from "@/styles/surfaces";
 import {
   formatTaskerDate,
   getCommentComposerTransition,
+  resolveCommentComposer,
   getInitials,
   getTaskerCommentsAttachmentBytes,
+  TASKER_REPORT_ATTACHMENTS_MAX_BYTES,
   sortComments,
   taskerCommentDraftFrom,
   type CommentComposerTarget,
@@ -59,12 +61,19 @@ interface TaskerCommentsCardProps {
   order?: CommentOrder;
   onOrderChange?: (order: CommentOrder) => void;
   /**
-   * Todos los comentarios van en un solo envío (Reportar Avería): el tope de
-   * adjuntos del formulario suma los de los demás comentarios.
+   * Todos los comentarios van en un solo envío (Reportar Avería): tope de 7 MB
+   * de archivos reales (TASKER_REPORT_ATTACHMENTS_MAX_BYTES) sumando los de
+   * los demás comentarios.
    */
   sharedAttachmentLimit?: boolean;
   /** ScrollView de la pantalla, para llevar el formulario a la vista. */
   scrollRef?: RefObject<ScrollView | null>;
+  /**
+   * Al cambiar, cierra el formulario abierto (agregar o editar) y descarta su
+   * borrador sin preguntar. Reportar lo sube tras un envío exitoso; sin él
+   * (Seguimiento) nunca cambia.
+   */
+  resetKey?: number;
 }
 
 /**
@@ -83,6 +92,7 @@ export default function TaskerCommentsCard({
   onOrderChange,
   sharedAttachmentLimit = false,
   scrollRef,
+  resetKey = 0,
 }: TaskerCommentsCardProps) {
   const { scale, verticalScale, font } = useResponsive();
   const styles = useMemo(
@@ -94,15 +104,25 @@ export default function TaskerCommentsCard({
   const order = controlledOrder ?? ownOrder;
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [openTarget, setOpenTarget] = useState<CommentComposerTarget>(null);
+  /** Último resetKey aplicado: si cambia, el formulario se cierra en este mismo render. */
+  const [seenResetKey, setSeenResetKey] = useState(resetKey);
   /** Lo avisa el formulario abierto; decide si se pide "¿Descartar cambios?". */
   const changedRef = useRef(false);
 
+  if (resetKey !== seenResetKey) {
+    // Ajuste de estado durante el render (sin efecto): el composer se
+    // desmonta ya, con su texto y adjuntos.
+    setSeenResetKey(resetKey);
+    setOpenTarget(null);
+  }
+
   const sorted = useMemo(() => sortComments(comments, order), [comments, order]);
-  // Si el comentario en edición deja de existir, su formulario cuenta como cerrado.
-  const composer: CommentComposerTarget =
-    openTarget?.mode === "edit" && !comments.some((c) => c.id === openTarget.id)
-      ? null
-      : openTarget;
+  // Reiniciada, o el comentario en edición dejó de existir → formulario cerrado.
+  const composer = resolveCommentComposer(
+    openTarget,
+    comments.map((c) => c.id),
+    { key: resetKey, seenKey: seenResetKey },
+  );
   const isAdding = composer?.mode === "add";
   const editingId = composer?.mode === "edit" ? composer.id : null;
 
@@ -152,10 +172,13 @@ export default function TaskerCommentsCard({
       onSave={handleSave}
       onCancel={() => requestComposer(null)}
       onChangedChange={handleChangedChange}
-      usedBytesElsewhere={
+      attachmentLimit={
         sharedAttachmentLimit
-          ? getTaskerCommentsAttachmentBytes(comments, editingId ?? undefined)
-          : 0
+          ? {
+              maxBytes: TASKER_REPORT_ATTACHMENTS_MAX_BYTES,
+              usedElsewhere: getTaskerCommentsAttachmentBytes(comments, editingId ?? undefined),
+            }
+          : undefined
       }
       onOpenImage={setViewerUri}
       scrollRef={scrollRef}

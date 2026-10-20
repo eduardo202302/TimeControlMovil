@@ -12,6 +12,7 @@ import {
   commentImagesToAttachments,
   getCommentAttachmentKind,
   getCommentComposerTransition,
+  resolveCommentComposer,
   isTaskerCommentDraftChanged,
   isTaskerCommentTextValid,
   removeTaskerComment,
@@ -21,8 +22,10 @@ import {
   emptyTaskerAddressDraft,
   formatTaskerAddress,
   getSelectedTaskerAddress,
+  fitTaskerAttachments,
+  getDataUriFileBytes,
   getTaskerCommentsAttachmentBytes,
-  isTaskerCommentsOverPayloadLimit,
+  TASKER_REPORT_ATTACHMENTS_MAX_BYTES,
   isTaskerAddressComplete,
   nextTaskerAddressId,
   removeTaskerAddress,
@@ -545,6 +548,32 @@ describe("comentarios de Seguimiento", () => {
     });
   });
 
+  describe("resolveCommentComposer (reinicio tras enviar el reporte)", () => {
+    const add = { mode: "add" } as const;
+    const edit2 = { mode: "edit", id: 2 } as const;
+
+    it("sin reinicio → el formulario abierto tal cual", () => {
+      expect(resolveCommentComposer(add, [1, 2])).toBe(add);
+      expect(resolveCommentComposer(edit2, [1, 2], { key: 3, seenKey: 3 })).toBe(edit2);
+      expect(resolveCommentComposer(null, [1])).toBeNull();
+    });
+    it("resetKey nuevo → cerrado, esté agregando o editando (sin preguntar)", () => {
+      expect(resolveCommentComposer(add, [1, 2], { key: 1, seenKey: 0 })).toBeNull();
+      expect(resolveCommentComposer(edit2, [1, 2], { key: 1, seenKey: 0 })).toBeNull();
+    });
+    it("editando un comentario que ya no existe → cerrado", () => {
+      expect(resolveCommentComposer(edit2, [1, 3])).toBeNull();
+      expect(resolveCommentComposer(edit2, [])).toBeNull();
+    });
+    it("agregar no depende de la lista (vacía tras enviar sigue abierto si no hubo reinicio)", () => {
+      expect(resolveCommentComposer(add, [])).toBe(add);
+    });
+    it("tras cerrarse, abrir de nuevo no pide confirmación", () => {
+      const closed = resolveCommentComposer(add, [], { key: 1, seenKey: 0 });
+      expect(getCommentComposerTransition(closed, add, true)).toBe("apply");
+    });
+  });
+
   describe("getCommentComposerTransition (formulario abierto en la tarjeta)", () => {
     const add = { mode: "add" } as const;
     const edit = (id: number) => ({ mode: "edit", id }) as const;
@@ -686,15 +715,33 @@ describe("comentarios de Seguimiento", () => {
       });
     });
 
-    describe("tope de adjuntos sumando todos los comentarios", () => {
+    describe("tope de adjuntos sumando todos los comentarios (archivos reales)", () => {
+      /** data-URI de un archivo de exactamente `bytes` bytes. */
+      const fileOf = (bytes: number, mime = "image/jpeg") =>
+        `data:${mime};base64,${btoa("x".repeat(bytes))}`;
       const withImages = (id: number, ...images: string[]) => existing(id, { images });
       const list = [
-        withImages(1, "a".repeat(40)),
-        withImages(2, "b".repeat(30), "c".repeat(20)),
+        withImages(1, fileOf(40)),
+        withImages(2, fileOf(30), fileOf(20, "application/pdf")),
         withImages(3),
       ];
+      const attachment = (name: string, bytes: number) => ({
+        id: name,
+        name,
+        mimeType: "image/jpeg",
+        dataUri: fileOf(bytes),
+      });
 
-      it("suma el largo de los adjuntos de todos los comentarios", () => {
+      it("el tope de Reportar es 7 MB", () => {
+        expect(TASKER_REPORT_ATTACHMENTS_MAX_BYTES).toBe(7 * 1024 * 1024);
+      });
+      it("getDataUriFileBytes: bytes del archivo decodificado, sin encabezado ni relleno", () => {
+        for (const bytes of [0, 1, 2, 3, 4, 5, 1000, 1001]) {
+          expect(getDataUriFileBytes(fileOf(bytes))).toBe(bytes);
+        }
+        expect(getDataUriFileBytes("data:text/plain,hola")).toBe(4);
+      });
+      it("suma los archivos reales de todos los comentarios (no el largo del base64)", () => {
         expect(getTaskerCommentsAttachmentBytes(list)).toBe(90);
       });
       it("excludeId deja fuera el comentario que se edita", () => {
@@ -704,12 +751,27 @@ describe("comentarios de Seguimiento", () => {
       it("lista vacía → 0", () => {
         expect(getTaskerCommentsAttachmentBytes([])).toBe(0);
       });
-      it("ninguno pasa el tope solo, pero repartidos en varios comentarios sí", () => {
-        expect(list.every((c) => !isTaskerCommentsOverPayloadLimit([c], 60))).toBe(true);
-        expect(isTaskerCommentsOverPayloadLimit(list, 60)).toBe(true);
+      it("fitTaskerAttachments: entran en orden los que caben; justo en el tope entra", () => {
+        const result = fitTaskerAttachments(
+          [attachment("a.jpg", 30), attachment("b.pdf", 50), attachment("c.jpg", 10)],
+          60,
+          100,
+        );
+        expect(result.accepted.map((a) => a.name)).toEqual(["a.jpg", "c.jpg"]);
+        expect(result.rejected).toHaveLength(1);
+        expect(result.rejected[0]).toMatch(/^b\.pdf \(supera el límite total de /);
       });
-      it("justo en el tope → no pasa", () => {
-        expect(isTaskerCommentsOverPayloadLimit(list, 90)).toBe(false);
+      it("fitTaskerAttachments: el texto del rechazo lleva el tope en MB", () => {
+        const max = TASKER_REPORT_ATTACHMENTS_MAX_BYTES;
+        const used = getTaskerCommentsAttachmentBytes(list);
+        const result = fitTaskerAttachments([attachment("foto.jpg", max - used + 1)], used, max);
+        expect(result.accepted).toEqual([]);
+        expect(result.rejected).toEqual(["foto.jpg (supera el límite total de 7MB)"]);
+        expect(fitTaskerAttachments([attachment("ok.jpg", max - used)], used, max).accepted).toHaveLength(1);
+      });
+      it("7 MB de archivos caben en el cuerpo de 9.5 MB", () => {
+        const base64Chars = Math.ceil(TASKER_REPORT_ATTACHMENTS_MAX_BYTES / 3) * 4;
+        expect(base64Chars).toBeLessThan(9.5 * 1024 * 1024);
       });
     });
 
