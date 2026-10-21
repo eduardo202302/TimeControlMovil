@@ -25,9 +25,11 @@ import { CARD_FORM, ROW_ACTION_BTN } from "@/styles/surfaces";
 import { Ionicons } from "@expo/vector-icons";
 import React, {
   useCallback,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
+  type Ref,
   type RefObject,
 } from "react";
 import {
@@ -53,7 +55,9 @@ import {
   taskerCommentDraftFrom,
   type CommentComposerTarget,
   type CommentOrder,
+  type TaskerOpenCommentDraft,
 } from "../../utils/taskerRules";
+import { scrollIntoView } from "./scrollIntoView";
 import {
   REPORT_LAYOUT as L,
   REPORT_TOUCH_MIN,
@@ -69,7 +73,16 @@ const ROW_BTN_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
 
 const EMPTY_DRAFT: TaskerCommentDraft = { text: "", attachments: [] };
 
+/** Lo que Reportar consulta de la tarjeta al tocar "Guardar y enviar". */
+export interface TaskerCommentsCardHandle {
+  /** Formulario abierto (agregar o editar) con su borrador; null = ninguno. */
+  getOpenDraft: () => TaskerOpenCommentDraft | null;
+  /** Lleva el formulario abierto a la vista (sin formulario, nada). */
+  revealComposer: () => void;
+}
+
 interface TaskerCommentsCardProps {
+  ref?: Ref<TaskerCommentsCardHandle>;
   comments: TaskerComment[];
   /** Muestra lápiz y papelera en ese comentario. */
   canEdit: (comment: TaskerComment) => boolean;
@@ -112,6 +125,7 @@ interface TaskerCommentsCardProps {
  * y qué formulario está abierto (ninguno, agregar o editar uno), de a uno.
  */
 export default function TaskerCommentsCard({
+  ref,
   comments,
   canEdit,
   onAdd,
@@ -138,6 +152,10 @@ export default function TaskerCommentsCard({
   const [seenResetKey, setSeenResetKey] = useState(resetKey);
   /** Lo avisa el formulario abierto; decide si se pide "¿Descartar cambios?". */
   const changedRef = useRef(false);
+  /** Último borrador que avisó el formulario abierto (null = aún no avisó). */
+  const draftRef = useRef<TaskerCommentDraft | null>(null);
+  /** Envoltorio del formulario abierto, para llevarlo a la vista. */
+  const composerRef = useRef<View>(null);
 
   if (resetKey !== seenResetKey) {
     // Ajuste de estado durante el render (sin efecto): el composer se
@@ -161,8 +179,27 @@ export default function TaskerCommentsCard({
 
   const openComposer = useCallback((next: CommentComposerTarget) => {
     changedRef.current = false;
+    draftRef.current = null;
     setOpenTarget(next);
   }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getOpenDraft: () => {
+        if (!composer) return null;
+        const initial =
+          composer.mode === "edit"
+            ? taskerCommentDraftFrom(comments.find((c) => c.id === composer.id) ?? null)
+            : EMPTY_DRAFT;
+        return { target: composer, initial, current: draftRef.current ?? initial };
+      },
+      revealComposer: () => {
+        if (composer) void scrollIntoView(scrollRef?.current, composerRef.current);
+      },
+    }),
+    [composer, comments, scrollRef],
+  );
 
   const requestComposer = (next: CommentComposerTarget) => {
     const transition = getCommentComposerTransition(
@@ -189,6 +226,10 @@ export default function TaskerCommentsCard({
 
   const handleChangedChange = useCallback((changed: boolean) => {
     changedRef.current = changed;
+  }, []);
+
+  const handleDraftChange = useCallback((draft: TaskerCommentDraft) => {
+    draftRef.current = draft;
   }, []);
 
   const handleSave = (draft: TaskerCommentDraft) => {
@@ -224,6 +265,7 @@ export default function TaskerCommentsCard({
       onSave={handleSave}
       onCancel={() => requestComposer(null)}
       onChangedChange={handleChangedChange}
+      onDraftChange={handleDraftChange}
       attachmentLimit={
         sharedAttachmentLimit
           ? {
@@ -319,6 +361,7 @@ export default function TaskerCommentsCard({
 
       {isAdding && (
         <View
+          ref={composerRef}
           style={[styles.addComposer, compact && styles.addComposerCompact]}
         >
           {renderComposer("add", EMPTY_DRAFT)}
@@ -337,9 +380,9 @@ export default function TaskerCommentsCard({
         >
           {sorted.map((comment) =>
             comment.id === editingId ? (
-              <React.Fragment key={comment.id}>
+              <View key={comment.id} ref={composerRef}>
                 {renderComposer("edit", taskerCommentDraftFrom(comment))}
-              </React.Fragment>
+              </View>
             ) : (
               <CommentItem
                 key={comment.id}

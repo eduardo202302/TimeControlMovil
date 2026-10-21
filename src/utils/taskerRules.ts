@@ -299,6 +299,22 @@ export function removeTaskerComment(list: TaskerComment[], id: number): TaskerCo
 }
 
 /**
+ * Guarda el borrador del formulario abierto: agrega uno nuevo o cambia el que
+ * se edita (mismas reglas que addTaskerComment / updateTaskerComment).
+ */
+export function saveTaskerCommentDraft(
+  list: TaskerComment[],
+  target: Exclude<CommentComposerTarget, null>,
+  draft: TaskerCommentDraft,
+  author: TaskerCommentAuthor,
+  now: Date,
+): TaskerComment[] {
+  return target.mode === "add"
+    ? addTaskerComment(list, draft, author, now)
+    : updateTaskerComment(list, target.id, draft);
+}
+
+/**
  * Tope de Reportar: archivos reales (no su base64) sumando TODOS los
  * comentarios. El base64 pesa ~33 % más, así 7 MB de archivos caben en el
  * cuerpo de 9.5 MB que se valida al enviar (TASKR_TASK_MAX_BYTES).
@@ -341,6 +357,40 @@ export interface TaskerAttachmentLimit {
   maxBytes: number;
   /** Lo que ya pesan los adjuntos de los OTROS comentarios del envío. */
   usedElsewhere: number;
+}
+
+/** Formulario de comentario abierto en la tarjeta: a cuál apunta, cómo arrancó y cómo va. */
+export interface TaskerOpenCommentDraft {
+  target: Exclude<CommentComposerTarget, null>;
+  initial: TaskerCommentDraft;
+  current: TaskerCommentDraft;
+}
+
+/**
+ * "Guardar y enviar" de Reportar: "send" si no hay formulario abierto o no
+ * tiene cambios (se envía y se cierra como siempre); "unsaved" pide el aviso
+ * "Comentario sin guardar". `canSave`: el borrador se puede guardar
+ * (canSaveTaskerComment y, con los adjuntos de los OTROS comentarios, dentro
+ * del tope del envío).
+ */
+export function getUnsavedCommentOnSend(
+  open: TaskerOpenCommentDraft | null,
+  comments: TaskerComment[],
+  maxBytes: number = TASKER_REPORT_ATTACHMENTS_MAX_BYTES,
+): { kind: "send" } | { kind: "unsaved"; canSave: boolean } {
+  if (!open || !isTaskerCommentDraftChanged(open.initial, open.current)) return { kind: "send" };
+  const usedElsewhere = getTaskerCommentsAttachmentBytes(
+    comments,
+    open.target.mode === "edit" ? open.target.id : undefined,
+  );
+  const draftBytes = open.current.attachments.reduce(
+    (sum, a) => sum + getDataUriFileBytes(a.dataUri),
+    0,
+  );
+  return {
+    kind: "unsaved",
+    canSave: canSaveTaskerComment(open.current) && usedElsewhere + draftBytes <= maxBytes,
+  };
 }
 
 /**

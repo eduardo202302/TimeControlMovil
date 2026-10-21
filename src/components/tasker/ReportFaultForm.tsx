@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
+  type AlertButton,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -72,12 +73,14 @@ import {
   getTaskerFaultLabel,
   getTaskerFormRules,
   getSelectedTaskerAddress,
+  getUnsavedCommentOnSend,
   hasSharedCoordinatesAcrossClients,
   pickNearestAddressCandidate,
   pickNearestClientAddress,
   pruneSelectedFaults,
   removeTaskerAddress,
   removeTaskerComment,
+  saveTaskerCommentDraft,
   selectTaskerAddress,
   sortTaskerAddresses,
   toggleTaskerAddressSelected,
@@ -107,7 +110,7 @@ import type {
 } from "../../../types/typesTasker/TaskerTypes";
 import TaskerAddressModal from "./TaskerAddressModal";
 import TaskerAddressSummary from "./TaskerAddressSummary";
-import TaskerCommentsCard from "./TaskerCommentsCard";
+import TaskerCommentsCard, { type TaskerCommentsCardHandle } from "./TaskerCommentsCard";
 import {
   REPORT_LAYOUT as L,
   REPORT_TOUCH_MIN,
@@ -148,7 +151,7 @@ interface ReportFaultFormProps {
 }
 
 /**
- * Cliente y dirección de arranque (o tras Cancelar): la más cercana entre
+ * Cliente y dirección de arranque (o tras Limpiar): la más cercana entre
  * TODAS las direcciones de TODOS los clientes. Sin ninguna con coordenadas →
  * primer cliente y su predeterminada.
  */
@@ -216,7 +219,10 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
     target: TaskerReportAddress | null;
   } | null>(null);
   const [comments, setComments] = useState<TaskerComment[]>([]);
-  /** Sube en cada reinicio (Cancelar o envío exitoso): la tarjeta cierra el comentario a medias. */
+  /**
+   * Sube en cada reinicio (Limpiar o envío exitoso) y en "Enviar sin él" /
+   * "Guardar y enviar": la tarjeta cierra el comentario a medias.
+   */
   const [commentsResetKey, setCommentsResetKey] = useState(0);
   /** Envío en curso: el ref bloquea un segundo toque antes del re-render. */
   const [sending, setSending] = useState(false);
@@ -226,6 +232,13 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
   const faultsRequestRef = useRef(0);
   /** La tarjeta de comentarios lleva su formulario a la vista (y sobre el teclado). */
   const scrollRef = useRef<ScrollView>(null);
+  /** Borrador del comentario abierto, que se revisa al enviar. */
+  const commentsCardRef = useRef<TaskerCommentsCardHandle>(null);
+
+  /** Tras Limpiar o un envío exitoso: a la vista el primer bloque del formulario. */
+  const scrollToTop = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -456,7 +469,7 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
   }, []);
 
   /**
-   * Cancelar y envío exitoso: todo vacío, cliente y dirección a la recomendada
+   * Limpiar y envío exitoso: todo vacío, cliente y dirección a la recomendada
    * con la posición actual, y el comentario a medias (agregar o editar) cerrado
    * y descartado sin preguntar. Ese borrador nunca viaja: solo cuenta lo
    * guardado en `comments`.
@@ -474,40 +487,100 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
     setCommentsResetKey((key) => key + 1);
   }, [clients, coords]);
 
-  const handleSubmit = useCallback(async () => {
+  const handleClear = useCallback(() => {
+    resetForm();
+    scrollToTop();
+  }, [resetForm, scrollToTop]);
+
+  /** Envío ya validado, con `toSend` como comentarios (los guardados, o con el borrador recién guardado). */
+  const sendReport = useCallback(
+    async (toSend: TaskerComment[]) => {
+      if (sendingRef.current) return;
+      const body = buildTaskrTaskBody({
+        appliesFault: config.appliesFault === true,
+        clientId: client.id,
+        faultIds,
+        description,
+        address: getSelectedTaskerAddress(addresses),
+        comments: toSend,
+      });
+      sendingRef.current = true;
+      setSending(true);
+      try {
+        const credentials = await sessionCredentials();
+        const response = credentials
+          ? await createTaskerTask({ ...credentials, body })
+          : { ok: false as const, message: TASKER_SEND_ERROR };
+        if (!mountedRef.current) return;
+        if (response.ok) {
+          Alert.alert(
+            "Reporte enviado",
+            response.id != null ? `Ticket #${response.id}` : undefined,
+            [{ text: "OK", onPress: scrollToTop }],
+          );
+          resetForm();
+        } else {
+          // Nada se limpia ni se mueve: el usuario puede corregir y reintentar.
+          Alert.alert("Reporte no enviado", response.message);
+        }
+      } finally {
+        sendingRef.current = false;
+        if (mountedRef.current) setSending(false);
+      }
+    },
+    [config.appliesFault, client.id, faultIds, description, addresses, resetForm, scrollToTop],
+  );
+
+  /**
+   * Valida y, si hay un comentario abierto con cambios, pregunta antes de
+   * enviar ("Volver", "Enviar sin él" y, si se puede guardar, "Guardar y enviar").
+   */
+  const handleSubmit = useCallback(() => {
     if (sendingRef.current) return;
     const result = validateReport({ faultIds, description, addresses }, rules);
     setErrors(result);
     if (Object.values(result).some(Boolean)) return;
 
-    const body = buildTaskrTaskBody({
-      appliesFault: config.appliesFault === true,
-      clientId: client.id,
-      faultIds,
-      description,
-      address: getSelectedTaskerAddress(addresses),
-      comments,
-    });
-    sendingRef.current = true;
-    setSending(true);
-    try {
-      const credentials = await sessionCredentials();
-      const response = credentials
-        ? await createTaskerTask({ ...credentials, body })
-        : { ok: false as const, message: TASKER_SEND_ERROR };
-      if (!mountedRef.current) return;
-      if (response.ok) {
-        Alert.alert("Reporte enviado", response.id != null ? `Ticket #${response.id}` : undefined);
-        resetForm();
-      } else {
-        // Nada se limpia: el usuario puede corregir y reintentar.
-        Alert.alert("Reporte no enviado", response.message);
-      }
-    } finally {
-      sendingRef.current = false;
-      if (mountedRef.current) setSending(false);
+    const open = commentsCardRef.current?.getOpenDraft() ?? null;
+    const unsaved = getUnsavedCommentOnSend(open, comments);
+    if (!open || unsaved.kind === "send") {
+      void sendReport(comments);
+      return;
     }
-  }, [faultIds, description, addresses, rules, comments, config.appliesFault, client.id, resetForm]);
+    const buttons: AlertButton[] = [
+      {
+        text: "Volver",
+        style: "cancel",
+        onPress: () => commentsCardRef.current?.revealComposer(),
+      },
+      {
+        text: "Enviar sin él",
+        style: "destructive",
+        onPress: () => {
+          setCommentsResetKey((key) => key + 1);
+          void sendReport(comments);
+        },
+      },
+    ];
+    if (unsaved.canSave) {
+      buttons.push({
+        text: "Guardar y enviar",
+        onPress: () => {
+          const saved = saveTaskerCommentDraft(
+            comments,
+            open.target,
+            open.current,
+            commentAuthor,
+            new Date(),
+          );
+          setComments(saved);
+          setCommentsResetKey((key) => key + 1);
+          void sendReport(saved);
+        },
+      });
+    }
+    Alert.alert("Comentario sin guardar", "Tienes un comentario que no has guardado.", buttons);
+  }, [faultIds, description, addresses, rules, comments, commentAuthor, sendReport]);
 
   return (
     <KeyboardAvoidingView
@@ -609,6 +682,7 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
 
         {/* ── Comentarios: texto, imágenes/PDF o ambos (todos del usuario en sesión: editables) ── */}
         <TaskerCommentsCard
+          ref={commentsCardRef}
           comments={comments}
           canEdit={() => true}
           onAdd={handleAddComment}
@@ -725,15 +799,15 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
         <View style={[styles.footerRow, isTablet && styles.contentTablet]}>
           <TouchableOpacity
             style={[styles.footerBtn, styles.cancelBtn, sending && styles.footerBtnDisabled]}
-            onPress={resetForm}
+            onPress={handleClear}
             disabled={sending}
             activeOpacity={0.8}
           >
-            <Text style={styles.cancelText}>Cancelar</Text>
+            <Text style={styles.cancelText}>Limpiar</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.footerBtn, styles.saveBtn, sending && styles.footerBtnDisabled]}
-            onPress={() => void handleSubmit()}
+            onPress={handleSubmit}
             disabled={sending}
             accessibilityState={{ disabled: sending, busy: sending }}
             activeOpacity={0.8}

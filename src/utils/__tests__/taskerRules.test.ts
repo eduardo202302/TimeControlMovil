@@ -12,7 +12,9 @@ import {
   commentImagesToAttachments,
   getCommentAttachmentKind,
   getCommentComposerTransition,
+  getUnsavedCommentOnSend,
   resolveCommentComposer,
+  saveTaskerCommentDraft,
   isTaskerCommentDraftChanged,
   isTaskerCommentTextValid,
   removeTaskerComment,
@@ -772,6 +774,118 @@ describe("comentarios de Seguimiento", () => {
       it("7 MB de archivos caben en el cuerpo de 9.5 MB", () => {
         const base64Chars = Math.ceil(TASKER_REPORT_ATTACHMENTS_MAX_BYTES / 3) * 4;
         expect(base64Chars).toBeLessThan(9.5 * 1024 * 1024);
+      });
+    });
+
+    describe("saveTaskerCommentDraft (Guardar y enviar del aviso)", () => {
+      const list = [existing(1), existing(2)];
+      it("agregar → nuevo al final con el usuario en sesión", () => {
+        const next = saveTaskerCommentDraft(list, { mode: "add" }, draft(" nuevo "), me, now);
+        expect(next.map((c) => c.id)).toEqual([1, 2, 3]);
+        expect(next[2].comment).toBe("nuevo");
+        expect(next[2].addUser).toEqual(me);
+      });
+      it("editar → cambia ese comentario y conserva el resto", () => {
+        const next = saveTaskerCommentDraft(list, { mode: "edit", id: 2 }, draft("cambiado"), me, now);
+        expect(next.map((c) => c.comment)).toEqual(["c1", "cambiado"]);
+        expect(next[1].addUser).toEqual(list[1].addUser);
+      });
+      it("borrador que no se puede guardar → lista igual", () => {
+        expect(saveTaskerCommentDraft(list, { mode: "add" }, draft("  "), me, now)).toBe(list);
+      });
+    });
+
+    describe("getUnsavedCommentOnSend (aviso al enviar con comentario abierto)", () => {
+      const fileOf = (bytes: number) => `data:image/jpeg;base64,${btoa("x".repeat(bytes))}`;
+      const attachment = (name: string, bytes: number): TaskerAttachment => ({
+        id: name,
+        name,
+        mimeType: "image/jpeg",
+        dataUri: fileOf(bytes),
+      });
+      const EMPTY = draft("");
+      const add = { mode: "add" } as const;
+      const list = [existing(1, { images: [fileOf(40)] }), existing(2, { images: [fileOf(30)] })];
+
+      it("sin formulario abierto → enviar", () => {
+        expect(getUnsavedCommentOnSend(null, list)).toEqual({ kind: "send" });
+      });
+      it("formulario abierto sin cambios → enviar (agregar vacío o editar intacto)", () => {
+        expect(getUnsavedCommentOnSend({ target: add, initial: EMPTY, current: EMPTY }, list)).toEqual({
+          kind: "send",
+        });
+        const initial = draft("c2", [attachment("a", 30)]);
+        expect(
+          getUnsavedCommentOnSend(
+            { target: { mode: "edit", id: 2 }, initial, current: { ...initial } },
+            list,
+          ),
+        ).toEqual({ kind: "send" });
+      });
+      it("con texto nuevo → aviso, se puede guardar", () => {
+        expect(
+          getUnsavedCommentOnSend({ target: add, initial: EMPTY, current: draft("hola") }, list),
+        ).toEqual({ kind: "unsaved", canSave: true });
+      });
+      it("solo con adjuntos → aviso, se puede guardar", () => {
+        expect(
+          getUnsavedCommentOnSend(
+            { target: add, initial: EMPTY, current: draft("", [attachment("a", 10)]) },
+            list,
+          ),
+        ).toEqual({ kind: "unsaved", canSave: true });
+      });
+      it("cambios que lo dejan vacío (solo espacios, o editar y borrar todo) → aviso sin guardar", () => {
+        expect(
+          getUnsavedCommentOnSend({ target: add, initial: EMPTY, current: draft("   ") }, list),
+        ).toEqual({ kind: "unsaved", canSave: false });
+        expect(
+          getUnsavedCommentOnSend(
+            { target: { mode: "edit", id: 1 }, initial: draft("c1"), current: EMPTY },
+            list,
+          ),
+        ).toEqual({ kind: "unsaved", canSave: false });
+      });
+      it("texto de más de 1000 → aviso sin guardar", () => {
+        expect(
+          getUnsavedCommentOnSend(
+            { target: add, initial: EMPTY, current: draft("a".repeat(1001)) },
+            list,
+          ),
+        ).toEqual({ kind: "unsaved", canSave: false });
+      });
+      it("tope de adjuntos: suma los OTROS comentarios; justo en el tope se puede guardar", () => {
+        // Otros = 70 bytes; tope 100.
+        const at = (bytes: number) =>
+          getUnsavedCommentOnSend(
+            { target: add, initial: EMPTY, current: draft("", [attachment("a", bytes)]) },
+            list,
+            100,
+          );
+        expect(at(30)).toEqual({ kind: "unsaved", canSave: true });
+        expect(at(31)).toEqual({ kind: "unsaved", canSave: false });
+      });
+      it("al editar, los adjuntos del propio comentario no cuentan dos veces", () => {
+        // Editando el 2 (30 bytes): otros = 40; el borrador pesa 60 → 100, entra.
+        const result = getUnsavedCommentOnSend(
+          {
+            target: { mode: "edit", id: 2 },
+            initial: draft("c2", [attachment("a", 30)]),
+            current: draft("c2", [attachment("b", 60)]),
+          },
+          list,
+          100,
+        );
+        expect(result).toEqual({ kind: "unsaved", canSave: true });
+      });
+      it("por defecto usa el tope de Reportar (7 MB)", () => {
+        const over = TASKER_REPORT_ATTACHMENTS_MAX_BYTES - 70 + 1;
+        expect(
+          getUnsavedCommentOnSend(
+            { target: add, initial: EMPTY, current: draft("", [attachment("a", over)]) },
+            list,
+          ),
+        ).toEqual({ kind: "unsaved", canSave: false });
       });
     });
 

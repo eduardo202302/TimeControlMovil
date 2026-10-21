@@ -57,6 +57,8 @@ interface TaskerCommentComposerProps {
   onCancel: () => void;
   /** Avisa a la tarjeta si hay cambios sin guardar. */
   onChangedChange?: (changed: boolean) => void;
+  /** Avisa el borrador a cada cambio (Reportar lo revisa al enviar). */
+  onDraftChange?: (draft: TaskerCommentDraft) => void;
   /**
    * Tope de adjuntos de todo el envío, con lo que ya pesan los OTROS
    * comentarios (Reportar Avería). Sin él, solo los topes del selector.
@@ -83,6 +85,7 @@ export default function TaskerCommentComposer({
   onSave,
   onCancel,
   onChangedChange,
+  onDraftChange,
   attachmentLimit,
   onOpenImage,
   scrollRef,
@@ -111,6 +114,10 @@ export default function TaskerCommentComposer({
   useEffect(() => {
     onChangedChange?.(changed);
   }, [changed, onChangedChange]);
+
+  useEffect(() => {
+    onDraftChange?.({ text, attachments });
+  }, [text, attachments, onDraftChange]);
 
   // ── Desplazamiento: al abrir, todo el formulario; con teclado, el campo ──
   const containerRef = useRef<View>(null);
