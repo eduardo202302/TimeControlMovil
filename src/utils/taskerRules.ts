@@ -452,6 +452,34 @@ export interface TaskerAddressLines {
   areaLine: string;
 }
 
+export const TASKER_UNNAMED_ADDRESS = "Dirección sin nombre";
+
+/**
+ * Textos de una dirección en Reportar, con datos incompletos: título =
+ * title → formattedAddress → address → "Calle Número" → "Dirección sin
+ * nombre" (nunca vacío). La línea de calle ("Calle #Número") queda vacía si
+ * falta o si ya se usó como título: no se muestra.
+ */
+export function getTaskerAddressDisplay(
+  address: Pick<
+    TaskerAddress,
+    "title" | "formattedAddress" | "address" | "street" | "streetNumber" | "sector" | "city" | "province"
+  >,
+): TaskerAddressLines {
+  const text = (value: string | null | undefined) => (typeof value === "string" ? value.trim() : "");
+  const street = text(address.street);
+  const streetNumber = text(address.streetNumber);
+  const lines = getTaskerAddressLines({ ...address, street, streetNumber });
+  const title =
+    text(address.title) ||
+    text(address.formattedAddress) ||
+    text(address.address) ||
+    [street, streetNumber].filter(Boolean).join(" ");
+  if (!title) return { ...lines, title: TASKER_UNNAMED_ADDRESS };
+  const titleIsStreet = !text(address.title) && !text(address.formattedAddress) && !text(address.address);
+  return { ...lines, title, streetLine: titleIsStreet ? "" : lines.streetLine };
+}
+
 /** Textos del resumen de una dirección (fila de Reportar Avería y pestaña Dirección). */
 export function getTaskerAddressLines(
   address: Pick<TaskerAddress, "title" | "street" | "streetNumber" | "sector" | "city" | "province">,
@@ -743,51 +771,202 @@ export function formatDistanceAway(meters: number | null | undefined): string | 
 }
 
 export interface ClientAddressHint {
-  /** "Más cercana" si la elegida es la recomendada (con distancia); si no, "Dirección seleccionada". */
-  caption: "Más cercana" | "Dirección seleccionada";
+  /** "Más cercana" si la elegida es la más cercana de TODAS; si no, "Seleccionada". */
+  caption: "Más cercana" | "Seleccionada";
   address: TaskerReportAddress;
   /** null si la dirección no tiene coordenadas o no hay posición. */
   distanceLabel: string | null;
 }
 
 /**
- * Línea bajo el cliente: la dirección marcada en la tarjeta Direcciones (al
- * abrir y al cambiar de cliente es la recomendada por pickNearestClientAddress
- * para ese cliente), con su distancia al teléfono. Sin ninguna marcada → null.
+ * Línea bajo el cliente: la dirección marcada en la tarjeta Direcciones, con
+ * su distancia al teléfono. "Más cercana" solo si es `nearest` (la más cercana
+ * entre todas las de todos los clientes) y `nearest` es de `clientId`. Sin
+ * ninguna marcada → null.
  */
 export function getClientAddressHint(
   addresses: TaskerReportAddress[],
-  recommended: NearestClientAddress | null,
+  clientId: number,
+  nearest: AddressCandidate | null,
   coords: { latitude: number; longitude: number } | null | undefined,
 ): ClientAddressHint | null {
   const address = getSelectedTaskerAddress(addresses);
   if (!address) return null;
   const point = addressPoint(address);
   const distanceLabel = coords && point ? formatDistanceAway(haversineMeters(coords, point)) : null;
-  const isRecommended =
-    address.fromClient &&
-    recommended?.distanceMeters != null &&
-    recommended.addressId === address.id;
+  const isNearest = nearest?.clientId === clientId && nearest.addressId === address.id;
   return {
-    caption: isRecommended ? "Más cercana" : "Dirección seleccionada",
+    caption: isNearest ? "Más cercana" : "Seleccionada",
     address,
     distanceLabel,
   };
 }
 
+// ─── Más cercana entre TODOS los clientes ───────────────────────────────────
+
+/** Dirección con coordenadas que compite por "Más cercana". */
+export interface AddressCandidate {
+  clientId: number;
+  clientName: string;
+  /**
+   * Id de la dirección: el del cliente (igual en la lista del reporte, ver
+   * clientAddressesToReport) o, para el cliente del reporte, el de su lista.
+   */
+  addressId: number;
+  title: string;
+  latitude: number;
+  longitude: number;
+  distanceMeters: number;
+  /** Es la predeterminada de su cliente. */
+  isDefault: boolean;
+  /** La agregó el usuario en este reporte. */
+  added: boolean;
+}
+
+/**
+ * Candidatas a "Más cercana": de cada cliente, en orden, todas sus direcciones
+ * (la predeterminada ya va dentro de `addresses`, sin duplicar: ver
+ * mapTaskerClient). Para el cliente del reporte (`report`) se usa su lista
+ * tal como está, con lo editado, borrado y agregado por el usuario. Solo las
+ * que tienen lat/lng válidos. Sin posición → [].
+ */
+export function collectAddressCandidates(
+  clients: TaskerUserClient[],
+  coords: { latitude: number; longitude: number } | null | undefined,
+  report?: { clientId: number; addresses: TaskerReportAddress[] } | null,
+): AddressCandidate[] {
+  if (!coords) return [];
+  const candidates: AddressCandidate[] = [];
+  for (const client of clients) {
+    const inReport = report?.clientId === client.id;
+    const defaultId = getDefaultClientAddressId(client.addresses);
+    const source = inReport
+      ? sortTaskerAddresses(report.addresses).map((a) => ({
+          address: a as TaskerAddress,
+          id: a.id,
+          isDefault: a.locked,
+          added: !a.fromClient,
+        }))
+      : client.addresses.map((a) => ({
+          address: a as TaskerAddress,
+          id: a.id,
+          isDefault: a.id === defaultId,
+          added: false,
+        }));
+    for (const { address, id, isDefault, added } of source) {
+      const point = addressPoint(address);
+      if (!point) continue;
+      candidates.push({
+        clientId: client.id,
+        clientName: client.name,
+        addressId: id,
+        title: getTaskerAddressDisplay(address).title,
+        latitude: point.latitude,
+        longitude: point.longitude,
+        distanceMeters: haversineMeters(coords, point),
+        isDefault,
+        added,
+      });
+    }
+  }
+  return candidates;
+}
+
+/**
+ * La más cercana de las candidatas. Empate (misma distancia): gana la
+ * predeterminada del cliente ya seleccionado; si no está entre las empatadas,
+ * la primera en orden. Sin candidatas → null.
+ */
+export function pickNearestAddressCandidate(
+  candidates: AddressCandidate[],
+  selectedClientId: number | null | undefined,
+): AddressCandidate | null {
+  if (candidates.length === 0) return null;
+  const min = Math.min(...candidates.map((c) => c.distanceMeters));
+  const tied = candidates.filter((c) => c.distanceMeters === min);
+  return tied.find((c) => c.clientId === selectedClientId && c.isDefault) ?? tied[0];
+}
+
+export interface NearestElsewhereHint {
+  clientId: number;
+  addressId: number;
+  /** "Más cercana: {cliente} · a X km" (sin el título de la dirección). */
+  label: string;
+}
+
+/** La más cercana de todas si es de OTRO cliente (para "Usar"); si no → null. */
+export function getNearestElsewhereHint(
+  nearest: AddressCandidate | null,
+  clientId: number,
+): NearestElsewhereHint | null {
+  if (!nearest || nearest.clientId === clientId) return null;
+  const distance = formatDistanceAway(nearest.distanceMeters);
+  return {
+    clientId: nearest.clientId,
+    addressId: nearest.addressId,
+    label: `Más cercana: ${nearest.clientName}${distance ? ` · ${distance}` : ""}`,
+  };
+}
+
+/** Diagnóstico (__DEV__): cliente · dirección · lat/lng a 4 decimales · km. */
+export function formatAddressCandidatesTable(candidates: AddressCandidate[]): string {
+  const header = ["Cliente", "Dirección", "Lat", "Lng", "Km"];
+  const rows = candidates.map((c) => [
+    c.clientName,
+    c.title,
+    c.latitude.toFixed(4),
+    c.longitude.toFixed(4),
+    (c.distanceMeters / 1000).toFixed(3),
+  ]);
+  const widths = header.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i].length)));
+  return [header, ...rows]
+    .map((row) => row.map((cell, i) => cell.padEnd(widths[i])).join(" · ").trimEnd())
+    .join("\n");
+}
+
+/** true si 2 o más direcciones de clientes DISTINTOS tienen exactamente las mismas lat/lng. */
+export function hasSharedCoordinatesAcrossClients(candidates: AddressCandidate[]): boolean {
+  const clientsByPoint = new Map<string, Set<number>>();
+  for (const c of candidates) {
+    const key = `${c.latitude},${c.longitude}`;
+    const ids = clientsByPoint.get(key) ?? new Set<number>();
+    ids.add(c.clientId);
+    if (ids.size > 1) return true;
+    clientsByPoint.set(key, ids);
+  }
+  return false;
+}
+
 // ─── Orden de arranque de Reportar ──────────────────────────────────────────
 
-/** Estado de la búsqueda de la posición del teléfono. */
+/**
+ * Estado de la búsqueda de la posición del teléfono. `refreshing`: buscando
+ * una posición nueva con el formulario ya abierto (al volver a entrar); la
+ * anterior ya se descartó.
+ */
 export type ReportLocationState =
   | { status: "pending" }
+  | { status: "refreshing" }
   | { status: "failed"; canAskAgain: boolean }
   | { status: "ok"; coords: { latitude: number; longitude: number } };
+
+/**
+ * Al entrar a Reportar y al salir: la posición nunca pasa de una visita a la
+ * otra. Con el formulario abierto (ok o refreshing) → refreshing (sigue
+ * abierto, sin posición, hasta que llegue la nueva); si no → pending.
+ */
+export function getLocationOnVisit(previous: ReportLocationState): ReportLocationState {
+  return previous.status === "ok" || previous.status === "refreshing"
+    ? { status: "refreshing" }
+    : { status: "pending" };
+}
 
 export type ReportGate = "unavailable" | "noClients" | "locating" | "noLocation" | "ready";
 
 /**
  * Qué muestra Reportar, en este orden estricto: compañía no conectada →
- * usuario sin clientes → buscando la posición → sin posición → formulario.
+ * usuario sin clientes → buscando la posición → sin posición → formulario
+ * (también mientras se refresca la posición con el formulario abierto).
  */
 export function getReportGate({
   config,
@@ -1098,27 +1277,6 @@ export function sortTaskerAddresses(list: TaskerReportAddress[]): TaskerReportAd
 }
 
 /**
- * Dirección con coordenadas más cercana a `coords` entre TODAS las de la lista
- * (la predeterminada, las demás del cliente y las agregadas): la etiqueta "Más
- * cercana". Empate → la primera de la lista. Sin coords o ninguna con
- * coordenadas → null. Independiente de la predeterminada y de la selección.
- */
-export function getNearestListAddressId(
-  list: TaskerReportAddress[],
-  coords: { latitude: number; longitude: number } | null | undefined,
-): number | null {
-  if (!coords) return null;
-  let best: { id: number; distance: number } | null = null;
-  for (const address of list) {
-    const point = addressPoint(address);
-    if (!point) continue;
-    const distance = haversineMeters(coords, point);
-    if (best === null || distance < best.distance) best = { id: address.id, distance };
-  }
-  return best?.id ?? null;
-}
-
-/**
  * Lista del reporte al elegir cliente: sus direcciones tal como están en el
  * cliente (lo editado o borrado de otro cliente no se arrastra: al volver, sus
  * direcciones vuelven al original) y después las que agregó el usuario, que se
@@ -1217,6 +1375,11 @@ export function toggleTaskerAddressSelected(
 ): TaskerReportAddress[] {
   const wasSelected = list.some((a) => a.id === id && a.selected);
   return list.map((a) => ({ ...a, selected: !wasSelected && a.id === id }));
+}
+
+/** Marca solo `id` (sin alternar: si ya estaba marcada, sigue marcada). */
+export function selectTaskerAddress(list: TaskerReportAddress[], id: number): TaskerReportAddress[] {
+  return list.map((a) => (a.selected === (a.id === id) ? a : { ...a, selected: a.id === id }));
 }
 
 export function getSelectedTaskerAddress(

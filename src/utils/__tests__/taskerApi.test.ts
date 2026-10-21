@@ -9,6 +9,7 @@ import {
   mapTaskerCompanyConfig,
   mapTaskerFaultActions,
   mapTaskerSession,
+  mergeDefaultAddressDuplicates,
   readTaskrMessage,
   serializeTaskrTaskBody,
   TASKER_ACTIONS_ERROR,
@@ -168,6 +169,17 @@ describe("mapTaskerClient", () => {
     const c = mapTaskerClient({ id: 1, name: "X", defaultAddress: SEDE, addresses: [SEDE, SUCURSAL] })!;
     expect(c.addresses.map((a) => a.title)).toEqual(["Sede Naco", "Sucursal"]);
   });
+  it("conserva TODAS las de addresses además de la predeterminada (sin duplicar)", () => {
+    const PLAZA = { title: "Plaza", latitude: 18.47, longitude: -69.93 };
+    const c = mapTaskerClient({
+      id: 1,
+      name: "X",
+      defaultAddress: SEDE,
+      addresses: [SUCURSAL, SEDE, PLAZA, SUCURSAL],
+    })!;
+    expect(c.addresses.map((a) => a.title)).toEqual(["Sede Naco", "Sucursal", "Plaza"]);
+    expect(c.addresses.map((a) => a.id)).toEqual([1, 2, 3]);
+  });
   it("ids propios 1..N (los de Taskr se descartan) y fuera order/selected", () => {
     const c = mapTaskerClient({ id: 1, name: "X", defaultAddress: SEDE, addresses: [SUCURSAL] })!;
     expect(c.addresses.map((a) => a.id)).toEqual([1, 2]);
@@ -213,6 +225,77 @@ describe("mapTaskerClient", () => {
   });
 });
 
+describe("mergeDefaultAddressDuplicates (predeterminada repetida con otros textos)", () => {
+  // Mismo punto que SEDE a 5 decimales (difiere en el 6.º), con otros textos.
+  const SEDE_COPIA = {
+    title: "Oficina Naco",
+    street: "",
+    whoReceives: "",
+    restrictions: "Solo de 8 a 5",
+    latitude: 18.477504,
+    longitude: -69.927296,
+  };
+  const SEDE_SIN_TEXTOS = { title: "", latitude: 18.4775, longitude: -69.9273 };
+
+  it("mismas coordenadas (5 decimales) → UNA sola, predeterminada", () => {
+    const c = mapTaskerClient({
+      id: 1,
+      name: "X",
+      defaultAddress: SEDE,
+      addresses: [SEDE_COPIA, SUCURSAL],
+    })!;
+    expect(c.addresses.map((a) => a.title)).toEqual(["Sede Naco", "Sucursal"]);
+    expect(c.addresses[0].isDefault).toBe(true);
+    expect(c.defaultAddress).toEqual(c.addresses[0]);
+  });
+  it("la predeterminada toma de la otra los textos que le faltan (los suyos se conservan)", () => {
+    const c = mapTaskerClient({ id: 1, name: "X", defaultAddress: SEDE, addresses: [SEDE_COPIA] })!;
+    expect(c.addresses).toHaveLength(1);
+    expect(c.addresses[0]).toMatchObject({
+      title: "Sede Naco",
+      street: "Av. Tiradentes",
+      restrictions: "Solo de 8 a 5",
+      latitude: 18.4775,
+      longitude: -69.9273,
+    });
+  });
+  it("predeterminada sin textos → se llena con los de la duplicada", () => {
+    const c = mapTaskerClient({
+      id: 1,
+      name: "X",
+      defaultAddress: SEDE_SIN_TEXTOS,
+      addresses: [SEDE],
+    })!;
+    expect(c.addresses).toHaveLength(1);
+    expect(c.addresses[0]).toMatchObject({ isDefault: true, title: "Sede Naco", street: "Av. Tiradentes" });
+  });
+  it("coordenadas distintas en el 5.º decimal → no se fusionan", () => {
+    const cerca = { title: "Al lado", latitude: 18.47751, longitude: -69.9273 };
+    const c = mapTaskerClient({ id: 1, name: "X", defaultAddress: SEDE, addresses: [cerca] })!;
+    expect(c.addresses.map((a) => a.title)).toEqual(["Sede Naco", "Al lado"]);
+  });
+  it("sin coordenadas → no se fusionan aunque los textos se parezcan", () => {
+    const sinMapa = { title: "Sin mapa A" };
+    const c = mapTaskerClient({
+      id: 1,
+      name: "X",
+      defaultAddress: sinMapa,
+      addresses: [{ title: "Sin mapa B" }],
+    })!;
+    expect(c.addresses).toHaveLength(2);
+  });
+  it("solo con la predeterminada: dos no-predeterminadas en el mismo punto siguen separadas", () => {
+    const a = { title: "A", latitude: 19, longitude: -70 };
+    const b = { title: "B", latitude: 19, longitude: -70 };
+    const c = mapTaskerClient({ id: 1, name: "X", defaultAddress: SEDE, addresses: [a, b] })!;
+    expect(c.addresses.map((x) => x.title)).toEqual(["Sede Naco", "A", "B"]);
+  });
+  it("sin duplicados → el mismo objeto", () => {
+    const c = mapTaskerClient({ id: 1, name: "X", defaultAddress: SEDE, addresses: [SUCURSAL] })!;
+    expect(mergeDefaultAddressDuplicates(c)).toBe(c);
+  });
+});
+
 describe("mapTaskerSession", () => {
   const data = {
     token: "x",
@@ -223,6 +306,19 @@ describe("mapTaskerSession", () => {
     const s = mapTaskerSession(data);
     expect(s.config.connected).toBe(true);
     expect(s.clients.map((c) => c.id)).toEqual([1]);
+  });
+  it("varios clientes con varias direcciones → cada uno conserva todas", () => {
+    const s = mapTaskerSession({
+      taskrCompany: {},
+      taskrClients: [
+        { id: 1, name: "A", defaultAddress: SEDE, addresses: [SUCURSAL] },
+        { id: 2, name: "B", defaultAddress: null, addresses: [SUCURSAL, SEDE] },
+      ],
+    });
+    expect(s.clients.map((c) => c.addresses.map((a) => a.title))).toEqual([
+      ["Sede Naco", "Sucursal"],
+      ["Sucursal", "Sede Naco"],
+    ]);
   });
   it("taskrCompany null → no conectada y sin clientes aunque vengan", () => {
     expect(mapTaskerSession({ ...data, taskrCompany: null })).toEqual({

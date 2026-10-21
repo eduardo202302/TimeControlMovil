@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -56,21 +57,27 @@ import {
   addTaskerAddress,
   addTaskerComment,
   buildReportAddresses,
+  collectAddressCandidates,
   filterFaultActionsForClient,
+  formatAddressCandidatesTable,
   formatSelectedFaultsSummary,
   getClientAddressHint,
   getRemovedFaultsNotice,
   getSelectedFaultNames,
-  getTaskerAddressLines,
-  getNearestListAddressId,
+  getDefaultClientAddressId,
+  getNearestElsewhereHint,
+  getTaskerAddressDisplay,
   getTaskerClientLabel,
   getTaskerFaultLabel,
   getTaskerFormRules,
   getSelectedTaskerAddress,
+  hasSharedCoordinatesAcrossClients,
+  pickNearestAddressCandidate,
   pickNearestClientAddress,
   pruneSelectedFaults,
   removeTaskerAddress,
   removeTaskerComment,
+  selectTaskerAddress,
   sortTaskerAddresses,
   toggleTaskerAddressSelected,
   updateTaskerAddress,
@@ -125,25 +132,34 @@ interface ReportFaultFormProps {
   config: TaskerCompanyConfig;
   /** Nunca vacío: ReportFaultGate no monta el formulario sin clientes. */
   clients: TaskerUserClient[];
-  /** Posición del teléfono al abrir (decide la dirección más cercana). */
-  coords: { latitude: number; longitude: number };
+  /**
+   * Posición NUEVA del teléfono en esta visita (decide la dirección más
+   * cercana). null = refrescándose al volver a entrar: sin distancias ni
+   * "Más cercana" hasta que llegue.
+   */
+  coords: { latitude: number; longitude: number } | null;
 }
 
-/** Cliente, dirección marcada y "Más cercana" de arranque (o tras Cancelar). */
+/**
+ * Cliente y dirección de arranque (o tras Cancelar): la más cercana entre
+ * TODAS las direcciones de TODOS los clientes. Sin ninguna con coordenadas →
+ * primer cliente y su predeterminada.
+ */
 function initialSelection(
   clients: TaskerUserClient[],
   coords: ReportFaultFormProps["coords"],
 ) {
-  const nearest = pickNearestClientAddress(clients, coords);
+  const nearest = pickNearestAddressCandidate(collectAddressCandidates(clients, coords), null);
   const client = clients.find((c) => c.id === nearest?.clientId) ?? clients[0];
-  return { client, addresses: buildReportAddresses(client, [], nearest?.addressId ?? null) };
+  const addressId = nearest ? nearest.addressId : getDefaultClientAddressId(client.addresses);
+  return { client, addresses: buildReportAddresses(client, [], addressId) };
 }
 
 /**
  * Reportar (Tasker) — FASE B: config y clientes de chooseschool, averías de
  * GET /taskr/actions y envío a POST /taskr/tasks. Solo se monta con la
  * compañía conectada, clientes y la posición del teléfono (ver
- * ReportFaultGate). Comentarios (con sus imágenes y PDF) y direcciones se
+ * ReportFaultGate); al volver a entrar sigue montado y recibe la nueva. Comentarios (con sus imágenes y PDF) y direcciones se
  * agregan, editan, borran y marcan en local; todo viaja junto en el envío.
  */
 export default function ReportFaultForm({ config, clients, coords }: ReportFaultFormProps) {
@@ -239,22 +255,37 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
     [availableFaults],
   );
   const faultsSummary = formatSelectedFaultsSummary(getSelectedFaultNames(faultIds, faultActions));
-  /** Recomendada del cliente elegido según la posición del teléfono. */
-  const recommended = useMemo(() => pickNearestClientAddress([client], coords), [client, coords]);
   /** Lista a mostrar: la predeterminada siempre primero. */
   const sortedAddresses = useMemo(() => sortTaskerAddresses(addresses), [addresses]);
   /**
-   * "Más cercana" en Direcciones: sobre TODA la lista con coordenadas (se
-   * recalcula al agregar, editar o borrar). Independiente de "Predeterminada"
-   * y de la selección.
+   * Candidatas a "Más cercana": las de todos los clientes; las del cliente
+   * elegido, tal como están en la lista (con las agregadas, editadas y sin las
+   * borradas). Se recalcula al agregar, editar, borrar o cambiar de cliente.
    */
-  const nearestAddressId = useMemo(
-    () => getNearestListAddressId(addresses, coords),
-    [addresses, coords],
+  const addressCandidates = useMemo(
+    () => collectAddressCandidates(clients, coords, { clientId: client.id, addresses }),
+    [clients, coords, client.id, addresses],
   );
-  /** Línea bajo el cliente: la dirección marcada, con su distancia. */
-  const addressHint = getClientAddressHint(addresses, recommended, coords);
-  const addressHintLines = addressHint ? getTaskerAddressLines(addressHint.address) : null;
+  const nearest = useMemo(
+    () => pickNearestAddressCandidate(addressCandidates, client.id),
+    [addressCandidates, client.id],
+  );
+  /** "Más cercana" en Direcciones: solo si la más cercana de TODAS es de este cliente. */
+  const nearestAddressId = nearest?.clientId === client.id ? nearest.addressId : null;
+  /** Línea bajo el cliente: "Más cercana" / "Seleccionada" con la distancia de la marcada. */
+  const addressHint = getClientAddressHint(addresses, client.id, nearest, coords);
+  const hintIsNearest = addressHint?.caption === "Más cercana";
+  /** La más cercana de todas, si es de otro cliente (con "Usar"). */
+  const nearestElsewhere = getNearestElsewhereHint(nearest, client.id);
+
+  // Diagnóstico: coordenadas de cada candidata (para ver repetidas en Tasker).
+  useEffect(() => {
+    if (!__DEV__) return;
+    console.log(`[Reportar] Direcciones candidatas\n${formatAddressCandidatesTable(addressCandidates)}`);
+    if (hasSharedCoordinatesAcrossClients(addressCandidates)) {
+      console.warn("Direcciones con coordenadas idénticas: revisar datos en Tasker");
+    }
+  }, [addressCandidates]);
   const clientLabel = getTaskerClientLabel(config);
   const removedFaultsNotice = getRemovedFaultsNotice(removedFaults);
   const clientOptions = useMemo(() => clients.map((c) => ({ id: c.id, name: c.name })), [clients]);
@@ -282,19 +313,35 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
   );
 
   /**
-   * Otro cliente: sus direcciones con la más cercana marcada (o la primera),
-   * las agregadas por el usuario se conservan y se quitan las averías que ya
-   * no le aplican (con aviso de cuántas).
+   * El usuario cambió cliente o dirección en esta visita: una posición nueva ya
+   * no mueve la selección, solo etiquetas y distancias. Se limpia al entrar.
    */
-  const handleSelectClient = useCallback(
-    (nextId: number) => {
-      setClientSheetVisible(false);
-      if (nextId === clientId) return;
+  const touchedRef = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      touchedRef.current = false;
+    }, []),
+  );
+
+  /**
+   * Mismo cliente → solo marca `addressId`. Otro cliente: sus direcciones con
+   * `addressId` marcada o, sin ella, la más cercana de ese cliente (o la
+   * primera); las agregadas por el usuario se conservan y se quitan las
+   * averías que ya no le aplican (con aviso de cuántas).
+   */
+  const applySelection = useCallback(
+    (nextId: number, addressId?: number) => {
+      if (nextId === clientId) {
+        if (addressId === undefined) return;
+        setAddresses((prev) => selectTaskerAddress(prev, addressId));
+        clearError("address");
+        return;
+      }
       const next = clients.find((c) => c.id === nextId);
       if (!next) return;
-      const nearest = pickNearestClientAddress([next], coords);
+      const selectedId = addressId ?? pickNearestClientAddress([next], coords)?.addressId ?? null;
       setClientId(next.id);
-      setAddresses((prev) => buildReportAddresses(next, prev, nearest?.addressId ?? null));
+      setAddresses((prev) => buildReportAddresses(next, prev, selectedId));
       const kept = pruneSelectedFaults(faultIds, filterFaultActionsForClient(faultActions, next.id));
       setFaultIds(kept);
       setRemovedFaults(faultIds.length - kept.length);
@@ -302,6 +349,35 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
     },
     [clientId, clients, coords, faultActions, faultIds, clearError],
   );
+
+  /** Otro cliente desde la hoja o con "Usar" (con su dirección). */
+  const handleSelectClient = useCallback(
+    (nextId: number, addressId?: number) => {
+      setClientSheetVisible(false);
+      if (nextId === clientId) return;
+      touchedRef.current = true;
+      applySelection(nextId, addressId);
+    },
+    [clientId, applySelection],
+  );
+
+  /**
+   * Posición nueva (al volver a entrar): sin cambios del usuario en esta
+   * visita, se vuelve a sugerir la más cercana de todas (cliente + dirección);
+   * con cambios, solo se recalculan etiquetas y distancias.
+   */
+  const suggestedCoordsRef = useRef(coords);
+  useEffect(() => {
+    if (!coords || coords === suggestedCoordsRef.current) return;
+    suggestedCoordsRef.current = coords;
+    if (touchedRef.current) return;
+    const nearest = pickNearestAddressCandidate(
+      collectAddressCandidates(clients, coords, { clientId, addresses }),
+      clientId,
+    );
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- la posición nueva llega de fuera (GPS) y se aplica una sola vez por lectura
+    if (nearest) applySelection(nearest.clientId, nearest.addressId);
+  }, [coords, clients, clientId, addresses, applySelection]);
 
   const handleAddressSelected = useCallback(
     (built: TaskerAddress) => {
@@ -318,6 +394,7 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
             })
           : addTaskerAddress(prev, built),
       );
+      touchedRef.current = true;
       // La nueva queda seleccionada: ya hay dirección.
       if (!target) clearError("address");
       setAddressEditor(null);
@@ -331,13 +408,17 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
       {
         text: "Eliminar",
         style: "destructive",
-        onPress: () => setAddresses((prev) => removeTaskerAddress(prev, address.id)),
+        onPress: () => {
+          touchedRef.current = true;
+          setAddresses((prev) => removeTaskerAddress(prev, address.id));
+        },
       },
     ]);
   }, []);
 
   const handleToggleAddress = useCallback(
     (id: number) => {
+      touchedRef.current = true;
       setAddresses((prev) => toggleTaskerAddressSelected(prev, id));
       clearError("address");
     },
@@ -360,20 +441,23 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
   }, []);
 
   /**
-   * Cancelar y envío exitoso: todo vacío, cliente y dirección a la recomendada,
-   * y el comentario a medias (agregar o editar) cerrado y descartado sin
-   * preguntar. Ese borrador nunca viaja: solo cuenta lo guardado en `comments`.
+   * Cancelar y envío exitoso: todo vacío, cliente y dirección a la recomendada
+   * con la posición actual, y el comentario a medias (agregar o editar) cerrado
+   * y descartado sin preguntar. Ese borrador nunca viaja: solo cuenta lo
+   * guardado en `comments`.
    */
   const resetForm = useCallback(() => {
-    setClientId(initial.client.id);
+    const fresh = initialSelection(clients, coords);
+    touchedRef.current = false;
+    setClientId(fresh.client.id);
     setFaultIds([]);
     setRemovedFaults(0);
     setDescription("");
     setComments([]);
-    setAddresses(initial.addresses);
+    setAddresses(fresh.addresses);
     setErrors({});
     setCommentsResetKey((key) => key + 1);
-  }, [initial]);
+  }, [clients, coords]);
 
   const handleSubmit = useCallback(async () => {
     if (sendingRef.current) return;
@@ -539,34 +623,45 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
           ) : (
             <Text style={styles.clientName}>{client.name}</Text>
           )}
-          {addressHint && addressHintLines && (
-            <View style={styles.hintRow}>
-              <Ionicons
-                name="location-outline"
-                size={18}
-                color={addressHint.caption === "Más cercana" ? SUCCESS_COLOR : PRIMARY_700}
-              />
-              <View style={styles.hintBody}>
-                <Text
-                  style={[
-                    styles.hintCaption,
-                    addressHint.caption === "Más cercana" && styles.hintCaptionNearest,
-                  ]}
-                >
-                  {addressHint.caption}
-                </Text>
-                <Text style={styles.hintTitle} numberOfLines={1}>
-                  {addressHintLines.title || addressHintLines.streetLine}
-                  {!!addressHint.distanceLabel && (
-                    <Text style={styles.hintDistance}> · {addressHint.distanceLabel}</Text>
-                  )}
-                </Text>
-                {!!addressHintLines.title && !!addressHintLines.streetLine && (
-                  <Text style={styles.hintStreet} numberOfLines={1}>
-                    {addressHintLines.streetLine}
+          {/* Recuadro simple: etiqueta y distancia (el detalle va en la tarjeta Direcciones). */}
+          {(addressHint || nearestElsewhere) && (
+            <View style={styles.hintBox}>
+              {addressHint && (
+                <View style={styles.hintRow}>
+                  <Ionicons
+                    name="location-outline"
+                    size={16}
+                    color={hintIsNearest ? SUCCESS_COLOR : PRIMARY_700}
+                  />
+                  <Text style={styles.hintLine} numberOfLines={1}>
+                    <Text style={[styles.hintCaption, hintIsNearest && styles.hintCaptionNearest]}>
+                      {addressHint.caption}
+                    </Text>
+                    {!!addressHint.distanceLabel && (
+                      <Text style={styles.hintDistance}> · {addressHint.distanceLabel}</Text>
+                    )}
                   </Text>
-                )}
-              </View>
+                </View>
+              )}
+              {nearestElsewhere && (
+                <View style={[styles.hintRow, !!addressHint && styles.elsewhereRowDivided]}>
+                  <Ionicons name="navigate-outline" size={16} color={SUCCESS_COLOR} />
+                  <Text style={styles.elsewhereText} numberOfLines={1}>
+                    {nearestElsewhere.label}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.useBtn}
+                    onPress={() =>
+                      handleSelectClient(nearestElsewhere.clientId, nearestElsewhere.addressId)
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={`Usar ${nearestElsewhere.label}`}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.useBtnText}>Usar</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           )}
           <View style={styles.reporterRow}>
@@ -719,6 +814,7 @@ function AddressRow({
   return (
     <TaskerAddressSummary
       address={address}
+      lines={getTaskerAddressDisplay(address)}
       style={styles.addressRow}
       actions={
         address.locked ? undefined : (
@@ -872,27 +968,33 @@ function createStyles(
     addBtnSpaced: { marginTop: verticalScale(12) },
     addBtnText: { fontSize: font(14), fontWeight: "600", color: PRIMARY_700 },
     clientName: { fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
-    hintRow: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: scale(8),
+    hintBox: {
       marginTop: verticalScale(10),
       paddingHorizontal: scale(12),
-      paddingVertical: verticalScale(10),
+      paddingVertical: verticalScale(6),
       borderRadius: RADIUS_SM,
       backgroundColor: PRIMARY_TINT_50,
     },
-    hintBody: { flex: 1 },
-    hintCaption: { fontSize: font(11), fontWeight: "700", color: PRIMARY_700 },
+    hintRow: { flexDirection: "row", alignItems: "center", gap: scale(6) },
+    hintLine: { flex: 1, fontSize: font(13) },
+    hintCaption: { fontWeight: "700", color: PRIMARY_700 },
     hintCaptionNearest: { color: SUCCESS_COLOR },
-    hintTitle: {
-      fontSize: font(14),
-      fontWeight: "600",
-      color: TEXT_PRIMARY,
-      marginTop: verticalScale(2),
-    },
     hintDistance: { fontWeight: "400", color: TEXT_MUTED },
-    hintStreet: { fontSize: font(12), color: TEXT_MUTED, marginTop: verticalScale(1) },
+    // "Más cercana" de otro cliente, separada de la seleccionada por una línea.
+    elsewhereRowDivided: {
+      marginTop: verticalScale(6),
+      paddingTop: verticalScale(6),
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: PRIMARY_TINT_BORDER,
+    },
+    elsewhereText: { flex: 1, fontSize: font(12), color: TEXT_SECONDARY },
+    useBtn: {
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(3),
+      borderRadius: RADIUS_PILL,
+      backgroundColor: SUCCESS_COLOR,
+    },
+    useBtnText: { fontSize: font(12), fontWeight: "700", color: ON_PRIMARY },
     reporterRow: {
       flexDirection: "row",
       alignItems: "center",

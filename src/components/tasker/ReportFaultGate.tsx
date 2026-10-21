@@ -1,9 +1,11 @@
+import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Linking } from "react-native";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { expoTaskerLocationApi } from "../../utils/locationApi";
 import { requestReportLocation } from "../../utils/taskerLocation";
 import {
+  getLocationOnVisit,
   getReportGate,
   isTaskerEnabled,
   TASKER_NO_CLIENTS_MESSAGE,
@@ -18,7 +20,9 @@ import TaskerBlockedState from "./TaskerBlockedState";
  * Arranque de Reportar, con bloqueos estrictos y en este orden (getReportGate):
  * compañía no conectada → usuario sin clientes → buscando la posición → sin
  * posición → formulario. La posición se pide recién cuando las dos primeras
- * pasan.
+ * pasan, y NUEVA en cada entrada a la pantalla y con cada sesión nueva
+ * (volver a iniciar sesión o cambiar de empresa). Al salir se descarta: nunca
+ * pasa de una visita a otra.
  */
 export default function ReportFaultGate() {
   const config = useSchoolStore((state) => state.taskerConfig);
@@ -51,16 +55,36 @@ export default function ReportFaultGate() {
     locate();
   }, [locate]);
 
-  // Arranca en "pending": la primera búsqueda no necesita marcarlo.
-  const needsLocation = isTaskerEnabled(config) && clients.length > 0;
+  // Sesión nueva (volver a iniciar sesión o cambiar de empresa): formulario
+  // nuevo (otra `key`) y a esperar la posición desde cero. La búsqueda la
+  // relanza el efecto de foco, que también depende de config y clientes.
+  const [sessionKey, setSessionKey] = useState(0);
+  const sessionRef = useRef({ config, clients });
   useEffect(() => {
-    if (needsLocation) locate();
-    return () => {
-      requestRef.current += 1;
-      abortRef.current?.abort();
-      abortRef.current = null;
-    };
-  }, [needsLocation, locate]);
+    if (sessionRef.current.config === config && sessionRef.current.clients === clients) return;
+    sessionRef.current = { config, clients };
+    setSessionKey((key) => key + 1);
+    setLocation({ status: "pending" });
+  }, [config, clients]);
+
+  // Cada entrada a Reportar pide una posición nueva; al salir se corta la
+  // búsqueda y se descarta la posición (con el formulario abierto, este sigue
+  // y espera la nueva: ver getLocationOnVisit).
+  const needsLocation = isTaskerEnabled(config) && clients.length > 0;
+  useFocusEffect(
+    useCallback(() => {
+      if (!needsLocation) return undefined;
+      setLocation(getLocationOnVisit);
+      locate();
+      return () => {
+        requestRef.current += 1;
+        abortRef.current?.abort();
+        abortRef.current = null;
+        setLocation(getLocationOnVisit);
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- config y clients: una sesión nueva con la pantalla abierta también busca
+    }, [needsLocation, locate, config, clients]),
+  );
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (next) => {
@@ -102,9 +126,15 @@ export default function ReportFaultGate() {
         />
       );
     case "ready":
-      // getReportGate solo da "ready" con config conectada, clientes y posición.
-      return location.status === "ok" && config ? (
-        <ReportFaultForm config={config} clients={clients} coords={location.coords} />
+      // getReportGate solo da "ready" con config conectada, clientes y posición
+      // (o refrescándola con el formulario abierto: sin coords hasta que llegue).
+      return config ? (
+        <ReportFaultForm
+          key={sessionKey}
+          config={config}
+          clients={clients}
+          coords={location.status === "ok" ? location.coords : null}
+        />
       ) : null;
   }
 }

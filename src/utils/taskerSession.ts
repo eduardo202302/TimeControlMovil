@@ -1,7 +1,11 @@
 // Imports relativos (no "@/"): tsconfig.jest.json no declara el alias.
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { TaskerSession } from "../../types/typesTasker/TaskerTypes";
-import { mapTaskerSession, TASKER_DISCONNECTED_CONFIG } from "./taskerApi";
+import {
+  mapTaskerSession,
+  mergeDefaultAddressDuplicates,
+  TASKER_DISCONNECTED_CONFIG,
+} from "./taskerApi";
 import { parseStoredTaskerClients, parseStoredTaskerConfig } from "./taskerRules";
 
 export type { TaskerSession };
@@ -60,7 +64,8 @@ export async function persistTaskerSession(chooseSchoolData: unknown): Promise<T
  * Arranque en frío: lo guardado si las dos claves son válidas. Si falta alguna
  * o está corrupta, no hay de dónde volver a leerlo (solo viene en
  * chooseschool): queda no conectada hasta el próximo inicio de sesión o
- * cambio de empresa. No escribe nada.
+ * cambio de empresa. No escribe nada. Lo guardado antes de la fusión de
+ * duplicados (mergeDefaultAddressDuplicates) se fusiona al leerlo.
  */
 export async function restoreTaskerSession(): Promise<TaskerSession> {
   try {
@@ -70,7 +75,7 @@ export async function restoreTaskerSession(): Promise<TaskerSession> {
     ]);
     const config = parseStoredTaskerConfig(configRaw);
     const clients = parseStoredTaskerClients(clientsRaw);
-    if (config && clients) return { config, clients };
+    if (config && clients) return { config, clients: clients.map(mergeDefaultAddressDuplicates) };
   } catch {
     // Sin lectura posible: igual que sin datos.
   }

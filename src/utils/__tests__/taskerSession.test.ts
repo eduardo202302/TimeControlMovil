@@ -149,6 +149,25 @@ describe("restoreTaskerSession (arranque en frío)", () => {
     await expect(restoreTaskerSession()).resolves.toEqual(fresh());
     expect(setItem).not.toHaveBeenCalled();
   });
+  it("guardado antes de la fusión de duplicados → se fusiona al leer", async () => {
+    const point = { latitude: 18.4775, longitude: -69.9273 };
+    const stored = [
+      {
+        id: 1,
+        name: "X",
+        defaultAddress: { id: 1, isDefault: true, title: "Sede", street: "", ...point },
+        addresses: [
+          { id: 1, isDefault: true, title: "Sede", street: "", ...point },
+          { id: 2, isDefault: false, title: "Copia", street: "Av. Tiradentes", ...point },
+        ],
+      },
+    ];
+    mem.set(TASKER_CONFIG_STORAGE_KEY, JSON.stringify(fresh().config));
+    mem.set(TASKER_CLIENTS_STORAGE_KEY, JSON.stringify(stored));
+    const { clients } = await restoreTaskerSession();
+    expect(clients[0].addresses).toHaveLength(1);
+    expect(clients[0].addresses[0]).toMatchObject({ id: 1, title: "Sede", street: "Av. Tiradentes" });
+  });
   it("ausente → no conectada, sin escribir nada (solo chooseschool trae los datos)", async () => {
     await expect(restoreTaskerSession()).resolves.toEqual(DISCONNECTED);
     expect(setItem).not.toHaveBeenCalled();

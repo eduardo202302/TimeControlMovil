@@ -18,11 +18,17 @@ import {
 } from "@/constants/colors";
 import { RADIUS_SM, useResponsive } from "@/constants/responsive";
 import { FILE_ROW } from "@/styles/surfaces";
-import { buildMapsUrl, getTaskerAddressLines } from "../../utils/taskerRules";
+import {
+  buildMapsUrl,
+  getTaskerAddressLines,
+  type TaskerAddressLines,
+} from "../../utils/taskerRules";
 import type { TaskerAddress } from "../../../types/typesTasker/TaskerTypes";
 
 interface TaskerAddressSummaryProps {
   address: TaskerAddress;
+  /** Textos a mostrar (Reportar: con título de respaldo); por defecto getTaskerAddressLines. */
+  lines?: TaskerAddressLines;
   style?: StyleProp<ViewStyle>;
   /** Debajo de los textos (p. ej. "Seleccionar" en Reportar Avería). */
   children?: React.ReactNode;
@@ -39,6 +45,7 @@ interface TaskerAddressSummaryProps {
  */
 export default function TaskerAddressSummary({
   address,
+  lines,
   style,
   children,
   actions,
@@ -50,7 +57,7 @@ export default function TaskerAddressSummary({
     [scale, verticalScale, font],
   );
 
-  const { title, streetLine, areaLine } = getTaskerAddressLines(address);
+  const { title, streetLine, areaLine } = lines ?? getTaskerAddressLines(address);
   const hasCoords =
     address.latitude != null &&
     address.latitude !== "" &&

@@ -2,35 +2,43 @@ import {
   addTaskerAddress,
   buildReportAddresses,
   clientAddressesToReport,
+  collectAddressCandidates,
   filterFaultActionsForClient,
   filterTaskerMenu,
   getDefaultClientAddressId,
-  getNearestListAddressId,
+  getLocationOnVisit,
+  getNearestElsewhereHint,
   getRemovedFaultsNotice,
   getReportGate,
   getSelectedTaskerAddress,
+  formatAddressCandidatesTable,
   formatDistanceAway,
   formatSelectedFaultsSummary,
   getClientAddressHint,
   getSelectedFaultNames,
+  getTaskerAddressDisplay,
   getTaskerClientLabel,
   getTaskerFaultLabel,
   getTaskerFormRules,
   getTaskerReportTitle,
+  hasSharedCoordinatesAcrossClients,
   haversineMeters,
   isTaskerEnabled,
   isTaskerPath,
   parseStoredTaskerClients,
   parseStoredTaskerConfig,
+  pickNearestAddressCandidate,
   pickNearestClientAddress,
   pruneSelectedFaults,
   removeTaskerAddress,
+  selectTaskerAddress,
   sortTaskerAddresses,
   TASKER_ADDRESS_REQUIRED_ERROR,
   TASKER_DESCRIPTION_REQUIRED_ERROR,
   TASKER_FAULTS_REQUIRED_ERROR,
   TASKER_FOLLOWUP_PATH,
   TASKER_REPORT_PATH,
+  TASKER_UNNAMED_ADDRESS,
   toggleFaultSelection,
   toggleTaskerAddressSelected,
   updateTaskerAddress,
@@ -86,6 +94,8 @@ function address(
 function client(id: number, addresses: TaskerClientAddress[]): TaskerUserClient {
   return { id, name: `Cliente ${id}`, defaultAddress: addresses[0] ?? null, addresses };
 }
+
+const withDefault = (a: TaskerClientAddress): TaskerClientAddress => ({ ...a, isDefault: true });
 
 // Puntos reales de Santo Domingo.
 const PIANTINI = { latitude: 18.4706, longitude: -69.9389 };
@@ -461,41 +471,208 @@ describe("getClientAddressHint", () => {
     address(12, PIANTINI.latitude + 0.003, PIANTINI.longitude, "Sede Piantini"),
     address(13, null, null, "Almacén"),
   ]);
-  const recommended = pickNearestClientAddress([c], PIANTINI);
+  const nearestOf = (list: TaskerReportAddress[]) =>
+    pickNearestAddressCandidate(
+      collectAddressCandidates([c], PIANTINI, { clientId: 1, addresses: list }),
+      1,
+    );
 
-  it("la recomendada marcada → 'Más cercana' con su distancia", () => {
-    const list = buildReportAddresses(c, [], recommended?.addressId ?? null);
-    const hint = getClientAddressHint(list, recommended, PIANTINI);
+  it("la más cercana marcada → 'Más cercana' con su distancia", () => {
+    const list = buildReportAddresses(c, [], 12);
+    const hint = getClientAddressHint(list, 1, nearestOf(list), PIANTINI);
     expect(hint?.caption).toBe("Más cercana");
     expect(hint?.address.id).toBe(12);
     expect(hint?.distanceLabel).toBe("a 334 m");
   });
-  it("otra marcada → 'Dirección seleccionada' con la distancia de esa", () => {
+  it("otra marcada → 'Seleccionada' con la distancia de esa", () => {
     const list = toggleTaskerAddressSelected(buildReportAddresses(c, [], 12), 11);
-    const hint = getClientAddressHint(list, recommended, PIANTINI);
-    expect(hint?.caption).toBe("Dirección seleccionada");
+    const hint = getClientAddressHint(list, 1, nearestOf(list), PIANTINI);
+    expect(hint?.caption).toBe("Seleccionada");
     expect(hint?.address.id).toBe(11);
     expect(hint?.distanceLabel).toMatch(/^a \d\.\d km$/);
   });
   it("marcada sin coordenadas → sin distancia", () => {
     const list = buildReportAddresses(c, [], 13);
-    expect(getClientAddressHint(list, recommended, PIANTINI)).toMatchObject({
-      caption: "Dirección seleccionada",
+    expect(getClientAddressHint(list, 1, nearestOf(list), PIANTINI)).toMatchObject({
+      caption: "Seleccionada",
       distanceLabel: null,
     });
   });
-  it("recomendada sin distancia (ninguna con coordenadas) → no es 'Más cercana'", () => {
-    const noCoords = client(3, [address(31, null, null)]);
-    const rec = pickNearestClientAddress([noCoords], PIANTINI);
-    const list = buildReportAddresses(noCoords, [], 31);
-    expect(getClientAddressHint(list, rec, PIANTINI)?.caption).toBe("Dirección seleccionada");
+  it("sin más cercana (ninguna con coordenadas) → no es 'Más cercana'", () => {
+    const list = buildReportAddresses(client(3, [address(31, null, null)]), [], 31);
+    expect(getClientAddressHint(list, 3, null, PIANTINI)?.caption).toBe("Seleccionada");
   });
-  it("una agregada marcada → 'Dirección seleccionada'", () => {
+  it("una agregada marcada que no es la más cercana → 'Seleccionada'", () => {
     const list = addTaskerAddress(buildReportAddresses(c, [], 12), address(0, 18.48, -69.94));
-    expect(getClientAddressHint(list, recommended, PIANTINI)?.caption).toBe("Dirección seleccionada");
+    expect(getClientAddressHint(list, 1, nearestOf(list), PIANTINI)?.caption).toBe(
+      "Seleccionada",
+    );
+  });
+  it("misma id pero la más cercana es de otro cliente → 'Seleccionada'", () => {
+    const list = buildReportAddresses(c, [], 12);
+    const other = { ...nearestOf(list)!, clientId: 2 };
+    expect(getClientAddressHint(list, 1, other, PIANTINI)?.caption).toBe("Seleccionada");
   });
   it("ninguna marcada → null", () => {
-    expect(getClientAddressHint(buildReportAddresses(c, [], null), recommended, PIANTINI)).toBeNull();
+    const list = buildReportAddresses(c, [], null);
+    expect(getClientAddressHint(list, 1, nearestOf(list), PIANTINI)).toBeNull();
+  });
+});
+
+// ─── Más cercana entre TODOS los clientes ───────────────────────────────────
+
+describe("Más cercana global (collectAddressCandidates + pickNearestAddressCandidate)", () => {
+  // Cliente 1: lejos (Los Mina, El Millón). Cliente 2: una a ~111 m de Piantini.
+  const A = client(1, [
+    withDefault(address(1, LOS_MINA.latitude, LOS_MINA.longitude, "Sede Los Mina")),
+    address(2, EL_MILLON.latitude, EL_MILLON.longitude, "Sucursal El Millón"),
+  ]);
+  const B = client(2, [
+    withDefault(address(1, LOS_MINA.latitude + 0.01, LOS_MINA.longitude, "Sede B")),
+    address(2, PIANTINI.latitude + 0.001, PIANTINI.longitude, "Piantini B"),
+    address(3, null, null, "Sin mapa"),
+  ]);
+  const reportOf = (c: TaskerUserClient, list: TaskerReportAddress[]) =>
+    collectAddressCandidates([A, B], PIANTINI, { clientId: c.id, addresses: list });
+
+  it("varios clientes con varias direcciones: gana la de todas, no la del primer cliente", () => {
+    const nearest = pickNearestAddressCandidate(collectAddressCandidates([A, B], PIANTINI), null);
+    expect(nearest).toMatchObject({ clientId: 2, addressId: 2, title: "Piantini B", added: false });
+    expect(nearest?.distanceMeters).toBeGreaterThan(100);
+    expect(nearest?.distanceMeters).toBeLessThan(120);
+    // Con el cliente 1 abierto sigue ganando la del cliente 2.
+    const list = buildReportAddresses(A, [], 1);
+    expect(pickNearestAddressCandidate(reportOf(A, list), 1)?.clientId).toBe(2);
+  });
+  it("una no-predeterminada (de addresses[]) también compite y puede ganar", () => {
+    const nearest = pickNearestAddressCandidate(collectAddressCandidates([A, B], PIANTINI), null);
+    expect(nearest?.isDefault).toBe(false);
+  });
+  it("dirección agregada más cercana que todas: gana, se marca y queda seleccionada", () => {
+    const list = addTaskerAddress(
+      buildReportAddresses(A, [], 1),
+      address(0, PIANTINI.latitude, PIANTINI.longitude, "Agregada"),
+    );
+    const nearest = pickNearestAddressCandidate(reportOf(A, list), 1);
+    expect(nearest).toMatchObject({ clientId: 1, title: "Agregada", added: true, distanceMeters: 0 });
+    expect(getSelectedTaskerAddress(list)?.id).toBe(nearest?.addressId);
+    expect(getClientAddressHint(list, 1, nearest, PIANTINI)?.caption).toBe("Más cercana");
+    expect(getNearestElsewhereHint(nearest, 1)).toBeNull();
+    // La predeterminada sigue bloqueada.
+    expect(list.find((a) => a.id === 1)?.locked).toBe(true);
+  });
+  it("agregada que no es la más cercana: compite pero no se lleva la etiqueta", () => {
+    const list = addTaskerAddress(
+      buildReportAddresses(A, [], 1),
+      address(0, EL_MILLON.latitude + 0.001, EL_MILLON.longitude, "Agregada"),
+    );
+    const candidates = reportOf(A, list);
+    expect(candidates.some((c) => c.added)).toBe(true);
+    expect(pickNearestAddressCandidate(candidates, 1)?.title).toBe("Piantini B");
+  });
+  it("del cliente abierto cuenta su lista: lo borrado no compite", () => {
+    const list = removeTaskerAddress(buildReportAddresses(A, [], 1), 2);
+    expect(reportOf(A, list).filter((c) => c.clientId === 1).map((c) => c.addressId)).toEqual([1]);
+  });
+  it("sin coordenadas (null, vacías, fuera de rango) no entra", () => {
+    const C = client(3, [
+      address(1, null, null),
+      address(2, "", ""),
+      address(3, 200, -69.9),
+      address(4, "18.4706", "-69.9389", "Texto numérico"),
+    ]);
+    const candidates = collectAddressCandidates([B, C], PIANTINI);
+    expect(candidates.map((c) => `${c.clientId}:${c.addressId}`)).toEqual(["2:1", "2:2", "3:4"]);
+    expect(collectAddressCandidates([client(4, [address(1, null, null)])], PIANTINI)).toEqual([]);
+    expect(pickNearestAddressCandidate([], 1)).toBeNull();
+  });
+  it("sin posición → sin candidatas", () => {
+    expect(collectAddressCandidates([A, B], null)).toEqual([]);
+  });
+  it("empate: gana la predeterminada del cliente ya seleccionado", () => {
+    const origin = { latitude: 0, longitude: 0 };
+    const c1 = client(1, [withDefault(address(1, 0, 1, "Uno"))]);
+    const c2 = client(2, [withDefault(address(1, 0, 1, "Dos"))]);
+    const candidates = collectAddressCandidates([c1, c2], origin);
+    expect(pickNearestAddressCandidate(candidates, 2)?.clientId).toBe(2);
+    expect(pickNearestAddressCandidate(candidates, 1)?.clientId).toBe(1);
+  });
+  it("empate sin predeterminada del seleccionado entre las empatadas → la primera en orden", () => {
+    const origin = { latitude: 0, longitude: 0 };
+    const c1 = client(1, [withDefault(address(1, 0, 1))]);
+    const c2 = client(2, [withDefault(address(1, 5, 5)), address(2, 0, 1)]);
+    const candidates = collectAddressCandidates([c1, c2], origin);
+    // La empatada del cliente 2 no es su predeterminada.
+    expect(pickNearestAddressCandidate(candidates, 2)).toMatchObject({ clientId: 1, addressId: 1 });
+    // Sin cliente seleccionado (al abrir) → la primera.
+    expect(pickNearestAddressCandidate(candidates, null)?.clientId).toBe(1);
+    // Misma distancia, distinto punto, mismo cliente → la primera.
+    const equidistant = client(3, [address(1, 1, 0), address(2, 0, 1)]);
+    const tie = collectAddressCandidates([equidistant], origin);
+    expect(pickNearestAddressCandidate(tie, null)?.addressId).toBe(1);
+  });
+});
+
+describe("getNearestElsewhereHint (más cercana en otro cliente)", () => {
+  const A = client(1, [withDefault(address(1, LOS_MINA.latitude, LOS_MINA.longitude, "Sede A"))]);
+  const B = client(2, [
+    withDefault(address(1, EL_MILLON.latitude, EL_MILLON.longitude, "Sede B")),
+    address(2, PIANTINI.latitude + 0.001, PIANTINI.longitude, "Piantini B"),
+  ]);
+
+  it("se informa con su cliente, distancia y destino de 'Usar'", () => {
+    const list = buildReportAddresses(A, [], 1);
+    const nearest = pickNearestAddressCandidate(
+      collectAddressCandidates([A, B], PIANTINI, { clientId: 1, addresses: list }),
+      1,
+    );
+    expect(getNearestElsewhereHint(nearest, 1)).toEqual({
+      clientId: 2,
+      addressId: 2,
+      label: "Más cercana: Cliente 2 · a 111 m",
+    });
+    // En el cliente abierto no hay etiqueta ni caption "Más cercana".
+    expect(getClientAddressHint(list, 1, nearest, PIANTINI)?.caption).toBe("Seleccionada");
+  });
+  it("'Usar' (cliente + dirección) → pasa a ser la seleccionada y 'Más cercana'", () => {
+    const list = buildReportAddresses(B, buildReportAddresses(A, [], 1), 2);
+    const nearest = pickNearestAddressCandidate(
+      collectAddressCandidates([A, B], PIANTINI, { clientId: 2, addresses: list }),
+      2,
+    );
+    expect(getSelectedTaskerAddress(list)?.id).toBe(2);
+    expect(getClientAddressHint(list, 2, nearest, PIANTINI)?.caption).toBe("Más cercana");
+    expect(getNearestElsewhereHint(nearest, 2)).toBeNull();
+  });
+  it("sin el título de la dirección: solo cliente y distancia", () => {
+    const nearest = pickNearestAddressCandidate(collectAddressCandidates([A, B], PIANTINI), 1);
+    expect(getNearestElsewhereHint(nearest, 1)?.label).not.toContain("Piantini B");
+  });
+  it("sin más cercana → null", () => {
+    expect(getNearestElsewhereHint(null, 1)).toBeNull();
+  });
+});
+
+describe("diagnóstico de candidatas", () => {
+  it("tabla: cliente · dirección · lat/lng a 4 decimales · km", () => {
+    const c = client(1, [address(1, 18.470612345, -69.938987654, "Sede")]);
+    const table = formatAddressCandidatesTable(collectAddressCandidates([c], PIANTINI));
+    const [header, row] = table.split("\n");
+    expect(header).toMatch(/^Cliente\s*· Dirección\s*· Lat\s*· Lng\s*· Km$/);
+    expect(row).toContain("Cliente 1");
+    expect(row).toContain("18.4706");
+    expect(row).toContain("-69.9390");
+    expect(row).toMatch(/0\.00\d$/);
+  });
+  it("coordenadas idénticas en clientes distintos → true; en el mismo cliente → false", () => {
+    const same = (id: number, n = 1) =>
+      client(id, Array.from({ length: n }, (_, i) => address(i + 1, 18.5, -69.9)));
+    expect(hasSharedCoordinatesAcrossClients(collectAddressCandidates([same(1), same(2)], PIANTINI))).toBe(
+      true,
+    );
+    expect(hasSharedCoordinatesAcrossClients(collectAddressCandidates([same(1, 2)], PIANTINI))).toBe(false);
+    const distinct = [client(1, [address(1, 18.5, -69.9)]), client(2, [address(1, 18.5, -69.90001)])];
+    expect(hasSharedCoordinatesAcrossClients(collectAddressCandidates(distinct, PIANTINI))).toBe(false);
   });
 });
 
@@ -533,11 +710,87 @@ describe("getReportGate", () => {
   it("todo en orden → ready", () => {
     expect(getReportGate({ config: config(), clients, location: ok })).toBe("ready");
   });
+  it("refrescando la posición con el formulario abierto → ready (sin coords)", () => {
+    expect(
+      getReportGate({ config: config(), clients, location: { status: "refreshing" } }),
+    ).toBe("ready");
+  });
+});
+
+describe("getLocationOnVisit (la posición no pasa de una visita a otra)", () => {
+  it("con posición o refrescando → refreshing (sin coords)", () => {
+    expect(getLocationOnVisit({ status: "ok", coords: PIANTINI })).toEqual({ status: "refreshing" });
+    expect(getLocationOnVisit({ status: "refreshing" })).toEqual({ status: "refreshing" });
+  });
+  it("sin formulario (pending o failed) → pending", () => {
+    expect(getLocationOnVisit({ status: "pending" })).toEqual({ status: "pending" });
+    expect(getLocationOnVisit({ status: "failed", canAskAgain: false })).toEqual({ status: "pending" });
+  });
+});
+
+// ─── Textos de direcciones con datos incompletos ────────────────────────────
+
+describe("getTaskerAddressDisplay (título y calle de respaldo)", () => {
+  const blank = {
+    title: "",
+    formattedAddress: "",
+    address: "",
+    street: "",
+    streetNumber: "",
+    sector: "",
+    city: "",
+    province: "",
+  };
+  it("title presente → ese título y la línea de calle", () => {
+    expect(
+      getTaskerAddressDisplay({ ...blank, title: "Sede", street: "Av. Lope", streetNumber: "5" }),
+    ).toMatchObject({ title: "Sede", streetLine: "Av. Lope #5" });
+  });
+  it("sin title → formattedAddress → address", () => {
+    const withFormatted = { ...blank, title: "  ", formattedAddress: "Av. Lope 5, Naco", address: "X" };
+    expect(getTaskerAddressDisplay(withFormatted).title).toBe("Av. Lope 5, Naco");
+    expect(getTaskerAddressDisplay({ ...blank, address: "Av. Lope 5, Santo Domingo" }).title).toBe(
+      "Av. Lope 5, Santo Domingo",
+    );
+  });
+  it("solo calle y número → 'Calle Número' de título, sin repetir la línea de calle", () => {
+    expect(getTaskerAddressDisplay({ ...blank, street: "Av. Lope", streetNumber: "5" })).toMatchObject({
+      title: "Av. Lope 5",
+      streetLine: "",
+    });
+  });
+  it("nada → 'Dirección sin nombre' y sin línea de calle", () => {
+    expect(getTaskerAddressDisplay(blank)).toMatchObject({
+      title: TASKER_UNNAMED_ADDRESS,
+      streetLine: "",
+    });
+    expect(TASKER_UNNAMED_ADDRESS).toBe("Dirección sin nombre");
+  });
+  it("con título pero sin calle → la línea de calle vacía (se omite)", () => {
+    expect(getTaskerAddressDisplay({ ...blank, title: "Sede", city: "Santiago" })).toMatchObject({
+      title: "Sede",
+      streetLine: "",
+      areaLine: "Santiago",
+    });
+  });
+  it("campos ausentes o null (datos de Taskr) → no rompe", () => {
+    const partial = { title: null, street: undefined } as unknown as typeof blank;
+    expect(getTaskerAddressDisplay(partial).title).toBe(TASKER_UNNAMED_ADDRESS);
+  });
+  it("es el título de la candidata (tabla de diagnóstico)", () => {
+    const unnamed = {
+      ...address(1, PIANTINI.latitude, PIANTINI.longitude),
+      title: "",
+      street: "",
+      streetNumber: "",
+    };
+    const candidates = collectAddressCandidates([client(9, [unnamed])], PIANTINI);
+    const nearest = pickNearestAddressCandidate(candidates, null);
+    expect(nearest?.title).toBe(TASKER_UNNAMED_ADDRESS);
+  });
 });
 
 // ─── Direcciones: predeterminada (locked), resto del cliente y agregadas ────
-
-const withDefault = (a: TaskerClientAddress): TaskerClientAddress => ({ ...a, isDefault: true });
 
 describe("getDefaultClientAddressId", () => {
   it("la marcada con isDefault, aunque no sea la primera", () => {
@@ -743,43 +996,14 @@ describe("sortTaskerAddresses", () => {
   });
 });
 
-describe("getNearestListAddressId ('Más cercana' sobre toda la lista)", () => {
-  const c = client(1, [withDefault(address(1, EL_MILLON.latitude, EL_MILLON.longitude, "Predet."))]);
-
-  it("una agregada más cercana que la predeterminada se lleva 'Más cercana'; la predeterminada sigue locked", () => {
-    const list = addTaskerAddress(
-      buildReportAddresses(c, [], 1),
-      address(0, PIANTINI.latitude + 0.001, PIANTINI.longitude, "Agregada"),
-    );
-    expect(getNearestListAddressId(list, PIANTINI)).toBe(2);
-    expect(list.find((a) => a.id === 1)?.locked).toBe(true);
-    // La agregada queda seleccionada (por agregarla, no por ser la más cercana).
-    expect(getSelectedTaskerAddress(list)?.id).toBe(2);
+describe("selectTaskerAddress", () => {
+  const list = buildReportAddresses(client(1, [address(1, null, null), address(2, null, null)]), [], 1);
+  it("marca solo esa (sin alternar: si ya estaba marcada, sigue)", () => {
+    expect(selectTaskerAddress(list, 2).map((a) => a.selected)).toEqual([false, true]);
+    expect(selectTaskerAddress(list, 1).map((a) => a.selected)).toEqual([true, false]);
   });
-  it("la predeterminada más cercana → coinciden las dos etiquetas", () => {
-    const list = addTaskerAddress(
-      buildReportAddresses(c, [], 1),
-      address(0, LOS_MINA.latitude, LOS_MINA.longitude),
-    );
-    expect(getNearestListAddressId(list, EL_MILLON)).toBe(1);
-  });
-  it("se recalcula al cambiar la lista (borrar la más cercana)", () => {
-    const list = addTaskerAddress(
-      buildReportAddresses(c, [], 1),
-      address(0, PIANTINI.latitude, PIANTINI.longitude),
-    );
-    expect(getNearestListAddressId(list, PIANTINI)).toBe(2);
-    expect(getNearestListAddressId(removeTaskerAddress(list, 2), PIANTINI)).toBe(1);
-  });
-  it("sin coordenadas en la lista o sin posición → null; empate → la primera", () => {
-    const noCoords = buildReportAddresses(client(2, [address(1, null, null)]), [], 1);
-    expect(getNearestListAddressId(noCoords, PIANTINI)).toBeNull();
-    expect(getNearestListAddressId(buildReportAddresses(c, [], 1), null)).toBeNull();
-    const tie = addTaskerAddress(
-      buildReportAddresses(c, [], 1),
-      address(0, EL_MILLON.latitude, EL_MILLON.longitude),
-    );
-    expect(getNearestListAddressId(tie, PIANTINI)).toBe(1);
+  it("las que no cambian conservan la referencia", () => {
+    expect(selectTaskerAddress(list, 1)[1]).toBe(list[1]);
   });
 });
 

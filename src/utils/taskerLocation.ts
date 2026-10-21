@@ -4,18 +4,20 @@
  * poder testearla en node. A diferencia del ponche, aquí la ubicación es
  * obligatoria: sin posición no se muestra el formulario.
  *
- * Pasos, todos dentro de REPORT_LOCATION_TIMEOUT_MS:
+ * Se pide en CADA entrada a Reportar; nada se guarda entre visitas. Pasos:
  *   1. permiso de primer plano (se pide si el sistema todavía deja);
  *   2. ubicación del teléfono encendida;
- *   3. última posición conocida, si tiene REPORT_LAST_KNOWN_MAX_AGE_MS o menos;
- *   4. posición nueva (getCurrentPositionAsync, Balanced);
- *   5. si la 4 da error o no responde en CURRENT_POSITION_WAIT_MS, respaldo:
- *      suscripción corta (watchPositionAsync, Balanced) que toma la primera
- *      posición y se cancela. La 4 sigue en carrera: gana la que llegue antes.
+ *   3. posición NUEVA (getCurrentPositionAsync, Balanced) dentro de
+ *      REPORT_LOCATION_TIMEOUT_MS. Si da error o no responde en
+ *      CURRENT_POSITION_WAIT_MS, se suma una suscripción corta
+ *      (watchPositionAsync, Balanced) que toma la primera posición y se
+ *      cancela; la 3 sigue en carrera: gana la que llegue antes;
+ *   4. solo si no hubo posición nueva, respaldo: la última conocida, y solo si
+ *      tiene REPORT_LAST_KNOWN_MAX_AGE_MS o menos (con timestamp). Si no →
+ *      "failed" ("Active la ubicación…").
  */
 
 import {
-  LAST_KNOWN_MAX_AGE_MS,
   LAST_KNOWN_REQUIRED_ACCURACY_M,
   promptLocationPermission,
   type LocationApi,
@@ -45,10 +47,10 @@ export interface TaskerLocationApi extends LocationApi {
 export const REPORT_LOCATION_TIMEOUT_MS = 15_000;
 /** Cuánto se espera a getCurrentPositionAsync sola antes de sumar el respaldo. */
 export const CURRENT_POSITION_WAIT_MS = 5_000;
-/** "Reciente" para la última posición conocida: 2 minutos (el del ponche). */
-export const REPORT_LAST_KNOWN_MAX_AGE_MS = LAST_KNOWN_MAX_AGE_MS;
+/** Edad máxima de la última posición conocida para usarla de respaldo: 120 s. */
+export const REPORT_LAST_KNOWN_MAX_AGE_MS = 120_000;
 
-export type ReportLocationResult = Exclude<ReportLocationState, { status: "pending" }>;
+export type ReportLocationResult = Extract<ReportLocationState, { status: "ok" | "failed" }>;
 
 export interface RequestReportLocationOptions {
   timeoutMs?: number;
@@ -69,17 +71,49 @@ export function getReadingAgeSeconds(timestamp: number | undefined, nowMs: numbe
 }
 
 /**
- * ¿Sirve la última posición conocida? expo ya filtra por maxAge, pero algunos
- * Android devuelven una más vieja: se vuelve a comprobar. Sin timestamp se
- * acepta (expo lo filtró).
+ * ¿Sirve la última posición conocida de respaldo? expo ya filtra por maxAge,
+ * pero algunos Android devuelven una más vieja: se vuelve a comprobar. Sin
+ * timestamp no se puede saber su edad → no.
  */
 export function isLastKnownFresh(
   timestamp: number | undefined,
   nowMs: number,
   maxAgeMs: number = REPORT_LAST_KNOWN_MAX_AGE_MS,
 ): boolean {
-  if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) return true;
+  if (typeof timestamp !== "number" || !Number.isFinite(timestamp)) return false;
   return nowMs - timestamp <= maxAgeMs;
+}
+
+export type ReportPositionSource = "nueva" | "respaldo";
+
+export interface ChosenReportPosition {
+  source: ReportPositionSource;
+  reading: TaskerPositionReading;
+  /** Antigüedad en segundos; null si la lectura no trae timestamp. */
+  ageSeconds: number | null;
+}
+
+/**
+ * Fuente de la posición: la nueva si llegó; si no, la última conocida solo si
+ * es de REPORT_LAST_KNOWN_MAX_AGE_MS o menos; si no → null (error de
+ * ubicación).
+ */
+export function chooseReportPosition(
+  fresh: TaskerPositionReading | null,
+  lastKnown: TaskerPositionReading | null,
+  nowMs: number,
+): ChosenReportPosition | null {
+  if (fresh) {
+    return { source: "nueva", reading: fresh, ageSeconds: getReadingAgeSeconds(fresh.timestamp, nowMs) };
+  }
+  if (lastKnown && isLastKnownFresh(lastKnown.timestamp, nowMs)) {
+    return {
+      source: "respaldo",
+      reading: lastKnown,
+      ageSeconds: getReadingAgeSeconds(lastKnown.timestamp, nowMs),
+    };
+  }
+  return null;
 }
 
 /** Coordenadas para el log: 2 decimales (~1 km), nunca completas. */
@@ -193,10 +227,100 @@ function ok(reading: TaskerPositionReading): ReportLocationResult {
 
 const FAILED: ReportLocationResult = { status: "failed", canAskAgain: true };
 
+/** Resultado de buscar una posición nueva. */
+type FreshOutcome =
+  | { kind: "position"; reading: TaskerPositionReading }
+  | { kind: "none" }
+  | { kind: "aborted" };
+
 /**
- * Permiso negado, ubicación apagada, error o sin posición dentro del tope →
- * "failed". `canAskAgain: false` = negado de forma permanente (solo se arregla
- * desde los ajustes del sistema). Nunca lanza.
+ * Posición nueva: getCurrentPositionAsync y, si no responde en `currentWaitMs`
+ * o da error, la suscripción corta en carrera con ella, hasta `remaining()`.
+ */
+async function requestFreshPosition(
+  api: TaskerLocationApi,
+  {
+    currentWaitMs,
+    remaining,
+    timeoutMs,
+    signal,
+    log,
+  }: {
+    currentWaitMs: number;
+    remaining: () => number;
+    timeoutMs: number;
+    signal?: AbortSignal;
+    log: (message: string) => void;
+  },
+): Promise<FreshOutcome> {
+  const current: Promise<Outcome> = api.getCurrentPositionAsync().then(
+    (reading): Outcome => ({ kind: "position", reading }),
+    (error): Outcome => ({ kind: "error", error }),
+  );
+  const firstWait = getCurrentPositionWaitMs(remaining(), currentWaitMs);
+  const first = await Promise.race([current, delay(firstWait, signal)]);
+  if (first.kind === "aborted") return { kind: "aborted" };
+  if (first.kind === "position") {
+    log(`getCurrentPositionAsync: posición ${formatCoordsForLog(first.reading.coords)}`);
+    return { kind: "position", reading: first.reading };
+  }
+  log(
+    first.kind === "error"
+      ? `getCurrentPositionAsync: error (${errorMessage(first.error)})`
+      : `getCurrentPositionAsync: sin respuesta en ${Math.round(firstWait / 1000)} s`,
+  );
+
+  // ── Suscripción corta, en carrera con getCurrentPositionAsync si sigue viva ──
+  const fallbackMs = remaining();
+  if (fallbackMs <= 0) {
+    log("sin tiempo para la suscripción");
+    return { kind: "none" };
+  }
+  log(`watchPositionAsync: respaldo por ${Math.round(fallbackMs / 1000)} s`);
+  const race = new AbortController();
+  const onOuterAbort = () => race.abort();
+  signal?.addEventListener("abort", onOuterAbort, { once: true });
+  const never = new Promise<never>(() => undefined);
+  // La posición nueva sigue compitiendo solo si no falló ya.
+  const currentAlive = first.kind === "timeout";
+  try {
+    const winner = await Promise.race([
+      watchFirstPosition(api, fallbackMs, race.signal).then((o) => {
+        if (o.kind === "position") return { source: "watchPositionAsync", outcome: o };
+        if (o.kind === "error") {
+          log(`watchPositionAsync: error (${errorMessage(o.error)})`);
+          if (currentAlive) return never; // queda la posición nueva hasta el tope
+        }
+        return { source: "watchPositionAsync", outcome: o };
+      }),
+      currentAlive
+        ? current.then((o) =>
+            o.kind === "position" ? { source: "getCurrentPositionAsync (tarde)", outcome: o } : never,
+          )
+        : never,
+      delay(fallbackMs, race.signal).then((o) => ({ source: "tope", outcome: o })),
+    ]);
+    const { source, outcome } = winner;
+    if (outcome.kind === "position") {
+      log(`${source}: posición ${formatCoordsForLog(outcome.reading.coords)}`);
+      return { kind: "position", reading: outcome.reading };
+    }
+    if (outcome.kind === "aborted") return { kind: "aborted" };
+    if (outcome.kind === "timeout") {
+      log(`sin posición nueva; tope de ${Math.round(timeoutMs / 1000)} s vencido`);
+    }
+    return { kind: "none" };
+  } finally {
+    // Cancela la suscripción (y el tope) gane quien gane.
+    race.abort();
+    signal?.removeEventListener("abort", onOuterAbort);
+  }
+}
+
+/**
+ * Permiso negado, ubicación apagada, o sin posición nueva ni respaldo de 120 s
+ * o menos → "failed". `canAskAgain: false` = negado de forma permanente (solo
+ * se arregla desde los ajustes del sistema). Nunca lanza.
  */
 export async function requestReportLocation(
   api: TaskerLocationApi,
@@ -231,97 +355,44 @@ export async function requestReportLocation(
     if (step !== "continue") return step;
     if (aborted()) return FAILED;
 
-    // ── Última posición conocida ──
-    try {
-      const lastKnown = (await api.getLastKnownPositionAsync({
-        maxAge: REPORT_LAST_KNOWN_MAX_AGE_MS,
-        requiredAccuracy: LAST_KNOWN_REQUIRED_ACCURACY_M,
-      })) as TaskerPositionReading | null;
-      if (!lastKnown) {
-        log("getLastKnownPositionAsync: null");
-      } else {
-        const age = getReadingAgeSeconds(lastKnown.timestamp, now());
-        const fresh = isLastKnownFresh(lastKnown.timestamp, now());
-        log(
-          `getLastKnownPositionAsync: ${formatCoordsForLog(lastKnown.coords)}, ` +
-            `antigüedad ${age ?? "?"} s${fresh ? "" : " (vieja, se descarta)"}`,
-        );
-        if (fresh) return ok(lastKnown);
-      }
-    } catch (error) {
-      log(`getLastKnownPositionAsync: error (${errorMessage(error)})`);
-    }
-    if (aborted()) return FAILED;
-
     // ── Posición nueva ──
-    const current: Promise<Outcome> = api.getCurrentPositionAsync().then(
-      (reading): Outcome => ({ kind: "position", reading }),
-      (error): Outcome => ({ kind: "error", error }),
-    );
-    const firstWait = getCurrentPositionWaitMs(remaining(), currentWaitMs);
-    const first = await Promise.race([current, delay(firstWait, signal)]);
-    if (first.kind === "aborted") {
+    const fresh = await requestFreshPosition(api, { currentWaitMs, remaining, timeoutMs, signal, log });
+    if (fresh.kind === "aborted" || signal?.aborted) {
       aborted();
       return FAILED;
     }
-    if (first.kind === "position") {
-      log(`getCurrentPositionAsync: posición ${formatCoordsForLog(first.reading.coords)}`);
-      return ok(first.reading);
-    }
-    log(
-      first.kind === "error"
-        ? `getCurrentPositionAsync: error (${errorMessage(first.error)})`
-        : `getCurrentPositionAsync: sin respuesta en ${Math.round(firstWait / 1000)} s`,
-    );
 
-    // ── Respaldo: suscripción corta, en carrera con la posición nueva si sigue viva ──
-    const fallbackMs = remaining();
-    if (fallbackMs <= 0) {
-      log("sin tiempo para el respaldo");
+    // ── Respaldo: última posición conocida, solo si es de hace 120 s o menos ──
+    let lastKnown: TaskerPositionReading | null = null;
+    if (fresh.kind === "none") {
+      try {
+        lastKnown = (await api.getLastKnownPositionAsync({
+          maxAge: REPORT_LAST_KNOWN_MAX_AGE_MS,
+          requiredAccuracy: LAST_KNOWN_REQUIRED_ACCURACY_M,
+        })) as TaskerPositionReading | null;
+        log(
+          lastKnown
+            ? `getLastKnownPositionAsync: ${formatCoordsForLog(lastKnown.coords)}, ` +
+                `antigüedad ${getReadingAgeSeconds(lastKnown.timestamp, now()) ?? "?"} s`
+            : "getLastKnownPositionAsync: null",
+        );
+      } catch (error) {
+        log(`getLastKnownPositionAsync: error (${errorMessage(error)})`);
+      }
+      if (aborted()) return FAILED;
+    }
+
+    const chosen = chooseReportPosition(
+      fresh.kind === "position" ? fresh.reading : null,
+      lastKnown,
+      now(),
+    );
+    if (!chosen) {
+      log("sin posición nueva ni respaldo de 120 s o menos");
       return FAILED;
     }
-    log(`watchPositionAsync: respaldo por ${Math.round(fallbackMs / 1000)} s`);
-    const race = new AbortController();
-    const onOuterAbort = () => race.abort();
-    signal?.addEventListener("abort", onOuterAbort, { once: true });
-    const never = new Promise<never>(() => undefined);
-    // La posición nueva sigue compitiendo solo si no falló ya.
-    const currentAlive = first.kind === "timeout";
-    try {
-      const winner = await Promise.race([
-        watchFirstPosition(api, fallbackMs, race.signal).then((o) => {
-          if (o.kind === "position") return { source: "watchPositionAsync", outcome: o };
-          if (o.kind === "error") {
-            log(`watchPositionAsync: error (${errorMessage(o.error)})`);
-            if (currentAlive) return never; // queda la posición nueva hasta el tope
-          }
-          return { source: "watchPositionAsync", outcome: o };
-        }),
-        currentAlive
-          ? current.then((o) =>
-              o.kind === "position" ? { source: "getCurrentPositionAsync (tarde)", outcome: o } : never,
-            )
-          : never,
-        delay(fallbackMs, race.signal).then((o) => ({ source: "tope", outcome: o })),
-      ]);
-      const { source, outcome } = winner;
-      if (outcome.kind === "position") {
-        log(`${source}: posición ${formatCoordsForLog(outcome.reading.coords)}`);
-        return ok(outcome.reading);
-      }
-      if (outcome.kind === "aborted") {
-        aborted();
-        return FAILED;
-      }
-      if (outcome.kind === "timeout") {
-        log(`sin posición; tope total de ${Math.round(timeoutMs / 1000)} s vencido`);
-      }
-      return FAILED;
-    } finally {
-      // Cancela la suscripción (y el tope) gane quien gane.
-      race.abort();
-      signal?.removeEventListener("abort", onOuterAbort);
-    }
+    log(`fuente: ${chosen.source}, edad ${chosen.ageSeconds ?? "?"} s`);
+    return ok(chosen.reading);
   } catch (error) {
     log(`error inesperado (${errorMessage(error)})`);
     return FAILED;

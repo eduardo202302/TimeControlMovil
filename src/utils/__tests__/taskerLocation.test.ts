@@ -1,6 +1,6 @@
 /// <reference types="jest" />
-import { LAST_KNOWN_MAX_AGE_MS } from "../punchLocation";
 import {
+  chooseReportPosition,
   CURRENT_POSITION_WAIT_MS,
   formatCoordsForLog,
   getCurrentPositionWaitMs,
@@ -55,9 +55,8 @@ const FAST = { timeoutMs: 120, currentWaitMs: 20 };
 // ─── Reglas puras ───────────────────────────────────────────────────────────
 
 describe("umbrales", () => {
-  it("'reciente' = 2 minutos o menos (el mismo del ponche)", () => {
-    expect(REPORT_LAST_KNOWN_MAX_AGE_MS).toBe(LAST_KNOWN_MAX_AGE_MS);
-    expect(REPORT_LAST_KNOWN_MAX_AGE_MS).toBeLessThanOrEqual(120_000);
+  it("respaldo (última conocida) = 120 s o menos", () => {
+    expect(REPORT_LAST_KNOWN_MAX_AGE_MS).toBe(120_000);
   });
   it("tope total 15 s; getCurrentPositionAsync sola, 5 s", () => {
     expect(REPORT_LOCATION_TIMEOUT_MS).toBe(15_000);
@@ -77,12 +76,44 @@ describe("getReadingAgeSeconds", () => {
 
 describe("isLastKnownFresh", () => {
   const now = 1_000_000;
-  it("hasta 2 minutos → sí; más → no", () => {
+  it("hasta 120 s → sí; más → no", () => {
     expect(isLastKnownFresh(now - 120_000, now)).toBe(true);
     expect(isLastKnownFresh(now - 120_001, now)).toBe(false);
   });
-  it("sin timestamp → se acepta (expo ya filtró por maxAge)", () => {
-    expect(isLastKnownFresh(undefined, now)).toBe(true);
+  it("sin timestamp (edad desconocida) → no", () => {
+    expect(isLastKnownFresh(undefined, now)).toBe(false);
+  });
+});
+
+describe("chooseReportPosition (fuente de la posición)", () => {
+  const now = 1_000_000;
+  it("nueva → se usa la nueva, aunque haya respaldo reciente", () => {
+    expect(chooseReportPosition(reading(1, 2, now - 2_000), reading(3, 4, now - 1_000), now)).toEqual({
+      source: "nueva",
+      reading: reading(1, 2, now - 2_000),
+      ageSeconds: 2,
+    });
+  });
+  it("sin nueva y respaldo de 120 s o menos → respaldo, con su edad", () => {
+    expect(chooseReportPosition(null, reading(3, 4, now - 120_000), now)).toMatchObject({
+      source: "respaldo",
+      ageSeconds: 120,
+    });
+    // Entre 30 y 120 s (antes se rechazaba) → también sirve.
+    expect(chooseReportPosition(null, reading(3, 4, now - 90_000), now)).toMatchObject({
+      source: "respaldo",
+      ageSeconds: 90,
+    });
+  });
+  it("sin nueva y respaldo viejo (o sin timestamp) → null = error de ubicación", () => {
+    expect(chooseReportPosition(null, reading(3, 4, now - 120_001), now)).toBeNull();
+    expect(chooseReportPosition(null, reading(3, 4), now)).toBeNull();
+  });
+  it("sin nueva ni respaldo → null", () => {
+    expect(chooseReportPosition(null, null, now)).toBeNull();
+  });
+  it("nueva sin timestamp → edad desconocida (null)", () => {
+    expect(chooseReportPosition(reading(1, 2), null, now)?.ageSeconds).toBeNull();
   });
 });
 
@@ -208,41 +239,64 @@ describe("requestReportLocation — permiso y ubicación", () => {
   });
 });
 
-describe("requestReportLocation — última posición conocida", () => {
-  it("pide maxAge de 2 minutos", async () => {
-    const { api } = fakeApi();
-    await requestReportLocation(api, { ...FAST, log: () => undefined });
-    expect(api.getLastKnownPositionAsync).toHaveBeenCalledWith(
-      expect.objectContaining({ maxAge: REPORT_LAST_KNOWN_MAX_AGE_MS }),
-    );
-  });
-  it("reciente → se usa, sin posición nueva", async () => {
+describe("requestReportLocation — posición nueva primero", () => {
+  it("siempre pide una nueva; la última conocida ni se consulta si llega", async () => {
     const now = 1_000_000;
     const { api } = fakeApi({
-      getLastKnownPositionAsync: jest.fn(async () => reading(1, 2, now - 30_000)),
-    });
-    await expect(
-      requestReportLocation(api, { ...FAST, now: () => now, log: () => undefined }),
-    ).resolves.toEqual({ status: "ok", coords: { latitude: 1, longitude: 2 } });
-    expect(api.getCurrentPositionAsync).not.toHaveBeenCalled();
-  });
-  it("más vieja que 2 minutos → se descarta y se pide una nueva", async () => {
-    const now = 1_000_000;
-    const { api } = fakeApi({
-      getLastKnownPositionAsync: jest.fn(async () => reading(1, 2, now - 600_000)),
+      getLastKnownPositionAsync: jest.fn(async () => reading(1, 2, now - 1_000)),
+      getCurrentPositionAsync: jest.fn(async () => reading(18.4706, -69.9389, now)),
     });
     await expect(
       requestReportLocation(api, { ...FAST, now: () => now, log: () => undefined }),
     ).resolves.toEqual({ status: "ok", coords: { latitude: 18.4706, longitude: -69.9389 } });
+    expect(api.getCurrentPositionAsync).toHaveBeenCalledTimes(1);
+    expect(api.getLastKnownPositionAsync).not.toHaveBeenCalled();
   });
-  it("falla → sigue con una posición nueva", async () => {
-    const { api } = fakeApi({
+});
+
+describe("requestReportLocation — respaldo con la última conocida", () => {
+  const failing = () => ({
+    getCurrentPositionAsync: jest.fn(async () => {
+      throw new Error("Location request failed");
+    }),
+  });
+  /** La suscripción también falla: no hay posición nueva. */
+  const noFresh = (over: Partial<Record<keyof TaskerLocationApi, jest.Mock>>) => {
+    const { api } = fakeApi({ ...failing(), ...over });
+    api.watchPositionAsync.mockRejectedValue(new Error("no provider"));
+    return api;
+  };
+
+  it("la nueva falla y la última conocida es de 120 s o menos → se usa", async () => {
+    const now = 1_000_000;
+    const api = noFresh({ getLastKnownPositionAsync: jest.fn(async () => reading(1, 2, now - 90_000)) });
+    await expect(
+      requestReportLocation(api, { ...FAST, now: () => now, log: () => undefined }),
+    ).resolves.toEqual({ status: "ok", coords: { latitude: 1, longitude: 2 } });
+    expect(api.getLastKnownPositionAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ maxAge: REPORT_LAST_KNOWN_MAX_AGE_MS }),
+    );
+  });
+  it("la nueva falla y la última conocida es más vieja → failed", async () => {
+    const now = 1_000_000;
+    const api = noFresh({ getLastKnownPositionAsync: jest.fn(async () => reading(1, 2, now - 121_000)) });
+    await expect(
+      requestReportLocation(api, { ...FAST, now: () => now, log: () => undefined }),
+    ).resolves.toEqual({ status: "failed", canAskAgain: true });
+  });
+  it("la nueva falla y la última conocida falla o es null → failed", async () => {
+    const throwing = noFresh({
       getLastKnownPositionAsync: jest.fn(async () => {
         throw new Error("x");
       }),
     });
-    await expect(requestReportLocation(api, { ...FAST, log: () => undefined })).resolves.toMatchObject({
-      status: "ok",
+    await expect(requestReportLocation(throwing, { ...FAST, log: () => undefined })).resolves.toEqual({
+      status: "failed",
+      canAskAgain: true,
+    });
+    await expect(requestReportLocation(noFresh({}), { ...FAST, log: () => undefined })).resolves.toEqual({
+      status: "failed",
+      canAskAgain: true,
     });
   });
 });
@@ -361,11 +415,30 @@ describe("requestReportLocation — logs", () => {
     const text = lines.join("\n");
     expect(text).toContain("permiso: granted");
     expect(text).toContain("hasServicesEnabledAsync: true");
-    expect(text).toContain("antigüedad 600 s (vieja, se descarta)");
     expect(text).toContain("getCurrentPositionAsync: sin respuesta");
     expect(text).toContain("watchPositionAsync: respaldo");
-    expect(text).toContain("tope total");
+    expect(text).toContain("tope de");
+    expect(text).toContain("antigüedad 600 s");
+    expect(text).toContain("sin posición nueva ni respaldo");
     expect(text).not.toMatch(/\d+\.\d{3,}/);
+  });
+  it("dicen la fuente usada y su edad en segundos", async () => {
+    const now = 1_000_000;
+    const fresh: string[] = [];
+    const { api } = fakeApi({ getCurrentPositionAsync: jest.fn(async () => reading(1, 2, now - 3_000)) });
+    await requestReportLocation(api, { ...FAST, now: () => now, log: (l) => fresh.push(l) });
+    expect(fresh).toContain("fuente: nueva, edad 3 s");
+
+    const backup: string[] = [];
+    const { api: api2 } = fakeApi({
+      getCurrentPositionAsync: jest.fn(async () => {
+        throw new Error("x");
+      }),
+      getLastKnownPositionAsync: jest.fn(async () => reading(1, 2, now - 12_000)),
+    });
+    api2.watchPositionAsync.mockRejectedValue(new Error("no provider"));
+    await requestReportLocation(api2, { ...FAST, now: () => now, log: (l) => backup.push(l) });
+    expect(backup).toContain("fuente: respaldo, edad 12 s");
   });
   it("sin __DEV__ (tests, producción) no escribe en la consola", async () => {
     const spy = jest.spyOn(console, "log").mockImplementation(() => undefined);

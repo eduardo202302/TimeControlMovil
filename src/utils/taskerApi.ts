@@ -127,7 +127,7 @@ function isEmptyAddress(raw: unknown): boolean {
   return !hasText && readCoordinates(raw) === null;
 }
 
-/** Misma dirección salvo id/isDefault (defaultAddress repetida en addresses). */
+/** Misma dirección salvo id/isDefault (defaultAddress o una de addresses repetida). */
 function isSameAddress(a: TaskerClientAddress, b: TaskerClientAddress): boolean {
   return (
     CLIENT_ADDRESS_TEXT_FIELDS.every((key) => a[key] === b[key]) &&
@@ -136,11 +136,58 @@ function isSameAddress(a: TaskerClientAddress, b: TaskerClientAddress): boolean 
   );
 }
 
+/** Mismo punto: lat/lng iguales redondeados a 5 decimales (~1 m). Sin coordenadas → no. */
+function isSameSpot(a: TaskerClientAddress, b: TaskerClientAddress): boolean {
+  const round = (value: unknown) => {
+    const n = toCoordinate(value);
+    return n === null ? null : n.toFixed(5);
+  };
+  const [aLat, aLng, bLat, bLng] = [a.latitude, a.longitude, b.latitude, b.longitude].map(round);
+  return aLat !== null && aLng !== null && aLat === bLat && aLng === bLng;
+}
+
+/** `base` con los textos que le faltan tomados de `other`. */
+function fillMissingTexts(base: TaskerClientAddress, other: TaskerClientAddress): TaskerClientAddress {
+  const merged = { ...base };
+  for (const key of CLIENT_ADDRESS_TEXT_FIELDS) {
+    const own = merged[key];
+    const theirs = other[key];
+    const ownEmpty = typeof own !== "string" || own.trim() === "";
+    if (ownEmpty && typeof theirs === "string" && theirs.trim() !== "") merged[key] = theirs;
+  }
+  return merged;
+}
+
+/**
+ * La predeterminada y otra del mismo cliente en el mismo punto (lat/lng a 5
+ * decimales) → UNA sola: queda la predeterminada (su id, isDefault y
+ * coordenadas) con los textos que le falten tomados de la otra. Sin
+ * duplicados → el mismo cliente.
+ */
+export function mergeDefaultAddressDuplicates(client: TaskerUserClient): TaskerUserClient {
+  const defaultAddress = client.addresses.find((a) => a.isDefault) ?? client.addresses[0];
+  if (!defaultAddress) return client;
+  const duplicates = client.addresses.filter(
+    (a) => a !== defaultAddress && isSameSpot(defaultAddress, a),
+  );
+  if (duplicates.length === 0) return client;
+  const merged = duplicates.reduce(fillMissingTexts, defaultAddress);
+  return {
+    ...client,
+    defaultAddress: merged,
+    addresses: client.addresses.flatMap((a) =>
+      a === defaultAddress ? [merged] : duplicates.includes(a) ? [] : [a],
+    ),
+  };
+}
+
 /**
  * Un cliente de `data.taskrClients` → { id, name, defaultAddress, addresses }.
  * La predeterminada es defaultAddress; si viene null o vacía, la primera de
- * addresses. Va primera en `addresses` con `isDefault: true` (y si también
- * venía repetida en addresses, no se duplica). Sin id numérico → null.
+ * addresses. Va primera en `addresses` con `isDefault: true`, seguida de TODAS
+ * las de addresses; una repetida (la predeterminada u otra) no se duplica, y
+ * una en el mismo punto que la predeterminada se fusiona con ella
+ * (mergeDefaultAddressDuplicates). Sin id numérico → null.
  */
 export function mapTaskerClient(raw: unknown): TaskerUserClient | null {
   if (!isRecord(raw) || typeof raw.id !== "number" || !Number.isFinite(raw.id)) return null;
@@ -155,15 +202,15 @@ export function mapTaskerClient(raw: unknown): TaskerUserClient | null {
   for (const source of sources) {
     const isDefault = addresses.length === 0;
     const address = normalizeTaskerClientAddress(source, addresses.length + 1, isDefault);
-    if (!isDefault && isSameAddress(address, addresses[0])) continue;
+    if (addresses.some((prev) => isSameAddress(address, prev))) continue;
     addresses.push(address);
   }
-  return {
+  return mergeDefaultAddressDuplicates({
     id: raw.id,
     name: textOrEmpty(raw.name),
     defaultAddress: addresses[0] ?? null,
     addresses,
-  };
+  });
 }
 
 /**
