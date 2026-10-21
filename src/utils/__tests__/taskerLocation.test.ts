@@ -2,6 +2,7 @@
 import {
   chooseReportPosition,
   CURRENT_POSITION_WAIT_MS,
+  EMULATOR_LAST_KNOWN_MAX_AGE_MS,
   formatCoordsForLog,
   getCurrentPositionWaitMs,
   getPermissionStep,
@@ -114,6 +115,30 @@ describe("chooseReportPosition (fuente de la posición)", () => {
   });
   it("nueva sin timestamp → edad desconocida (null)", () => {
     expect(chooseReportPosition(reading(1, 2), null, now)?.ageSeconds).toBeNull();
+  });
+  it("emulador en __DEV__ (acceptStaleLastKnown) → respaldo viejo aceptado, con su edad", () => {
+    const emulator = { acceptStaleLastKnown: true };
+    expect(chooseReportPosition(null, reading(3, 4, now - 600_000), now, emulator)).toEqual({
+      source: "respaldo emulador",
+      reading: reading(3, 4, now - 600_000),
+      ageSeconds: 600,
+    });
+    expect(chooseReportPosition(null, reading(3, 4), now, emulator)).toMatchObject({
+      source: "respaldo emulador",
+      ageSeconds: null,
+    });
+    // De 120 s o menos sigue siendo el respaldo normal; la nueva siempre gana.
+    expect(chooseReportPosition(null, reading(3, 4, now - 60_000), now, emulator)?.source).toBe("respaldo");
+    expect(chooseReportPosition(reading(1, 2, now), reading(3, 4, now - 600_000), now, emulator)?.source).toBe(
+      "nueva",
+    );
+    expect(chooseReportPosition(null, null, now, emulator)).toBeNull();
+  });
+  it("dispositivo real / producción (sin la opción o false) → la regla de 120 s no cambia", () => {
+    expect(chooseReportPosition(null, reading(3, 4, now - 600_000), now)).toBeNull();
+    expect(
+      chooseReportPosition(null, reading(3, 4, now - 600_000), now, { acceptStaleLastKnown: false }),
+    ).toBeNull();
   });
 });
 
@@ -283,6 +308,23 @@ describe("requestReportLocation — respaldo con la última conocida", () => {
     await expect(
       requestReportLocation(api, { ...FAST, now: () => now, log: () => undefined }),
     ).resolves.toEqual({ status: "failed", canAskAgain: true });
+  });
+  it("emulador (acceptStaleLastKnown): la última conocida vieja se usa, sin tope de maxAge, y lo registra", async () => {
+    const now = 1_000_000;
+    const lines: string[] = [];
+    const api = noFresh({ getLastKnownPositionAsync: jest.fn(async () => reading(1, 2, now - 300_000)) });
+    await expect(
+      requestReportLocation(api, {
+        ...FAST,
+        now: () => now,
+        log: (l) => lines.push(l),
+        acceptStaleLastKnown: true,
+      }),
+    ).resolves.toEqual({ status: "ok", coords: { latitude: 1, longitude: 2 } });
+    expect(api.getLastKnownPositionAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ maxAge: EMULATOR_LAST_KNOWN_MAX_AGE_MS }),
+    );
+    expect(lines).toContain("respaldo emulador, edad 300 s");
   });
   it("la nueva falla y la última conocida falla o es null → failed", async () => {
     const throwing = noFresh({

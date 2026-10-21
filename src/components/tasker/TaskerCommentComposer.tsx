@@ -40,6 +40,7 @@ import type {
   TaskerAttachment,
   TaskerCommentDraft,
 } from "../../../types/typesTasker/TaskerTypes";
+import { REPORT_LAYOUT as L, reportMultilineStyle } from "./reportCompact";
 import { scrollIntoView } from "./scrollIntoView";
 import TaskerCommentThumb from "./TaskerCommentThumb";
 import { useTaskerAttachmentPicker } from "./useTaskerAttachmentPicker";
@@ -64,6 +65,11 @@ interface TaskerCommentComposerProps {
   onOpenImage: (uri: string) => void;
   /** ScrollView de la pantalla: al abrir y al enfocar el texto se desplaza hasta acá. */
   scrollRef?: RefObject<ScrollView | null>;
+  /**
+   * Reportar: menos aire y el texto arranca en 2 líneas (crece hasta 5 y
+   * luego hace scroll interno). Sin él (Seguimiento), el formulario de siempre.
+   */
+  compact?: boolean;
 }
 
 /**
@@ -80,6 +86,7 @@ export default function TaskerCommentComposer({
   attachmentLimit,
   onOpenImage,
   scrollRef,
+  compact = false,
 }: TaskerCommentComposerProps) {
   const { scale, verticalScale, font } = useResponsive();
   const styles = useMemo(
@@ -139,11 +146,15 @@ export default function TaskerCommentComposer({
   };
 
   return (
-    <View ref={containerRef} style={styles.container} onLayout={handleContainerLayout}>
+    <View
+      ref={containerRef}
+      style={[styles.container, compact && styles.containerCompact]}
+      onLayout={handleContainerLayout}
+    >
       <View ref={inputBlockRef} style={styles.inputBlock}>
         <TextInput
           ref={inputRef}
-          style={styles.input}
+          style={[styles.input, compact && styles.inputCompact]}
           value={text}
           onChangeText={setText}
           onFocus={handleFocus}
@@ -242,6 +253,11 @@ function createStyles(
       lineHeight: font(20),
       color: TEXT_PRIMARY,
     },
+    containerCompact: {
+      gap: verticalScale(L.composerGap),
+      padding: scale(L.composerPadding),
+    },
+    inputCompact: reportMultilineStyle(scale, font),
     counter: {
       alignSelf: "flex-end",
       fontSize: font(12),

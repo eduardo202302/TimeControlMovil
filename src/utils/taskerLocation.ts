@@ -14,7 +14,8 @@
  *      cancela; la 3 sigue en carrera: gana la que llegue antes;
  *   4. solo si no hubo posición nueva, respaldo: la última conocida, y solo si
  *      tiene REPORT_LAST_KNOWN_MAX_AGE_MS o menos (con timestamp). Si no →
- *      "failed" ("Active la ubicación…").
+ *      "failed" ("Active la ubicación…"). Excepción: emulador en __DEV__
+ *      (acceptStaleLastKnown) acepta la última conocida de cualquier edad.
  */
 
 import {
@@ -49,6 +50,8 @@ export const REPORT_LOCATION_TIMEOUT_MS = 15_000;
 export const CURRENT_POSITION_WAIT_MS = 5_000;
 /** Edad máxima de la última posición conocida para usarla de respaldo: 120 s. */
 export const REPORT_LAST_KNOWN_MAX_AGE_MS = 120_000;
+/** maxAge para expo con acceptStaleLastKnown: sin tope (finito, para el puente nativo). */
+export const EMULATOR_LAST_KNOWN_MAX_AGE_MS = Number.MAX_SAFE_INTEGER;
 
 export type ReportLocationResult = Extract<ReportLocationState, { status: "ok" | "failed" }>;
 
@@ -60,6 +63,12 @@ export interface RequestReportLocationOptions {
   /** Logs de diagnóstico; por defecto console.log solo en __DEV__. */
   log?: (message: string) => void;
   now?: () => number;
+  /**
+   * Solo emulador en __DEV__ (lo decide el llamador, ver isDevEmulator en
+   * locationApi.ts): la última conocida sirve aunque tenga más de 120 s. En
+   * dispositivo real y en producción, siempre false.
+   */
+  acceptStaleLastKnown?: boolean;
 }
 
 // ─── Reglas puras ───────────────────────────────────────────────────────────
@@ -84,7 +93,7 @@ export function isLastKnownFresh(
   return nowMs - timestamp <= maxAgeMs;
 }
 
-export type ReportPositionSource = "nueva" | "respaldo";
+export type ReportPositionSource = "nueva" | "respaldo" | "respaldo emulador";
 
 export interface ChosenReportPosition {
   source: ReportPositionSource;
@@ -96,22 +105,25 @@ export interface ChosenReportPosition {
 /**
  * Fuente de la posición: la nueva si llegó; si no, la última conocida solo si
  * es de REPORT_LAST_KNOWN_MAX_AGE_MS o menos; si no → null (error de
- * ubicación).
+ * ubicación). Con `acceptStaleLastKnown` (emulador en __DEV__), la última
+ * conocida más vieja (o sin timestamp) también sirve: "respaldo emulador".
  */
 export function chooseReportPosition(
   fresh: TaskerPositionReading | null,
   lastKnown: TaskerPositionReading | null,
   nowMs: number,
+  options: { acceptStaleLastKnown?: boolean } = {},
 ): ChosenReportPosition | null {
   if (fresh) {
     return { source: "nueva", reading: fresh, ageSeconds: getReadingAgeSeconds(fresh.timestamp, nowMs) };
   }
-  if (lastKnown && isLastKnownFresh(lastKnown.timestamp, nowMs)) {
-    return {
-      source: "respaldo",
-      reading: lastKnown,
-      ageSeconds: getReadingAgeSeconds(lastKnown.timestamp, nowMs),
-    };
+  if (!lastKnown) return null;
+  const ageSeconds = getReadingAgeSeconds(lastKnown.timestamp, nowMs);
+  if (isLastKnownFresh(lastKnown.timestamp, nowMs)) {
+    return { source: "respaldo", reading: lastKnown, ageSeconds };
+  }
+  if (options.acceptStaleLastKnown) {
+    return { source: "respaldo emulador", reading: lastKnown, ageSeconds };
   }
   return null;
 }
@@ -332,6 +344,7 @@ export async function requestReportLocation(
     signal,
     log = defaultLog,
     now = Date.now,
+    acceptStaleLastKnown = false,
   } = options;
   const deadline = now() + timeoutMs;
   const remaining = () => Math.max(0, deadline - now());
@@ -367,7 +380,8 @@ export async function requestReportLocation(
     if (fresh.kind === "none") {
       try {
         lastKnown = (await api.getLastKnownPositionAsync({
-          maxAge: REPORT_LAST_KNOWN_MAX_AGE_MS,
+          // expo ya filtra por maxAge: en emulador no debe descartar la vieja.
+          maxAge: acceptStaleLastKnown ? EMULATOR_LAST_KNOWN_MAX_AGE_MS : REPORT_LAST_KNOWN_MAX_AGE_MS,
           requiredAccuracy: LAST_KNOWN_REQUIRED_ACCURACY_M,
         })) as TaskerPositionReading | null;
         log(
@@ -386,12 +400,17 @@ export async function requestReportLocation(
       fresh.kind === "position" ? fresh.reading : null,
       lastKnown,
       now(),
+      { acceptStaleLastKnown },
     );
     if (!chosen) {
       log("sin posición nueva ni respaldo de 120 s o menos");
       return FAILED;
     }
-    log(`fuente: ${chosen.source}, edad ${chosen.ageSeconds ?? "?"} s`);
+    log(
+      chosen.source === "respaldo emulador"
+        ? `respaldo emulador, edad ${chosen.ageSeconds ?? "?"} s`
+        : `fuente: ${chosen.source}, edad ${chosen.ageSeconds ?? "?"} s`,
+    );
     return ok(chosen.reading);
   } catch (error) {
     log(`error inesperado (${errorMessage(error)})`);

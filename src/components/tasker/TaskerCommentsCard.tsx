@@ -36,6 +36,7 @@ import type {
   TaskerComment,
   TaskerCommentDraft,
 } from "../../../types/typesTasker/TaskerTypes";
+import { REPORT_LAYOUT as L, REPORT_TOUCH_MIN, reportTitleMetrics } from "./reportCompact";
 import TaskerCommentComposer from "./TaskerCommentComposer";
 import TaskerCommentThumb from "./TaskerCommentThumb";
 
@@ -74,6 +75,12 @@ interface TaskerCommentsCardProps {
    * (Seguimiento) nunca cambia.
    */
   resetKey?: number;
+  /**
+   * Reportar: tarjeta compacta (menos aire, ícono del título a la altura del
+   * texto, texto del comentario de 2 líneas) y "Agregar" como botón circular
+   * "+" / "×". Sin él (Seguimiento), la tarjeta de siempre.
+   */
+  compact?: boolean;
 }
 
 /**
@@ -93,6 +100,7 @@ export default function TaskerCommentsCard({
   sharedAttachmentLimit = false,
   scrollRef,
   resetKey = 0,
+  compact = false,
 }: TaskerCommentsCardProps) {
   const { scale, verticalScale, font } = useResponsive();
   const styles = useMemo(
@@ -182,16 +190,31 @@ export default function TaskerCommentsCard({
       }
       onOpenImage={setViewerUri}
       scrollRef={scrollRef}
+      compact={compact}
     />
   );
 
+  const titleIcon = compact ? reportTitleMetrics(font) : null;
+  const toggleAdding = () => requestComposer(isAdding ? null : { mode: "add" });
+
   return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <SectionIcon tone="blue">
-          <Ionicons name="chatbubble-ellipses-outline" size={18} color={SECTION_ICON_COLOR} />
+    <View style={[styles.card, compact && styles.cardCompact]}>
+      <View style={[styles.cardHeader, compact && styles.cardHeaderCompact]}>
+        <SectionIcon tone="blue" size={titleIcon?.side} radius={titleIcon?.radius}>
+          <Ionicons
+            name="chatbubble-ellipses-outline"
+            size={titleIcon?.glyph ?? 18}
+            color={SECTION_ICON_COLOR}
+          />
         </SectionIcon>
-        <Text style={styles.cardTitle}>{`Comentarios (${comments.length})`}</Text>
+        <Text
+          style={[
+            styles.cardTitle,
+            titleIcon && { fontSize: titleIcon.fontSize, lineHeight: titleIcon.lineHeight },
+          ]}
+        >
+          {`Comentarios (${comments.length})`}
+        </Text>
         <TouchableOpacity
           style={styles.iconBtn}
           onPress={toggleOrder}
@@ -204,29 +227,46 @@ export default function TaskerCommentsCard({
         >
           <Ionicons name="swap-vertical-outline" size={18} color={TEXT_MUTED} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.addCommentBtn}
-          onPress={() => requestComposer(isAdding ? null : { mode: "add" })}
-          accessibilityState={{ expanded: isAdding }}
-          activeOpacity={0.75}
-        >
-          <Ionicons
-            name={isAdding ? "remove-circle-outline" : "add-circle-outline"}
-            size={16}
-            color={PRIMARY_700}
-          />
-          <Text style={styles.addCommentText}>{isAdding ? "Ocultar" : "Agregar"}</Text>
-        </TouchableOpacity>
+        {compact ? (
+          <TouchableOpacity
+            style={styles.addCommentRoundBtn}
+            onPress={toggleAdding}
+            accessibilityRole="button"
+            accessibilityLabel={isAdding ? "Cerrar comentario" : "Agregar comentario"}
+            accessibilityState={{ expanded: isAdding }}
+            activeOpacity={0.75}
+          >
+            <Ionicons name={isAdding ? "close" : "add"} size={22} color={PRIMARY_700} />
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.addCommentBtn}
+            onPress={toggleAdding}
+            accessibilityState={{ expanded: isAdding }}
+            activeOpacity={0.75}
+          >
+            <Ionicons
+              name={isAdding ? "remove-circle-outline" : "add-circle-outline"}
+              size={16}
+              color={PRIMARY_700}
+            />
+            <Text style={styles.addCommentText}>{isAdding ? "Ocultar" : "Agregar"}</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {isAdding && <View style={styles.addComposer}>{renderComposer("add", EMPTY_DRAFT)}</View>}
+      {isAdding && (
+        <View style={[styles.addComposer, compact && styles.addComposerCompact]}>
+          {renderComposer("add", EMPTY_DRAFT)}
+        </View>
+      )}
 
       {sorted.length === 0 ? (
         !isAdding && (
           <Text style={styles.emptyText}>Agrega un comentario, una imagen o un PDF.</Text>
         )
       ) : (
-        <View style={styles.commentList}>
+        <View style={[styles.commentList, compact && styles.commentListCompact]}>
           {sorted.map((comment) =>
             comment.id === editingId ? (
               <React.Fragment key={comment.id}>
@@ -238,6 +278,7 @@ export default function TaskerCommentsCard({
                 comment={comment}
                 editable={canEdit(comment)}
                 styles={styles}
+                compact={compact}
                 onEdit={() => requestComposer({ mode: "edit", id: comment.id })}
                 onDelete={() => handleDelete(comment)}
                 onOpenImage={setViewerUri}
@@ -256,14 +297,23 @@ interface CommentItemProps {
   comment: TaskerComment;
   editable: boolean;
   styles: Styles;
+  compact: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onOpenImage: (uri: string) => void;
 }
 
-function CommentItem({ comment, editable, styles, onEdit, onDelete, onOpenImage }: CommentItemProps) {
+function CommentItem({
+  comment,
+  editable,
+  styles,
+  compact,
+  onEdit,
+  onDelete,
+  onOpenImage,
+}: CommentItemProps) {
   return (
-    <View style={styles.comment}>
+    <View style={[styles.comment, compact && styles.commentCompact]}>
       <View style={styles.commentHeader}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{getInitials(comment.addUser.name)}</Text>
@@ -353,6 +403,30 @@ function createStyles(
       backgroundColor: PRIMARY_TINT_50,
     },
     addCommentText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_700 },
+    // Botón circular "+" / "×" de Reportar: 44×44 fijo (área táctil), mismo acento.
+    addCommentRoundBtn: {
+      width: REPORT_TOUCH_MIN,
+      height: REPORT_TOUCH_MIN,
+      borderWidth: 1,
+      borderColor: PRIMARY_TINT_BORDER,
+      borderRadius: RADIUS_PILL,
+      backgroundColor: PRIMARY_TINT_50,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    // Reportar compacto: medidas en reportCompact.ts.
+    cardCompact: {
+      paddingHorizontal: scale(L.cardPaddingH),
+      paddingTop: verticalScale(L.cardPaddingTop),
+      paddingBottom: verticalScale(L.cardPaddingBottom),
+    },
+    cardHeaderCompact: {
+      gap: scale(L.headerGap),
+      marginBottom: verticalScale(L.headerMarginBottom),
+    },
+    addComposerCompact: { marginBottom: verticalScale(L.addComposerMarginBottom) },
+    commentListCompact: { gap: verticalScale(L.commentListGap) },
+    commentCompact: { padding: scale(L.commentPadding) },
     commentList: { gap: verticalScale(8) },
     comment: {
       padding: scale(12),

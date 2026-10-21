@@ -68,6 +68,7 @@ import {
   getNearestElsewhereHint,
   getTaskerAddressDisplay,
   getTaskerClientLabel,
+  getFaultSelectPlaceholder,
   getTaskerFaultLabel,
   getTaskerFormRules,
   getSelectedTaskerAddress,
@@ -107,6 +108,12 @@ import type {
 import TaskerAddressModal from "./TaskerAddressModal";
 import TaskerAddressSummary from "./TaskerAddressSummary";
 import TaskerCommentsCard from "./TaskerCommentsCard";
+import {
+  REPORT_LAYOUT as L,
+  REPORT_TOUCH_MIN,
+  reportMultilineStyle,
+  reportTitleMetrics,
+} from "./reportCompact";
 
 type Styles = ReturnType<typeof createStyles>;
 
@@ -553,7 +560,7 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
                   style={faultsSummary ? styles.selectValue : styles.selectPlaceholder}
                   numberOfLines={2}
                 >
-                  {faultsSummary ?? "Seleccionar averías"}
+                  {faultsSummary ?? getFaultSelectPlaceholder(faultLabel)}
                 </Text>
                 <Ionicons name="chevron-down" size={16} color={TEXT_PLACEHOLDER} />
               </TouchableOpacity>
@@ -567,42 +574,6 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
             )}
           </View>
         )}
-
-        {/* ── Descripción ── */}
-        <View style={styles.card}>
-          <CardHeader
-            styles={styles}
-            tone="blue"
-            icon="document-text-outline"
-            title="Descripción"
-          />
-          <Text style={styles.label}>
-            Detalle(s)
-            {rules.descriptionRequired && <Text style={styles.required}> *</Text>}
-          </Text>
-          <TextInput
-            style={[styles.textarea, !!errors.description && styles.fieldInvalid]}
-            value={description}
-            onChangeText={handleDescriptionChange}
-            multiline
-            textAlignVertical="top"
-          />
-          {!!errors.description && (
-            <Text style={styles.fieldError}>{errors.description}</Text>
-          )}
-        </View>
-
-        {/* ── Comentarios: texto, imágenes/PDF o ambos (todos del usuario en sesión: editables) ── */}
-        <TaskerCommentsCard
-          comments={comments}
-          canEdit={() => true}
-          onAdd={handleAddComment}
-          onEdit={handleEditComment}
-          onDelete={handleRemoveComment}
-          sharedAttachmentLimit
-          scrollRef={scrollRef}
-          resetKey={commentsResetKey}
-        />
 
         {/* ── Cliente: fijo con uno solo; con 2 o más, selector ── */}
         <View style={styles.card}>
@@ -671,6 +642,43 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
             </Text>
           </View>
         </View>
+
+        {/* ── Descripción ── */}
+        <View style={styles.card}>
+          <CardHeader
+            styles={styles}
+            tone="blue"
+            icon="document-text-outline"
+            title="Descripción"
+            required={rules.descriptionRequired}
+          />
+          <TextInput
+            style={[styles.textarea, !!errors.description && styles.fieldInvalid]}
+            value={description}
+            onChangeText={handleDescriptionChange}
+            placeholder="Describa los detalles aquí…"
+            placeholderTextColor={TEXT_PLACEHOLDER}
+            multiline
+            textAlignVertical="top"
+            accessibilityLabel="Descripción"
+          />
+          {!!errors.description && (
+            <Text style={styles.fieldError}>{errors.description}</Text>
+          )}
+        </View>
+
+        {/* ── Comentarios: texto, imágenes/PDF o ambos (todos del usuario en sesión: editables) ── */}
+        <TaskerCommentsCard
+          comments={comments}
+          canEdit={() => true}
+          onAdd={handleAddComment}
+          onEdit={handleEditComment}
+          onDelete={handleRemoveComment}
+          sharedAttachmentLimit
+          scrollRef={scrollRef}
+          resetKey={commentsResetKey}
+          compact
+        />
 
         {/* ── Direcciones: las del cliente (la predeterminada solo se elige) + las agregadas ── */}
         <View style={styles.card}>
@@ -774,10 +782,12 @@ interface CardHeaderProps {
 }
 
 function CardHeader({ styles, tone, icon, title, required, children }: CardHeaderProps) {
+  const { font } = useResponsive();
+  const titleIcon = reportTitleMetrics(font);
   return (
     <View style={styles.cardHeader}>
-      <SectionIcon tone={tone}>
-        <Ionicons name={icon} size={18} color={SECTION_ICON_COLOR} />
+      <SectionIcon tone={tone} size={titleIcon.side} radius={titleIcon.radius}>
+        <Ionicons name={icon} size={titleIcon.glyph} color={SECTION_ICON_COLOR} />
       </SectionIcon>
       <Text style={styles.cardTitle}>
         {title}
@@ -885,10 +895,11 @@ function createStyles(
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     flex: { flex: 1 },
+    // Medidas del diseño compacto: reportCompact.ts (áreas táctiles ≥ 44).
     content: {
-      padding: scale(16),
-      gap: verticalScale(14),
-      paddingBottom: verticalScale(24),
+      padding: scale(L.screenPadding),
+      gap: verticalScale(L.cardGap),
+      paddingBottom: verticalScale(L.screenPaddingBottom),
     },
     contentTablet: {
       maxWidth: MAX_CONTENT_WIDTH,
@@ -897,22 +908,23 @@ function createStyles(
     },
     card: {
       ...CARD_FORM,
-      paddingHorizontal: scale(16),
-      paddingTop: verticalScale(14),
-      paddingBottom: verticalScale(16),
+      paddingHorizontal: scale(L.cardPaddingH),
+      paddingTop: verticalScale(L.cardPaddingTop),
+      paddingBottom: verticalScale(L.cardPaddingBottom),
     },
     cardHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(8),
-      marginBottom: verticalScale(14),
+      gap: scale(L.headerGap),
+      marginBottom: verticalScale(L.headerMarginBottom),
     },
-    cardTitle: { flex: 1, fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
-    label: {
-      fontSize: font(12),
-      fontWeight: "600",
-      color: TEXT_SECONDARY,
-      marginBottom: verticalScale(6),
+    // lineHeight = lado del ícono (reportTitleMetrics): quedan a la misma altura.
+    cardTitle: {
+      flex: 1,
+      fontSize: reportTitleMetrics(font).fontSize,
+      lineHeight: reportTitleMetrics(font).lineHeight,
+      fontWeight: "700",
+      color: TEXT_PRIMARY,
     },
     required: { color: ERROR_COLOR },
     select: {
@@ -920,7 +932,7 @@ function createStyles(
       flexDirection: "row",
       alignItems: "center",
       gap: scale(10),
-      minHeight: verticalScale(48),
+      minHeight: Math.max(REPORT_TOUCH_MIN, verticalScale(44)),
       paddingHorizontal: scale(12),
     },
     selectValue: { flex: 1, fontSize: font(14), color: TEXT_PRIMARY },
@@ -940,19 +952,19 @@ function createStyles(
       flexDirection: "row",
       alignItems: "flex-start",
       gap: scale(6),
-      marginTop: verticalScale(8),
+      marginTop: verticalScale(L.noticeMarginTop),
       paddingHorizontal: scale(10),
-      paddingVertical: verticalScale(8),
+      paddingVertical: verticalScale(L.noticePaddingV),
       borderRadius: RADIUS_SM,
       backgroundColor: WARNING_TINT_BACKGROUND,
     },
     noticeText: { flex: 1, fontSize: font(12), lineHeight: font(17), color: WARNING_TEXT_STRONG },
+    // 2 líneas al arrancar; crece hasta 5 y luego scroll interno.
     textarea: {
       ...FIELD_SURFACE,
-      minHeight: verticalScale(96),
-      padding: scale(12),
+      ...reportMultilineStyle(scale, font),
+      paddingHorizontal: scale(12),
       fontSize: font(14),
-      lineHeight: font(20),
       color: TEXT_PRIMARY,
     },
     fieldInvalid: { borderColor: ERROR_COLOR },
@@ -963,15 +975,15 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
       gap: scale(8),
-      minHeight: verticalScale(48),
+      minHeight: Math.max(REPORT_TOUCH_MIN, verticalScale(44)),
     },
-    addBtnSpaced: { marginTop: verticalScale(12) },
+    addBtnSpaced: { marginTop: verticalScale(L.addBtnMarginTop) },
     addBtnText: { fontSize: font(14), fontWeight: "600", color: PRIMARY_700 },
     clientName: { fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
     hintBox: {
-      marginTop: verticalScale(10),
-      paddingHorizontal: scale(12),
-      paddingVertical: verticalScale(6),
+      marginTop: verticalScale(L.hintMarginTop),
+      paddingHorizontal: scale(L.hintPaddingH),
+      paddingVertical: verticalScale(L.hintPaddingV),
       borderRadius: RADIUS_SM,
       backgroundColor: PRIMARY_TINT_50,
     },
@@ -982,8 +994,8 @@ function createStyles(
     hintDistance: { fontWeight: "400", color: TEXT_MUTED },
     // "Más cercana" de otro cliente, separada de la seleccionada por una línea.
     elsewhereRowDivided: {
-      marginTop: verticalScale(6),
-      paddingTop: verticalScale(6),
+      marginTop: verticalScale(L.hintDividerSpace),
+      paddingTop: verticalScale(L.hintDividerSpace),
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: PRIMARY_TINT_BORDER,
     },
@@ -999,18 +1011,18 @@ function createStyles(
       flexDirection: "row",
       alignItems: "center",
       gap: scale(6),
-      marginTop: verticalScale(8),
+      marginTop: verticalScale(L.reporterMarginTop),
     },
     reporterText: { fontSize: font(13), color: TEXT_MUTED },
     reporterName: { fontWeight: "600", color: TEXT_SECONDARY },
     // El resto de la fila vive en TaskerAddressSummary.
-    addressRow: { marginBottom: verticalScale(8) },
+    addressRow: { marginBottom: verticalScale(L.addressRowMarginBottom) },
     addressChips: {
       flexDirection: "row",
       flexWrap: "wrap",
       alignItems: "center",
       gap: scale(8),
-      marginTop: verticalScale(10),
+      marginTop: verticalScale(L.addressChipsMarginTop),
     },
     selectAddressBtn: {
       flexDirection: "row",

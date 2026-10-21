@@ -2,7 +2,7 @@ import { useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Linking } from "react-native";
 import { useSchoolStore } from "../../../store/useSchoolStore";
-import { expoTaskerLocationApi } from "../../utils/locationApi";
+import { expoTaskerLocationApi, isDevEmulator } from "../../utils/locationApi";
 import { requestReportLocation } from "../../utils/taskerLocation";
 import {
   getLocationOnVisit,
@@ -42,11 +42,12 @@ export default function ReportFaultGate() {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
-    void requestReportLocation(expoTaskerLocationApi, { signal: controller.signal }).then(
-      (result) => {
-        if (id === requestRef.current) setLocation(result);
-      },
-    );
+    void requestReportLocation(expoTaskerLocationApi, {
+      signal: controller.signal,
+      acceptStaleLastKnown: isDevEmulator,
+    }).then((result) => {
+      if (id === requestRef.current) setLocation(result);
+    });
   }, []);
 
   /** Reintento: vuelve al indicador de carga y busca de nuevo. */

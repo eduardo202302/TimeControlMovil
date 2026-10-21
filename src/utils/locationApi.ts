@@ -1,3 +1,4 @@
+import * as Device from "expo-device";
 import * as Location from "expo-location";
 import type { LocationApi } from "./punchLocation";
 import type { TaskerLocationApi } from "./taskerLocation";
@@ -32,3 +33,10 @@ export const expoTaskerLocationApi: TaskerLocationApi = {
       onReading,
     ),
 };
+
+/**
+ * Emulador / simulador en desarrollo: Reportar acepta ahí la última posición
+ * conocida aunque tenga más de 120 s (ver acceptStaleLastKnown en
+ * taskerLocation.ts). En dispositivo real y en producción, siempre false.
+ */
+export const isDevEmulator: boolean = __DEV__ && Device.isDevice === false;

@@ -613,6 +613,14 @@ export function getTaskerFaultLabel(config: TaskerCompanyConfig | null | undefin
   return trimmedLabel(config?.failureReportLabel, TASKER_FAULT_LABEL_FALLBACK);
 }
 
+/**
+ * Placeholder del selector de averías: "Seleccionar" + el título del bloque
+ * en minúscula ("Seleccionar servicio(s)"). Sin título → "Seleccionar averías".
+ */
+export function getFaultSelectPlaceholder(label: string | null | undefined): string {
+  return `Seleccionar ${trimmedLabel(label, TASKER_FAULT_LABEL_FALLBACK).toLowerCase()}`;
+}
+
 /** Título de la tarjeta del cliente (provisional): clientLabel o "Cliente". */
 export function getTaskerClientLabel(config: TaskerCompanyConfig | null | undefined): string {
   return trimmedLabel(config?.clientLabel, TASKER_CLIENT_LABEL_FALLBACK);

@@ -8,6 +8,8 @@ interface SectionIconProps {
   tone: SectionTone;
   /** Lado del cuadrito. Por defecto scale(32). */
   size?: number;
+  /** Radio del cuadrito. Por defecto RADIUS_SM (para achicarlo sin volverlo círculo). */
+  radius?: number;
   /**
    * El ícono que ya tenía el título, tal cual (mismo nombre, familia y
    * tamaño). No se clona ni se modifica: el llamado le pasa
@@ -20,7 +22,7 @@ interface SectionIconProps {
  * Chip sólido detrás del ícono de un título de sección — rediseño v2. Solo
  * envuelve: no cambia el ícono ni el orden del header.
  */
-export default function SectionIcon({ tone, size, children }: SectionIconProps) {
+export default function SectionIcon({ tone, size, radius, children }: SectionIconProps) {
   const { scale } = useResponsive();
   const styles = useMemo(() => createStyles(), []);
 
@@ -32,6 +34,7 @@ export default function SectionIcon({ tone, size, children }: SectionIconProps) 
       style={[
         styles.chip,
         { width: side, height: side, backgroundColor: color },
+        radius !== undefined && { borderRadius: radius },
         tintedShadow(color),
       ]}
     >

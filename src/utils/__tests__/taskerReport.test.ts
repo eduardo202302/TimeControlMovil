@@ -19,6 +19,7 @@ import {
   getTaskerAddressDisplay,
   getTaskerClientLabel,
   getTaskerFaultLabel,
+  getFaultSelectPlaceholder,
   getTaskerFormRules,
   getTaskerReportTitle,
   hasSharedCoordinatesAcrossClients,
@@ -190,6 +191,17 @@ describe("getTaskerFaultLabel", () => {
   it("sin config → 'Averías'; no usa failureReportMenuLabel", () => {
     expect(getTaskerFaultLabel(null)).toBe("Averías");
     expect(getTaskerFaultLabel(config({ failureReportMenuLabel: "Servicio" }))).toBe("Averías");
+  });
+});
+
+describe("getFaultSelectPlaceholder", () => {
+  it("usa el título del bloque en minúscula", () => {
+    expect(getFaultSelectPlaceholder("Servicio(s)")).toBe("Seleccionar servicio(s)");
+    expect(getFaultSelectPlaceholder("  Tipo de Avería ")).toBe("Seleccionar tipo de avería");
+  });
+
+  it.each([undefined, null, "", "   "])("título vacío (%p) → \"Seleccionar averías\"", (label) => {
+    expect(getFaultSelectPlaceholder(label)).toBe("Seleccionar averías");
   });
 });
 
