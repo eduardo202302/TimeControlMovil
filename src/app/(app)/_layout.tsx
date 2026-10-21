@@ -78,10 +78,13 @@ export default function AppLayout() {
   const pathname = usePathname();
   // Reportar toma el failureReportMenuLabel de Tasker, igual que su opción del menú.
   const taskerConfig = useSchoolStore((state) => state.taskerConfig);
-  const title =
-    pathname === TASKER_REPORT_PATH
-      ? getTaskerReportTitle(taskerConfig)
-      : (ROUTE_TITLES[pathname] ?? "Time Flow");
+  const isReport = pathname === TASKER_REPORT_PATH;
+  const title = isReport
+    ? getTaskerReportTitle(taskerConfig)
+    : (ROUTE_TITLES[pathname] ?? "Time Flow");
+  // Subtítulo solo en Reportar: el cliente (localidad) elegido en el formulario.
+  const reportClientName = useSchoolStore((state) => state.taskerReportClientName);
+  const subtitle = isReport ? reportClientName : null;
 
   // Empresa activa. Es el `key` del Slot: al cambiar de empresa TODAS las
   // pantallas se remontan y vuelven a cargar con el token nuevo (varias leen
@@ -164,7 +167,23 @@ export default function AppLayout() {
         >
           <Ionicons name="menu" size={24} color={HEADER_TEXT} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{title}</Text>
+        {isReport ? (
+          <View style={styles.headerTitleBlock}>
+            <Text style={[styles.headerTitle, styles.headerTitleWithSubtitle]} numberOfLines={1}>
+              {title}
+            </Text>
+            {/* Línea reservada siempre en Reportar: el header no salta cuando aparece. */}
+            <View style={styles.headerSubtitleSlot}>
+              {!!subtitle && (
+                <Text style={styles.headerSubtitle} numberOfLines={1} ellipsizeMode="tail">
+                  {subtitle}
+                </Text>
+              )}
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.headerTitle}>{title}</Text>
+        )}
         <View style={styles.headerSpacer} />
       </View>
 
@@ -233,5 +252,19 @@ function createStyles(
     /** Spacer simétrico al menuBtn — mantiene el título centrado en el header. */
     headerSpacer: { width: 40 },
     headerTitle: { fontSize: font(18), fontWeight: "700", color: HEADER_TEXT },
+    /**
+     * Reportar: título + subtítulo apilados y centrados entre el menú y el
+     * spacer. 22 + 16 de línea ≈ los 40 del menuBtn: el header mide lo mismo.
+     */
+    headerTitleBlock: { flex: 1, alignItems: "center", marginHorizontal: scale(8) },
+    headerTitleWithSubtitle: { lineHeight: font(22) },
+    headerSubtitleSlot: { height: font(16), justifyContent: "center" },
+    headerSubtitle: {
+      fontSize: font(12),
+      lineHeight: font(16),
+      fontWeight: "500",
+      color: HEADER_TEXT,
+      opacity: 0.75,
+    },
   });
 }

@@ -1,6 +1,6 @@
+import type { TaskerAttachment } from "../../../types/typesTasker/TaskerTypes";
 import { pickAttachments } from "../permissions/pickAttachments";
 import { pickUserPhoto, type UserPhotoSource } from "../users/pickUserPhoto";
-import type { TaskerAttachment } from "../../../types/typesTasker/TaskerTypes";
 
 /**
  * Adjuntos de Tasker: solo imágenes (comprimidas a JPEG por pickUserPhoto,
@@ -15,7 +15,9 @@ export type PickTaskerPhotoResult =
   | { status: "denied" }
   | { status: "error" };
 
-export async function pickTaskerPhoto(source: UserPhotoSource): Promise<PickTaskerPhotoResult> {
+export async function pickTaskerPhoto(
+  source: UserPhotoSource,
+): Promise<PickTaskerPhotoResult> {
   const result = await pickUserPhoto(source);
   if (result.status !== "ok") return result;
   const stamp = Date.now();
@@ -38,7 +40,9 @@ export interface PickTaskerPdfResult {
 }
 
 /** `usedBytes`: lo que ya pesan los adjuntos de la lista (ver pickAttachments). */
-export async function pickTaskerPdf(usedBytes: number): Promise<PickTaskerPdfResult> {
+export async function pickTaskerPdf(
+  usedBytes: number,
+): Promise<PickTaskerPdfResult> {
   const result = await pickAttachments(usedBytes);
   if (result.canceled) return { canceled: true, accepted: [], rejected: [] };
 

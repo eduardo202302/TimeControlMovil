@@ -1,6 +1,5 @@
-import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useMemo, useRef, useState, type RefObject } from "react";
-import { Alert, type ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import ImageViewerModal from "@/components/ui/ImageViewerModal";
+import SectionIcon from "@/components/ui/SectionIcon";
 import {
   CARD_BACKGROUND,
   DANGER_ICON,
@@ -16,27 +15,50 @@ import {
   TEXT_PRIMARY,
   TEXT_SECONDARY,
 } from "@/constants/colors";
-import { RADIUS_LG, RADIUS_PILL, RADIUS_SM, useResponsive } from "@/constants/responsive";
-import ImageViewerModal from "@/components/ui/ImageViewerModal";
-import SectionIcon from "@/components/ui/SectionIcon";
-import { CARD_FORM, ROW_ACTION_BTN } from "@/styles/surfaces";
 import {
-  formatTaskerDate,
-  getCommentComposerTransition,
-  resolveCommentComposer,
-  getInitials,
-  getTaskerCommentsAttachmentBytes,
-  TASKER_REPORT_ATTACHMENTS_MAX_BYTES,
-  sortComments,
-  taskerCommentDraftFrom,
-  type CommentComposerTarget,
-  type CommentOrder,
-} from "../../utils/taskerRules";
+  RADIUS_LG,
+  RADIUS_PILL,
+  RADIUS_SM,
+  useResponsive,
+} from "@/constants/responsive";
+import { CARD_FORM, ROW_ACTION_BTN } from "@/styles/surfaces";
+import { Ionicons } from "@expo/vector-icons";
+import React, {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  type ScrollView,
+} from "react-native";
 import type {
   TaskerComment,
   TaskerCommentDraft,
 } from "../../../types/typesTasker/TaskerTypes";
-import { REPORT_LAYOUT as L, REPORT_TOUCH_MIN, reportTitleMetrics } from "./reportCompact";
+import {
+  formatTaskerDate,
+  getCommentComposerTransition,
+  getInitials,
+  getTaskerCommentsAttachmentBytes,
+  resolveCommentComposer,
+  sortComments,
+  TASKER_REPORT_ATTACHMENTS_MAX_BYTES,
+  taskerCommentDraftFrom,
+  type CommentComposerTarget,
+  type CommentOrder,
+} from "../../utils/taskerRules";
+import {
+  REPORT_LAYOUT as L,
+  REPORT_TOUCH_MIN,
+  reportTitleMetrics,
+} from "./reportCompact";
 import TaskerCommentComposer from "./TaskerCommentComposer";
 import TaskerCommentThumb from "./TaskerCommentThumb";
 
@@ -124,7 +146,10 @@ export default function TaskerCommentsCard({
     setOpenTarget(null);
   }
 
-  const sorted = useMemo(() => sortComments(comments, order), [comments, order]);
+  const sorted = useMemo(
+    () => sortComments(comments, order),
+    [comments, order],
+  );
   // Reiniciada, o el comentario en edición dejó de existir → formulario cerrado.
   const composer = resolveCommentComposer(
     openTarget,
@@ -140,13 +165,25 @@ export default function TaskerCommentsCard({
   }, []);
 
   const requestComposer = (next: CommentComposerTarget) => {
-    const transition = getCommentComposerTransition(composer, next, changedRef.current);
+    const transition = getCommentComposerTransition(
+      composer,
+      next,
+      changedRef.current,
+    );
     if (transition === "apply") openComposer(next);
     else if (transition === "confirm") {
-      Alert.alert("¿Descartar cambios?", "Lo que escribiste en este comentario se perderá.", [
-        { text: "Seguir editando", style: "cancel" },
-        { text: "Descartar", style: "destructive", onPress: () => openComposer(next) },
-      ]);
+      Alert.alert(
+        "¿Descartar cambios?",
+        "Lo que escribiste en este comentario se perderá.",
+        [
+          { text: "Seguir editando", style: "cancel" },
+          {
+            text: "Descartar",
+            style: "destructive",
+            onPress: () => openComposer(next),
+          },
+        ],
+      );
     }
   };
 
@@ -163,7 +200,11 @@ export default function TaskerCommentsCard({
   const handleDelete = (comment: TaskerComment) => {
     Alert.alert("¿Eliminar comentario?", undefined, [
       { text: "Cancelar", style: "cancel" },
-      { text: "Eliminar", style: "destructive", onPress: () => onDelete(comment.id) },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: () => onDelete(comment.id),
+      },
     ]);
   };
 
@@ -173,7 +214,10 @@ export default function TaskerCommentsCard({
     else setOwnOrder(next);
   };
 
-  const renderComposer = (mode: "add" | "edit", initialDraft: TaskerCommentDraft) => (
+  const renderComposer = (
+    mode: "add" | "edit",
+    initialDraft: TaskerCommentDraft,
+  ) => (
     <TaskerCommentComposer
       mode={mode}
       initialDraft={initialDraft}
@@ -184,7 +228,10 @@ export default function TaskerCommentsCard({
         sharedAttachmentLimit
           ? {
               maxBytes: TASKER_REPORT_ATTACHMENTS_MAX_BYTES,
-              usedElsewhere: getTaskerCommentsAttachmentBytes(comments, editingId ?? undefined),
+              usedElsewhere: getTaskerCommentsAttachmentBytes(
+                comments,
+                editingId ?? undefined,
+              ),
             }
           : undefined
       }
@@ -200,7 +247,11 @@ export default function TaskerCommentsCard({
   return (
     <View style={[styles.card, compact && styles.cardCompact]}>
       <View style={[styles.cardHeader, compact && styles.cardHeaderCompact]}>
-        <SectionIcon tone="blue" size={titleIcon?.side} radius={titleIcon?.radius}>
+        <SectionIcon
+          tone="blue"
+          size={titleIcon?.side}
+          radius={titleIcon?.radius}
+        >
           <Ionicons
             name="chatbubble-ellipses-outline"
             size={titleIcon?.glyph ?? 18}
@@ -210,7 +261,10 @@ export default function TaskerCommentsCard({
         <Text
           style={[
             styles.cardTitle,
-            titleIcon && { fontSize: titleIcon.fontSize, lineHeight: titleIcon.lineHeight },
+            titleIcon && {
+              fontSize: titleIcon.fontSize,
+              lineHeight: titleIcon.lineHeight,
+            },
           ]}
         >
           {`Comentarios (${comments.length})`}
@@ -232,11 +286,17 @@ export default function TaskerCommentsCard({
             style={styles.addCommentRoundBtn}
             onPress={toggleAdding}
             accessibilityRole="button"
-            accessibilityLabel={isAdding ? "Cerrar comentario" : "Agregar comentario"}
+            accessibilityLabel={
+              isAdding ? "Cerrar comentario" : "Agregar comentario"
+            }
             accessibilityState={{ expanded: isAdding }}
             activeOpacity={0.75}
           >
-            <Ionicons name={isAdding ? "close" : "add"} size={22} color={PRIMARY_700} />
+            <Ionicons
+              name={isAdding ? "close" : "add"}
+              size={22}
+              color={PRIMARY_700}
+            />
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -250,23 +310,31 @@ export default function TaskerCommentsCard({
               size={16}
               color={PRIMARY_700}
             />
-            <Text style={styles.addCommentText}>{isAdding ? "Ocultar" : "Agregar"}</Text>
+            <Text style={styles.addCommentText}>
+              {isAdding ? "Ocultar" : "Agregar"}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
 
       {isAdding && (
-        <View style={[styles.addComposer, compact && styles.addComposerCompact]}>
+        <View
+          style={[styles.addComposer, compact && styles.addComposerCompact]}
+        >
           {renderComposer("add", EMPTY_DRAFT)}
         </View>
       )}
 
       {sorted.length === 0 ? (
         !isAdding && (
-          <Text style={styles.emptyText}>Agrega un comentario, una imagen o un PDF.</Text>
+          <Text style={styles.emptyText}>
+            Agrega un comentario, una imagen o un archivo.
+          </Text>
         )
       ) : (
-        <View style={[styles.commentList, compact && styles.commentListCompact]}>
+        <View
+          style={[styles.commentList, compact && styles.commentListCompact]}
+        >
           {sorted.map((comment) =>
             comment.id === editingId ? (
               <React.Fragment key={comment.id}>
@@ -316,11 +384,15 @@ function CommentItem({
     <View style={[styles.comment, compact && styles.commentCompact]}>
       <View style={styles.commentHeader}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{getInitials(comment.addUser.name)}</Text>
+          <Text style={styles.avatarText}>
+            {getInitials(comment.addUser.name)}
+          </Text>
         </View>
         <View style={styles.commentMeta}>
           <Text style={styles.commentAuthor}>{comment.addUser.name}</Text>
-          <Text style={styles.commentDate}>{formatTaskerDate(comment.createdDate)}</Text>
+          <Text style={styles.commentDate}>
+            {formatTaskerDate(comment.createdDate)}
+          </Text>
         </View>
         {editable && (
           <View style={styles.rowActions}>
@@ -346,7 +418,9 @@ function CommentItem({
         )}
       </View>
       {/* Comentario de solo adjuntos (como Tasker): sin línea de texto vacía. */}
-      {!!comment.comment.trim() && <Text style={styles.commentText}>{comment.comment}</Text>}
+      {!!comment.comment.trim() && (
+        <Text style={styles.commentText}>{comment.comment}</Text>
+      )}
       {comment.images.length > 0 && (
         <View style={styles.commentImages}>
           {comment.images.map((path, index) => (
@@ -381,7 +455,12 @@ function createStyles(
       gap: scale(8),
       marginBottom: verticalScale(14),
     },
-    cardTitle: { flex: 1, fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
+    cardTitle: {
+      flex: 1,
+      fontSize: font(15),
+      fontWeight: "700",
+      color: TEXT_PRIMARY,
+    },
     // Botón de ícono cuadrado: 40×40 fijo (área táctil).
     iconBtn: {
       ...ROW_ACTION_BTN,
@@ -402,7 +481,11 @@ function createStyles(
       borderRadius: RADIUS_LG,
       backgroundColor: PRIMARY_TINT_50,
     },
-    addCommentText: { fontSize: font(13), fontWeight: "700", color: PRIMARY_700 },
+    addCommentText: {
+      fontSize: font(13),
+      fontWeight: "700",
+      color: PRIMARY_700,
+    },
     // Botón circular "+" / "×" de Reportar: 44×44 fijo (área táctil), mismo acento.
     addCommentRoundBtn: {
       width: REPORT_TOUCH_MIN,
@@ -424,7 +507,9 @@ function createStyles(
       gap: scale(L.headerGap),
       marginBottom: verticalScale(L.headerMarginBottom),
     },
-    addComposerCompact: { marginBottom: verticalScale(L.addComposerMarginBottom) },
+    addComposerCompact: {
+      marginBottom: verticalScale(L.addComposerMarginBottom),
+    },
     commentListCompact: { gap: verticalScale(L.commentListGap) },
     commentCompact: { padding: scale(L.commentPadding) },
     commentList: { gap: verticalScale(8) },
@@ -433,7 +518,11 @@ function createStyles(
       borderRadius: RADIUS_LG,
       backgroundColor: FIELD_BACKGROUND,
     },
-    commentHeader: { flexDirection: "row", alignItems: "center", gap: scale(10) },
+    commentHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+    },
     // Avatar circular de iniciales: 32×32 fijo.
     avatar: {
       width: 32,
@@ -445,8 +534,16 @@ function createStyles(
     },
     avatarText: { fontSize: font(12), fontWeight: "700", color: PRIMARY_700 },
     commentMeta: { flex: 1 },
-    commentAuthor: { fontSize: font(14), fontWeight: "700", color: TEXT_PRIMARY },
-    commentDate: { fontSize: font(12), color: TEXT_MUTED, fontVariant: ["tabular-nums"] },
+    commentAuthor: {
+      fontSize: font(14),
+      fontWeight: "700",
+      color: TEXT_PRIMARY,
+    },
+    commentDate: {
+      fontSize: font(12),
+      color: TEXT_MUTED,
+      fontVariant: ["tabular-nums"],
+    },
     // gap ≥ 8: los hitSlop de 4 de cada botón no se pisan.
     rowActions: { flexDirection: "row", alignItems: "center", gap: scale(8) },
     // Botón de ícono cuadrado: 36×36 fijo (+ hitSlop 4 = 44 de área táctil).
@@ -471,6 +568,10 @@ function createStyles(
       gap: scale(8),
       marginTop: verticalScale(10),
     },
-    emptyText: { fontSize: font(13), color: TEXT_PLACEHOLDER, fontStyle: "italic" },
+    emptyText: {
+      fontSize: font(13),
+      color: TEXT_PLACEHOLDER,
+      fontStyle: "italic",
+    },
   });
 }

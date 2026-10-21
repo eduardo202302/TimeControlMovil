@@ -203,7 +203,7 @@ export default function TaskerCommentComposer({
           )}
           <Text style={styles.addBtnText}>Tomar foto o adjuntar archivo</Text>
         </TouchableOpacity>
-        <Text style={styles.helper}>Imágenes o PDF.</Text>
+        {!compact && <Text style={styles.helper}>Imágenes o PDF.</Text>}
       </View>
 
       <View style={styles.actions}>

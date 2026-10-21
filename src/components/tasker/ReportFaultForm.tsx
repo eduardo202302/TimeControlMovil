@@ -195,6 +195,14 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
   const [initial] = useState(() => initialSelection(clients, coords));
   const [clientId, setClientId] = useState<number>(initial.client.id);
   const client = clients.find((c) => c.id === clientId) ?? initial.client;
+
+  // Subtítulo del header (ver (app)/_layout.tsx): el cliente elegido, mientras
+  // el formulario está montado. Sin nombre o al desmontar → sin subtítulo.
+  const setHeaderClientName = useSchoolStore((state) => state.setTaskerReportClientName);
+  useEffect(() => {
+    setHeaderClientName(client.name.trim() || null);
+  }, [client.name, setHeaderClientName]);
+  useEffect(() => () => setHeaderClientName(null), [setHeaderClientName]);
   const [faultIds, setFaultIds] = useState<number[]>([]);
   /** Averías que se quitaron en el último cambio de cliente (0 = sin aviso). */
   const [removedFaults, setRemovedFaults] = useState(0);
@@ -575,6 +583,43 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
           </View>
         )}
 
+        {/* ── Descripción ── */}
+        <View style={styles.card}>
+          <CardHeader
+            styles={styles}
+            tone="blue"
+            icon="document-text-outline"
+            title="Descripción"
+            required={rules.descriptionRequired}
+          />
+          <TextInput
+            style={[styles.textarea, !!errors.description && styles.fieldInvalid]}
+            value={description}
+            onChangeText={handleDescriptionChange}
+            placeholder="Describa los detalles aquí…"
+            placeholderTextColor={TEXT_PLACEHOLDER}
+            multiline
+            textAlignVertical="top"
+            accessibilityLabel="Descripción"
+          />
+          {!!errors.description && (
+            <Text style={styles.fieldError}>{errors.description}</Text>
+          )}
+        </View>
+
+        {/* ── Comentarios: texto, imágenes/PDF o ambos (todos del usuario en sesión: editables) ── */}
+        <TaskerCommentsCard
+          comments={comments}
+          canEdit={() => true}
+          onAdd={handleAddComment}
+          onEdit={handleEditComment}
+          onDelete={handleRemoveComment}
+          sharedAttachmentLimit
+          scrollRef={scrollRef}
+          resetKey={commentsResetKey}
+          compact
+        />
+
         {/* ── Cliente: fijo con uno solo; con 2 o más, selector ── */}
         <View style={styles.card}>
           <CardHeader styles={styles} tone="blue" icon="business-outline" title={clientLabel} />
@@ -642,43 +687,6 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
             </Text>
           </View>
         </View>
-
-        {/* ── Descripción ── */}
-        <View style={styles.card}>
-          <CardHeader
-            styles={styles}
-            tone="blue"
-            icon="document-text-outline"
-            title="Descripción"
-            required={rules.descriptionRequired}
-          />
-          <TextInput
-            style={[styles.textarea, !!errors.description && styles.fieldInvalid]}
-            value={description}
-            onChangeText={handleDescriptionChange}
-            placeholder="Describa los detalles aquí…"
-            placeholderTextColor={TEXT_PLACEHOLDER}
-            multiline
-            textAlignVertical="top"
-            accessibilityLabel="Descripción"
-          />
-          {!!errors.description && (
-            <Text style={styles.fieldError}>{errors.description}</Text>
-          )}
-        </View>
-
-        {/* ── Comentarios: texto, imágenes/PDF o ambos (todos del usuario en sesión: editables) ── */}
-        <TaskerCommentsCard
-          comments={comments}
-          canEdit={() => true}
-          onAdd={handleAddComment}
-          onEdit={handleEditComment}
-          onDelete={handleRemoveComment}
-          sharedAttachmentLimit
-          scrollRef={scrollRef}
-          resetKey={commentsResetKey}
-          compact
-        />
 
         {/* ── Direcciones: las del cliente (la predeterminada solo se elige) + las agregadas ── */}
         <View style={styles.card}>

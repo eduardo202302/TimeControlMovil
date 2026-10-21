@@ -379,6 +379,9 @@ export interface SchoolStore {
   // cargar o sin clientes.
   taskerConfig: TaskerCompanyConfig | null;
   taskerClients: TaskerUserClient[];
+  // Nombre del cliente (localidad) elegido en Reportar: subtítulo del header
+  // en /reportfault. Solo en memoria; null = sin formulario montado.
+  taskerReportClientName: string | null;
 
   // Acciones existentes
   setSchool: (school: School) => void;
@@ -397,6 +400,7 @@ export interface SchoolStore {
   setPendingOpenDay: (p: PunchEvent | null) => void;
   setClosedOpenDayKey: (key: string | null) => void;
   setTaskerSession: (session: TaskerSession) => void;
+  setTaskerReportClientName: (name: string | null) => void;
   /** Actualiza el store y la persiste en SecureStore. */
   setLastCompany: (lastCompany: LastCompany) => Promise<void>;
   /** La saca del store y la borra de SecureStore. */
