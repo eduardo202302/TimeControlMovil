@@ -59,10 +59,10 @@ import {
 } from "../../utils/taskerRules";
 import { scrollIntoView } from "./scrollIntoView";
 import {
-  REPORT_LAYOUT as L,
-  REPORT_TOUCH_MIN,
-  reportTitleMetrics,
-} from "./reportCompact";
+  TASKER_LAYOUT as L,
+  TASKER_TOUCH_MIN,
+  taskerTitleMetrics,
+} from "./taskerCompact";
 import TaskerCommentComposer from "./TaskerCommentComposer";
 import TaskerCommentThumb from "./TaskerCommentThumb";
 
@@ -126,9 +126,9 @@ interface TaskerCommentsCardProps {
    */
   resetKey?: number;
   /**
-   * Reportar: tarjeta compacta (menos aire, ícono del título a la altura del
-   * texto, texto del comentario de 2 líneas) y "Agregar" como botón circular
-   * "+" / "×". Sin él (Seguimiento), la tarjeta de siempre.
+   * Reportar y Seguimiento: tarjeta compacta (menos aire, ícono del título a
+   * la altura del texto, texto del comentario de 2 líneas) y "Agregar" como
+   * botón circular "+" / "×". Sin él, la tarjeta de siempre.
    */
   compact?: boolean;
 }
@@ -317,7 +317,7 @@ export default function TaskerCommentsCard({
     />
   );
 
-  const titleIcon = compact ? reportTitleMetrics(font) : null;
+  const titleIcon = compact ? taskerTitleMetrics(font) : null;
   const toggleAdding = () => {
     if (!saving) requestComposer(isAdding ? null : { mode: "add" });
   };
@@ -574,10 +574,10 @@ function createStyles(
       fontWeight: "700",
       color: PRIMARY_700,
     },
-    // Botón circular "+" / "×" de Reportar: 44×44 fijo (área táctil), mismo acento.
+    // Botón circular "+" / "×" (compacto): 44×44 fijo (área táctil), mismo acento.
     addCommentRoundBtn: {
-      width: REPORT_TOUCH_MIN,
-      height: REPORT_TOUCH_MIN,
+      width: TASKER_TOUCH_MIN,
+      height: TASKER_TOUCH_MIN,
       borderWidth: 1,
       borderColor: PRIMARY_TINT_BORDER,
       borderRadius: RADIUS_PILL,
@@ -585,7 +585,7 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
     },
-    // Reportar compacto: medidas en reportCompact.ts.
+    // Compacto (Reportar y Seguimiento): medidas en taskerCompact.ts.
     cardCompact: {
       paddingHorizontal: scale(L.cardPaddingH),
       paddingTop: verticalScale(L.cardPaddingTop),

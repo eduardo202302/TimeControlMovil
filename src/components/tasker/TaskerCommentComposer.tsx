@@ -40,7 +40,7 @@ import type {
   TaskerAttachment,
   TaskerCommentDraft,
 } from "../../../types/typesTasker/TaskerTypes";
-import { REPORT_LAYOUT as L, reportMultilineStyle } from "./reportCompact";
+import { TASKER_LAYOUT as L, taskerMultilineStyle } from "./taskerCompact";
 import { scrollIntoView } from "./scrollIntoView";
 import TaskerCommentThumb from "./TaskerCommentThumb";
 import { useTaskerAttachmentPicker } from "./useTaskerAttachmentPicker";
@@ -70,8 +70,8 @@ interface TaskerCommentComposerProps {
   /** ScrollView de la pantalla: al abrir y al enfocar el texto se desplaza hasta acá. */
   scrollRef?: RefObject<ScrollView | null>;
   /**
-   * Reportar: menos aire y el texto arranca en 2 líneas (crece hasta 5 y
-   * luego hace scroll interno). Sin él (Seguimiento), el formulario de siempre.
+   * Reportar y Seguimiento: menos aire y el texto arranca en 2 líneas (crece
+   * hasta 5 y luego hace scroll interno). Sin él, el formulario de siempre.
    */
   compact?: boolean;
 }
@@ -274,7 +274,7 @@ function createStyles(
       gap: verticalScale(L.composerGap),
       padding: scale(L.composerPadding),
     },
-    inputCompact: reportMultilineStyle(scale, font),
+    inputCompact: taskerMultilineStyle(scale, font),
     counter: {
       alignSelf: "flex-end",
       fontSize: font(12),

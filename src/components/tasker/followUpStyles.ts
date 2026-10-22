@@ -30,16 +30,22 @@ import {
   SEGMENTED_SURFACE,
   SEGMENT_ACTIVE,
 } from "@/styles/surfaces";
+import { TASKER_LAYOUT as L, TASKER_TOUCH_MIN, taskerTitleMetrics } from "./taskerCompact";
 
 /**
  * Un solo createStyles para Seguimiento: FollowUpView lo memoiza y lo pasa
- * por prop a las tres pestañas (ninguna llama useResponsive()).
+ * por prop a las tres pestañas (ninguna llama useResponsive()). Tarjetas,
+ * títulos y áreas táctiles con las medidas compactas de Reportar
+ * (taskerCompact.ts).
  */
 export function createFollowUpStyles(
   scale: (size: number) => number,
   verticalScale: (size: number) => number,
   font: (size: number) => number,
 ) {
+  const title = taskerTitleMetrics(font);
+  const touchMin = Math.max(TASKER_TOUCH_MIN, verticalScale(44));
+
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     flex: { flex: 1 },
@@ -49,16 +55,17 @@ export function createFollowUpStyles(
       width: "100%",
     },
     content: {
-      paddingHorizontal: scale(16),
-      paddingBottom: verticalScale(24),
-      gap: verticalScale(14),
+      paddingHorizontal: scale(L.screenPadding),
+      paddingBottom: verticalScale(L.screenPaddingBottom),
+      gap: verticalScale(L.cardGap),
     },
 
     /* ── Pestañas segmentadas (fijas arriba) ── */
+    // Debajo, la misma separación que entre tarjetas.
     tabsWrap: {
-      paddingHorizontal: scale(16),
-      paddingTop: verticalScale(16),
-      paddingBottom: verticalScale(14),
+      paddingHorizontal: scale(L.screenPadding),
+      paddingTop: verticalScale(L.screenPadding),
+      paddingBottom: verticalScale(L.cardGap),
     },
     segmented: {
       ...SEGMENTED_SURFACE,
@@ -72,10 +79,12 @@ export function createFollowUpStyles(
       alignItems: "center",
       justifyContent: "center",
       gap: scale(6),
-      minHeight: verticalScale(44),
+      minHeight: touchMin,
       borderRadius: RADIUS_SM,
     },
     segmentActive: { ...SEGMENT_ACTIVE },
+    // Bloqueada (sin ticket elegido): atenuada, como los botones deshabilitados.
+    segmentDisabled: { opacity: 0.4 },
     segmentText: { fontSize: font(13), fontWeight: "600", color: TEXT_MUTED },
     segmentTextActive: { color: ON_PRIMARY, fontWeight: "700" },
     segmentBadge: {
@@ -97,17 +106,24 @@ export function createFollowUpStyles(
     /* ── Tarjetas ── */
     card: {
       ...CARD_FORM,
-      paddingHorizontal: scale(16),
-      paddingTop: verticalScale(14),
-      paddingBottom: verticalScale(16),
+      paddingHorizontal: scale(L.cardPaddingH),
+      paddingTop: verticalScale(L.cardPaddingTop),
+      paddingBottom: verticalScale(L.cardPaddingBottom),
     },
     cardHeader: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(8),
-      marginBottom: verticalScale(14),
+      gap: scale(L.headerGap),
+      marginBottom: verticalScale(L.headerMarginBottom),
     },
-    cardTitle: { flex: 1, fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
+    // lineHeight = lado del ícono (taskerTitleMetrics): quedan a la misma altura.
+    cardTitle: {
+      flex: 1,
+      fontSize: title.fontSize,
+      lineHeight: title.lineHeight,
+      fontWeight: "700",
+      color: TEXT_PRIMARY,
+    },
 
     /* ── Estados de una pestaña (cargando, vacío, error, sin selección) ── */
     notice: {
@@ -126,16 +142,16 @@ export function createFollowUpStyles(
       flexDirection: "row",
       alignItems: "center",
       gap: scale(8),
-      minHeight: verticalScale(44),
+      minHeight: touchMin,
       paddingHorizontal: scale(20),
     },
     noticeBtnText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
 
     /* ── Selector de tickets (fila horizontal) ── */
     // Sangra hasta el borde de la pantalla: la fila se desliza bajo el padding.
-    picker: { marginHorizontal: -scale(16) },
+    picker: { marginHorizontal: -scale(L.screenPadding) },
     pickerContent: {
-      paddingHorizontal: scale(16),
+      paddingHorizontal: scale(L.screenPadding),
       // Aire para la sombra de las tarjetas (el scroll horizontal la recorta).
       paddingVertical: verticalScale(4),
       gap: scale(10),
@@ -180,7 +196,7 @@ export function createFollowUpStyles(
       flexDirection: "row",
       alignItems: "center",
       gap: scale(10),
-      paddingHorizontal: scale(16),
+      paddingHorizontal: scale(L.cardPaddingH),
       paddingVertical: verticalScale(12),
     },
     stripBody: { flex: 1 },
@@ -288,7 +304,7 @@ export function createFollowUpStyles(
       flexDirection: "row",
       alignItems: "center",
       gap: scale(6),
-      minHeight: verticalScale(44),
+      minHeight: touchMin,
       paddingHorizontal: scale(14),
       borderWidth: 1,
       borderColor: PRIMARY_TINT_BORDER,
@@ -413,7 +429,7 @@ export function createFollowUpStyles(
       flexDirection: "row",
       alignItems: "center",
       gap: scale(6),
-      minHeight: verticalScale(40),
+      minHeight: touchMin,
       paddingHorizontal: scale(12),
       borderWidth: 1,
       borderColor: PRIMARY_TINT_BORDER,

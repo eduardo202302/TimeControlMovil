@@ -154,6 +154,7 @@ export default function FollowUpTicketTab({
         onOrderChange={onCommentOrderChange}
         resetKey={commentsResetKey}
         scrollRef={scrollRef}
+        compact
       />
     </>
   );

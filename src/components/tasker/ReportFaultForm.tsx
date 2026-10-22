@@ -112,11 +112,11 @@ import TaskerAddressModal from "./TaskerAddressModal";
 import TaskerAddressSummary from "./TaskerAddressSummary";
 import TaskerCommentsCard, { type TaskerCommentsCardHandle } from "./TaskerCommentsCard";
 import {
-  REPORT_LAYOUT as L,
-  REPORT_TOUCH_MIN,
-  reportMultilineStyle,
-  reportTitleMetrics,
-} from "./reportCompact";
+  TASKER_LAYOUT as L,
+  TASKER_TOUCH_MIN,
+  taskerMultilineStyle,
+  taskerTitleMetrics,
+} from "./taskerCompact";
 
 type Styles = ReturnType<typeof createStyles>;
 
@@ -865,7 +865,7 @@ interface CardHeaderProps {
 
 function CardHeader({ styles, tone, icon, title, required, children }: CardHeaderProps) {
   const { font } = useResponsive();
-  const titleIcon = reportTitleMetrics(font);
+  const titleIcon = taskerTitleMetrics(font);
   return (
     <View style={styles.cardHeader}>
       <SectionIcon tone={tone} size={titleIcon.side} radius={titleIcon.radius}>
@@ -977,7 +977,7 @@ function createStyles(
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
     flex: { flex: 1 },
-    // Medidas del diseño compacto: reportCompact.ts (áreas táctiles ≥ 44).
+    // Medidas del diseño compacto: taskerCompact.ts (áreas táctiles ≥ 44).
     content: {
       padding: scale(L.screenPadding),
       gap: verticalScale(L.cardGap),
@@ -1000,11 +1000,11 @@ function createStyles(
       gap: scale(L.headerGap),
       marginBottom: verticalScale(L.headerMarginBottom),
     },
-    // lineHeight = lado del ícono (reportTitleMetrics): quedan a la misma altura.
+    // lineHeight = lado del ícono (taskerTitleMetrics): quedan a la misma altura.
     cardTitle: {
       flex: 1,
-      fontSize: reportTitleMetrics(font).fontSize,
-      lineHeight: reportTitleMetrics(font).lineHeight,
+      fontSize: taskerTitleMetrics(font).fontSize,
+      lineHeight: taskerTitleMetrics(font).lineHeight,
       fontWeight: "700",
       color: TEXT_PRIMARY,
     },
@@ -1014,7 +1014,7 @@ function createStyles(
       flexDirection: "row",
       alignItems: "center",
       gap: scale(10),
-      minHeight: Math.max(REPORT_TOUCH_MIN, verticalScale(44)),
+      minHeight: Math.max(TASKER_TOUCH_MIN, verticalScale(44)),
       paddingHorizontal: scale(12),
     },
     selectValue: { flex: 1, fontSize: font(14), color: TEXT_PRIMARY },
@@ -1044,7 +1044,7 @@ function createStyles(
     // 2 líneas al arrancar; crece hasta 5 y luego scroll interno.
     textarea: {
       ...FIELD_SURFACE,
-      ...reportMultilineStyle(scale, font),
+      ...taskerMultilineStyle(scale, font),
       paddingHorizontal: scale(12),
       fontSize: font(14),
       color: TEXT_PRIMARY,
@@ -1057,7 +1057,7 @@ function createStyles(
       alignItems: "center",
       justifyContent: "center",
       gap: scale(8),
-      minHeight: Math.max(REPORT_TOUCH_MIN, verticalScale(44)),
+      minHeight: Math.max(TASKER_TOUCH_MIN, verticalScale(44)),
     },
     addBtnSpaced: { marginTop: verticalScale(L.addBtnMarginTop) },
     addBtnText: { fontSize: font(14), fontWeight: "600", color: PRIMARY_700 },

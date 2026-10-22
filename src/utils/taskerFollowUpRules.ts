@@ -27,7 +27,6 @@ export const TASKR_TASK_GONE_MESSAGE = "La tarea ya no está disponible.";
 
 export const TASKER_NO_TICKETS_MESSAGE = "No tienes tickets reportados.";
 export const TASKER_SELECT_TICKET_MESSAGE = "Selecciona un ticket para ver el detalle.";
-export const TASKER_SELECT_TICKET_TAB_MESSAGE = "Selecciona un ticket en la pestaña Ticket.";
 export const TASKER_NO_CLIENT_LABEL = "Sin cliente";
 export const TASKER_UNASSIGNED_LABEL = "Sin asignar";
 /** Autor sin nombre en ningún lado (ni addUser ni externalUserName). */

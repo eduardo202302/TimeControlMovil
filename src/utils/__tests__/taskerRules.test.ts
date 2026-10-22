@@ -40,6 +40,7 @@ import {
   formatTaskerDate,
   getActivityTime,
   getAddressFields,
+  formatTaskerAddressArea,
   getTaskerAddressLines,
   getInitials,
   getStateActivities,
@@ -780,8 +781,35 @@ describe("comentarios de Seguimiento", () => {
   });
 });
 
+describe("formatTaskerAddressArea", () => {
+  it("los tres: Ciudad, Zona, Sector en ese orden", () => {
+    expect(
+      formatTaskerAddressArea({ sector: "Naco", zone: "Zona Norte", city: "Santo Domingo" }),
+    ).toBe("Santo Domingo, Zona Norte, Naco");
+  });
+  it("vacíos o solo espacios: se omiten sin comas sueltas", () => {
+    expect(formatTaskerAddressArea({ city: "Santiago", zone: "", sector: "Gurabo" })).toBe(
+      "Santiago, Gurabo",
+    );
+    expect(formatTaskerAddressArea({ city: "", zone: "Zona Este", sector: "  " })).toBe("Zona Este");
+    expect(formatTaskerAddressArea({ city: " Santiago ", zone: "", sector: "" })).toBe("Santiago");
+  });
+  it("los tres vacíos → \"\" (la línea no se muestra)", () => {
+    expect(formatTaskerAddressArea({ city: "", zone: " ", sector: "" })).toBe("");
+  });
+  it("campos ausentes o null (datos de Taskr) → no rompe", () => {
+    const partial = { city: null, sector: "Gazcue" } as unknown as TaskerAddress;
+    expect(formatTaskerAddressArea(partial)).toBe("Gazcue");
+  });
+  it("la provincia no entra en la línea", () => {
+    expect(formatTaskerAddressArea(emptyAddress({ province: "D.N.", city: "Santo Domingo" }))).toBe(
+      "Santo Domingo",
+    );
+  });
+});
+
 describe("getTaskerAddressLines", () => {
-  it("completa: título, calle con #número y sector, ciudad, provincia", () => {
+  it("completa: título, calle con #número y ciudad, zona, sector", () => {
     expect(
       getTaskerAddressLines(
         emptyAddress({
@@ -789,6 +817,7 @@ describe("getTaskerAddressLines", () => {
           street: "Calle Luis F. Thomén",
           streetNumber: "412",
           sector: "Sector El Millón",
+          zone: "Zona Oeste",
           city: "Santo Domingo de Guzmán",
           province: "D.N.",
         }),
@@ -796,7 +825,7 @@ describe("getTaskerAddressLines", () => {
     ).toEqual({
       title: "El Millón",
       streetLine: "Calle Luis F. Thomén #412",
-      areaLine: "Sector El Millón, Santo Domingo de Guzmán, D.N.",
+      areaLine: "Santo Domingo de Guzmán, Zona Oeste, Sector El Millón",
     });
   });
   it("con vacíos: se saltan sin dejar comas sueltas", () => {
@@ -807,7 +836,7 @@ describe("getTaskerAddressLines", () => {
     });
     expect(
       getTaskerAddressLines(emptyAddress({ sector: "Gazcue", province: "D.N." })).areaLine,
-    ).toBe("Gazcue, D.N.");
+    ).toBe("Gazcue");
     expect(getTaskerAddressLines(emptyAddress())).toEqual({
       title: "",
       streetLine: "",
@@ -826,7 +855,7 @@ describe("getTaskerAddressLines", () => {
     expect(getTaskerAddressLines(SAMPLE_ADDRESS)).toEqual({
       title: "Clínica Las Marías",
       streetLine: "Av. Las Marías #104",
-      areaLine: "Sector Norte, Santo Domingo, Distrito Nacional",
+      areaLine: "Santo Domingo, Sector Norte",
     });
   });
 });

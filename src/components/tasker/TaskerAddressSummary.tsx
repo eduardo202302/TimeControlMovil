@@ -40,7 +40,7 @@ interface TaskerAddressSummaryProps {
 
 /**
  * Fila de dirección compartida por Reportar Avería y Seguimiento: título en
- * negrita, calle y número, sector/ciudad/provincia en gris y, salvo que se
+ * negrita, calle y número, ciudad/zona/sector en gris y, salvo que se
  * apague, el botón de mapa.
  */
 export default function TaskerAddressSummary({

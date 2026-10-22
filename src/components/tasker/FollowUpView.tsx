@@ -35,7 +35,6 @@ import {
   shouldDiscardOpenComment,
   TASKER_NO_TICKETS_MESSAGE,
   TASKER_SELECT_TICKET_MESSAGE,
-  TASKER_SELECT_TICKET_TAB_MESSAGE,
 } from "../../utils/taskerFollowUpRules";
 import type {
   TaskerCommentDraft,
@@ -126,11 +125,13 @@ export default function FollowUpView() {
     setDetail(next);
   }, []);
 
+  /** Sin ticket elegido, Dirección y Acciones se bloquean: se vuelve a Ticket. */
   const updateSelection = useCallback(
     (id: number | null, nextDetail: DetailState | null) => {
       selectedIdRef.current = id;
       setSelectedId(id);
       updateDetail(nextDetail);
+      if (id === null) setTab("ticket");
     },
     [updateDetail],
   );
@@ -322,10 +323,16 @@ export default function FollowUpView() {
   const task = detail?.status === "ready" ? detail.task : null;
   const stateActivities = useMemo(() => (task ? getStateActivities(task.activities) : []), [task]);
 
-  /** Sin detalle a la vista: elegir, cargando o error con "Reintentar". */
-  const renderDetailPlaceholder = (message: string) => {
+  /** Sin detalle a la vista: elegir (solo en Ticket), cargando o error con "Reintentar". */
+  const renderDetailPlaceholder = () => {
     if (selectedId === null) {
-      return <FollowUpNotice styles={styles} icon="hand-left-outline" message={message} />;
+      return (
+        <FollowUpNotice
+          styles={styles}
+          icon="hand-left-outline"
+          message={TASKER_SELECT_TICKET_MESSAGE}
+        />
+      );
     }
     if (detail?.status === "error") {
       return (
@@ -383,7 +390,7 @@ export default function FollowUpView() {
             scrollRef={scrollRef}
           />
         ) : (
-          renderDetailPlaceholder(TASKER_SELECT_TICKET_MESSAGE)
+          renderDetailPlaceholder()
         )}
       </>
     );
@@ -396,14 +403,21 @@ export default function FollowUpView() {
         <View style={styles.segmented}>
           {TABS.map(({ key, label, icon }) => {
             const active = tab === key;
+            // Dirección y Acciones necesitan un ticket elegido; Ticket, nunca bloqueada.
+            const disabled = key !== "ticket" && selectedId === null;
             return (
               <TouchableOpacity
                 key={key}
-                style={[styles.segment, active && styles.segmentActive]}
+                style={[
+                  styles.segment,
+                  active && styles.segmentActive,
+                  disabled && styles.segmentDisabled,
+                ]}
                 onPress={() => setTab(key)}
+                disabled={disabled}
                 activeOpacity={0.8}
                 accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
+                accessibilityState={{ selected: active, disabled }}
               >
                 <Ionicons name={icon} size={16} color={active ? ON_PRIMARY : TEXT_MUTED} />
                 <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
@@ -448,7 +462,7 @@ export default function FollowUpView() {
         >
           {tab === "ticket" && renderTicketTab()}
 
-          {tab !== "ticket" && !task && renderDetailPlaceholder(TASKER_SELECT_TICKET_TAB_MESSAGE)}
+          {tab !== "ticket" && !task && renderDetailPlaceholder()}
 
           {tab !== "ticket" && task && (
             <>

@@ -450,7 +450,7 @@ export interface TaskerAddressLines {
   title: string;
   /** "Calle #Número" sin los vacíos. */
   streetLine: string;
-  /** "Sector, Ciudad, Provincia" sin los vacíos. */
+  /** "Ciudad, Zona, Sector" sin los vacíos (formatTaskerAddressArea). */
   areaLine: string;
 }
 
@@ -465,7 +465,7 @@ export const TASKER_UNNAMED_ADDRESS = "Dirección sin nombre";
 export function getTaskerAddressDisplay(
   address: Pick<
     TaskerAddress,
-    "title" | "formattedAddress" | "address" | "street" | "streetNumber" | "sector" | "city" | "province"
+    "title" | "formattedAddress" | "address" | "street" | "streetNumber" | "city" | "zone" | "sector"
   >,
 ): TaskerAddressLines {
   const text = (value: string | null | undefined) => (typeof value === "string" ? value.trim() : "");
@@ -482,16 +482,30 @@ export function getTaskerAddressDisplay(
   return { ...lines, title, streetLine: titleIsStreet ? "" : lines.streetLine };
 }
 
+/**
+ * Línea de ubicación de toda tarjeta de dirección (Reportar y Seguimiento):
+ * Ciudad, Zona, Sector en ese orden, sin los vacíos. "" si faltan los tres
+ * (la línea no se muestra).
+ */
+export function formatTaskerAddressArea(
+  address: Pick<TaskerAddress, "city" | "zone" | "sector">,
+): string {
+  return [address.city, address.zone, address.sector]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .filter(Boolean)
+    .join(", ");
+}
+
 /** Textos del resumen de una dirección (fila de Reportar Avería y pestaña Dirección). */
 export function getTaskerAddressLines(
-  address: Pick<TaskerAddress, "title" | "street" | "streetNumber" | "sector" | "city" | "province">,
+  address: Pick<TaskerAddress, "title" | "street" | "streetNumber" | "city" | "zone" | "sector">,
 ): TaskerAddressLines {
   return {
     title: address.title,
     streetLine: [address.street, address.streetNumber && `#${address.streetNumber}`]
       .filter(Boolean)
       .join(" "),
-    areaLine: [address.sector, address.city, address.province].filter(Boolean).join(", "),
+    areaLine: formatTaskerAddressArea(address),
   };
 }
 

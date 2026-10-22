@@ -1,20 +1,21 @@
 import { RADIUS_SM } from "@/constants/responsive";
 
 /**
- * Medidas del diseño compacto de Reportar, todas en un solo lugar. Son los
- * valores BASE: cada estilo los pasa por scale / verticalScale / font.
+ * Medidas del diseño compacto de Tasker (Reportar y Seguimiento), todas en un
+ * solo lugar. Son los valores BASE: cada estilo los pasa por scale /
+ * verticalScale / font.
  */
 
-/** Área táctil mínima de los controles que se achican en Reportar. */
-export const REPORT_TOUCH_MIN = 44;
+/** Área táctil mínima de los controles que se achican en Reportar y Seguimiento. */
+export const TASKER_TOUCH_MIN = 44;
 
 /** Cuánto del aire original queda dentro de las tarjetas (padding, título → contenido, entre elementos). */
-export const REPORT_INNER_FACTOR = 1;
+export const TASKER_INNER_FACTOR = 1;
 
 /** Medida original con el factor de dentro de tarjeta. */
-const inner = (original: number) => original * REPORT_INNER_FACTOR;
+const inner = (original: number) => original * TASKER_INNER_FACTOR;
 
-export const REPORT_LAYOUT = {
+export const TASKER_LAYOUT = {
   // Bordes de la pantalla: los originales. Entre tarjetas: original (14) + 10 %.
   screenPadding: 16,
   screenPaddingBottom: 24,
@@ -59,17 +60,17 @@ export const REPORT_LAYOUT = {
 } as const;
 
 /**
- * Título de tarjeta en Reportar: el cuadrito del ícono mide lo mismo que la
+ * Título de tarjeta en Reportar y Seguimiento: el cuadrito del ícono mide lo mismo que la
  * línea del título (quedan alineados) y conserva la forma de SectionIcon
  * (radio RADIUS_SM sobre 32 → ¼ del lado).
  */
-export function reportTitleMetrics(font: (size: number) => number) {
-  const side = font(REPORT_LAYOUT.titleIconSide);
+export function taskerTitleMetrics(font: (size: number) => number) {
+  const side = font(TASKER_LAYOUT.titleIconSide);
   return {
-    fontSize: font(REPORT_LAYOUT.titleFontSize),
+    fontSize: font(TASKER_LAYOUT.titleFontSize),
     lineHeight: side,
     side,
-    glyph: font(REPORT_LAYOUT.titleIconGlyph),
+    glyph: font(TASKER_LAYOUT.titleIconGlyph),
     radius: Math.round((side * RADIUS_SM) / 32),
   };
 }
@@ -79,12 +80,12 @@ export function reportTitleMetrics(font: (size: number) => number) {
  * escribir hasta 5; de ahí en más hace scroll interno. El alto incluye el
  * borde de FIELD_SURFACE (1 arriba y 1 abajo).
  */
-export function reportMultilineStyle(
+export function taskerMultilineStyle(
   scale: (size: number) => number,
   font: (size: number) => number,
 ) {
-  const lineHeight = font(REPORT_LAYOUT.multilineLineHeight);
-  const paddingVertical = scale(REPORT_LAYOUT.multilinePaddingV);
+  const lineHeight = font(TASKER_LAYOUT.multilineLineHeight);
+  const paddingVertical = scale(TASKER_LAYOUT.multilinePaddingV);
   const chrome = paddingVertical * 2 + 2;
   return {
     lineHeight,

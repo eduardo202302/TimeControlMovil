@@ -14,11 +14,13 @@ import {
   SECTION_ICON_COLOR,
   type SectionTone,
 } from "@/constants/colors";
+import { useResponsive } from "@/constants/responsive";
 import SectionIcon from "@/components/ui/SectionIcon";
 import { getStateChipColors } from "../../utils/taskerRules";
 import { getTaskerStateLabel } from "../../utils/taskerFollowUpRules";
 import type { TaskerState } from "../../../types/typesTasker/TaskerTypes";
 import type { FollowUpStyles } from "./followUpStyles";
+import { taskerTitleMetrics } from "./taskerCompact";
 
 /** Piezas compartidas por las pestañas de Seguimiento. */
 
@@ -31,11 +33,14 @@ interface CardHeaderProps {
   children?: ReactNode;
 }
 
+/** Título de tarjeta con el ícono compacto de Reportar (taskerTitleMetrics). */
 export function FollowUpCardHeader({ styles, tone, icon, title, children }: CardHeaderProps) {
+  const { font } = useResponsive();
+  const titleIcon = taskerTitleMetrics(font);
   return (
     <View style={styles.cardHeader}>
-      <SectionIcon tone={tone}>
-        <Ionicons name={icon} size={18} color={SECTION_ICON_COLOR} />
+      <SectionIcon tone={tone} size={titleIcon.side} radius={titleIcon.radius}>
+        <Ionicons name={icon} size={titleIcon.glyph} color={SECTION_ICON_COLOR} />
       </SectionIcon>
       <Text style={styles.cardTitle}>{title}</Text>
       {children}

@@ -749,9 +749,9 @@ describe("getTaskerAddressDisplay (título y calle de respaldo)", () => {
     address: "",
     street: "",
     streetNumber: "",
-    sector: "",
     city: "",
-    province: "",
+    zone: "",
+    sector: "",
   };
   it("title presente → ese título y la línea de calle", () => {
     expect(
