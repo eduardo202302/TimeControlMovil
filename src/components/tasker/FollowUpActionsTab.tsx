@@ -8,26 +8,35 @@ import {
   formatActivityRange,
   getActivityTime,
 } from "../../utils/taskerRules";
-import type { TaskerActivity } from "../../../types/typesTasker/TaskerTypes";
+import {
+  getActivityActorName,
+  getStateActivityTitle,
+} from "../../utils/taskerFollowUpRules";
+import type { TaskerActivity, TaskerTask } from "../../../types/typesTasker/TaskerTypes";
 import { FollowUpCardHeader } from "./FollowUpParts";
 import type { FollowUpStyles } from "./followUpStyles";
+import { useNowMs } from "./useNowMs";
 
 interface FollowUpActionsTabProps {
-  /** Ya filtradas por getStateActivities (solo estados, id descendente). */
+  /** Ya filtradas por getStateActivities (solo estados, beginDate descendente). */
   activities: TaskerActivity[];
   /** Estado actual del ticket. */
   stateId: number;
-  /** "Ahora" fijado al montar la pantalla. */
-  nowMs: number;
+  /** Cuenta del puente y quién reportó: deciden el "Por:" (getActivityActorName). */
+  owner: Pick<TaskerTask, "addUserId" | "externalUserName">;
+  /** Seguimiento a la vista y app en primer plano: el tiempo en curso corre. */
+  live: boolean;
   styles: FollowUpStyles;
 }
 
 export default function FollowUpActionsTab({
   activities,
   stateId,
-  nowMs,
+  owner,
+  live,
   styles,
 }: FollowUpActionsTabProps) {
+  const nowMs = useNowMs(live);
   return (
     <View style={styles.card}>
       <FollowUpCardHeader
@@ -36,14 +45,19 @@ export default function FollowUpActionsTab({
         icon="time-outline"
         title={`Historial de Acciones - ${activities.length}`}
       />
+      {activities.length === 0 && (
+        <Text style={styles.descriptionText}>Sin cambios de estado registrados.</Text>
+      )}
       <View>
         {activities.map((activity, index) => {
           const time = getActivityTime(activity, stateId, nowMs);
+          const actor = getActivityActorName(activity, owner);
           const isLast = index === activities.length - 1;
           return index === 0 ? (
             <CurrentRow
               key={activity.id}
               activity={activity}
+              actor={actor}
               time={time}
               isLast={isLast}
               styles={styles}
@@ -52,6 +66,7 @@ export default function FollowUpActionsTab({
             <PastRow
               key={activity.id}
               activity={activity}
+              actor={actor}
               time={time}
               isLast={isLast}
               styles={styles}
@@ -65,13 +80,16 @@ export default function FollowUpActionsTab({
 
 interface RowProps {
   activity: TaskerActivity;
+  /** "Por:" ya resuelto (nunca la cuenta del puente). */
+  actor: string;
   time: string | null;
   isLast: boolean;
   styles: FollowUpStyles;
 }
 
 /** Estado actual: tarjeta destacada con nodo grande. */
-function CurrentRow({ activity, time, isLast, styles }: RowProps) {
+function CurrentRow({ activity, actor, time, isLast, styles }: RowProps) {
+  const title = getStateActivityTitle(activity);
   return (
     <View style={styles.timelineRow}>
       <View style={styles.rail}>
@@ -85,15 +103,13 @@ function CurrentRow({ activity, time, isLast, styles }: RowProps) {
           <Text style={styles.currentBadgeText}>Estado actual</Text>
         </View>
         <Text style={styles.currentTitle}>
-          {activity.action}
-          {!!activity.message && (
-            <Text style={styles.currentMessage}> {activity.message}</Text>
-          )}
+          {title.state}
+          {!!title.message && <Text style={styles.currentMessage}> {title.message}</Text>}
         </Text>
         <Text style={styles.currentRange}>{formatActivityRange(activity)}</Text>
         <View style={[styles.metaRow, styles.currentMetaRow]}>
           <Text style={styles.currentBy}>
-            Por: <Text style={styles.currentByName}>{activity.user.name}</Text>
+            Por: <Text style={styles.currentByName}>{actor}</Text>
           </Text>
           {time != null && (
             <View style={styles.currentTime}>
@@ -108,7 +124,8 @@ function CurrentRow({ activity, time, isLast, styles }: RowProps) {
 }
 
 /** Estados anteriores: atenuados sobre la línea de tiempo. */
-function PastRow({ activity, time, isLast, styles }: RowProps) {
+function PastRow({ activity, actor, time, isLast, styles }: RowProps) {
+  const title = getStateActivityTitle(activity);
   return (
     <View style={styles.timelineRow}>
       <View style={styles.rail}>
@@ -117,13 +134,13 @@ function PastRow({ activity, time, isLast, styles }: RowProps) {
       </View>
       <View style={[styles.pastBody, !isLast && styles.pastBodySpaced]}>
         <Text style={styles.pastTitle}>
-          <Text style={styles.pastAction}>{activity.action}</Text>
-          {activity.message ? ` ${activity.message}` : ""}
+          <Text style={styles.pastAction}>{title.state}</Text>
+          {title.message ? ` ${title.message}` : ""}
         </Text>
         <Text style={styles.pastRange}>{formatActivityRange(activity)}</Text>
         <View style={[styles.metaRow, styles.pastMetaRow]}>
           <Text style={styles.pastBy}>
-            Por: <Text style={styles.pastByName}>{activity.user.name}</Text>
+            Por: <Text style={styles.pastByName}>{actor}</Text>
           </Text>
           {time != null && <Text style={styles.pastTime}>{time}</Text>}
         </View>

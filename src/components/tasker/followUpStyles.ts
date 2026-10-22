@@ -26,6 +26,7 @@ import { SHADOW_SM } from "@/constants/shadows";
 import {
   CARD_FORM,
   CARD_ROW,
+  FOOTER_BTN_SAVE,
   SEGMENTED_SURFACE,
   SEGMENT_ACTIVE,
 } from "@/styles/surfaces";
@@ -108,6 +109,58 @@ export function createFollowUpStyles(
     },
     cardTitle: { flex: 1, fontSize: font(15), fontWeight: "700", color: TEXT_PRIMARY },
 
+    /* ── Estados de una pestaña (cargando, vacío, error, sin selección) ── */
+    notice: {
+      alignItems: "center",
+      gap: verticalScale(12),
+      paddingVertical: verticalScale(24),
+    },
+    noticeText: {
+      fontSize: font(14),
+      lineHeight: font(20),
+      color: TEXT_SECONDARY,
+      textAlign: "center",
+    },
+    noticeBtn: {
+      ...FOOTER_BTN_SAVE,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(8),
+      minHeight: verticalScale(44),
+      paddingHorizontal: scale(20),
+    },
+    noticeBtnText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
+
+    /* ── Selector de tickets (fila horizontal) ── */
+    // Sangra hasta el borde de la pantalla: la fila se desliza bajo el padding.
+    picker: { marginHorizontal: -scale(16) },
+    pickerContent: {
+      paddingHorizontal: scale(16),
+      // Aire para la sombra de las tarjetas (el scroll horizontal la recorta).
+      paddingVertical: verticalScale(4),
+      gap: scale(10),
+    },
+    pickerCard: {
+      ...CARD_ROW,
+      width: scale(156),
+      gap: verticalScale(6),
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(10),
+    },
+    pickerCardSelected: {
+      borderColor: PRIMARY_COLOR,
+      backgroundColor: PRIMARY_TINT_50,
+    },
+    pickerId: {
+      fontSize: font(14),
+      fontWeight: "800",
+      color: TEXT_PRIMARY,
+      fontVariant: ["tabular-nums"],
+    },
+    pickerIdSelected: { color: PRIMARY_700 },
+    pickerClient: { fontSize: font(12), color: TEXT_MUTED },
+    pickerChip: { alignSelf: "flex-start" },
+
     /* ── Chip de estado (colores en línea desde getStateChipColors) ── */
     stateChip: {
       flexDirection: "row",
@@ -119,7 +172,7 @@ export function createFollowUpStyles(
     },
     // Punto del chip: 8×8 fijo.
     stateDot: { width: 8, height: 8, borderRadius: RADIUS_PILL },
-    stateText: { fontSize: font(12), fontWeight: "700", color: TEXT_PRIMARY },
+    stateText: { flexShrink: 1, fontSize: font(12), fontWeight: "700", color: TEXT_PRIMARY },
 
     /* ── Franja compacta (Dirección / Acciones) ── */
     strip: {
@@ -196,6 +249,19 @@ export function createFollowUpStyles(
       backgroundColor: FIELD_DISABLED_BACKGROUND,
     },
     descriptionText: { fontSize: font(14), lineHeight: font(20), color: TEXT_SECONDARY },
+    faultList: { gap: verticalScale(8) },
+    faultRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(10),
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(10),
+      borderRadius: RADIUS_LG,
+      backgroundColor: FIELD_BACKGROUND,
+    },
+    // Punto de cada avería: 6×6 fijo.
+    faultDot: { width: 6, height: 6, borderRadius: RADIUS_PILL, backgroundColor: PRIMARY_COLOR },
+    faultText: { flex: 1, fontSize: font(14), lineHeight: font(20), color: TEXT_PRIMARY },
     /* ── Pestaña Dirección ── */
     addressGrid: {
       flexDirection: "row",

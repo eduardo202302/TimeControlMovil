@@ -1,22 +1,22 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Linking from "expo-linking";
 import React from "react";
 import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
 import { CARD_BORDER, PRIMARY_700, PRIMARY_TINT_BACKGROUND } from "@/constants/colors";
 import { RADIUS_MD } from "@/constants/responsive";
 import { getCommentAttachmentKind } from "../../utils/taskerRules";
-import { showPendingAction } from "./pendingAction";
 
 interface TaskerCommentThumbProps {
-  /** data-URI local o ruta guardada en el servidor. */
+  /** data-URI local o URL del servidor (buildTaskrFileUrl). */
   uri: string;
   name: string;
   onOpen: (uri: string) => void;
 }
 
 /**
- * Miniatura de adjunto de un comentario (lista y formulario): imagen local →
- * la imagen real, abre el visor; PDF local → ícono, no se abre; ruta del
- * servidor → ícono, sigue pendiente.
+ * Miniatura de adjunto de un comentario (lista y formulario): imagen (local o
+ * del servidor) → la imagen real, abre el visor; PDF local → ícono, no se
+ * abre; PDF del servidor → ícono, se abre fuera de la app.
  */
 export default function TaskerCommentThumb({ uri, name, onOpen }: TaskerCommentThumbProps) {
   const kind = getCommentAttachmentKind(uri);
@@ -27,18 +27,26 @@ export default function TaskerCommentThumb({ uri, name, onOpen }: TaskerCommentT
       </View>
     );
   }
+  if (kind === "remoteFile") {
+    return (
+      <TouchableOpacity
+        style={styles.thumb}
+        onPress={() => Linking.openURL(uri).catch(() => undefined)}
+        accessibilityLabel={`Abrir ${name}`}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="document-outline" size={22} color={PRIMARY_700} />
+      </TouchableOpacity>
+    );
+  }
   return (
     <TouchableOpacity
       style={styles.thumb}
-      onPress={kind === "image" ? () => onOpen(uri) : showPendingAction}
+      onPress={() => onOpen(uri)}
       accessibilityLabel={`Ver ${name}`}
       activeOpacity={0.8}
     >
-      {kind === "image" ? (
-        <Image source={{ uri }} style={styles.fill} resizeMode="cover" />
-      ) : (
-        <Ionicons name="image-outline" size={22} color={PRIMARY_700} />
-      )}
+      <Image source={{ uri }} style={styles.fill} resizeMode="cover" />
     </TouchableOpacity>
   );
 }
@@ -56,6 +64,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  // Adjunto de imagen en local (data-URI): la imagen real llena la miniatura.
+  // Adjunto de imagen (data-URI o URL): la imagen real llena la miniatura.
   fill: { width: "100%", height: "100%", borderRadius: RADIUS_MD },
 });

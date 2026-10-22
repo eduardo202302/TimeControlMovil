@@ -16,13 +16,11 @@ import type {
   TaskerComment,
   TaskerCommentAuthor,
   TaskerCommentDraft,
-  TaskerCommentPayload,
   TaskerCompanyConfig,
   TaskerFaultAction,
   TaskerFormRules,
   TaskerReportAddress,
   TaskerReportErrors,
-  TaskerTask,
   TaskerUserClient,
 } from "../../types/typesTasker/TaskerTypes";
 import type { MenuTree } from "../../utils/resolveRoute";
@@ -40,10 +38,7 @@ import {
   WARNING_TEXT_STRONG,
   WARNING_TINT_BACKGROUND,
 } from "../constants/colors";
-import {
-  TASKER_STATE_CANCELLED,
-  TASKER_STATE_COMPLETED,
-} from "../constants/taskerMock";
+import { canCommentOnTask } from "./taskerFollowUpRules";
 import { geocodeLocation, type GeocodeResult, type LatLng } from "./addressRules";
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -84,14 +79,22 @@ export function formatElapsed(fromMs: number, nowMs: number): string {
   return `${seconds}s`;
 }
 
-/** Solo los cambios de estado, del más reciente al más viejo (id descendente). */
+/**
+ * Solo los cambios de estado, del más reciente al más viejo (beginDate
+ * descendente; misma fecha → id descendente). Fecha inválida → la más vieja.
+ */
 export function getStateActivities(activities: TaskerActivity[]): TaskerActivity[] {
-  return activities.filter((a) => a.type === "state").sort((a, b) => b.id - a.id);
+  const time = (a: TaskerActivity) => toDate(a.beginDate)?.getTime() ?? 0;
+  return activities
+    .filter((a) => a.type === "state")
+    .sort((a, b) => time(b) - time(a) || b.id - a.id);
 }
 
 /**
- * Duración a mostrar en una fila del historial. `stateId` es el estado ACTUAL
- * del ticket: si ya terminó, una actividad sin `time` no se pinta.
+ * Duración a mostrar en una fila del historial: `time` si Tasker lo trae;
+ * cerrada (con endDate) → de beginDate a endDate; en curso (endDate null) →
+ * de beginDate a `nowMs` (en vivo). `stateId` es el estado ACTUAL del ticket:
+ * si ya terminó (5/6), la última actividad no corre y no se pinta.
  */
 export function getActivityTime(
   activity: TaskerActivity,
@@ -99,11 +102,13 @@ export function getActivityTime(
   nowMs: number,
 ): string | null {
   if (activity.time) return activity.time;
-  if (stateId !== TASKER_STATE_COMPLETED && stateId !== TASKER_STATE_CANCELLED) {
-    const begin = toDate(activity.beginDate);
-    return begin ? formatElapsed(begin.getTime(), nowMs) : null;
+  const begin = toDate(activity.beginDate);
+  if (!begin) return null;
+  if (activity.endDate) {
+    const end = toDate(activity.endDate);
+    return end ? formatElapsed(begin.getTime(), end.getTime()) : null;
   }
-  return null;
+  return canCommentOnTask(stateId) ? formatElapsed(begin.getTime(), nowMs) : null;
 }
 
 /** "inicio" o "inicio - fin" si la actividad ya cerró. */
@@ -114,18 +119,20 @@ export function formatActivityRange(activity: TaskerActivity): string {
 
 export type CommentOrder = "desc" | "asc";
 
-/** Copia ordenada por createdDate. Por defecto, el más reciente primero. */
+/**
+ * Copia ordenada por createdDate (misma fecha → por id). Por defecto, el más
+ * reciente primero.
+ */
 export function sortComments(
   comments: TaskerComment[],
   order: CommentOrder = "desc",
 ): TaskerComment[] {
   const time = (c: TaskerComment) => toDate(c.createdDate)?.getTime() ?? 0;
-  return [...comments].sort((a, b) =>
-    order === "desc" ? time(b) - time(a) : time(a) - time(b),
-  );
+  const asc = (a: TaskerComment, b: TaskerComment) => time(a) - time(b) || a.id - b.id;
+  return [...comments].sort((a, b) => (order === "desc" ? asc(b, a) : asc(a, b)));
 }
 
-// ─── Comentarios de Seguimiento ─────────────────────────────────────────────
+// ─── Comentarios (Reportar y Seguimiento) ───────────────────────────────────
 
 /** "Agregar" del formulario: con texto (sin contar espacios) o con adjuntos. */
 export function canSubmitComment(text: string, attachments: TaskerAttachment[]): boolean {
@@ -138,33 +145,6 @@ function toTaskerLocalIso(date: Date): string {
     `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}` +
     `T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`
   );
-}
-
-/**
- * Comentario que se pinta al momento, sin esperar al servidor. Como Tasker,
- * el autor es task.addUser (el solicitante), no quien escribe. El id es
- * negativo para no chocar con los del servidor. Va marcado isLocal: es lo que
- * lo deja editar y borrar (ver canEditTaskerComment).
- */
-export function buildLocalComment({
-  text,
-  attachments,
-  task,
-  now,
-}: {
-  text: string;
-  attachments: TaskerAttachment[];
-  task: Pick<TaskerTask, "addUser">;
-  now: Date;
-}): TaskerComment {
-  return {
-    id: -now.getTime(),
-    addUser: { name: task.addUser.name },
-    createdDate: toTaskerLocalIso(now),
-    comment: text.trim(),
-    images: attachments.map((a) => a.dataUri),
-    isLocal: true,
-  };
 }
 
 /** Tope del texto de un comentario (maxLength del campo y validación). */
@@ -420,45 +400,17 @@ export function fitTaskerAttachments(
   return { accepted, rejected };
 }
 
-/**
- * ¿Lo escribió quien está en sesión? Con id del autor, se compara por id; sin
- * él (Tasker hoy no lo devuelve), solo los creados en este dispositivo.
- * TODO(puente): cuando Tasker devuelva addUserId en los comentarios, llenar
- * addUser.id con él y comparar siempre por id.
- */
-export function canEditTaskerComment(
-  comment: TaskerComment,
-  currentUser: TaskerCommentAuthor | null,
-): boolean {
-  const authorId = comment.addUser.id;
-  if (authorId != null) return currentUser?.id != null && authorId === currentUser.id;
-  return comment.isLocal === true;
-}
-
-/** Cuerpo que Tasker manda al agregar un comentario. */
-export function buildCommentPayload(
-  text: string,
-  attachments: TaskerAttachment[],
-): TaskerCommentPayload {
-  return {
-    taskComments: [
-      {
-        comment: text.trim(),
-        images: attachments.map((a) => a.dataUri),
-        localAttachments: [],
-      },
-    ],
-  };
-}
+export type CommentAttachmentKind = "image" | "file" | "remoteImage" | "remoteFile";
 
 /**
  * Qué es un adjunto de comentario: data-URI de imagen (se abre en el visor),
- * data-URI de otro tipo (PDF, no se abre) o ruta guardada en el servidor.
+ * data-URI de otro tipo (PDF, no se abre), o URL del servidor (Seguimiento):
+ * ".pdf" → archivo (se abre fuera de la app); cualquier otra → imagen.
  */
-export function getCommentAttachmentKind(value: string): "image" | "file" | "server" {
+export function getCommentAttachmentKind(value: string): CommentAttachmentKind {
   if (/^data:image\//i.test(value)) return "image";
   if (/^data:/i.test(value)) return "file";
-  return "server";
+  return /\.pdf(?:[?#]|$)/i.test(value) ? "remoteFile" : "remoteImage";
 }
 
 export interface AddressField {

@@ -65,6 +65,8 @@ interface TaskerCommentComposerProps {
    */
   attachmentLimit?: TaskerAttachmentLimit;
   onOpenImage: (uri: string) => void;
+  /** Enviando (Seguimiento): todo queda bloqueado y "Guardar" muestra el indicador. */
+  saving?: boolean;
   /** ScrollView de la pantalla: al abrir y al enfocar el texto se desplaza hasta acá. */
   scrollRef?: RefObject<ScrollView | null>;
   /**
@@ -76,8 +78,8 @@ interface TaskerCommentComposerProps {
 
 /**
  * Formulario en línea "Agregar / Editar comentario" dentro de
- * TaskerCommentsCard (Reportar Avería y Seguimiento). Nada va al backend:
- * devuelve el borrador y la pantalla lo aplica en local.
+ * TaskerCommentsCard (Reportar Avería y Seguimiento). Devuelve el borrador:
+ * Reportar lo aplica en local y Seguimiento lo envía (ver `saving`).
  */
 export default function TaskerCommentComposer({
   mode,
@@ -88,6 +90,7 @@ export default function TaskerCommentComposer({
   onDraftChange,
   attachmentLimit,
   onOpenImage,
+  saving = false,
   scrollRef,
   compact = false,
 }: TaskerCommentComposerProps) {
@@ -149,7 +152,7 @@ export default function TaskerCommentComposer({
   };
 
   const handleSave = () => {
-    if (canSave) onSave(draft);
+    if (canSave && !saving) onSave(draft);
   };
 
   return (
@@ -165,6 +168,7 @@ export default function TaskerCommentComposer({
           value={text}
           onChangeText={setText}
           onFocus={handleFocus}
+          editable={!saving}
           placeholder="Escriba un comentario"
           placeholderTextColor={TEXT_PLACEHOLDER}
           maxLength={TASKER_COMMENT_MAX_LENGTH}
@@ -185,6 +189,7 @@ export default function TaskerCommentComposer({
               <TouchableOpacity
                 style={styles.removeBtn}
                 onPress={() => setAttachments((prev) => prev.filter((a) => a.id !== file.id))}
+                disabled={saving}
                 hitSlop={REMOVE_HIT_SLOP}
                 accessibilityLabel={`Quitar ${file.name}`}
                 activeOpacity={0.75}
@@ -200,7 +205,7 @@ export default function TaskerCommentComposer({
         <TouchableOpacity
           style={styles.addBtn}
           onPress={picker.openPicker}
-          disabled={picker.busy}
+          disabled={picker.busy || saving}
           activeOpacity={0.75}
         >
           {picker.busy ? (
@@ -217,6 +222,7 @@ export default function TaskerCommentComposer({
         <TouchableOpacity
           style={[styles.actionBtn, styles.cancelBtn]}
           onPress={onCancel}
+          disabled={saving}
           activeOpacity={0.8}
         >
           <Text style={styles.cancelText}>Cancelar</Text>
@@ -224,12 +230,16 @@ export default function TaskerCommentComposer({
         <TouchableOpacity
           style={[styles.actionBtn, styles.saveBtn, !canSave && styles.saveBtnDisabled]}
           onPress={handleSave}
-          disabled={!canSave}
-          accessibilityState={{ disabled: !canSave }}
+          disabled={!canSave || saving}
+          accessibilityState={{ disabled: !canSave || saving, busy: saving }}
           activeOpacity={0.8}
         >
-          <Ionicons name="checkmark" size={18} color={ON_PRIMARY} />
-          <Text style={styles.saveText}>Guardar</Text>
+          {saving ? (
+            <ActivityIndicator size="small" color={ON_PRIMARY} />
+          ) : (
+            <Ionicons name="checkmark" size={18} color={ON_PRIMARY} />
+          )}
+          <Text style={styles.saveText}>{saving ? "Enviando…" : "Guardar"}</Text>
         </TouchableOpacity>
       </View>
     </View>

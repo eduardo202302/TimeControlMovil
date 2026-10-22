@@ -2,11 +2,8 @@ import {
   addTaskerAddress,
   addTaskerComment,
   applyTaskerGeocode,
-  buildCommentPayload,
-  buildLocalComment,
   buildMapsUrl,
   buildTaskerAddress,
-  canEditTaskerComment,
   canSaveTaskerComment,
   canSubmitComment,
   commentImagesToAttachments,
@@ -51,11 +48,7 @@ import {
   sortComments,
   TASKER_STATE_COLOR_FALLBACK,
 } from "../taskerRules";
-import {
-  getTaskerOpenTask,
-  TASKER_STATE_CANCELLED,
-  TASKER_STATE_COMPLETED,
-} from "../../constants/taskerMock";
+import { TASKER_STATE_CANCELLED, TASKER_STATE_COMPLETED } from "../taskerFollowUpRules";
 import type { GeocodeResult } from "../addressRules";
 import type {
   TaskerActivity,
@@ -82,9 +75,6 @@ const MIN = 60 * SEC;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 
-/** "Ahora" fijo para el ejemplo de taskerMock: sus fechas se arman desde acá. */
-const MOCK_NOW = new Date(2026, 9, 7, 18, 11, 48).getTime();
-const ms = (value: string | null) => (value ? new Date(value).getTime() : NaN);
 
 function activity(over: Partial<TaskerActivity>): TaskerActivity {
   return {
@@ -94,7 +84,7 @@ function activity(over: Partial<TaskerActivity>): TaskerActivity {
     message: "",
     beginDate: localIso(2026, 9, 6, 9, 58, 11),
     endDate: null,
-    user: { name: "Jeremy Domínguez" },
+    user: { id: 22, name: "Jeremy Domínguez" },
     time: null,
     coordinates: null,
     ...over,
@@ -120,6 +110,21 @@ function emptyAddress(over: Partial<TaskerAddress> = {}): TaskerAddress {
     ...over,
   };
 }
+
+/** Dirección completa salvo Zona, N° de Apartamento y Restricciones. */
+const SAMPLE_ADDRESS = emptyAddress({
+  title: "Clínica Las Marías",
+  province: "Distrito Nacional",
+  city: "Santo Domingo",
+  sector: "Sector Norte",
+  street: "Av. Las Marías",
+  streetNumber: "104",
+  building: "Edificio Médico",
+  latitude: 18.4571092,
+  longitude: -69.9524086,
+  referenceToArrive: "Frente al Parque Central",
+  whoReceives: "Recepción",
+});
 
 describe("formatTaskerDate", () => {
   it("formatea en DD/MM/YYYY hh:mm:ss A (mañana)", () => {
@@ -173,113 +178,29 @@ describe("formatElapsed", () => {
 });
 
 describe("getStateActivities", () => {
-  it("filtra type === 'state' y ordena por id descendente", () => {
+  it("filtra type === 'state' y ordena por beginDate descendente (más reciente arriba)", () => {
     const result = getStateActivities([
-      activity({ id: 1 }),
-      activity({ id: 4, type: "assignedUser" }),
-      activity({ id: 3 }),
-      activity({ id: 2 }),
+      activity({ id: 1, beginDate: localIso(2026, 9, 6, 8) }),
+      activity({ id: 4, type: "assignedUser", beginDate: localIso(2026, 9, 7, 9) }),
+      // id menor pero más reciente: manda la fecha, no el id.
+      activity({ id: 2, beginDate: localIso(2026, 9, 7, 10) }),
+      activity({ id: 3, beginDate: localIso(2026, 9, 6, 12) }),
     ]);
-    expect(result.map((a) => a.id)).toEqual([3, 2, 1]);
+    expect(result.map((a) => a.id)).toEqual([2, 3, 1]);
+  });
+  it("misma beginDate → id descendente; fecha inválida al final", () => {
+    const same = localIso(2026, 9, 7, 10);
+    const result = getStateActivities([
+      activity({ id: 5, beginDate: "" }),
+      activity({ id: 6, beginDate: same }),
+      activity({ id: 7, beginDate: same }),
+    ]);
+    expect(result.map((a) => a.id)).toEqual([7, 6, 5]);
   });
   it("no muta el arreglo original", () => {
     const input = [activity({ id: 1 }), activity({ id: 2 })];
     getStateActivities(input);
     expect(input.map((a) => a.id)).toEqual([1, 2]);
-  });
-  it("con los datos fijos quedan 3 actividades de estado", () => {
-    expect(getStateActivities(getTaskerOpenTask().task.activities)).toHaveLength(3);
-  });
-});
-
-describe("historial de ejemplo (taskerMock)", () => {
-  const { task } = getTaskerOpenTask(MOCK_NOW);
-  // Del más viejo al más nuevo: Reportado → Asignada → Iniciada.
-  const states = getStateActivities(task.activities).reverse();
-  const durationMs = (a: TaskerActivity) =>
-    (a.endDate ? ms(a.endDate) : MOCK_NOW) - ms(a.beginDate);
-  const allDates = (t: typeof task) => [
-    t.createdDate,
-    ...t.activities.flatMap((a) => [a.beginDate, a.endDate]).filter((d): d is string => !!d),
-    ...t.comments.map((c) => c.createdDate),
-  ];
-  /** "1h 35m 20s" → ms, para comparar los time fijos. */
-  const parseElapsed = (value: string | null) =>
-    (value ?? "").split(" ").reduce((total, part) => {
-      const n = parseInt(part, 10);
-      const unit = { d: DAY, h: HOUR, m: MIN, s: SEC }[part.slice(-1)] ?? NaN;
-      return total + n * unit;
-    }, 0);
-
-  it("horas fijas de oficina sobre el día de now", () => {
-    expect(task.createdDate).toBe(localIso(2026, 9, 7, 8, 15));
-    expect(states.map((a) => [a.action, a.beginDate, a.endDate, a.time])).toEqual([
-      ["Reportado", localIso(2026, 9, 7, 8, 15), localIso(2026, 9, 7, 9, 50, 20), "1h 35m 20s"],
-      ["Asignada", localIso(2026, 9, 7, 9, 50, 20), localIso(2026, 9, 7, 10, 48, 35), "58m 15s"],
-      ["Iniciada", localIso(2026, 9, 7, 10, 48, 35), null, "22m 10s"],
-    ]);
-    const assigned = task.activities.find((a) => a.type === "assignedUser");
-    expect(assigned?.beginDate).toBe(localIso(2026, 9, 7, 9, 50, 20));
-  });
-  it("el ticket de ejemplo llega sin comentarios", () => {
-    expect(task.comments).toEqual([]);
-    expect(getTaskerOpenTask().task.comments).toEqual([]);
-  });
-  it("todas las fechas caen en el mismo día", () => {
-    const days = new Set(allDates(task).map((d) => d.slice(0, 10)));
-    expect([...days]).toEqual(["2026-10-07"]);
-  });
-  it("tiempos de mayor a menor: Reportado > Asignada > Iniciada", () => {
-    const [reported, assigned, started] = states.map((a) =>
-      parseElapsed(getActivityTime(a, task.stateId, MOCK_NOW)),
-    );
-    expect(reported).toBeGreaterThan(assigned);
-    expect(assigned).toBeGreaterThan(started);
-  });
-  it("Iniciada muestra su time fijo aunque now avance", () => {
-    const late = new Date(2026, 9, 7, 23, 59, 59).getTime();
-    const started = getStateActivities(getTaskerOpenTask(late).task.activities)[0];
-    expect(started.action).toBe("Iniciada");
-    expect(getActivityTime(started, task.stateId, late)).toBe("22m 10s");
-  });
-  it("ningún estado dura 0", () => {
-    for (const a of states) {
-      expect(durationMs(a)).toBeGreaterThan(0);
-      expect(getActivityTime(a, task.stateId, MOCK_NOW)).not.toBe("0s");
-    }
-  });
-  it("cada estado empieza donde termina el anterior", () => {
-    expect(states[0].beginDate).toBe(task.createdDate);
-    for (let i = 1; i < states.length; i++) {
-      expect(states[i].beginDate).toBe(states[i - 1].endDate);
-    }
-  });
-  it("time de los cerrados coincide con sus fechas", () => {
-    for (const a of states.filter((s) => s.endDate)) {
-      expect(a.time).toBe(formatElapsed(ms(a.beginDate), ms(a.endDate)));
-    }
-  });
-  it("con now a las 08:00 AM el día base es el anterior", () => {
-    const early = new Date(2026, 9, 7, 8, 0).getTime();
-    const t = getTaskerOpenTask(early).task;
-    expect(new Set(allDates(t).map((d) => d.slice(0, 10)))).toEqual(new Set(["2026-10-06"]));
-    expect(allDates(t).every((d) => ms(d) <= early)).toBe(true);
-  });
-  it("el corte es a las 11:30: 11:29:59 → día anterior, 11:30:00 → mismo día", () => {
-    expect(getTaskerOpenTask(new Date(2026, 9, 7, 11, 29, 59).getTime()).task.createdDate).toBe(
-      localIso(2026, 9, 6, 8, 15),
-    );
-    expect(getTaskerOpenTask(new Date(2026, 9, 7, 11, 30).getTime()).task.createdDate).toBe(
-      localIso(2026, 9, 7, 8, 15),
-    );
-  });
-  it("justo en el corte ninguna fecha queda en el futuro", () => {
-    const cutoff = new Date(2026, 9, 7, 11, 30).getTime();
-    expect(allDates(getTaskerOpenTask(cutoff).task).every((d) => ms(d) <= cutoff)).toBe(true);
-  });
-  it("antes del corte el primer día del mes cae en el último del mes anterior", () => {
-    const t = getTaskerOpenTask(new Date(2026, 9, 1, 7, 0).getTime()).task;
-    expect(t.createdDate).toBe(localIso(2026, 8, 30, 8, 15));
   });
 });
 
@@ -300,6 +221,18 @@ describe("getActivityTime", () => {
   });
   it("sin time y beginDate inválido → null", () => {
     expect(getActivityTime(activity({ beginDate: "" }), 3, now)).toBeNull();
+  });
+  it("sin time y cerrada (con endDate) → de beginDate a endDate, sin depender de ahora", () => {
+    const closed = activity({
+      beginDate: localIso(2026, 9, 7, 8, 15),
+      endDate: localIso(2026, 9, 7, 9, 50, 20),
+    });
+    expect(getActivityTime(closed, 3, now)).toBe("1h 35m 20s");
+    expect(getActivityTime(closed, TASKER_STATE_COMPLETED, now)).toBe("1h 35m 20s");
+  });
+  it("en curso: corre con ahora (duración en vivo)", () => {
+    expect(getActivityTime(open, 3, now)).toBe("7h 5m 33s");
+    expect(getActivityTime(open, 3, now + 27 * SEC)).toBe("7h 6m 0s");
   });
 });
 
@@ -403,61 +336,6 @@ describe("comentarios de Seguimiento", () => {
     });
   });
 
-  describe("buildLocalComment", () => {
-    const task = { addUser: { id: 21, name: "Jeremy Domínguez" } };
-    const now = new Date(2026, 9, 9, 14, 5, 7);
-
-    it("autor = task.addUser (el solicitante), como Tasker", () => {
-      const c = buildLocalComment({ text: "x", attachments: [], task, now });
-      expect(c.addUser).toEqual({ name: "Jeremy Domínguez" });
-    });
-    it("fecha de ese momento, sin zona, en hora local", () => {
-      const c = buildLocalComment({ text: "x", attachments: [], task, now });
-      expect(c.createdDate).toBe(localIso(2026, 9, 9, 14, 5, 7));
-      expect(formatTaskerDate(c.createdDate)).toBe("09/10/2026 02:05:07 PM");
-    });
-    it("texto recortado al inicio y al final", () => {
-      const c = buildLocalComment({ text: "  hola\nmundo \n", attachments: [], task, now });
-      expect(c.comment).toBe("hola\nmundo");
-    });
-    it("images = data-URIs de los adjuntos, en orden", () => {
-      const c = buildLocalComment({
-        text: "",
-        attachments: [file("a", PNG), file("b", PDF)],
-        task,
-        now,
-      });
-      expect(c.images).toEqual([PNG, PDF]);
-    });
-    it("id negativo (no choca con los del servidor)", () => {
-      const c = buildLocalComment({ text: "x", attachments: [], task, now });
-      expect(c.id).toBeLessThan(0);
-    });
-    it("marcado isLocal (lo deja editar y borrar sin id de autor)", () => {
-      const c = buildLocalComment({ text: "x", attachments: [], task, now });
-      expect(c.isLocal).toBe(true);
-      expect(c.addUser.id).toBeUndefined();
-    });
-    it("queda más reciente que los del servidor al ordenar desc", () => {
-      const local = buildLocalComment({ text: "x", attachments: [], task, now });
-      const sorted = sortComments([...SERVER_COMMENTS, local], "desc");
-      expect(sorted[0]).toBe(local);
-    });
-  });
-
-  describe("buildCommentPayload", () => {
-    it("forma exacta de Tasker", () => {
-      expect(buildCommentPayload("  hola  ", [file("a", PNG), file("b", PDF)])).toEqual({
-        taskComments: [{ comment: "hola", images: [PNG, PDF], localAttachments: [] }],
-      });
-    });
-    it("sin adjuntos → images vacío", () => {
-      expect(buildCommentPayload("hola", [])).toEqual({
-        taskComments: [{ comment: "hola", images: [], localAttachments: [] }],
-      });
-    });
-  });
-
   describe("getCommentAttachmentKind", () => {
     it("data-URI de imagen → image", () => {
       expect(getCommentAttachmentKind(PNG)).toBe("image");
@@ -466,8 +344,11 @@ describe("comentarios de Seguimiento", () => {
     it("data-URI de otro tipo (PDF) → file", () => {
       expect(getCommentAttachmentKind(PDF)).toBe("file");
     });
-    it("ruta guardada del servidor → server", () => {
-      expect(getCommentAttachmentKind("comentarios/4045/adjunto-1.jpg")).toBe("server");
+    it("URL del servidor → remoteImage, salvo .pdf → remoteFile", () => {
+      expect(getCommentAttachmentKind("https://x.test/files/adjunto-1.jpg")).toBe("remoteImage");
+      expect(getCommentAttachmentKind("https://x.test/files/sin-extension")).toBe("remoteImage");
+      expect(getCommentAttachmentKind("https://x.test/files/informe.PDF")).toBe("remoteFile");
+      expect(getCommentAttachmentKind("https://x.test/files/informe.pdf?v=2")).toBe("remoteFile");
     });
   });
 
@@ -888,45 +769,6 @@ describe("comentarios de Seguimiento", () => {
         ).toEqual({ kind: "unsaved", canSave: false });
       });
     });
-
-    describe("canEditTaskerComment", () => {
-      it("con id de autor: el mismo usuario → true", () => {
-        expect(canEditTaskerComment(existing(1, { addUser: { id: 7, name: "Ana" } }), me)).toBe(
-          true,
-        );
-      });
-      it("con id de autor: autor ajeno → false, aunque sea local", () => {
-        const c = existing(1, { addUser: { id: 8, name: "Ana Pérez" }, isLocal: true });
-        expect(canEditTaskerComment(c, me)).toBe(false);
-      });
-      it("con id de autor pero sin usuario en sesión → false", () => {
-        expect(canEditTaskerComment(existing(1, { addUser: { id: 7, name: "Ana" } }), null)).toBe(
-          false,
-        );
-        expect(
-          canEditTaskerComment(existing(1, { addUser: { id: 7, name: "Ana" } }), { name: "Ana" }),
-        ).toBe(false);
-      });
-      it("sin id de autor: solo los creados en local", () => {
-        expect(canEditTaskerComment(existing(1, { isLocal: true }), me)).toBe(true);
-        expect(canEditTaskerComment(existing(1), me)).toBe(false);
-      });
-      it("sin id de autor: el mismo nombre no alcanza", () => {
-        expect(canEditTaskerComment(existing(1, { addUser: { name: "Ana Pérez" } }), me)).toBe(
-          false,
-        );
-      });
-      it("los del servidor son de solo lectura", () => {
-        expect(SERVER_COMMENTS.every((c) => !canEditTaskerComment(c, me))).toBe(true);
-      });
-      it("los de buildLocalComment (Seguimiento) y addTaskerComment (Reportar) se editan", () => {
-        const task = { addUser: { id: 21, name: "Jeremy Domínguez" } };
-        const local = buildLocalComment({ text: "x", attachments: [], task, now });
-        const [reported] = addTaskerComment([], draft("x"), me, now);
-        expect(canEditTaskerComment(local, me)).toBe(true);
-        expect(canEditTaskerComment(reported, me)).toBe(true);
-      });
-    });
   });
 
   describe("comentarios del servidor (datos de prueba)", () => {
@@ -980,8 +822,8 @@ describe("getTaskerAddressLines", () => {
   it("sin calle: solo #número", () => {
     expect(getTaskerAddressLines(emptyAddress({ streetNumber: "104" })).streetLine).toBe("#104");
   });
-  it("con la dirección de ejemplo de Seguimiento", () => {
-    expect(getTaskerAddressLines(getTaskerOpenTask(MOCK_NOW).task.address!)).toEqual({
+  it("con una dirección completa", () => {
+    expect(getTaskerAddressLines(SAMPLE_ADDRESS)).toEqual({
       title: "Clínica Las Marías",
       streetLine: "Av. Las Marías #104",
       areaLine: "Sector Norte, Santo Domingo, Distrito Nacional",
@@ -1037,8 +879,8 @@ describe("getAddressFields", () => {
       { key: "latitude", label: "Latitud", value: "0" },
     ]);
   });
-  it("con los datos fijos oculta Zona, N° de Apartamento y Restricciones", () => {
-    const labels = getAddressFields(getTaskerOpenTask().task.address).map((f) => f.label);
+  it("oculta Zona, N° de Apartamento y Restricciones vacíos", () => {
+    const labels = getAddressFields(SAMPLE_ADDRESS).map((f) => f.label);
     expect(labels).not.toContain("Zona");
     expect(labels).not.toContain("N° de Apartamento");
     expect(labels).not.toContain("Restricciones");

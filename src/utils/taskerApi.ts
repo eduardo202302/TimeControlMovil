@@ -1,27 +1,42 @@
 /**
- * Puente de Reportar con FaceClass/Taskr: lo que llega de chooseschool, el
- * catálogo de averías (GET /taskr/actions) y la tarea nueva (POST
- * /taskr/tasks). Las funciones de mapeo y armado son puras; los servicios de
- * red nunca lanzan y devuelven { ok, ..., message }.
- *
- * Seguimiento no pasa por acá (sigue con taskerMock.ts).
+ * Puente de Tasker con FaceClass/Taskr. Reportar: lo que llega de
+ * chooseschool, el catálogo de averías (GET /taskr/actions) y la tarea nueva
+ * (POST /taskr/tasks). Seguimiento: la lista (GET /taskr/tasks), el detalle
+ * (GET /taskr/tasks/{id}) y los comentarios (PATCH /taskr/tasks/{id}). Las
+ * funciones de mapeo y armado son puras; los servicios de red nunca lanzan y
+ * devuelven { ok, ..., message }.
  *
  * Imports relativos (no "@/"): tsconfig.jest.json no declara el alias.
  */
 
 import axios from "axios";
 import type {
+  TaskerActivity,
   TaskerAddress,
+  TaskerClient,
   TaskerClientAddress,
   TaskerComment,
+  TaskerCommentDraft,
   TaskerCompanyConfig,
   TaskerFaultAction,
+  TaskerPriority,
   TaskerSession,
+  TaskerState,
+  TaskerTag,
+  TaskerTask,
+  TaskerTaskSummary,
   TaskerUserClient,
+  TaskerUserRef,
+  TaskrCommentBody,
   TaskrTaskAddress,
   TaskrTaskBody,
   TaskrTaskComment,
 } from "../../types/typesTasker/TaskerTypes";
+import {
+  buildTaskrFileUrl,
+  getTaskerCommentAuthorName,
+  isTaskrTaskGoneMessage,
+} from "./taskerFollowUpRules";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -408,15 +423,20 @@ export function utf8ByteLength(value: string): number {
   return bytes;
 }
 
+type SerializedBody = { ok: true; json: string; message: string } | { ok: false; message: string };
+
 /** El JSON a enviar, o el error si pasa de TASKR_TASK_MAX_BYTES. */
-export function serializeTaskrTaskBody(
-  body: TaskrTaskBody,
-): { ok: true; json: string; message: string } | { ok: false; message: string } {
+function serializeWithinLimit(body: object): SerializedBody {
   const json = JSON.stringify(body);
   if (utf8ByteLength(json) > TASKR_TASK_MAX_BYTES) {
     return { ok: false, message: TASKER_ATTACHMENTS_TOO_LARGE_ERROR };
   }
   return { ok: true, json, message: "" };
+}
+
+/** El JSON a enviar, o el error si pasa de TASKR_TASK_MAX_BYTES. */
+export function serializeTaskrTaskBody(body: TaskrTaskBody): SerializedBody {
+  return serializeWithinLimit(body);
 }
 
 export type CreateTaskerTaskResult =
@@ -454,5 +474,331 @@ export async function createTaskerTask({
       };
     }
     return { ok: false, message: TASKER_NETWORK_ERROR };
+  }
+}
+
+// ─── Seguimiento: mapeo ─────────────────────────────────────────────────────
+
+function idOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** { id, name } con id numérico; cualquier otra cosa → null. */
+function mapUserRef(raw: unknown): TaskerUserRef | null {
+  if (!isRecord(raw)) return null;
+  const id = idOrNull(raw.id);
+  return id === null ? null : { id, name: textOrEmpty(raw.name) };
+}
+
+function mapTaskClient(raw: unknown): TaskerClient | null {
+  if (!isRecord(raw)) return null;
+  const id = idOrNull(raw.id);
+  return id === null ? null : { id, name: textOrEmpty(raw.name), phone: textOrEmpty(raw.phone) };
+}
+
+function mapPriority(raw: unknown): TaskerPriority | null {
+  if (!isRecord(raw)) return null;
+  const id = idOrNull(raw.id);
+  return id === null ? null : { id, name: textOrEmpty(raw.name), color: textOrEmpty(raw.color) };
+}
+
+/** stateId de la tarea o, si falta, el id de su `state`. Sin ninguno → 0. */
+function readStateId(raw: Record<string, unknown>): number {
+  return idOrNull(raw.stateId) ?? (isRecord(raw.state) ? idOrNull(raw.state.id) : null) ?? 0;
+}
+
+function mapState(raw: unknown, stateId: number): TaskerState {
+  const state = isRecord(raw) ? raw : {};
+  return { id: stateId, name: textOrEmpty(state.name), color: textOrEmpty(state.color) };
+}
+
+/** Una tarea de GET /taskr/tasks → tarjeta del selector. Sin id numérico → null. */
+export function mapTaskrTaskSummary(raw: unknown): TaskerTaskSummary | null {
+  if (!isRecord(raw)) return null;
+  const id = idOrNull(raw.id);
+  if (id === null) return null;
+  const stateId = readStateId(raw);
+  return {
+    id,
+    createdDate: textOrEmpty(raw.createdDate),
+    stateId,
+    state: mapState(raw.state, stateId),
+    client: mapTaskClient(raw.client),
+    assignedUser: mapUserRef(raw.assignedUser),
+    priority: mapPriority(raw.priority),
+  };
+}
+
+/** `data` de GET /taskr/tasks → tarjetas en el orden que vienen, y data.count. */
+export function mapTaskrTasks(data: unknown): { tasks: TaskerTaskSummary[]; count: number } {
+  const source = isRecord(data) ? data : {};
+  const items = Array.isArray(source.items) ? source.items : [];
+  const tasks = items.flatMap((item) => {
+    const task = mapTaskrTaskSummary(item);
+    return task ? [task] : [];
+  });
+  return { tasks, count: idOrNull(source.count) ?? tasks.length };
+}
+
+/** Dirección de la tarea: null si no viene o está vacía. Sin coordenadas válidas → lat/lng null. */
+export function mapTaskrTaskAddress(raw: unknown): TaskerAddress | null {
+  if (isEmptyAddress(raw)) return null;
+  const source = raw as Record<string, unknown>;
+  const address = {} as TaskerAddress;
+  for (const key of CLIENT_ADDRESS_TEXT_FIELDS) address[key] = textOrEmpty(source[key]);
+  const point = readCoordinates(source);
+  address.latitude = point?.lat ?? null;
+  address.longitude = point?.lng ?? null;
+  return address;
+}
+
+function mapTags(raw: unknown): TaskerTag[] {
+  return (Array.isArray(raw) ? raw : []).flatMap((tag): TaskerTag[] => {
+    if (!isRecord(tag) || idOrNull(tag.id) === null) return [];
+    const category = isRecord(tag.category) ? tag.category : {};
+    return [
+      { id: tag.id as number, name: textOrEmpty(tag.name), category: { name: textOrEmpty(category.name) } },
+    ];
+  });
+}
+
+/** Primer texto no vacío de un elemento de taskList. */
+const TASK_LIST_TEXT_KEYS = ["action", "text", "name", "description"] as const;
+
+/** taskList[] → textos ordenados por `order` (sin order, al final en su orden). */
+export function mapTaskrTaskList(raw: unknown): string[] {
+  const items = (Array.isArray(raw) ? raw : []).flatMap((item, index) => {
+    if (!isRecord(item)) return [];
+    const text = TASK_LIST_TEXT_KEYS.map((key) => textOrEmpty(item[key]).trim()).find(Boolean);
+    if (!text) return [];
+    return [{ text, order: idOrNull(item.order) ?? Number.POSITIVE_INFINITY, index }];
+  });
+  return items.sort((a, b) => a.order - b.order || a.index - b.index).map((item) => item.text);
+}
+
+/** Coordenadas de una actividad: `coordinates` o lat/lng sueltos. Inválidas → null. */
+function mapActivityCoordinates(raw: Record<string, unknown>): TaskerActivity["coordinates"] {
+  const point = (isRecord(raw.coordinates) && readCoordinates(raw.coordinates)) || readCoordinates(raw);
+  return point ? { latitude: point.lat, longitude: point.lng } : null;
+}
+
+export function mapTaskrActivities(raw: unknown): TaskerActivity[] {
+  return (Array.isArray(raw) ? raw : []).flatMap((item): TaskerActivity[] => {
+    if (!isRecord(item)) return [];
+    const id = idOrNull(item.id);
+    if (id === null) return [];
+    return [
+      {
+        id,
+        type: textOrEmpty(item.type),
+        action: textOrEmpty(item.action),
+        message: textOrEmpty(item.message),
+        beginDate: textOrEmpty(item.beginDate),
+        endDate: typeof item.endDate === "string" && item.endDate !== "" ? item.endDate : null,
+        user: isRecord(item.user)
+          ? { id: idOrNull(item.user.id), name: textOrEmpty(item.user.name) }
+          : null,
+        time: typeof item.time === "string" && item.time.trim() !== "" ? item.time : null,
+        coordinates: mapActivityCoordinates(item),
+      },
+    ];
+  });
+}
+
+/**
+ * comments[] → comentarios ordenados por id, con el autor ya resuelto
+ * (getTaskerCommentAuthorName) y los adjuntos como URL (buildTaskrFileUrl).
+ */
+export function mapTaskrComments(
+  raw: unknown,
+  task: Pick<TaskerTask, "addUserId" | "externalUserName">,
+  urlColegio: string,
+): TaskerComment[] {
+  const comments = (Array.isArray(raw) ? raw : []).flatMap((item): TaskerComment[] => {
+    if (!isRecord(item)) return [];
+    const id = idOrNull(item.id);
+    if (id === null) return [];
+    const author = isRecord(item.addUser)
+      ? { id: idOrNull(item.addUser.id), name: textOrEmpty(item.addUser.name) }
+      : null;
+    const images = (Array.isArray(item.images) ? item.images : [])
+      .map((path) => (typeof path === "string" ? buildTaskrFileUrl(path, urlColegio) : ""))
+      .filter(Boolean);
+    return [
+      {
+        id,
+        addUser: { id: author?.id ?? null, name: getTaskerCommentAuthorName(author, task) },
+        createdDate: textOrEmpty(item.createdDate),
+        comment: textOrEmpty(item.comment),
+        images,
+      },
+    ];
+  });
+  return comments.sort((a, b) => a.id - b.id);
+}
+
+/**
+ * `data` de GET /taskr/tasks/{id} → detalle. `urlColegio` arma la URL de los
+ * adjuntos (buildTaskrFileUrl). Sin id numérico → null.
+ */
+export function mapTaskrTaskDetail(data: unknown, urlColegio: string): TaskerTask | null {
+  const summary = mapTaskrTaskSummary(data);
+  if (!summary) return null;
+  const raw = data as Record<string, unknown>;
+  const owner = {
+    addUserId: idOrNull(raw.addUserId) ?? (isRecord(raw.addUser) ? idOrNull(raw.addUser.id) : null),
+    externalUserName: textOrEmpty(raw.externalUserName),
+  };
+  return {
+    id: summary.id,
+    createdDate: summary.createdDate,
+    action: textOrEmpty(raw.action),
+    stateId: summary.stateId,
+    state: summary.state,
+    ...owner,
+    assignedUser: summary.assignedUser,
+    client: summary.client,
+    priority: summary.priority,
+    tags: mapTags(raw.tags),
+    address: mapTaskrTaskAddress(raw.address),
+    faults: mapTaskrTaskList(raw.taskList),
+    comments: mapTaskrComments(raw.comments, owner, urlColegio),
+    activities: mapTaskrActivities(raw.activities),
+  };
+}
+
+// ─── Seguimiento: comentario nuevo (PATCH /taskr/tasks/{id}) ────────────────
+
+/**
+ * Cuerpo del PATCH: un comentario con `comment` siempre presente ("" si solo
+ * trae adjuntos) y los adjuntos como data URIs.
+ */
+export function buildTaskrCommentBody(draft: TaskerCommentDraft): TaskrCommentBody {
+  return {
+    taskComments: [
+      {
+        comment: draft.text.trim(),
+        images: draft.attachments
+          .map((a) => a.dataUri)
+          .filter((value) => typeof value === "string" && /^data:/i.test(value)),
+      },
+    ],
+  };
+}
+
+/** El JSON del PATCH, o el error si pasa de TASKR_TASK_MAX_BYTES (9.5 MB). */
+export function serializeTaskrCommentBody(body: TaskrCommentBody): SerializedBody {
+  return serializeWithinLimit(body);
+}
+
+// ─── Seguimiento: servicios ─────────────────────────────────────────────────
+
+export const TASKER_TASKS_ERROR = "No se pudieron cargar los tickets.";
+export const TASKER_TASK_ERROR = "No se pudo cargar el ticket.";
+export const TASKER_COMMENT_SEND_ERROR = "No se pudo enviar el comentario. Intente nuevamente.";
+
+/** Parámetros fijos de la lista: nunca se pasa otro ni nada que escriba el usuario. */
+export const TASKR_TASKS_PARAMS = Object.freeze({
+  orderKey: "createdDate",
+  orderDir: "desc",
+});
+
+/** `gone`: Taskr dijo "La tarea ya no está disponible." (deseleccionar y recargar). */
+export type TaskrFailure = { ok: false; message: string; gone: boolean };
+
+/** success:false → su message (texto) o `fallback`, marcando si la tarea ya no existe. */
+export function taskrFailure(message: unknown, fallback: string): TaskrFailure {
+  const text = readTaskrMessage(message, fallback);
+  return { ok: false, message: text, gone: isTaskrTaskGoneMessage(text) };
+}
+
+/** Error de axios: con respuesta → su message; sin respuesta (red o timeout) → TASKER_NETWORK_ERROR. */
+function failureFromError(error: any, fallback: string): TaskrFailure {
+  if (error?.response) return taskrFailure(error.response.data?.message, fallback);
+  return { ok: false, message: TASKER_NETWORK_ERROR, gone: false };
+}
+
+/** El id va en la ruta: solo enteros positivos. */
+function isTaskId(id: unknown): id is number {
+  return typeof id === "number" && Number.isInteger(id) && id > 0;
+}
+
+export type FetchTaskerTasksResult =
+  | { ok: true; tasks: TaskerTaskSummary[]; count: number; message: string }
+  | TaskrFailure;
+
+export async function fetchTaskerTasks({
+  token,
+  urlColegio,
+}: AuthArgs): Promise<FetchTaskerTasksResult> {
+  try {
+    const response = await axios.get(`${urlColegio}/taskr/tasks`, {
+      headers: authHeaders(token),
+      params: { ...TASKR_TASKS_PARAMS },
+      timeout: TASKER_FETCH_TIMEOUT_MS,
+    });
+    if (response.data?.success !== true) {
+      return taskrFailure(response.data?.message, TASKER_TASKS_ERROR);
+    }
+    return { ok: true, ...mapTaskrTasks(response.data.data), message: "" };
+  } catch (error: any) {
+    console.warn("fetchTaskerTasks:", error?.message ?? "error desconocido");
+    return failureFromError(error, TASKER_TASKS_ERROR);
+  }
+}
+
+export type FetchTaskerTaskResult = { ok: true; task: TaskerTask; message: string } | TaskrFailure;
+
+export async function fetchTaskerTask({
+  token,
+  urlColegio,
+  id,
+}: AuthArgs & { id: number }): Promise<FetchTaskerTaskResult> {
+  if (!isTaskId(id)) return { ok: false, message: TASKER_TASK_ERROR, gone: false };
+  try {
+    const response = await axios.get(`${urlColegio}/taskr/tasks/${id}`, {
+      headers: authHeaders(token),
+      timeout: TASKER_FETCH_TIMEOUT_MS,
+    });
+    if (response.data?.success !== true) {
+      return taskrFailure(response.data?.message, TASKER_TASK_ERROR);
+    }
+    const task = mapTaskrTaskDetail(response.data.data, urlColegio);
+    return task
+      ? { ok: true, task, message: "" }
+      : { ok: false, message: TASKER_TASK_ERROR, gone: false };
+  } catch (error: any) {
+    console.warn("fetchTaskerTask:", error?.message ?? "error desconocido");
+    return failureFromError(error, TASKER_TASK_ERROR);
+  }
+}
+
+export type AddTaskerCommentResult = { ok: true; message: string } | TaskrFailure;
+
+/**
+ * Agrega un comentario. Antes valida el tamaño (no envía si se pasa). La
+ * respuesta trae la tarea sin activities: quien llama vuelve a pedir el detalle.
+ */
+export async function addTaskerTaskComment({
+  token,
+  urlColegio,
+  id,
+  body,
+}: AuthArgs & { id: number; body: TaskrCommentBody }): Promise<AddTaskerCommentResult> {
+  if (!isTaskId(id)) return { ok: false, message: TASKER_COMMENT_SEND_ERROR, gone: false };
+  const serialized = serializeTaskrCommentBody(body);
+  if (!serialized.ok) return { ...serialized, gone: false };
+  try {
+    const response = await axios.patch(`${urlColegio}/taskr/tasks/${id}`, serialized.json, {
+      headers: { ...authHeaders(token), "Content-Type": "application/json" },
+      timeout: TASKER_SEND_TIMEOUT_MS,
+    });
+    if (response.data?.success !== true) {
+      return taskrFailure(response.data?.message, TASKER_COMMENT_SEND_ERROR);
+    }
+    return { ok: true, message: "" };
+  } catch (error: any) {
+    console.warn("addTaskerTaskComment:", error?.message ?? "error desconocido");
+    return failureFromError(error, TASKER_COMMENT_SEND_ERROR);
   }
 }

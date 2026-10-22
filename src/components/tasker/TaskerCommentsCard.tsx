@@ -84,12 +84,27 @@ export interface TaskerCommentsCardHandle {
 interface TaskerCommentsCardProps {
   ref?: Ref<TaskerCommentsCardHandle>;
   comments: TaskerComment[];
-  /** Muestra lápiz y papelera en ese comentario. */
-  canEdit: (comment: TaskerComment) => boolean;
-  onAdd: (draft: TaskerCommentDraft) => void;
-  onEdit: (id: number, draft: TaskerCommentDraft) => void;
+  /**
+   * Muestra lápiz y papelera en ese comentario. Sin él (Seguimiento), ningún
+   * comentario se edita ni se borra.
+   */
+  canEdit?: (comment: TaskerComment) => boolean;
+  /**
+   * Reportar lo aplica en local (devuelve void) y el formulario se cierra ya.
+   * Seguimiento lo envía y devuelve una promesa: mientras tanto el formulario
+   * queda en "Enviando…", y solo se cierra si resuelve true.
+   */
+  onAdd: (draft: TaskerCommentDraft) => void | Promise<boolean>;
+  onEdit?: (id: number, draft: TaskerCommentDraft) => void;
   /** Ya confirmado ("¿Eliminar comentario?"). */
-  onDelete: (id: number) => void;
+  onDelete?: (id: number) => void;
+  /**
+   * false (ticket cerrado en Seguimiento): sin botón de agregar, cualquier
+   * formulario abierto se cierra y se muestra `closedNotice`. Los comentarios
+   * existentes se siguen viendo.
+   */
+  canAdd?: boolean;
+  closedNotice?: string;
   /**
    * Orden controlado desde afuera (Seguimiento lo conserva al cambiar de
    * pestaña). Sin estas dos props, la tarjeta lo guarda ella misma.
@@ -123,6 +138,7 @@ interface TaskerCommentsCardProps {
  * las imágenes y PDF siempre viven dentro de un comentario (texto, adjuntos o
  * ambos). La lista vive en la pantalla; la tarjeta guarda el orden, el visor
  * y qué formulario está abierto (ninguno, agregar o editar uno), de a uno.
+ * Seguimiento solo agrega (sin lápiz ni papelera).
  */
 export default function TaskerCommentsCard({
   ref,
@@ -131,6 +147,8 @@ export default function TaskerCommentsCard({
   onAdd,
   onEdit,
   onDelete,
+  canAdd = true,
+  closedNotice,
   order: controlledOrder,
   onOrderChange,
   sharedAttachmentLimit = false,
@@ -148,6 +166,8 @@ export default function TaskerCommentsCard({
   const order = controlledOrder ?? ownOrder;
   const [viewerUri, setViewerUri] = useState<string | null>(null);
   const [openTarget, setOpenTarget] = useState<CommentComposerTarget>(null);
+  /** onAdd devolvió una promesa que todavía no resolvió. */
+  const [saving, setSaving] = useState(false);
   /** Último resetKey aplicado: si cambia, el formulario se cierra en este mismo render. */
   const [seenResetKey, setSeenResetKey] = useState(resetKey);
   /** Lo avisa el formulario abierto; decide si se pide "¿Descartar cambios?". */
@@ -168,9 +188,9 @@ export default function TaskerCommentsCard({
     () => sortComments(comments, order),
     [comments, order],
   );
-  // Reiniciada, o el comentario en edición dejó de existir → formulario cerrado.
+  // Reiniciada, ticket cerrado o el comentario en edición dejó de existir → formulario cerrado.
   const composer = resolveCommentComposer(
-    openTarget,
+    canAdd ? openTarget : null,
     comments.map((c) => c.id),
     { key: resetKey, seenKey: seenResetKey },
   );
@@ -233,9 +253,22 @@ export default function TaskerCommentsCard({
   }, []);
 
   const handleSave = (draft: TaskerCommentDraft) => {
-    if (composer?.mode === "edit") onEdit(composer.id, draft);
-    else onAdd(draft);
-    openComposer(null);
+    if (composer?.mode === "edit") {
+      onEdit?.(composer.id, draft);
+      openComposer(null);
+      return;
+    }
+    const result = onAdd(draft);
+    if (!(result instanceof Promise)) {
+      openComposer(null);
+      return;
+    }
+    // Enviado → se cierra; rechazado → queda abierto con el borrador.
+    setSaving(true);
+    void result.then((sent) => {
+      setSaving(false);
+      if (sent) openComposer(null);
+    });
   };
 
   const handleDelete = (comment: TaskerComment) => {
@@ -244,7 +277,7 @@ export default function TaskerCommentsCard({
       {
         text: "Eliminar",
         style: "destructive",
-        onPress: () => onDelete(comment.id),
+        onPress: () => onDelete?.(comment.id),
       },
     ]);
   };
@@ -266,6 +299,7 @@ export default function TaskerCommentsCard({
       onCancel={() => requestComposer(null)}
       onChangedChange={handleChangedChange}
       onDraftChange={handleDraftChange}
+      saving={saving}
       attachmentLimit={
         sharedAttachmentLimit
           ? {
@@ -284,7 +318,9 @@ export default function TaskerCommentsCard({
   );
 
   const titleIcon = compact ? reportTitleMetrics(font) : null;
-  const toggleAdding = () => requestComposer(isAdding ? null : { mode: "add" });
+  const toggleAdding = () => {
+    if (!saving) requestComposer(isAdding ? null : { mode: "add" });
+  };
 
   return (
     <View style={[styles.card, compact && styles.cardCompact]}>
@@ -323,7 +359,7 @@ export default function TaskerCommentsCard({
         >
           <Ionicons name="swap-vertical-outline" size={18} color={TEXT_MUTED} />
         </TouchableOpacity>
-        {compact ? (
+        {!canAdd ? null : compact ? (
           <TouchableOpacity
             style={styles.addCommentRoundBtn}
             onPress={toggleAdding}
@@ -359,6 +395,13 @@ export default function TaskerCommentsCard({
         )}
       </View>
 
+      {!canAdd && !!closedNotice && (
+        <View style={styles.closedNotice}>
+          <Ionicons name="lock-closed-outline" size={16} color={TEXT_MUTED} />
+          <Text style={styles.closedNoticeText}>{closedNotice}</Text>
+        </View>
+      )}
+
       {isAdding && (
         <View
           ref={composerRef}
@@ -371,7 +414,9 @@ export default function TaskerCommentsCard({
       {sorted.length === 0 ? (
         !isAdding && (
           <Text style={styles.emptyText}>
-            Agrega un comentario, una imagen o un archivo.
+            {canAdd
+              ? "Agrega un comentario, una imagen o un archivo."
+              : "Sin comentarios."}
           </Text>
         )
       ) : (
@@ -387,7 +432,7 @@ export default function TaskerCommentsCard({
               <CommentItem
                 key={comment.id}
                 comment={comment}
-                editable={canEdit(comment)}
+                editable={!!onEdit && !!onDelete && !!canEdit?.(comment)}
                 styles={styles}
                 compact={compact}
                 onEdit={() => requestComposer({ mode: "edit", id: comment.id })}
@@ -610,6 +655,21 @@ function createStyles(
       flexWrap: "wrap",
       gap: scale(8),
       marginTop: verticalScale(10),
+    },
+    closedNotice: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(8),
+      marginBottom: verticalScale(12),
+      padding: scale(12),
+      borderRadius: RADIUS_LG,
+      backgroundColor: FIELD_BACKGROUND,
+    },
+    closedNoticeText: {
+      flex: 1,
+      fontSize: font(13),
+      lineHeight: font(18),
+      color: TEXT_SECONDARY,
     },
     emptyText: {
       fontSize: font(13),

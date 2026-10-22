@@ -1,7 +1,6 @@
 /**
- * Forma de los datos de Tasker tal como los devuelve hoy su API (vista de
- * seguimiento de un ticket abierto). El puente de face-class-api debe
- * devolver esta misma forma para que las pantallas no cambien al conectar.
+ * Datos de Tasker ya mapeados para las pantallas (Reportar y Seguimiento).
+ * Lo que llega de FaceClass/Taskr pasa por los mapeadores de taskerApi.ts.
  */
 
 export interface TaskerUserRef {
@@ -149,7 +148,10 @@ export interface TaskerAddressConfig {
   showRestrictions: boolean;
 }
 
-/** Autor de un comentario. Tasker hoy no devuelve el id (ver canEditTaskerComment). */
+/**
+ * Autor de un comentario. En Seguimiento `name` ya viene resuelto con
+ * getTaskerCommentAuthorName (puede ser el externalUserName de la tarea).
+ */
 export interface TaskerCommentAuthor {
   id?: number | null;
   name: string;
@@ -161,8 +163,8 @@ export interface TaskerComment {
   createdDate: string;
   comment: string;
   /**
-   * Adjuntos del comentario: rutas guardadas en el servidor o, en un
-   * comentario recién agregado en local, data-URIs.
+   * Adjuntos del comentario: URLs del servidor (Seguimiento, ver
+   * buildTaskrFileUrl) o data-URIs (Reportar, todavía sin enviar).
    */
   images: string[];
   /** Creado en este dispositivo y todavía sin enviar. */
@@ -179,15 +181,6 @@ export interface TaskerCommentDraft {
   attachments: TaskerAttachment[];
 }
 
-/** Cuerpo de "Agregar comentario" de Tasker (buildCommentPayload). */
-export interface TaskerCommentPayload {
-  taskComments: {
-    comment: string;
-    images: string[];
-    localAttachments: never[];
-  }[];
-}
-
 export interface TaskerCoordinates {
   latitude: number;
   longitude: number;
@@ -201,35 +194,54 @@ export interface TaskerActivity {
   message: string;
   beginDate: string;
   endDate: string | null;
-  user: { name: string };
+  /**
+   * Quién hizo el cambio; null si Taskr no lo trae. Nunca se muestra tal
+   * cual: ver getActivityActorName (la cuenta del puente no aparece).
+   */
+  user: { id: number | null; name: string } | null;
   /** Duración ya calculada por Tasker ("1d 1h 8m 4s"); null si sigue abierta. */
   time: string | null;
   coordinates: TaskerCoordinates | null;
 }
 
+export interface TaskerPriority {
+  id: number;
+  name: string;
+  color: string;
+}
+
+/** Un ticket de GET /taskr/tasks (tarjetas del selector de Seguimiento). */
+export interface TaskerTaskSummary {
+  id: number;
+  createdDate: string;
+  stateId: number;
+  state: TaskerState;
+  client: TaskerClient | null;
+  assignedUser: TaskerUserRef | null;
+  priority: TaskerPriority | null;
+}
+
+/** Detalle de GET /taskr/tasks/{id} (Seguimiento). */
 export interface TaskerTask {
   id: number;
   createdDate: string;
   /** Descripción de la avería. */
   action: string;
   stateId: number;
-  addUser: TaskerUserRef;
-  assignedUser: TaskerUserRef | null;
-  client: TaskerClient;
   state: TaskerState;
+  /** Cuenta que creó la tarea (la de la app). Decide el autor de los comentarios. */
+  addUserId: number | null;
+  /** Quién la pidió: "Solicitado por". */
+  externalUserName: string;
+  assignedUser: TaskerUserRef | null;
+  client: TaskerClient | null;
+  priority: TaskerPriority | null;
   tags: TaskerTag[];
   address: TaskerAddress | null;
+  /** Textos de taskList[], ya ordenados por `order`. */
+  faults: string[];
   comments: TaskerComment[];
   activities: TaskerActivity[];
-}
-
-export interface TaskerSettings {
-  companyName: string;
-}
-
-export interface TaskerOpenTaskResponse {
-  task: TaskerTask;
-  settings: TaskerSettings;
 }
 
 /** Qué pide el formulario de Reportar según la compañía (getTaskerFormRules). */
@@ -296,4 +308,14 @@ export interface TaskrTaskBody {
   actionIds?: number[];
   address?: TaskrTaskAddress;
   taskComments?: TaskrTaskComment[];
+}
+
+/** Cuerpo de PATCH /taskr/tasks/{id} para agregar un comentario (buildTaskrCommentBody). */
+export interface TaskrCommentBody {
+  taskComments: {
+    /** Siempre presente ("" si solo trae adjuntos). */
+    comment: string;
+    /** Data URIs completos ("data:<mime>;base64,…"). */
+    images: string[];
+  }[];
 }

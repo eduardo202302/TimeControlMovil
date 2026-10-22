@@ -35,12 +35,20 @@ interface FollowUpAddressTabProps {
 }
 
 export default function FollowUpAddressTab({ address, styles }: FollowUpAddressTabProps) {
-  if (!address) return null;
+  if (!address) {
+    return (
+      <View style={styles.card}>
+        <FollowUpCardHeader styles={styles} tone="teal" icon="location-outline" title="Dirección" />
+        <Text style={styles.descriptionText}>Este ticket no tiene dirección registrada.</Text>
+      </View>
+    );
+  }
 
   const fields = getAddressFields(address);
   const titleField = fields.find((f) => f.key === "title");
   const gridFields = fields.filter((f) => f.key !== "title" && !LONG_KEYS.has(f.key));
   const longFields = fields.filter((f) => LONG_KEYS.has(f.key));
+  // Sin coordenadas válidas (el mapeo las deja en null) → sin botón de mapa.
   const hasCoords =
     fields.some((f) => f.key === "latitude") && fields.some((f) => f.key === "longitude");
 
