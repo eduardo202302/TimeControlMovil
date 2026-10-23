@@ -10,7 +10,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest",
-    "build:apk": "node scripts/bump-version.js major && eas build --platform android --profile preview",
+    "build:apk": "node scripts/bump-version.js major && eas build --platform android --profile preview --local",
     "update": "node scripts/bump-version.js patch && eas update --branch main --environment preview"
   },
   "dependencies": {
