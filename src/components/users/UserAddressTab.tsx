@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import type { MapPressEvent, MarkerDragStartEndEvent } from "react-native-maps";
 import type MapViewType from "react-native-maps";
+import { MAP_AVAILABLE } from "@/constants/maps";
 import { RADIUS_LG, RADIUS_MD, useResponsive } from "@/constants/responsive";
 import {
   ADDRESS_SEARCH_DEBOUNCE_MS,
@@ -60,7 +61,8 @@ type EditableField = Exclude<AddressTextField, "formattedAddress">;
  * found" AL EVALUAR EL MÓDULO si el dev client no se recompiló con la
  * dependencia. Con un import estático eso tumbaba UserFormModal completo (y
  * users.tsx en cascada). Sin el módulo nativo la tab sigue funcionando
- * (buscador, campos, textarea) y el mapa muestra un aviso.
+ * (buscador, campos, textarea) y el mapa muestra un aviso. Igual sin la key
+ * de Google Maps en el build (MAP_AVAILABLE): montar el MapView crashearía.
  */
 type MapsModule = typeof import("react-native-maps");
 const maps: MapsModule | null = (() => {
@@ -72,7 +74,7 @@ const maps: MapsModule | null = (() => {
     return null;
   }
 })();
-const MapView = maps?.default ?? null;
+const MapView = MAP_AVAILABLE ? (maps?.default ?? null) : null;
 const Marker = maps?.Marker ?? null;
 
 /**

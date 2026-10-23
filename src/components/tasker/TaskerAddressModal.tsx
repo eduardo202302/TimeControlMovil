@@ -37,6 +37,7 @@ import {
   TEXT_PRIMARY,
   TEXT_SECONDARY,
 } from "@/constants/colors";
+import { MAP_AVAILABLE } from "@/constants/maps";
 import {
   MAX_CONTENT_WIDTH,
   RADIUS_LG,
@@ -78,7 +79,10 @@ import type {
 
 type Styles = ReturnType<typeof createStyles>;
 
-/** Mismo require protegido que UserAddressTab: sin el módulo nativo, aviso en lugar del mapa. */
+/**
+ * Mismo require protegido que UserAddressTab: sin el módulo nativo, o sin la
+ * key de Google Maps en el build (MAP_AVAILABLE), aviso en lugar del mapa.
+ */
 type MapsModule = typeof import("react-native-maps");
 const maps: MapsModule | null = (() => {
   try {
@@ -89,7 +93,7 @@ const maps: MapsModule | null = (() => {
     return null;
   }
 })();
-const MapView = maps?.default ?? null;
+const MapView = MAP_AVAILABLE ? (maps?.default ?? null) : null;
 const Marker = maps?.Marker ?? null;
 
 /** Mismo mínimo de caracteres que el buscador de UserAddressTab. */
@@ -418,41 +422,26 @@ function AddressForm({ address, isTablet, styles, onClose, onSelect }: AddressFo
           {/* ── Mapa: tocar mueve el marcador (no se arrastra) ── */}
           <View style={styles.mapWrapper}>
             {MapView && Marker ? (
-              <>
-                <MapView
-                  ref={mapRef}
-                  style={styles.map}
-                  mapType="standard"
-                  initialRegion={{
-                    latitude: mapStart.lat,
-                    longitude: mapStart.lng,
-                    latitudeDelta: DEFAULT_MAP_DELTA,
-                    longitudeDelta: DEFAULT_MAP_DELTA,
-                  }}
-                  onPress={onMapPress}
-                  toolbarEnabled={false}
-                >
-                  {marker && (
-                    <Marker
-                      coordinate={{ latitude: marker.lat, longitude: marker.lng }}
-                      draggable={false}
-                    />
-                  )}
-                </MapView>
-                <TouchableOpacity
-                  style={styles.locateBtn}
-                  onPress={goToMyLocation}
-                  disabled={locating}
-                  accessibilityLabel="Usar mi ubicación"
-                  activeOpacity={0.8}
-                >
-                  {locating ? (
-                    <ActivityIndicator size="small" color={PRIMARY_COLOR} />
-                  ) : (
-                    <Ionicons name="locate" size={20} color={PRIMARY_700} />
-                  )}
-                </TouchableOpacity>
-              </>
+              <MapView
+                ref={mapRef}
+                style={styles.map}
+                mapType="standard"
+                initialRegion={{
+                  latitude: mapStart.lat,
+                  longitude: mapStart.lng,
+                  latitudeDelta: DEFAULT_MAP_DELTA,
+                  longitudeDelta: DEFAULT_MAP_DELTA,
+                }}
+                onPress={onMapPress}
+                toolbarEnabled={false}
+              >
+                {marker && (
+                  <Marker
+                    coordinate={{ latitude: marker.lat, longitude: marker.lng }}
+                    draggable={false}
+                  />
+                )}
+              </MapView>
             ) : (
               <View style={styles.mapFallback}>
                 <Ionicons name="map-outline" size={28} color={TEXT_PLACEHOLDER} />
@@ -462,6 +451,20 @@ function AddressForm({ address, isTablet, styles, onClose, onSelect }: AddressFo
                 </Text>
               </View>
             )}
+            {/* Fuera del ternario: sin mapa, "mi ubicación" sigue rellenando desde el GPS. */}
+            <TouchableOpacity
+              style={styles.locateBtn}
+              onPress={goToMyLocation}
+              disabled={locating}
+              accessibilityLabel="Usar mi ubicación"
+              activeOpacity={0.8}
+            >
+              {locating ? (
+                <ActivityIndicator size="small" color={PRIMARY_COLOR} />
+              ) : (
+                <Ionicons name="locate" size={20} color={PRIMARY_700} />
+              )}
+            </TouchableOpacity>
           </View>
         </View>
 
