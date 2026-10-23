@@ -17,12 +17,13 @@ import {
   ONLINE_DOT,
   PRIMARY_700,
   PRIMARY_COLOR,
-  PRIMARY_TINT_25,
   PRIMARY_TINT_50,
   PRIMARY_TINT_BACKGROUND,
   PRIMARY_TINT_BORDER,
   SECTION_ICON_COLOR,
   SUCCESS_ACCENT,
+  SUCCESS_COLOR,
+  SUCCESS_TINT_50,
   SUCCESS_TINT_BACKGROUND,
   SUCCESS_TINT_BORDER,
   TEXT_MUTED,
@@ -56,7 +57,12 @@ import {
   FOOTER_BTN_SAVE,
   POPUP_CARD,
 } from "@/styles/surfaces";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import {
+  Feather,
+  Ionicons,
+  MaterialCommunityIcons,
+  MaterialIcons,
+} from "@expo/vector-icons";
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
@@ -100,6 +106,7 @@ import {
   findOpenDayPunchForUser,
   formatLateDuration,
   getApprovedPermissionsToday,
+  getActionTimingSections,
   getBreakTagCategoryId,
   getButtonVisibilityMinutes,
   getLateMinutes,
@@ -133,6 +140,7 @@ import {
   toRD,
   toRDDateString,
   WEEK_DAYS,
+  type ActionTimingSectionId,
   type PunchEvent,
   type Tag,
   type UserDayPermission,
@@ -186,6 +194,69 @@ const CATEGORY_ICONS: Record<Category, keyof typeof Ionicons.glyphMap> = {
   Almuerzo: "restaurant-outline",
   Break: "cafe-outline",
 };
+
+/**
+ * Bloques de "Tiempo para mostrar Acciones" — mismos títulos e íconos que el
+ * webapp (renderTimingSectionIcon: Feather log-in / coffee y Material
+ * restaurant son los SVG que dibuja a mano), colores con tokens de la app.
+ */
+const ACTION_TIMING_THEMES: Record<
+  ActionTimingSectionId,
+  {
+    title: string;
+    background: string;
+    border: string;
+    chip: string;
+    text: string;
+    titleColor: string;
+  }
+> = {
+  jornada: {
+    title: "JORNADA",
+    background: PRIMARY_TINT_50,
+    border: PRIMARY_TINT_BORDER,
+    chip: PRIMARY_TINT_BACKGROUND,
+    text: PRIMARY_700,
+    titleColor: HEADER_NAVY,
+  },
+  almuerzo: {
+    title: "ALMUERZO",
+    background: SUCCESS_TINT_50,
+    border: SUCCESS_TINT_BORDER,
+    chip: SUCCESS_TINT_BACKGROUND,
+    text: SUCCESS_COLOR,
+    titleColor: SUCCESS_COLOR,
+  },
+  break: {
+    title: "BREAK",
+    background: WARNING_TINT_50,
+    border: WARNING_TINT_BORDER,
+    chip: WARNING_TINT_BACKGROUND,
+    text: WARNING_TEXT_STRONG,
+    titleColor: WARNING_TEXT_STRONG,
+  },
+};
+
+function ActionTimingIcon({
+  id,
+  size,
+  color,
+}: {
+  id: ActionTimingSectionId;
+  size: number;
+  color: string;
+}) {
+  if (id === "almuerzo") {
+    return <MaterialIcons name="restaurant" size={size} color={color} />;
+  }
+  return (
+    <Feather
+      name={id === "jornada" ? "log-in" : "coffee"}
+      size={size}
+      color={color}
+    />
+  );
+}
 
 const PUNCH_TYPE_MAP: Record<Category, { inicio: string; fin: string }> = {
   Jornada: { inicio: "InicioJornada", fin: "FinJornada" },
@@ -674,6 +745,28 @@ export default function PunchInOut() {
     "isApplyBreak",
   );
 
+  // Tarjeta "Tiempo para mostrar Acciones". Almuerzo según el horario de hoy
+  // (hasLunchScheduleConfigured del webapp), sin mirar isApplyLunch; Break con
+  // el mismo applyBreak que habilita la pestaña (visibleCategories).
+  const actionTimingSections = getActionTimingSections({
+    buttonVisibility: {
+      workIn: btnVisWorkIn,
+      workOut: btnVisWorkOut,
+      lunchIn: btnVisLunchIn,
+      lunchOut: btnVisLunchOut,
+    },
+    breakConfig: getBreakWindowConfig(schoolSettings),
+    hasLunchSchedule: Boolean(
+      todaySchedule?.lunchEntryTime && todaySchedule?.lunchExitTime,
+    ),
+    showBreak: applyBreak,
+  });
+  // Tablet: Jornada y Almuerzo comparten fila; Break, o el que quede solo, a
+  // ancho completo (.actionTimingCardFullWidth del webapp).
+  const actionTimingPairCount = actionTimingSections.filter(
+    (section) => section.id !== "break",
+  ).length;
+
   // Geocerca: coordenadas de la sede y radio permitido (metros, default 200m)
   const schoolObj: School | undefined = schoolUser?.school ?? user?.school;
   const schoolLatitude: number = Number(
@@ -1021,8 +1114,13 @@ export default function PunchInOut() {
         }),
       ]);
       animation = Animated.loop(pulse, { iterations: BLINK_PULSES });
-      animation.start(({ finished }) => {
-        if (finished) setBlinkPunchId(null);
+      // Siempre, no solo con finished: si la fila se desmonta a medio blink
+      // (Historial colapsado) la animación termina interrumpida y el id
+      // quedaba fijo. Solo limpia SU id: el stop() del cleanup no debe borrar
+      // el de un ponche más nuevo.
+      const id = blinkPunchId;
+      animation.start(() => {
+        setBlinkPunchId((current) => (current === id ? null : current));
       });
     }, 500);
     return () => {
@@ -1032,6 +1130,17 @@ export default function PunchInOut() {
       blinkOpacity.setValue(0);
     };
   }, [blinkPunchId, blinkOpacity]);
+
+  // Colapsar el Historial corta el blink en curso: sin esto la fila, al volver
+  // a expandir, quedaba resaltada con la opacidad en que se interrumpió.
+  const toggleHistoryExpanded = () => {
+    if (historyExpanded) {
+      blinkOpacity.stopAnimation();
+      blinkOpacity.setValue(0);
+      setBlinkPunchId(null);
+    }
+    setHistoryExpanded(!historyExpanded);
+  };
 
   // Motivos de Break se traen frescos cada vez que se abre la pantalla — no se
   // cachean entre sesiones, mismo criterio ya usado para settings de la sede.
@@ -2743,13 +2852,19 @@ export default function PunchInOut() {
           </View>
         )}
 
-        {/* ── Tolerancias de visibilidad de botones ── */}
-        {showPunchActions && (
+        {/* ── Tiempo para mostrar Acciones: salvo noSchedule o sin bloques ── */}
+        {!isNoSchedule && actionTimingSections.length > 0 && (
           <View style={styles.floatCard}>
             <TouchableOpacity
-              style={styles.sectionHeaderToggle}
+              style={[
+                styles.sectionHeaderToggle,
+                // Colapsada: sin el margen del encabezado, tarjeta compacta.
+                !tolerancesExpanded && styles.sectionHeaderToggleCollapsed,
+              ]}
               onPress={() => setTolerancesExpanded((prev) => !prev)}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: tolerancesExpanded }}
             >
               <View style={styles.sectionHeaderToggleLabel}>
                 <SectionIcon tone="sky">
@@ -2759,9 +2874,18 @@ export default function PunchInOut() {
                     color={SECTION_ICON_COLOR}
                   />
                 </SectionIcon>
-                <Text style={styles.sectionHeaderText}>
-                  Tiempo para mostrar acciones
-                </Text>
+                <View>
+                  <Text style={styles.sectionHeaderText}>
+                    Tiempo para mostrar Acciones
+                  </Text>
+                  {!tolerancesExpanded && (
+                    <Text
+                      style={[styles.actionTimingHint, { fontSize: font(12) }]}
+                    >
+                      Toca para ver
+                    </Text>
+                  )}
+                </View>
               </View>
               <View style={styles.historyChevronBtn}>
                 <Ionicons
@@ -2772,73 +2896,136 @@ export default function PunchInOut() {
               </View>
             </TouchableOpacity>
             {tolerancesExpanded && (
-              <View style={styles.toleranceGrid}>
-                <View
-                  style={[
-                    styles.toleranceCell,
-                    isTablet && styles.toleranceCellTablet,
-                  ]}
-                >
-                  <Text
-                    style={[styles.toleranceCellLabel, styles.toleranceLabelIn]}
-                  >
-                    Entrada Jornada
-                  </Text>
-                  <Text style={styles.toleranceCellValue}>
-                    {btnVisWorkIn} min antes
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.toleranceCell,
-                    isTablet && styles.toleranceCellTablet,
-                  ]}
-                >
-                  <Text
-                    style={[styles.toleranceCellLabel, styles.toleranceLabelIn]}
-                  >
-                    Entrada Almuerzo
-                  </Text>
-                  <Text style={styles.toleranceCellValue}>
-                    {btnVisLunchIn} min antes
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.toleranceCell,
-                    isTablet && styles.toleranceCellTablet,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.toleranceCellLabel,
-                      styles.toleranceLabelOut,
-                    ]}
-                  >
-                    Salida Jornada
-                  </Text>
-                  <Text style={styles.toleranceCellValue}>
-                    {btnVisWorkOut} min antes
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.toleranceCell,
-                    isTablet && styles.toleranceCellTablet,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.toleranceCellLabel,
-                      styles.toleranceLabelOut,
-                    ]}
-                  >
-                    Salida Almuerzo
-                  </Text>
-                  <Text style={styles.toleranceCellValue}>
-                    {btnVisLunchOut} min antes
-                  </Text>
-                </View>
+              <View
+                style={[
+                  styles.actionTimingPanel,
+                  { gap: scale(isTablet ? 7 : 6) },
+                ]}
+              >
+                {actionTimingSections.map((section) => {
+                  const theme = ACTION_TIMING_THEMES[section.id];
+                  const isFullWidth =
+                    !isTablet ||
+                    section.id === "break" ||
+                    actionTimingPairCount === 1;
+                  return (
+                    <View
+                      key={section.id}
+                      style={[
+                        styles.actionTimingCard,
+                        isTablet
+                          ? styles.actionTimingCardTablet
+                          : styles.actionTimingCardPhone,
+                        {
+                          flexBasis: isFullWidth ? "100%" : "45%",
+                          backgroundColor: theme.background,
+                          borderColor: theme.border,
+                          paddingVertical: scale(isTablet ? 9 : 6),
+                          paddingHorizontal: scale(isTablet ? 13 : 8),
+                        },
+                      ]}
+                    >
+                      {isTablet && (
+                        <>
+                          <View
+                            style={[
+                              styles.actionTimingIconCircle,
+                              {
+                                width: scale(38),
+                                height: scale(38),
+                                backgroundColor: theme.chip,
+                              },
+                            ]}
+                          >
+                            <ActionTimingIcon
+                              id={section.id}
+                              size={scale(19)}
+                              color={theme.text}
+                            />
+                          </View>
+                          <View
+                            style={[
+                              styles.actionTimingDivider,
+                              {
+                                backgroundColor: theme.border,
+                                marginHorizontal: scale(12),
+                              },
+                            ]}
+                          />
+                        </>
+                      )}
+                      <View style={[styles.actionTimingBody, { gap: scale(4) }]}>
+                        <Text
+                          style={[
+                            styles.actionTimingTitle,
+                            { color: theme.titleColor, fontSize: font(13) },
+                          ]}
+                        >
+                          {theme.title}
+                        </Text>
+                        {section.rows.map((row) => (
+                          <View
+                            key={row.label}
+                            style={[
+                              styles.actionTimingRow,
+                              { gap: scale(isTablet ? 12 : 8) },
+                            ]}
+                          >
+                            <Text
+                              numberOfLines={1}
+                              style={[
+                                styles.actionTimingLabel,
+                                {
+                                  color: theme.titleColor,
+                                  width: scale(isTablet ? 95 : 85),
+                                  fontSize: font(isTablet ? 13 : 12),
+                                },
+                              ]}
+                            >
+                              {row.label}
+                            </Text>
+                            <View
+                              style={[
+                                styles.actionTimingChips,
+                                { gap: scale(isTablet ? 6 : 4) },
+                              ]}
+                            >
+                              {row.chips.map((chip, index) => (
+                                <View
+                                  key={index}
+                                  style={[
+                                    styles.actionTimingChip,
+                                    {
+                                      width: scale(isTablet ? 102 : 88),
+                                      paddingVertical: scale(2),
+                                      paddingHorizontal: scale(isTablet ? 9 : 7),
+                                    },
+                                    chip && { backgroundColor: theme.chip },
+                                  ]}
+                                >
+                                  {chip && (
+                                    <Text
+                                      numberOfLines={1}
+                                      style={[
+                                        styles.actionTimingChipText,
+                                        {
+                                          color: theme.text,
+                                          fontSize: font(isTablet ? 12 : 11),
+                                        },
+                                      ]}
+                                    >
+                                      {chip.minutes} {chip.suffix}
+                                    </Text>
+                                  )}
+                                </View>
+                              ))}
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  );
+                })}
               </View>
             )}
           </View>
@@ -2848,9 +3035,14 @@ export default function PunchInOut() {
         {!isNoSchedule && (
           <View style={styles.floatCard}>
             <TouchableOpacity
-              style={styles.sectionHeaderToggle}
-              onPress={() => setHistoryExpanded(!historyExpanded)}
+              style={[
+                styles.sectionHeaderToggle,
+                !historyExpanded && styles.sectionHeaderToggleCollapsed,
+              ]}
+              onPress={toggleHistoryExpanded}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: historyExpanded }}
             >
               <View style={styles.sectionHeaderToggleLabel}>
                 <SectionIcon tone="green">
@@ -2860,7 +3052,18 @@ export default function PunchInOut() {
                     color={SECTION_ICON_COLOR}
                   />
                 </SectionIcon>
-                <Text style={styles.sectionHeaderText}>Historial del Día</Text>
+                <View>
+                  <Text style={styles.sectionHeaderText}>
+                    Historial del Día
+                  </Text>
+                  {!historyExpanded && (
+                    <Text
+                      style={[styles.actionTimingHint, { fontSize: font(12) }]}
+                    >
+                      Toca para ver
+                    </Text>
+                  )}
+                </View>
               </View>
               <View style={styles.historyChevronBtn}>
                 <Ionicons
@@ -3372,45 +3575,70 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: PRIMARY_COLOR,
   },
-  toleranceGrid: {
+  /**
+   * Tarjeta "Tiempo para mostrar Acciones" — calco de .actionTiming* del
+   * webapp (styles.module.css:353-610 y @media max-width 768px). Los colores
+   * van por bloque (ACTION_TIMING_THEMES) y los tamaños inline con scale/font.
+   */
+  sectionHeaderToggleCollapsed: { marginBottom: 0 },
+  actionTimingHint: { color: TEXT_MUTED },
+  actionTimingPanel: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
   },
-  toleranceCell: {
-    flexBasis: "47%",
+  actionTimingCard: {
     flexGrow: 1,
-    backgroundColor: PRIMARY_TINT_25,
-    borderRadius: RADIUS_MD,
-    paddingVertical: 7,
-    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderRadius: RADIUS_LG,
   },
-  /**
-   * En tablet los 4 items (Entrada/Salida × Jornada/Almuerzo) son homogéneos y
-   * entran en una sola fila: 4 × 23% = 92% + 3 gaps de 8px caben en los 648dp
-   * útiles del contenedor capado a MAX_CONTENT_WIDTH.
-   *
-   * `alignItems: "center"` es el fix real del hallazgo: con la celda ya ancha,
-   * sin centrar, el label quedaba pegado a la izquierda con la caja vacía a la
-   * derecha. Mismo patrón que scheduleTableCol, que por eso sí se veía bien.
-   */
-  toleranceCellTablet: {
-    flexBasis: "23%",
+  actionTimingCardTablet: {
+    flexDirection: "row",
     alignItems: "center",
   },
-  toleranceCellLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: TEXT_MUTED,
-    marginBottom: 1,
+  // Teléfono: sin círculo ni divisor, el cuerpo a todo el ancho.
+  actionTimingCardPhone: {
+    flexDirection: "column",
+    alignItems: "stretch",
   },
-  // Mismo verde/rojo que los botones Entrada / Salida (registerBtn*).
-  toleranceLabelIn: { color: SUCCESS_ACCENT },
-  toleranceLabelOut: { color: ERROR_COLOR },
-  toleranceCellValue: {
-    fontSize: 13,
+  actionTimingIconCircle: {
+    borderRadius: RADIUS_PILL,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  actionTimingDivider: {
+    width: 1,
+    alignSelf: "stretch",
+    borderRadius: 1,
+    flexShrink: 0,
+  },
+  actionTimingBody: {
+    flex: 1,
+    minWidth: 0,
+  },
+  actionTimingTitle: {
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  actionTimingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  actionTimingLabel: {
     fontWeight: "700",
-    color: TEXT_MUTED,
+    flexShrink: 0,
+  },
+  actionTimingChips: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  actionTimingChip: {
+    borderRadius: RADIUS_PILL,
+  },
+  actionTimingChipText: {
+    fontWeight: "700",
+    textAlign: "left",
   },
   holidayNotice: {
     flexDirection: "row",

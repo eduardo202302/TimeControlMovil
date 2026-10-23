@@ -937,6 +937,107 @@ export function isApplyFlagEnabled(
   return Boolean(companySettings?.[key]) && Boolean(userSettings?.[key]);
 }
 
+// ─── Tarjeta "Tiempo para mostrar Acciones" ───────────────────────────────────
+
+export type ActionTimingSectionId = "jornada" | "almuerzo" | "break";
+
+export interface ActionTimingChip {
+  minutes: number;
+  /** Texto tras el número: "min", "min antes", "min después", "min de espera". */
+  suffix: string;
+}
+
+export interface ActionTimingRow {
+  label: string;
+  /** Dos columnas fijas: un chip oculto queda null para no correr la columna. */
+  chips: [ActionTimingChip | null, ActionTimingChip | null];
+}
+
+export interface ActionTimingSection {
+  id: ActionTimingSectionId;
+  rows: ActionTimingRow[];
+}
+
+/**
+ * Bloques de la tarjeta "Tiempo para mostrar Acciones" — port de
+ * actionTimingSections (webapp PunchInOutForm/index.jsx:1033-1112), mismos
+ * orden y textos. Desvío del webapp: un valor en 0 no se muestra (chip null),
+ * una fila sin chips se quita y un bloque sin filas también.
+ *
+ * - hasLunchSchedule: horario de hoy con lunchEntryTime Y lunchExitTime
+ *   (hasLunchScheduleConfigured del webapp). No mira isApplyLunch.
+ * - showBreak: la misma condición que habilita el Break en la pantalla.
+ */
+export function getActionTimingSections({
+  buttonVisibility,
+  breakConfig,
+  hasLunchSchedule,
+  showBreak,
+}: {
+  buttonVisibility: ButtonVisibilityMinutes;
+  breakConfig: BreakWindowConfig;
+  hasLunchSchedule: boolean;
+  showBreak: boolean;
+}): ActionTimingSection[] {
+  const chip = (minutes: number, suffix: string): ActionTimingChip | null =>
+    minutes === 0 ? null : { minutes, suffix };
+  const row = (
+    label: string,
+    first: ActionTimingChip | null,
+    second: ActionTimingChip | null,
+  ): ActionTimingRow[] =>
+    first || second ? [{ label, chips: [first, second] }] : [];
+
+  const candidates: ActionTimingSection[] = [
+    {
+      id: "jornada",
+      rows: row(
+        "Entrada / Salida",
+        chip(buttonVisibility.workIn, "min"),
+        chip(buttonVisibility.workOut, "min"),
+      ),
+    },
+  ];
+
+  if (hasLunchSchedule) {
+    candidates.push({
+      id: "almuerzo",
+      rows: row(
+        "Entrada / Salida",
+        chip(buttonVisibility.lunchIn, "min"),
+        chip(buttonVisibility.lunchOut, "min"),
+      ),
+    });
+  }
+
+  if (showBreak) {
+    candidates.push({
+      id: "break",
+      rows: [
+        ...row(
+          "Entrada / Salida",
+          chip(breakConfig.startAfterEntry, "min después"),
+          chip(breakConfig.endBeforeExit, "min antes"),
+        ),
+        ...(hasLunchSchedule
+          ? row(
+              "Almuerzo",
+              chip(breakConfig.endBeforeLunch, "min antes"),
+              chip(breakConfig.startAfterLunch, "min después"),
+            )
+          : []),
+        ...row(
+          "Entre breaks",
+          null,
+          chip(breakConfig.cooldownAfterBreak, "min de espera"),
+        ),
+      ],
+    });
+  }
+
+  return candidates.filter((section) => section.rows.length > 0);
+}
+
 export type PunchCategory = "Jornada" | "Break" | "Almuerzo";
 
 const ALL_CATEGORIES: PunchCategory[] = ["Almuerzo", "Break", "Jornada"];
