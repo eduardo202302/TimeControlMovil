@@ -22,6 +22,8 @@ import {
   getFaultSelectPlaceholder,
   getTaskerFormRules,
   getTaskerReportTitle,
+  getReportSubjectLabel,
+  formatReportSentAt,
   hasSharedCoordinatesAcrossClients,
   haversineMeters,
   isTaskerEnabled,
@@ -1145,5 +1147,53 @@ describe("parseStoredTaskerClients", () => {
         JSON.stringify([{ id: 1, name: "X", defaultAddress: { title: "A" }, addresses: [] }]),
       ),
     ).toBeNull();
+  });
+});
+
+describe("getReportSubjectLabel (título del diálogo: Reporte de {X})", () => {
+  it("quita el prefijo \"Reportar \"", () => {
+    expect(getReportSubjectLabel("Reportar Servicio")).toBe("Servicio");
+    expect(getReportSubjectLabel("Reportar Avería")).toBe("Avería");
+  });
+  it("el prefijo sin importar mayúsculas; el resto tal cual", () => {
+    expect(getReportSubjectLabel("reportar avería")).toBe("avería");
+    expect(getReportSubjectLabel("REPORTAR Falla Eléctrica")).toBe("Falla Eléctrica");
+  });
+  it("sin el prefijo → el label completo", () => {
+    expect(getReportSubjectLabel("Averías Técnicas")).toBe("Averías Técnicas");
+    expect(getReportSubjectLabel("Reportaje")).toBe("Reportaje");
+  });
+  it("recorta espacios como el título del menú", () => {
+    expect(getReportSubjectLabel("  Reportar Avería ")).toBe("Avería");
+  });
+  it("vacío, en blanco o null → \"Servicio\" (respaldo de \"Reportar Servicio\")", () => {
+    for (const label of ["", "   ", null, undefined]) {
+      expect(getReportSubjectLabel(label)).toBe("Servicio");
+    }
+  });
+});
+
+describe("formatReportSentAt (fecha y hora del reporte, hora RD)", () => {
+  it("createdDate de Tasker sin zona → tal cual (ya es hora RD)", () => {
+    expect(formatReportSentAt("2026-10-23T13:12:05")).toBe("23 oct 2026 · 1:12 p. m.");
+    expect(formatReportSentAt("2026-01-05 09:07:00.123")).toBe("5 ene 2026 · 9:07 a. m.");
+  });
+  it("Date (hora de confirmación) → convertido a RD con toRD", () => {
+    // 17:12 UTC = 13:12 en RD (UTC-4). Jest corre con TZ=UTC.
+    expect(formatReportSentAt(new Date(Date.UTC(2026, 9, 23, 17, 12, 0)))).toBe(
+      "23 oct 2026 · 1:12 p. m.",
+    );
+  });
+  it("texto con zona → convertido a RD", () => {
+    expect(formatReportSentAt("2026-12-31T23:30:00Z")).toBe("31 dic 2026 · 7:30 p. m.");
+  });
+  it("mediodía es 12 p. m. y medianoche 12 a. m.", () => {
+    expect(formatReportSentAt("2026-10-23T12:00:00")).toBe("23 oct 2026 · 12:00 p. m.");
+    expect(formatReportSentAt("2026-10-23T00:05:00")).toBe("23 oct 2026 · 12:05 a. m.");
+  });
+  it("inválida → vacío", () => {
+    expect(formatReportSentAt("no es fecha")).toBe("");
+    expect(formatReportSentAt(new Date(Number.NaN))).toBe("");
+    expect(formatReportSentAt("2026-13-01T10:00:00")).toBe("");
   });
 });

@@ -31,6 +31,7 @@ import {
   getTaskerClientName,
   getTicketGoneNotice,
   isTaskInList,
+  resolveRequestedTicket,
   SEGUIMIENTO_REFRESH_MS,
   shouldDiscardOpenComment,
   TASKER_NO_TICKETS_MESSAGE,
@@ -80,14 +81,29 @@ type DetailLoad = "ok" | "gone" | "error" | "stale";
 
 const noSession = (message: string): TaskrFailure => ({ ok: false, message, gone: false });
 
+interface FollowUpViewProps {
+  /**
+   * Ticket a abrir al cargar la lista (llega de "Ver seguimiento" tras
+   * enviar un reporte). Se toma una sola vez: al recibirlo se llama
+   * `onRequestConsumed` y las recargas siguientes no lo vuelven a aplicar.
+   */
+  requestedTicketId?: number | null;
+  onRequestConsumed?: () => void;
+}
+
 /**
  * Seguimiento de los tickets de Tasker. La lista se carga al entrar y no se
- * elige ninguno; al tocar una tarjeta se pide su detalle. Mientras la
+ * elige ninguno (salvo `requestedTicketId`, si está en la lista: se elige, se
+ * pide su detalle y su tarjeta se lleva a la vista); al tocar una tarjeta se
+ * pide su detalle. Mientras la
  * pantalla tiene el foco y la app está en primer plano, lista y detalle se
  * recargan solos cada SEGUIMIENTO_REFRESH_MS, sin indicador y sin tocar el
  * formulario de comentario abierto (salvo que el ticket se cierre).
  */
-export default function FollowUpView() {
+export default function FollowUpView({
+  requestedTicketId = null,
+  onRequestConsumed,
+}: FollowUpViewProps) {
   const { scale, verticalScale, font, isTablet } = useResponsive();
   const styles = useMemo(
     () => createFollowUpStyles(scale, verticalScale, font),
@@ -114,6 +130,11 @@ export default function FollowUpView() {
   const detailRef = useRef<DetailState | null>(null);
   /** Lista + detalle de a una: si una recarga no terminó, no se lanza otra. */
   const [runExclusive] = useState(createExclusiveRunner);
+  /** Ticket pedido que espera a la próxima lista cargada con éxito. */
+  const pendingTicketRef = useRef<number | null>(null);
+  /** Tarjeta a llevar a la vista en la fila de tickets (solo la pedida). */
+  const [revealId, setRevealId] = useState<number | null>(null);
+  const clearReveal = useCallback(() => setRevealId(null), []);
 
   const updateList = useCallback((next: ListState) => {
     listRef.current = next;
@@ -172,6 +193,17 @@ export default function FollowUpView() {
         return false;
       }
       updateList({ status: "ready", tasks: result.tasks });
+      // Ticket pedido: se aplica una sola vez, en la primera lista que llega.
+      // Si no está en ella, todo sigue como siempre.
+      const requested = pendingTicketRef.current;
+      pendingTicketRef.current = null;
+      const target = resolveRequestedTicket(result.tasks, requested);
+      if (target !== null) {
+        if (target !== selectedIdRef.current) updateSelection(target, { status: "loading" });
+        setTab("ticket");
+        setRevealId(target);
+        return true;
+      }
       const id = selectedIdRef.current;
       if (id !== null && !isTaskInList(result.tasks, id)) {
         updateSelection(null, null);
@@ -217,7 +249,9 @@ export default function FollowUpView() {
       const keepsSelection = await loadList(mode);
       const id = selectedIdRef.current;
       if (!keepsSelection || id === null) return;
-      if ((await loadDetail(id, true)) === "gone") await loadList("silent");
+      // Recién elegido por la lista (ticket pedido): con indicador y error, como un toque.
+      const silent = detailRef.current?.status !== "loading";
+      if ((await loadDetail(id, silent)) === "gone") await loadList("silent");
     },
     [loadList, loadDetail],
   );
@@ -307,6 +341,19 @@ export default function FollowUpView() {
 
   const live = focused && appActive;
 
+  // Ticket pedido: queda pendiente hasta la próxima lista y el parámetro se
+  // consume ya, así ni las recargas ni volver sin parámetro lo reaplican. Con
+  // la lista ya cargada (pedido con la pantalla montada) se recarga para
+  // aplicarlo; si no, lo aplica la carga del foco.
+  useEffect(() => {
+    if (requestedTicketId === null) return;
+    pendingTicketRef.current = requestedTicketId;
+    onRequestConsumed?.();
+    if (listRef.current.status !== "loading") {
+      void runExclusive(() => reloadAll("silent"));
+    }
+  }, [requestedTicketId, onRequestConsumed, runExclusive, reloadAll]);
+
   // Al entrar (o volver a primer plano) se recarga ya, y luego cada 30 s. Al
   // perder el foco o pasar a segundo plano, el intervalo se limpia.
   useEffect(() => {
@@ -375,6 +422,8 @@ export default function FollowUpView() {
           selectedId={selectedId}
           onSelect={handleSelect}
           styles={styles}
+          revealId={revealId}
+          onRevealed={clearReveal}
         />
         {task ? (
           <FollowUpTicketTab

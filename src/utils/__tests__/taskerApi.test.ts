@@ -620,6 +620,7 @@ describe("createTaskerTask", () => {
     await expect(createTaskerTask({ token: TOKEN, urlColegio: URL, body })).resolves.toEqual({
       ok: true,
       id: 4051,
+      createdDate: null,
       message: "",
     });
     const [url, sent, options] = mockedPost.mock.calls[0];
@@ -638,8 +639,26 @@ describe("createTaskerTask", () => {
     await expect(createTaskerTask({ token: TOKEN, urlColegio: URL, body })).resolves.toEqual({
       ok: true,
       id: null,
+      createdDate: null,
       message: "",
     });
+  });
+  it("éxito con createdDate → se devuelve; vacío o no texto → null", async () => {
+    mockedPost.mockResolvedValueOnce({
+      data: { success: true, data: { id: 4052, createdDate: "2026-10-23T13:12:05" } },
+    });
+    await expect(createTaskerTask({ token: TOKEN, urlColegio: URL, body })).resolves.toEqual({
+      ok: true,
+      id: 4052,
+      createdDate: "2026-10-23T13:12:05",
+      message: "",
+    });
+    for (const createdDate of ["  ", 1729700000000, null]) {
+      mockedPost.mockResolvedValueOnce({ data: { success: true, data: { id: 1, createdDate } } });
+      await expect(createTaskerTask({ token: TOKEN, urlColegio: URL, body })).resolves.toMatchObject({
+        createdDate: null,
+      });
+    }
   });
   it("success:false con message texto → ese texto", async () => {
     mockedPost.mockResolvedValueOnce({

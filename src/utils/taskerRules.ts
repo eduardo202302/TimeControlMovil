@@ -40,6 +40,7 @@ import {
 } from "../constants/colors";
 import { canCommentOnTask } from "./taskerFollowUpRules";
 import { geocodeLocation, type GeocodeResult, type LatLng } from "./addressRules";
+import { toRD } from "./punchRules";
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
@@ -617,6 +618,46 @@ export function filterTaskerMenu(menuTree: MenuTree[], enabled: boolean): MenuTr
 function trimmedLabel(value: string | null | undefined, fallback: string): string {
   const label = typeof value === "string" ? value.trim() : "";
   return label || fallback;
+}
+
+/**
+ * Qué se reportó, para "Reporte de {X}": failureReportMenuLabel (o el respaldo
+ * "Reportar Servicio") sin el prefijo "Reportar " (sin importar mayúsculas);
+ * el resto tal cual. Sin prefijo → el label completo; vacío → "Servicio".
+ */
+export function getReportSubjectLabel(label: string | null | undefined): string {
+  // trimmedLabel ya recorta y aplica el respaldo: lo que queda nunca es vacío.
+  return trimmedLabel(label, TASKER_REPORT_TITLE_FALLBACK).replace(/^reportar\s+/i, "");
+}
+
+const MONTHS_SHORT = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** Fecha de Tasker sin zona ("2026-10-23T13:12:05"): ya es hora de RD. */
+const NAIVE_TASKER_DATE = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/;
+
+/**
+ * Fecha y hora del reporte enviado en hora RD: "23 oct 2026 · 1:12 p. m.".
+ * Un texto de Tasker sin zona ya está en hora RD y se toma tal cual; un Date
+ * (o texto con zona) se pasa a RD con toRD. Inválida → "".
+ */
+export function formatReportSentAt(value: string | Date): string {
+  let parts: { year: number; month: number; day: number; hours: number; minutes: number };
+  const naive = typeof value === "string" ? NAIVE_TASKER_DATE.exec(value.trim()) : null;
+  if (naive) {
+    const [, year, month, day, hours, minutes] = naive.map(Number);
+    parts = { year, month: month - 1, day, hours, minutes };
+  } else {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    parts = toRD(date);
+  }
+  const { year, month, day, hours, minutes } = parts;
+  if (month < 0 || month > 11) return "";
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  return (
+    `${day} ${MONTHS_SHORT[month]} ${year} · ` +
+    `${hour12}:${pad2(minutes)} ${hours < 12 ? "a. m." : "p. m."}`
+  );
 }
 
 /** Título de Reportar en el menú y el encabezado: failureReportMenuLabel o "Reportar Servicio". */

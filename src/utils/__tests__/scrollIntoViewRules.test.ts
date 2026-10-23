@@ -1,4 +1,8 @@
-import { getScrollIntoViewDelta, getVisibleViewport } from "../scrollIntoViewRules";
+import {
+  getCenteredScrollOffset,
+  getScrollIntoViewDelta,
+  getVisibleViewport,
+} from "../scrollIntoViewRules";
 
 describe("getVisibleViewport", () => {
   it("sin teclado → el marco del ScrollView", () => {
@@ -31,5 +35,21 @@ describe("getScrollIntoViewDelta", () => {
   });
   it("justo en el borde con margen → 0", () => {
     expect(getScrollIntoViewDelta({ top: 116, bottom: 484 }, viewport, margin)).toBe(0);
+  });
+});
+
+describe("getCenteredScrollOffset (tarjeta pedida en la fila horizontal)", () => {
+  // Viewport 360, tarjetas de 156 con 10 de gap y 16 de padding inicial.
+  it("tarjeta en el medio → queda centrada", () => {
+    expect(getCenteredScrollOffset(514, 156, 360, 1500)).toBe(412);
+  });
+  it("primera tarjeta → no baja de 0", () => {
+    expect(getCenteredScrollOffset(16, 156, 360, 1500)).toBe(0);
+  });
+  it("última tarjeta → no pasa del final del contenido", () => {
+    expect(getCenteredScrollOffset(1328, 156, 360, 1500)).toBe(1140);
+  });
+  it("contenido más angosto que el viewport → 0", () => {
+    expect(getCenteredScrollOffset(182, 156, 360, 340)).toBe(0);
   });
 });

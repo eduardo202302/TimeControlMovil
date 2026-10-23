@@ -440,7 +440,8 @@ export function serializeTaskrTaskBody(body: TaskrTaskBody): SerializedBody {
 }
 
 export type CreateTaskerTaskResult =
-  | { ok: true; id: number | null; message: string }
+  /** `createdDate`: el de la tarea creada si la respuesta lo trae (texto no vacío); si no, null. */
+  | { ok: true; id: number | null; createdDate: string | null; message: string }
   | { ok: false; message: string };
 
 /**
@@ -464,7 +465,8 @@ export async function createTaskerTask({
       return { ok: false, message: readTaskrMessage(response.data?.message, TASKER_SEND_ERROR) };
     }
     const id = response.data?.data?.id;
-    return { ok: true, id: typeof id === "number" ? id : null, message: "" };
+    const createdDate = textOrNull(response.data?.data?.createdDate)?.trim() || null;
+    return { ok: true, id: typeof id === "number" ? id : null, createdDate, message: "" };
   } catch (error: any) {
     console.warn("createTaskerTask:", error?.message ?? "error desconocido");
     if (error?.response) {

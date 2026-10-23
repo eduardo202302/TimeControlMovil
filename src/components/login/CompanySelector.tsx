@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Modal,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -49,6 +50,12 @@ interface CompanySelectorProps<T extends CompanyOption> {
   busy?: boolean;
 }
 
+/**
+ * Tope de alto de la lista (fracción de la ventana): con muchas compañías
+ * scrollea y "Cancelar" sigue a la vista. Con pocas, mide lo que su contenido.
+ */
+const LIST_MAX_HEIGHT_RATIO = 0.52;
+
 const DEFAULT_SUBTITLE =
   "Tu usuario pertenece a varias compañías. Selecciona con cuál deseas ingresar.";
 
@@ -64,7 +71,8 @@ export default function CompanySelector<T extends CompanyOption>({
   loading = false,
   busy = false,
 }: CompanySelectorProps<T>) {
-  const { scale, verticalScale, font } = useResponsive();
+  // `height` es el de useWindowDimensions (vía useResponsive).
+  const { scale, verticalScale, font, height } = useResponsive();
   const theme = useAuthTheme();
   const styles = createStyles(scale, verticalScale, font, theme);
 
@@ -86,7 +94,11 @@ export default function CompanySelector<T extends CompanyOption>({
           {loading ? (
             <ActivityIndicator color={AUTH_BRAND} style={styles.loader} />
           ) : (
-            <View style={styles.list}>
+            <ScrollView
+              style={[styles.list, { maxHeight: height * LIST_MAX_HEIGHT_RATIO }]}
+              contentContainerStyle={styles.listContent}
+              keyboardShouldPersistTaps="handled"
+            >
               {companies.map((company) => {
                 // Mismo criterio que CompanyCard del webapp: "Inactiva" gana a
                 // "Actual", y una inactiva no se puede elegir.
@@ -140,7 +152,7 @@ export default function CompanySelector<T extends CompanyOption>({
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
           )}
 
           <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
@@ -189,7 +201,9 @@ function createStyles(
       marginTop: verticalScale(6),
       lineHeight: 18,
     },
-    list: {
+    // Sin flexGrow: con pocas compañías la lista mide su contenido.
+    list: { flexGrow: 0 },
+    listContent: {
       gap: scale(10),
     },
     companyItem: {

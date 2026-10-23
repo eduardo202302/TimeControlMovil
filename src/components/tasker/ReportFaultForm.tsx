@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -43,6 +43,7 @@ import {
   RADIUS_SM,
   useResponsive,
 } from "@/constants/responsive";
+import ResultDialog from "@/components/ui/ResultDialog";
 import SectionIcon from "@/components/ui/SectionIcon";
 import TagOptionSheet from "@/components/permissions/TagOptionSheet";
 import TagMultiSelectSheet from "@/components/users/TagMultiSelectSheet";
@@ -61,12 +62,14 @@ import {
   collectAddressCandidates,
   filterFaultActionsForClient,
   formatAddressCandidatesTable,
+  formatReportSentAt,
   formatSelectedFaultsSummary,
   getClientAddressHint,
   getRemovedFaultsNotice,
   getSelectedFaultNames,
   getDefaultClientAddressId,
   getNearestElsewhereHint,
+  getReportSubjectLabel,
   getTaskerAddressDisplay,
   getTaskerClientLabel,
   getFaultSelectPlaceholder,
@@ -75,6 +78,7 @@ import {
   getSelectedTaskerAddress,
   getUnsavedCommentOnSend,
   hasSharedCoordinatesAcrossClients,
+  isTaskerEnabled,
   pickNearestAddressCandidate,
   pickNearestClientAddress,
   pruneSelectedFaults,
@@ -83,11 +87,13 @@ import {
   saveTaskerCommentDraft,
   selectTaskerAddress,
   sortTaskerAddresses,
+  TASKER_FOLLOWUP_PATH,
   toggleTaskerAddressSelected,
   updateTaskerAddress,
   updateTaskerComment,
   validateReport,
 } from "../../utils/taskerRules";
+import { FOLLOWUP_TICKET_PARAM } from "../../utils/taskerFollowUpRules";
 import {
   buildTaskrTaskBody,
   createTaskerTask,
@@ -125,6 +131,11 @@ type FaultActionsState =
   | { status: "loading" }
   | { status: "error" }
   | { status: "ready"; actions: TaskerFaultAction[] };
+
+/** Resultado del envío que muestra ResultDialog. */
+type SendResult =
+  | { tone: "success"; id: number | null; sentAt: string }
+  | { tone: "error"; message: string };
 
 /** Token y servidor de la sesión, como las demás llamadas a FaceClass. Nunca lanza. */
 async function sessionCredentials(): Promise<{ token: string; urlColegio: string } | null> {
@@ -227,6 +238,11 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
   /** Envío en curso: el ref bloquea un segundo toque antes del re-render. */
   const [sending, setSending] = useState(false);
   const sendingRef = useRef(false);
+  // El resultado se conserva al cerrar: el diálogo se desvanece con su contenido.
+  const [sendResult, setSendResult] = useState<SendResult | null>(null);
+  const [resultVisible, setResultVisible] = useState(false);
+  // "Ver seguimiento" con el mismo gate que Seguimiento en el menú.
+  const followUpEnabled = useSchoolStore((state) => isTaskerEnabled(state.taskerConfig));
   /** Las respuestas que llegan tras desmontar no tocan el estado. */
   const mountedRef = useRef(true);
   const faultsRequestRef = useRef(0);
@@ -513,23 +529,46 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
           : { ok: false as const, message: TASKER_SEND_ERROR };
         if (!mountedRef.current) return;
         if (response.ok) {
-          Alert.alert(
-            "Reporte enviado",
-            response.id != null ? `Ticket #${response.id}` : undefined,
-            [{ text: "OK", onPress: scrollToTop }],
-          );
+          // Fecha del reporte: createdDate de la respuesta o, si no viene, ahora.
+          setSendResult({
+            tone: "success",
+            id: response.id,
+            sentAt: formatReportSentAt(response.createdDate ?? new Date()),
+          });
+          setResultVisible(true);
           resetForm();
         } else {
           // Nada se limpia ni se mueve: el usuario puede corregir y reintentar.
-          Alert.alert("Reporte no enviado", response.message);
+          setSendResult({ tone: "error", message: response.message });
+          setResultVisible(true);
         }
       } finally {
         sendingRef.current = false;
         if (mountedRef.current) setSending(false);
       }
     },
-    [config.appliesFault, client.id, faultIds, description, addresses, resetForm, scrollToTop],
+    [config.appliesFault, client.id, faultIds, description, addresses, resetForm],
   );
+
+  /** "Entendido": cierra; tras un envío exitoso, además al primer bloque. */
+  const closeSendResult = useCallback(() => {
+    setResultVisible(false);
+    if (sendResult?.tone === "success") scrollToTop();
+  }, [sendResult, scrollToTop]);
+
+  /** "Ver seguimiento": cierra y abre Seguimiento con el ticket recién creado. */
+  const openFollowUp = useCallback((id: number) => {
+    setResultVisible(false);
+    router.push({
+      pathname: TASKER_FOLLOWUP_PATH,
+      params: { [FOLLOWUP_TICKET_PARAM]: String(id) },
+    });
+  }, []);
+
+  const followUpTicketId =
+    sendResult?.tone === "success" && sendResult.id != null && followUpEnabled
+      ? sendResult.id
+      : null;
 
   /**
    * Valida y, si hay un comentario abierto con cambios, pregunta antes de
@@ -848,6 +887,35 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
         onClose={() => setAddressEditor(null)}
         onSelect={handleAddressSelected}
       />
+
+      {/* ── Resultado del envío ── */}
+      {sendResult?.tone === "success" ? (
+        <ResultDialog
+          visible={resultVisible}
+          tone="success"
+          title={`Reporte de ${getReportSubjectLabel(config.failureReportMenuLabel)}`}
+          badge={sendResult.id != null ? `No. ${sendResult.id}` : undefined}
+          message={sendResult.sentAt}
+          messageTone="muted"
+          onClose={closeSendResult}
+          {...(followUpTicketId !== null
+            ? {
+                buttonLabel: "Ver seguimiento",
+                onPress: () => openFollowUp(followUpTicketId),
+                secondaryButton: { label: "Entendido", onPress: closeSendResult },
+              }
+            : { buttonLabel: "Entendido" })}
+        />
+      ) : (
+        <ResultDialog
+          visible={resultVisible}
+          tone="error"
+          title="Reporte no enviado"
+          message={sendResult?.message}
+          buttonLabel="Entendido"
+          onClose={closeSendResult}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 import { usePathname, useRouter } from "expo-router";
 import * as Storage from "../../utils/storage";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -295,6 +296,16 @@ function createStyles(
       justifyContent: "center",
     },
     scroll: { flex: 1 },
+    /** Pie fijo bajo el menú: versión de la app. */
+    versionFooter: {
+      paddingHorizontal: scale(16),
+      paddingVertical: verticalScale(8),
+    },
+    versionText: {
+      fontSize: font(11),
+      color: TEXT_MUTED,
+      textAlign: "right",
+    },
     section: {
       marginBottom: verticalScale(2),
     },
@@ -573,6 +584,8 @@ export default function DrawerMenu({
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const { width, isTablet, scale, verticalScale, font } = useResponsive();
   const insets = useSafeAreaInsets();
+  // Versión del JS en ejecución (la del OTA aplicado, no necesariamente la del APK).
+  const appVersion = Constants.expoConfig?.version;
 
   const styles = useMemo(
     () => createStyles(scale, verticalScale, font, insets.top),
@@ -803,6 +816,13 @@ const confirmLogout = useCallback(async () => {
             </Animated.View>
           )}
         </ScrollView>
+
+        {/* Pie fijo: fuera del scroll, dentro del inset inferior. */}
+        {!!appVersion && (
+          <View style={styles.versionFooter}>
+            <Text style={styles.versionText}>v{appVersion}</Text>
+          </View>
+        )}
         </SafeAreaView>
       </Animated.View>
     </View>

@@ -93,7 +93,7 @@ describe("getActionTimingSections", () => {
           },
           {
             label: "Entre breaks",
-            chips: [{ minutes: 15, suffix: "min de espera" }, null],
+            chips: [{ minutes: 15, suffix: "min" }, null],
           },
         ],
       },
@@ -119,7 +119,7 @@ describe("getActionTimingSections", () => {
       { minutes: 60, suffix: "min antes" },
     ]);
     expect(row(brk, "Entre breaks")?.chips).toEqual([
-      { minutes: 30, suffix: "min de espera" },
+      { minutes: 30, suffix: "min" },
       null,
     ]);
   });
@@ -217,7 +217,7 @@ describe("getActionTimingSections", () => {
     expect(withCooldown?.rows).toEqual([
       {
         label: "Entre breaks",
-        chips: [{ minutes: 25, suffix: "min de espera" }, null],
+        chips: [{ minutes: 25, suffix: "min" }, null],
       },
     ]);
 

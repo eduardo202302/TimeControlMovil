@@ -1,4 +1,5 @@
 import type { ExpoConfig } from "expo/config";
+import appVersion from "./version.json";
 
 /**
  * Key del SDK nativo de Google Maps (Android). Viene de .env / variables de
@@ -7,12 +8,21 @@ import type { ExpoConfig } from "expo/config";
  * app recibe `hasGoogleMapsKey` en `extra` y no monta el mapa (ver
  * src/constants/maps.ts).
  */
-const googleMapsAndroidApiKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY?.trim() ?? "";
+const googleMapsAndroidApiKey =
+  process.env.GOOGLE_MAPS_ANDROID_API_KEY?.trim() ?? "";
+
+/**
+ * Versión de la app: version.json (lo sube scripts/bump-version.js). El
+ * runtime solo cambia con el major (build nativo); los minor/patch viajan por
+ * OTA al mismo runtime sin romper la entrega a los APK instalados.
+ */
+const version = `${appVersion.major}.${appVersion.minor}.${appVersion.patch}`;
+const runtimeVersion = `${appVersion.major}.0.0`;
 
 const config: ExpoConfig = {
-  name: "timeControlApp",
+  name: "Time Control App",
   slug: "timeControlMovil",
-  version: "1.0.0",
+  version,
   orientation: "portrait",
   icon: "./assets/images/logos/logo2.png",
   scheme: "timecontrolapp",
@@ -86,9 +96,7 @@ const config: ExpoConfig = {
     },
     hasGoogleMapsKey: googleMapsAndroidApiKey.length > 0,
   },
-  runtimeVersion: {
-    policy: "appVersion",
-  },
+  runtimeVersion,
   updates: {
     url: "https://u.expo.dev/ea57f376-647a-4164-a977-94d685b3ac4e",
   },

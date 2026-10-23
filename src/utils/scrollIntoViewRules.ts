@@ -41,3 +41,19 @@ export function getVisibleViewport(
   const bottom = scrollTop + scrollHeight;
   return { top: scrollTop, bottom: keyboardTop == null ? bottom : Math.min(bottom, keyboardTop) };
 }
+
+/**
+ * Offset de un ScrollView (en su eje) que centra un elemento que empieza en
+ * `itemStart` (coordenadas del contenido) y mide `itemSize`, sin pasarse de
+ * los extremos: nunca negativo ni más allá del final del contenido.
+ */
+export function getCenteredScrollOffset(
+  itemStart: number,
+  itemSize: number,
+  viewportSize: number,
+  contentSize: number,
+): number {
+  const max = Math.max(0, contentSize - viewportSize);
+  const centered = itemStart - (viewportSize - itemSize) / 2;
+  return Math.round(Math.min(max, Math.max(0, centered)));
+}

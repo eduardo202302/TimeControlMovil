@@ -33,6 +33,8 @@ import {
   getTicketGoneNotice,
   isTaskInList,
   isTaskrTaskGoneMessage,
+  parseFollowUpTicketParam,
+  resolveRequestedTicket,
   SEGUIMIENTO_REFRESH_MS,
   shouldDiscardOpenComment,
   TASKER_NO_CLIENT_LABEL,
@@ -757,5 +759,39 @@ describe("addTaskerTaskComment", () => {
       message: TASKER_NETWORK_ERROR,
       gone: false,
     });
+  });
+});
+
+describe("parseFollowUpTicketParam (?ticket= de Ver seguimiento)", () => {
+  it("entero positivo en texto → número", () => {
+    expect(parseFollowUpTicketParam("482")).toBe(482);
+    expect(parseFollowUpTicketParam(" 7 ")).toBe(7);
+  });
+  it("arreglo → el primero", () => {
+    expect(parseFollowUpTicketParam(["12", "13"])).toBe(12);
+  });
+  it("ausente, vacío, cero, negativo, decimal o texto → null", () => {
+    for (const value of [undefined, "", "0", "-3", "4.5", "abc", "12abc", []]) {
+      expect(parseFollowUpTicketParam(value as string | string[] | undefined)).toBeNull();
+    }
+  });
+  it("fuera de rango seguro → null", () => {
+    expect(parseFollowUpTicketParam("99999999999999999999")).toBeNull();
+  });
+});
+
+describe("resolveRequestedTicket (selección inicial de Seguimiento)", () => {
+  const tasks = [{ id: 10 }, { id: 482 }, { id: 7 }];
+  it("pedido y en la lista → ese", () => {
+    expect(resolveRequestedTicket(tasks, 482)).toBe(482);
+  });
+  it("pedido pero no está en la lista → null (ninguno elegido, como hoy)", () => {
+    expect(resolveRequestedTicket(tasks, 999)).toBeNull();
+  });
+  it("sin pedido → null", () => {
+    expect(resolveRequestedTicket(tasks, null)).toBeNull();
+  });
+  it("lista vacía → null", () => {
+    expect(resolveRequestedTicket([], 482)).toBeNull();
   });
 });

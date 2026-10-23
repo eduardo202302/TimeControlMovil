@@ -155,6 +155,31 @@ export function isTaskInList(tasks: Pick<TaskerTaskSummary, "id">[], id: number)
   return tasks.some((t) => t.id === id);
 }
 
+/** Parámetro de /followup con el ticket a abrir (desde "Ver seguimiento"). */
+export const FOLLOWUP_TICKET_PARAM = "ticket";
+
+/**
+ * Valor del parámetro `ticket` → id, o null si falta o no es un entero
+ * positivo. expo-router puede entregarlo como arreglo: se usa el primero.
+ */
+export function parseFollowUpTicketParam(value: string | string[] | undefined): number | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (typeof raw !== "string" || !/^\d+$/.test(raw.trim())) return null;
+  const id = Number(raw.trim());
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * Ticket a elegir al llegar con uno pedido: el pedido si está en la lista;
+ * si no (o no se pidió ninguno), null = ninguno elegido, como siempre.
+ */
+export function resolveRequestedTicket(
+  tasks: Pick<TaskerTaskSummary, "id">[],
+  requestedId: number | null,
+): number | null {
+  return requestedId !== null && isTaskInList(tasks, requestedId) ? requestedId : null;
+}
+
 /**
  * Corre una tarea a la vez: si la anterior no terminó, la nueva se descarta
  * (devuelve false). Así la recarga automática nunca se encima.
