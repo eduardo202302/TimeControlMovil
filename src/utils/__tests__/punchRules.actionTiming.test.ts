@@ -93,7 +93,7 @@ describe("getActionTimingSections", () => {
           },
           {
             label: "Entre breaks",
-            chips: [null, { minutes: 15, suffix: "min de espera" }],
+            chips: [{ minutes: 15, suffix: "min de espera" }, null],
           },
         ],
       },
@@ -119,8 +119,8 @@ describe("getActionTimingSections", () => {
       { minutes: 60, suffix: "min antes" },
     ]);
     expect(row(brk, "Entre breaks")?.chips).toEqual([
-      null,
       { minutes: 30, suffix: "min de espera" },
+      null,
     ]);
   });
 
@@ -204,7 +204,7 @@ describe("getActionTimingSections", () => {
     expect(sections.map((s) => s.id)).toEqual(["jornada", "almuerzo"]);
   });
 
-  it("Entre breaks siempre [null, chip], o fila ausente con espera 0", () => {
+  it("Entre breaks siempre [chip, null], o fila ausente con espera 0", () => {
     const withCooldown = section(
       getActionTimingSections({
         buttonVisibility: LBL,
@@ -217,7 +217,7 @@ describe("getActionTimingSections", () => {
     expect(withCooldown?.rows).toEqual([
       {
         label: "Entre breaks",
-        chips: [null, { minutes: 25, suffix: "min de espera" }],
+        chips: [{ minutes: 25, suffix: "min de espera" }, null],
       },
     ]);
 

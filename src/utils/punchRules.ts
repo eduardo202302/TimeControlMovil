@@ -573,7 +573,9 @@ export function tagsOfCategory(
 
 // ─── Permisos del día ─────────────────────────────────────────────────────────
 
-export function normalizePermissionName(value: string | null | undefined): string {
+export function normalizePermissionName(
+  value: string | null | undefined,
+): string {
   return (value ?? "").trim().toLowerCase();
 }
 
@@ -962,7 +964,8 @@ export interface ActionTimingSection {
  * Bloques de la tarjeta "Tiempo para mostrar Acciones" — port de
  * actionTimingSections (webapp PunchInOutForm/index.jsx:1033-1112), mismos
  * orden y textos. Desvío del webapp: un valor en 0 no se muestra (chip null),
- * una fila sin chips se quita y un bloque sin filas también.
+ * una fila sin chips se quita y un bloque sin filas también. "Entre breaks"
+ * lleva su único chip (espera) en la 1ª columna: [chip, null].
  *
  * - hasLunchSchedule: horario de hoy con lunchEntryTime Y lunchExitTime
  *   (hasLunchScheduleConfigured del webapp). No mira isApplyLunch.
@@ -1028,8 +1031,8 @@ export function getActionTimingSections({
           : []),
         ...row(
           "Entre breaks",
+          chip(breakConfig.cooldownAfterBreak, "min"),
           null,
-          chip(breakConfig.cooldownAfterBreak, "min de espera"),
         ),
       ],
     });
@@ -1238,7 +1241,11 @@ export function isJornadaVisible(
     }
     // Fuera de Horario vigente -> habilita la salida fuera de su ventana
     if (
-      getApprovedPermission(permissions, PERMISSION_ACTION.FUERA_DE_HORARIO, now)
+      getApprovedPermission(
+        permissions,
+        PERMISSION_ACTION.FUERA_DE_HORARIO,
+        now,
+      )
     ) {
       return true;
     }
@@ -1387,8 +1394,7 @@ export function isBreakVisible(
 
   const morningStart =
     timeStrToMinutes(schedule.workEntryTime) + config.startAfterEntry;
-  const dayEnd =
-    timeStrToMinutes(schedule.workExitTime) - config.endBeforeExit;
+  const dayEnd = timeStrToMinutes(schedule.workExitTime) - config.endBeforeExit;
 
   if (schedule.lunchEntryTime && schedule.lunchExitTime) {
     const morningEnd =
