@@ -32,6 +32,8 @@ import {
 } from "@/styles/surfaces";
 import {
   canSaveTaskerComment,
+  formatTaskerVideoProgress,
+  getTaskerAttachmentHelper,
   isTaskerCommentDraftChanged,
   TASKER_COMMENT_MAX_LENGTH,
   type TaskerAttachmentLimit,
@@ -42,6 +44,7 @@ import type {
 } from "../../../types/typesTasker/TaskerTypes";
 import { TASKER_LAYOUT as L, taskerMultilineStyle } from "./taskerCompact";
 import { scrollIntoView } from "./scrollIntoView";
+import TaskerAttachmentSheet from "./TaskerAttachmentSheet";
 import TaskerCommentThumb from "./TaskerCommentThumb";
 import { useTaskerAttachmentPicker } from "./useTaskerAttachmentPicker";
 
@@ -61,9 +64,12 @@ interface TaskerCommentComposerProps {
   onDraftChange?: (draft: TaskerCommentDraft) => void;
   /**
    * Tope de adjuntos de todo el envío, con lo que ya pesan los OTROS
-   * comentarios (Reportar Avería). Sin él, solo los topes del selector.
+   * comentarios (Reportar Avería). Sin él (Seguimiento), 7 MB para este
+   * comentario solo.
    */
   attachmentLimit?: TaskerAttachmentLimit;
+  /** Avisa si se está eligiendo o procesando un adjunto (Reportar no deja enviar). */
+  onBusyChange?: (busy: boolean) => void;
   onOpenImage: (uri: string) => void;
   /** Enviando (Seguimiento): todo queda bloqueado y "Guardar" muestra el indicador. */
   saving?: boolean;
@@ -89,6 +95,7 @@ export default function TaskerCommentComposer({
   onChangedChange,
   onDraftChange,
   attachmentLimit,
+  onBusyChange,
   onOpenImage,
   saving = false,
   scrollRef,
@@ -111,8 +118,15 @@ export default function TaskerCommentComposer({
   const picker = useTaskerAttachmentPicker(attachments, handleAddAttachments, attachmentLimit);
 
   const draft: TaskerCommentDraft = { text, attachments };
-  const canSave = canSaveTaskerComment(draft);
+  // Mientras se procesa un adjunto (p. ej. comprimiendo un video) no se guarda.
+  const canSave = canSaveTaskerComment(draft) && !picker.busy;
   const changed = isTaskerCommentDraftChanged(initial, draft);
+
+  useEffect(() => {
+    onBusyChange?.(picker.busy);
+  }, [picker.busy, onBusyChange]);
+  // Al desmontarse (se cerró la ventana) deja de estar ocupado.
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
 
   useEffect(() => {
     onChangedChange?.(changed);
@@ -215,8 +229,17 @@ export default function TaskerCommentComposer({
           )}
           <Text style={styles.addBtnText}>Tomar foto o adjuntar archivo</Text>
         </TouchableOpacity>
-        {!compact && <Text style={styles.helper}>Imágenes o PDF.</Text>}
+        {picker.progress != null ? (
+          <Text style={styles.progress} accessibilityLiveRegion="polite">
+            {formatTaskerVideoProgress(picker.progress)}
+          </Text>
+        ) : (
+          !compact && (
+            <Text style={styles.helper}>{getTaskerAttachmentHelper(picker.videoSupported)}</Text>
+          )
+        )}
       </View>
+      <TaskerAttachmentSheet {...picker.sheet} />
 
       <View style={styles.actions}>
         <TouchableOpacity
@@ -314,6 +337,12 @@ function createStyles(
     },
     addBtnText: { fontSize: font(14), fontWeight: "600", color: PRIMARY_700 },
     helper: { fontSize: font(12), color: TEXT_MUTED },
+    progress: {
+      fontSize: font(12),
+      fontWeight: "600",
+      color: PRIMARY_700,
+      fontVariant: ["tabular-nums"],
+    },
     actions: { flexDirection: "row", gap: scale(10) },
     actionBtn: {
       flexDirection: "row",

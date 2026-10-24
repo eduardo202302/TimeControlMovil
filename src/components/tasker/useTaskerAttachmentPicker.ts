@@ -1,34 +1,57 @@
-import { useCallback, useState } from "react";
-import { ActionSheetIOS, Alert, Platform } from "react-native";
-import type { UserPhotoSource } from "../users/pickUserPhoto";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Platform } from "react-native";
 import type { TaskerAttachment } from "../../../types/typesTasker/TaskerTypes";
 import {
-  fitTaskerAttachments,
-  getDataUriFileBytes,
+  formatTaskerRejections,
+  getTaskerAttachmentUsedBytes,
+  resolveTaskerAttachmentLimit,
+  toTaskerProgressPercent,
   type TaskerAttachmentLimit,
 } from "../../utils/taskerRules";
-import { pickTaskerPdf, pickTaskerPhoto } from "./pickTaskerAttachment";
+import {
+  cancelTaskerPickJob,
+  createTaskerPickJob,
+  isTaskerVideoSupported,
+  pickTaskerAttachments,
+  type TaskerAttachmentSource,
+  type TaskerPickJob,
+} from "./pickTaskerAttachment";
+import type { TaskerAttachmentOption } from "./TaskerAttachmentSheet";
 
-type AttachmentSource = UserPhotoSource | "pdf";
-
-const OPTIONS: { source: AttachmentSource; label: string }[] = [
-  { source: "camera", label: "Tomar foto" },
-  { source: "gallery", label: "Galería" },
-  { source: "pdf", label: "Archivo PDF" },
+const OPTIONS: TaskerAttachmentOption[] = [
+  { source: "photo", label: "Tomar foto", icon: "camera-outline" },
+  { source: "video", label: "Grabar video", icon: "videocam-outline" },
+  { source: "gallery", label: "Galería (fotos y videos)", icon: "images-outline" },
+  { source: "file", label: "Archivo", icon: "document-attach-outline" },
 ];
 
+/** Sin el compresor en el binario: sin "Grabar video" y la galería solo con fotos. */
+const OPTIONS_WITHOUT_VIDEO: TaskerAttachmentOption[] = OPTIONS.flatMap((o) =>
+  o.source === "video" ? [] : o.source === "gallery" ? [{ ...o, label: "Galería" }] : [o],
+);
+
+const DENIED_MESSAGES: Record<Exclude<TaskerAttachmentSource, "file">, string> = {
+  photo: "Necesitas permitir el acceso a la cámara para tomar la foto.",
+  video: "Necesitas permitir el acceso a la cámara para grabar el video.",
+  gallery: "Necesitas permitir el acceso a la galería para adjuntar la foto o el video.",
+};
+
+/** iOS: si el sheet no avisa onDismiss, la selección arranca igual pasado este tiempo. */
+const IOS_DISMISS_FALLBACK_MS = 700;
+
 /**
- * Menú "Tomar foto / Galería / Archivo PDF" de la ventana de comentarios
- * (Reportar Avería y Seguimiento). Los avisos de permiso y de error son los
- * mismos de la foto de Usuarios (UserBasicInfoTab).
+ * Menú "Adjuntar" (Tomar foto / Grabar video / Galería / Archivo) de la
+ * ventana de comentarios de Reportar Avería y Seguimiento. Devuelve las props
+ * del sheet (TaskerAttachmentSheet) para que la ventana lo dibuje.
  *
- * `limit`: tope de archivos reales de todo el envío (Reportar Avería), con lo
- * que ya pesan los otros comentarios. Aplica a fotos y PDF; los que no caben
- * se avisan como los rechazos del selector. Sin `limit` (Seguimiento), solo
- * los topes de pickAttachments.
+ * Tope: 7 MB de archivos reales. `limit` (Reportar) trae lo que ya pesan los
+ * otros comentarios del envío; sin él (Seguimiento), los 7 MB son del
+ * comentario solo (resolveTaskerAttachmentLimit). Lo que no entra se avisa
+ * con su motivo.
  *
- * En iOS es un ActionSheet con "Cancelar"; en Android, un Alert de tres
- * botones (el máximo de Android) que se cierra tocando fuera.
+ * `busy`: eligiendo o procesando (la ventana no deja guardar). `progress`:
+ * porcentaje de la compresión del video en curso (null si no hay). Al
+ * desmontarse la ventana se cancela la compresión y se borran temporales.
  */
 export function useTaskerAttachmentPicker(
   attachments: TaskerAttachment[],
@@ -36,76 +59,102 @@ export function useTaskerAttachmentPicker(
   limit?: TaskerAttachmentLimit,
 ) {
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [videoSupported] = useState(isTaskerVideoSupported);
+  const jobRef = useRef<TaskerPickJob | null>(null);
+  /** iOS: lo elegido en el sheet, a la espera de que termine de cerrarse. */
+  const pendingRef = useRef<TaskerAttachmentSource | null>(null);
+  const fallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (fallbackRef.current) clearTimeout(fallbackRef.current);
+      pendingRef.current = null;
+      if (jobRef.current) cancelTaskerPickJob(jobRef.current);
+    },
+    [],
+  );
 
   const pick = useCallback(
-    async (source: AttachmentSource) => {
-      /** Aplica el tope del envío (si hay) y avisa lo que no entró. */
-      const addWithinLimit = (added: TaskerAttachment[], rejected: string[] = []) => {
-        let accepted = added;
-        const notAdded = [...rejected];
-        if (limit) {
-          const used =
-            limit.usedElsewhere +
-            attachments.reduce((sum, a) => sum + getDataUriFileBytes(a.dataUri), 0);
-          const fit = fitTaskerAttachments(added, used, limit.maxBytes);
-          accepted = fit.accepted;
-          notAdded.push(...fit.rejected);
-        }
-        if (accepted.length > 0) onAdd(accepted);
-        if (notAdded.length > 0) {
-          Alert.alert("Adjuntos", `No se adjuntaron: ${notAdded.join(", ")}`);
-        }
-      };
-
+    async (source: TaskerAttachmentSource) => {
+      const effectiveLimit = resolveTaskerAttachmentLimit(limit);
+      const job = createTaskerPickJob();
+      jobRef.current = job;
       setBusy(true);
       try {
-        if (source === "pdf") {
-          const usedBytes = attachments.reduce((sum, a) => sum + a.dataUri.length, 0);
-          const result = await pickTaskerPdf(usedBytes);
-          if (result.canceled) return;
-          addWithinLimit(result.accepted, result.rejected);
+        const result = await pickTaskerAttachments(source, {
+          usedBytes: getTaskerAttachmentUsedBytes(effectiveLimit, attachments),
+          maxBytes: effectiveLimit.maxBytes,
+          job,
+          onProgress: (value) => {
+            if (!job.canceled) setProgress(toTaskerProgressPercent(value));
+          },
+        });
+        // Ventana cerrada mientras procesaba: no se agrega ni se avisa nada.
+        if (job.canceled || result.status === "canceled") return;
+        if (result.status === "denied") {
+          if (source !== "file") Alert.alert("Permiso requerido", DENIED_MESSAGES[source]);
           return;
         }
-        const result = await pickTaskerPhoto(source);
-        if (result.status === "ok") addWithinLimit([result.attachment]);
-        else if (result.status === "denied") {
-          Alert.alert(
-            "Permiso requerido",
-            source === "camera"
-              ? "Necesitas permitir el acceso a la cámara para tomar la foto."
-              : "Necesitas permitir el acceso a la galería para adjuntar la foto.",
-          );
-        } else if (result.status === "error") {
-          Alert.alert("Error de Imagen", "No se pudo procesar la imagen.");
+        if (result.accepted.length > 0) onAdd(result.accepted);
+        if (result.rejected.length > 0) {
+          Alert.alert("Adjuntos", formatTaskerRejections(result.rejected));
         }
       } catch (error: any) {
+        if (job.canceled) return;
         console.error("useTaskerAttachmentPicker:", error?.message ?? error);
         Alert.alert("Adjuntos", "No se pudo abrir el selector de archivos.");
       } finally {
+        if (jobRef.current === job) jobRef.current = null;
         setBusy(false);
+        setProgress(null);
       }
     },
     [attachments, onAdd, limit],
   );
 
-  const openPicker = useCallback(() => {
-    if (busy) return;
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: [...OPTIONS.map((o) => o.label), "Cancelar"], cancelButtonIndex: OPTIONS.length },
-        (index) => {
-          if (index < OPTIONS.length) pick(OPTIONS[index].source);
-        },
-      );
-      return;
-    }
-    Alert.alert(
-      "Adjuntar",
-      undefined,
-      OPTIONS.map((o) => ({ text: o.label, onPress: () => pick(o.source) })),
-      { cancelable: true },
-    );
-  }, [busy, pick]);
+  const runPending = useCallback(() => {
+    if (fallbackRef.current) clearTimeout(fallbackRef.current);
+    fallbackRef.current = null;
+    const source = pendingRef.current;
+    pendingRef.current = null;
+    if (source) void pick(source);
+  }, [pick]);
 
-  return { busy, openPicker };
+  const openPicker = useCallback(() => {
+    if (!busy) setSheetVisible(true);
+  }, [busy]);
+
+  const closeSheet = useCallback(() => {
+    pendingRef.current = null;
+    setSheetVisible(false);
+  }, []);
+
+  const selectOption = useCallback(
+    (source: TaskerAttachmentSource) => {
+      setSheetVisible(false);
+      if (Platform.OS !== "ios") {
+        void pick(source);
+        return;
+      }
+      // iOS no presenta la cámara/galería mientras el Modal se está cerrando.
+      pendingRef.current = source;
+      fallbackRef.current = setTimeout(runPending, IOS_DISMISS_FALLBACK_MS);
+    },
+    [pick, runPending],
+  );
+
+  const sheet = useMemo(
+    () => ({
+      visible: sheetVisible,
+      options: videoSupported ? OPTIONS : OPTIONS_WITHOUT_VIDEO,
+      onSelect: selectOption,
+      onClose: closeSheet,
+      onDismiss: runPending,
+    }),
+    [sheetVisible, videoSupported, selectOption, closeSheet, runPending],
+  );
+
+  return { busy, progress, videoSupported, openPicker, sheet };
 }

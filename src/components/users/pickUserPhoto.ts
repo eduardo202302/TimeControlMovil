@@ -33,7 +33,7 @@ export type PickUserPhotoResult =
   | { status: "denied" }
   | { status: "error" };
 
-async function compressToDataUrl(uri: string): Promise<string | null> {
+export async function compressToDataUrl(uri: string): Promise<string | null> {
   const manipulator = loadManipulator();
   if (!manipulator) return null;
   const { ImageManipulator, SaveFormat } = manipulator;

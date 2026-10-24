@@ -69,6 +69,8 @@ const config: ExpoConfig = {
     ],
     "expo-secure-store",
     "expo-image-picker",
+    // Videos de los comentarios de Tasker (540p): módulo nativo, va en el build.
+    "react-native-compressor",
     "@react-native-community/datetimepicker",
     "expo-font",
     "expo-image",

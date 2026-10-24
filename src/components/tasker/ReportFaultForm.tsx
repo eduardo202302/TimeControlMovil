@@ -180,7 +180,7 @@ function initialSelection(
  * Reportar (Tasker) — FASE B: config y clientes de chooseschool, averías de
  * GET /taskr/actions y envío a POST /taskr/tasks. Solo se monta con la
  * compañía conectada, clientes y la posición del teléfono (ver
- * ReportFaultGate); al volver a entrar sigue montado y recibe la nueva. Comentarios (con sus imágenes y PDF) y direcciones se
+ * ReportFaultGate); al volver a entrar sigue montado y recibe la nueva. Comentarios (con sus fotos, videos y archivos) y direcciones se
  * agregan, editan, borran y marcan en local; todo viaja junto en el envío.
  */
 export default function ReportFaultForm({ config, clients, coords }: ReportFaultFormProps) {
@@ -238,6 +238,8 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
   /** Envío en curso: el ref bloquea un segundo toque antes del re-render. */
   const [sending, setSending] = useState(false);
   const sendingRef = useRef(false);
+  /** El comentario abierto está eligiendo o procesando un adjunto (p. ej. un video): no se envía. */
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
   // El resultado se conserva al cerrar: el diálogo se desvanece con su contenido.
   const [sendResult, setSendResult] = useState<SendResult | null>(null);
   const [resultVisible, setResultVisible] = useState(false);
@@ -575,7 +577,7 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
    * enviar ("Volver", "Enviar sin él" y, si se puede guardar, "Guardar y enviar").
    */
   const handleSubmit = useCallback(() => {
-    if (sendingRef.current) return;
+    if (sendingRef.current || attachmentBusy) return;
     const result = validateReport({ faultIds, description, addresses }, rules);
     setErrors(result);
     if (Object.values(result).some(Boolean)) return;
@@ -619,7 +621,7 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
       });
     }
     Alert.alert("Comentario sin guardar", "Tienes un comentario que no has guardado.", buttons);
-  }, [faultIds, description, addresses, rules, comments, commentAuthor, sendReport]);
+  }, [faultIds, description, addresses, rules, comments, commentAuthor, sendReport, attachmentBusy]);
 
   return (
     <KeyboardAvoidingView
@@ -719,7 +721,7 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
           )}
         </View>
 
-        {/* ── Comentarios: texto, imágenes/PDF o ambos (todos del usuario en sesión: editables) ── */}
+        {/* ── Comentarios: texto, adjuntos o ambos (todos del usuario en sesión: editables) ── */}
         <TaskerCommentsCard
           ref={commentsCardRef}
           comments={comments}
@@ -728,6 +730,7 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
           onEdit={handleEditComment}
           onDelete={handleRemoveComment}
           sharedAttachmentLimit
+          onAttachmentBusyChange={setAttachmentBusy}
           scrollRef={scrollRef}
           resetKey={commentsResetKey}
           compact
@@ -845,10 +848,14 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
             <Text style={styles.cancelText}>Limpiar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.footerBtn, styles.saveBtn, sending && styles.footerBtnDisabled]}
+            style={[
+              styles.footerBtn,
+              styles.saveBtn,
+              (sending || attachmentBusy) && styles.footerBtnDisabled,
+            ]}
             onPress={handleSubmit}
-            disabled={sending}
-            accessibilityState={{ disabled: sending, busy: sending }}
+            disabled={sending || attachmentBusy}
+            accessibilityState={{ disabled: sending || attachmentBusy, busy: sending }}
             activeOpacity={0.8}
           >
             {sending ? (

@@ -296,11 +296,247 @@ export function saveTaskerCommentDraft(
 }
 
 /**
- * Tope de Reportar: archivos reales (no su base64) sumando TODOS los
- * comentarios. El base64 pesa ~33 % más, así 7 MB de archivos caben en el
- * cuerpo de 9.5 MB que se valida al enviar (TASKR_TASK_MAX_BYTES).
+ * Tope de adjuntos: archivos reales (no su base64). Reportar suma TODOS los
+ * comentarios (van en un solo envío); Seguimiento, el comentario solo (cada
+ * uno va en su PATCH). El base64 pesa ~33 % más, así 7 MB de archivos caben
+ * en el cuerpo de 9.5 MB que se valida al enviar (TASKR_TASK_MAX_BYTES).
  */
-export const TASKER_REPORT_ATTACHMENTS_MAX_BYTES = 7 * 1024 * 1024;
+export const TASKER_ATTACHMENTS_MAX_BYTES = 7 * 1024 * 1024;
+
+const MB = 1024 * 1024;
+
+/**
+ * Bytes → MB con un decimal ("7", "5.2"). `round`: "up" para lo que pesa y
+ * "down" para lo que queda, así un rechazo nunca muestra los dos iguales.
+ */
+export function formatTaskerMb(bytes: number, round: "nearest" | "up" | "down" = "nearest"): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0";
+  const fn = round === "up" ? Math.ceil : round === "down" ? Math.floor : Math.round;
+  const value = fn(Number(((bytes / MB) * 10).toFixed(6))) / 10;
+  return String(round === "down" ? value : Math.max(0.1, value));
+}
+
+/**
+ * Tope que aplica la ventana de comentarios: el del envío (Reportar, con lo
+ * de los otros comentarios) o, sin él (Seguimiento), los 7 MB para el
+ * comentario solo.
+ */
+export function resolveTaskerAttachmentLimit(limit?: TaskerAttachmentLimit): TaskerAttachmentLimit {
+  return limit ?? { maxBytes: TASKER_ATTACHMENTS_MAX_BYTES, usedElsewhere: 0 };
+}
+
+/** Bytes de archivo ya usados del tope: otros comentarios + los de la ventana. */
+export function getTaskerAttachmentUsedBytes(
+  limit: TaskerAttachmentLimit,
+  attachments: Pick<TaskerAttachment, "dataUri">[],
+): number {
+  return (
+    limit.usedElsewhere + attachments.reduce((sum, a) => sum + getDataUriFileBytes(a.dataUri), 0)
+  );
+}
+
+/** Bytes de archivo que todavía caben (nunca negativo). */
+export function getTaskerAttachmentRoom(
+  limit: TaskerAttachmentLimit,
+  attachments: Pick<TaskerAttachment, "dataUri">[],
+): number {
+  return Math.max(0, limit.maxBytes - getTaskerAttachmentUsedBytes(limit, attachments));
+}
+
+/**
+ * Motivo de rechazo por peso: cuánto pesa y cuánto queda del tope.
+ * `compressed`: video ya comprimido (lo que pesa es la versión final).
+ */
+export function taskerNoRoomReason(
+  bytes: number,
+  roomBytes: number,
+  maxBytes: number = TASKER_ATTACHMENTS_MAX_BYTES,
+  compressed = false,
+): string {
+  const max = formatTaskerMb(maxBytes);
+  if (roomBytes <= 0) return `ya se usaron los ${max} MB permitidos`;
+  const weight = `pesa ${formatTaskerMb(bytes, "up")} MB${compressed ? " ya comprimido" : ""}`;
+  const room = formatTaskerMb(roomBytes, "down");
+  const left = room === "0" ? "menos de 0.1 MB" : `${room} MB`;
+  return `${weight} y solo quedan ${left} de los ${max} MB`;
+}
+
+/** Lo que no se adjuntó y por qué (el motivo va en minúscula, sin punto). */
+export interface TaskerAttachmentRejection {
+  name: string;
+  reason: string;
+}
+
+/** Texto del aviso "Adjuntos": uno → frase; varios → lista. */
+export function formatTaskerRejections(rejections: TaskerAttachmentRejection[]): string {
+  if (rejections.length === 1) {
+    const [{ name, reason }] = rejections;
+    return `No se adjuntó ${name}: ${reason}.`;
+  }
+  return ["No se adjuntaron:", ...rejections.map((r) => `• ${r.name}: ${r.reason}`)].join("\n");
+}
+
+// ─── Videos de comentarios ──────────────────────────────────────────────────
+
+/** Duración máxima: videoMaxDuration al grabar y rechazo al elegir uno hecho. */
+export const TASKER_VIDEO_MAX_SECONDS = 30;
+/** Margen para el redondeo de la cámara (un video de 30 s puede medir 30.04 s). */
+export const TASKER_VIDEO_DURATION_TOLERANCE_MS = 500;
+/** 540p: el lado corto del video comprimido. */
+export const TASKER_VIDEO_SHORT_SIDE = 540;
+/** ~1.2 Mbps: 30 s de video quedan en ~4.5 MB. */
+export const TASKER_VIDEO_BITRATE = 1_200_000;
+/**
+ * Tope del video original, antes de comprimir: 30 s de 4K del teléfono rondan
+ * los 100–200 MB; más que eso no se procesa (tardaría y no es de 30 s).
+ */
+export const TASKER_VIDEO_SOURCE_MAX_BYTES = 200 * MB;
+/** Lado largo de 540p en 16:9, para cuando no se saben las medidas. */
+const VIDEO_DEFAULT_LONG_SIDE = 960;
+
+export const TASKER_VIDEO_TOO_LONG_REASON = `dura más de ${TASKER_VIDEO_MAX_SECONDS} s`;
+export const TASKER_VIDEO_SOURCE_TOO_BIG_REASON = `pesa más de ${formatTaskerMb(
+  TASKER_VIDEO_SOURCE_MAX_BYTES,
+)} MB sin comprimir`;
+export const TASKER_VIDEO_PROCESS_REASON = "no se pudo procesar el video";
+export const TASKER_VIDEO_UNSUPPORTED_REASON = "esta versión de la app no procesa videos";
+export const TASKER_IMAGE_PROCESS_REASON = "no se pudo procesar la imagen";
+export const TASKER_FILE_UNREADABLE_REASON = "no se pudo leer";
+export const TASKER_FILE_EMPTY_REASON = "está vacío";
+
+/**
+ * `durationMs` del selector o de los metadatos. null/desconocida → se deja
+ * pasar: la acota el peso del video comprimido.
+ */
+export function isTaskerVideoDurationValid(durationMs: number | null | undefined): boolean {
+  if (durationMs == null || !Number.isFinite(durationMs)) return true;
+  return durationMs <= TASKER_VIDEO_MAX_SECONDS * 1000 + TASKER_VIDEO_DURATION_TOLERANCE_MS;
+}
+
+/** Peso del original antes de comprimir; desconocido → se deja pasar. */
+export function isTaskerVideoSourceSizeValid(bytes: number | null | undefined): boolean {
+  if (bytes == null || !Number.isFinite(bytes)) return true;
+  return bytes <= TASKER_VIDEO_SOURCE_MAX_BYTES;
+}
+
+/**
+ * `maxSize` de react-native-compressor, que es el lado LARGO: el que deja el
+ * corto en 540 conservando la proporción (1920×1080 → 960). Si el video ya es
+ * de 540p o menos, su lado largo (no se agranda). Sin medidas, 960 (16:9).
+ */
+export function getTaskerVideoMaxSize(
+  width: number | null | undefined,
+  height: number | null | undefined,
+): number {
+  if (!width || !height || width <= 0 || height <= 0) return VIDEO_DEFAULT_LONG_SIDE;
+  const long = Math.max(width, height);
+  const short = Math.min(width, height);
+  if (short <= TASKER_VIDEO_SHORT_SIDE) return long;
+  return Math.round((long * TASKER_VIDEO_SHORT_SIDE) / short);
+}
+
+/** Progreso del compresor (0–1) como porcentaje entero 0–100. */
+export function toTaskerProgressPercent(progress: number): number {
+  if (!Number.isFinite(progress)) return 0;
+  return Math.round(Math.min(1, Math.max(0, progress)) * 100);
+}
+
+export function formatTaskerVideoProgress(percent: number): string {
+  return `Procesando video… ${percent} %`;
+}
+
+/** Ayuda bajo "Tomar foto o adjuntar archivo" (oculta en compacto). */
+export function getTaskerAttachmentHelper(videoSupported: boolean): string {
+  const max = formatTaskerMb(TASKER_ATTACHMENTS_MAX_BYTES);
+  return videoSupported
+    ? `Fotos, videos (máx. ${TASKER_VIDEO_MAX_SECONDS} s) o archivos; hasta ${max} MB en total.`
+    : `Fotos o archivos; hasta ${max} MB en total.`;
+}
+
+// ─── Tipos de adjunto ───────────────────────────────────────────────────────
+
+/** Imágenes que el visor (Image de react-native) muestra en iOS y Android. */
+const VIEWABLE_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "bmp"];
+const VIDEO_EXTENSIONS = ["mp4", "mov", "m4v", "3gp", "3g2", "webm", "mkv", "avi"];
+
+/** Extensión conocida por mime (lo que no está, se deduce del subtipo si es corto). */
+const MIME_EXTENSIONS: Record<string, string> = {
+  "application/pdf": "pdf",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.ms-excel": "xls",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.ms-powerpoint": "ppt",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+  "application/zip": "zip",
+  "application/x-zip-compressed": "zip",
+  "application/vnd.rar": "rar",
+  "application/x-rar-compressed": "rar",
+  "text/plain": "txt",
+  "text/csv": "csv",
+  "audio/mpeg": "mp3",
+  "audio/mp4": "m4a",
+  "audio/x-wav": "wav",
+  "video/quicktime": "mov",
+  "image/jpeg": "jpg",
+};
+
+/** Mime de un data-URI ("" si no es uno). */
+function dataUriMime(value: string): string {
+  return /^data:([^;,]+)/i.exec(value)?.[1]?.toLowerCase() ?? "";
+}
+
+/**
+ * Extensión de un nombre o ruta, en minúscula y sin el punto: sin query ni
+ * hash, solo del último segmento, 1–5 letras o números. Nada → "".
+ */
+export function getFileExtension(value: string): string {
+  if (/^data:/i.test(value)) return "";
+  const path = value.split(/[?#]/)[0];
+  const segment = path.slice(path.lastIndexOf("/") + 1);
+  const dot = segment.lastIndexOf(".");
+  if (dot <= 0) return "";
+  const ext = segment.slice(dot + 1).toLowerCase();
+  return /^[a-z0-9]{1,5}$/.test(ext) ? ext : "";
+}
+
+/** Extensión del mime: la de la tabla o el subtipo si es corto ("png", "json"). */
+function extensionFromMime(mime: string): string {
+  const known = MIME_EXTENSIONS[mime];
+  if (known) return known;
+  const subtype = mime.split("/")[1] ?? "";
+  return /^[a-z0-9]{2,4}$/.test(subtype) ? subtype : "";
+}
+
+export type TaskerMediaKind = "image" | "video" | "file";
+
+/**
+ * Qué se eligió: video (por `type` del selector, mime o extensión), imagen o
+ * cualquier otro archivo. `type` es el de expo-image-picker.
+ */
+export function getTaskerMediaKind(asset: {
+  type?: string | null;
+  mimeType?: string | null;
+  name?: string | null;
+}): TaskerMediaKind {
+  const mime = asset.mimeType?.toLowerCase() ?? "";
+  const ext = getFileExtension(asset.name ?? "");
+  if (asset.type === "video" || mime.startsWith("video/") || VIDEO_EXTENSIONS.includes(ext)) {
+    return "video";
+  }
+  if (asset.type === "image" || asset.type === "livePhoto" || mime.startsWith("image/")) {
+    return "image";
+  }
+  return "file";
+}
+
+export type CommentAttachmentKind =
+  | "image"
+  | "video"
+  | "file"
+  | "remoteImage"
+  | "remoteVideo"
+  | "remoteFile";
 
 /**
  * Bytes del archivo dentro de un data-URI ("data:<mime>;base64,…"): lo que
@@ -357,7 +593,7 @@ export interface TaskerOpenCommentDraft {
 export function getUnsavedCommentOnSend(
   open: TaskerOpenCommentDraft | null,
   comments: TaskerComment[],
-  maxBytes: number = TASKER_REPORT_ATTACHMENTS_MAX_BYTES,
+  maxBytes: number = TASKER_ATTACHMENTS_MAX_BYTES,
 ): { kind: "send" } | { kind: "unsaved"; canSave: boolean } {
   if (!open || !isTaskerCommentDraftChanged(open.initial, open.current)) return { kind: "send" };
   const usedElsewhere = getTaskerCommentsAttachmentBytes(
@@ -377,22 +613,23 @@ export function getUnsavedCommentOnSend(
 /**
  * Deja entrar, en orden, los adjuntos nuevos que caben en el tope (`usedBytes`
  * = lo ya adjuntado en todo el envío); los que desbordan van a `rejected` con
- * el mismo texto que pickAttachments ("<nombre> (supera el límite total de
- * N MB)").
+ * cuánto pesan y cuánto quedaba (taskerNoRoomReason).
  */
 export function fitTaskerAttachments(
   added: TaskerAttachment[],
   usedBytes: number,
   maxBytes: number,
-): { accepted: TaskerAttachment[]; rejected: string[] } {
-  const label = `${Math.round((maxBytes / (1024 * 1024)) * 10) / 10}MB`;
+): { accepted: TaskerAttachment[]; rejected: TaskerAttachmentRejection[] } {
   const accepted: TaskerAttachment[] = [];
-  const rejected: string[] = [];
+  const rejected: TaskerAttachmentRejection[] = [];
   let budget = usedBytes;
   for (const attachment of added) {
     const bytes = getDataUriFileBytes(attachment.dataUri);
     if (budget + bytes > maxBytes) {
-      rejected.push(`${attachment.name} (supera el límite total de ${label})`);
+      rejected.push({
+        name: attachment.name,
+        reason: taskerNoRoomReason(bytes, maxBytes - budget, maxBytes),
+      });
       continue;
     }
     budget += bytes;
@@ -401,17 +638,35 @@ export function fitTaskerAttachments(
   return { accepted, rejected };
 }
 
-export type CommentAttachmentKind = "image" | "file" | "remoteImage" | "remoteFile";
-
 /**
- * Qué es un adjunto de comentario: data-URI de imagen (se abre en el visor),
- * data-URI de otro tipo (PDF, no se abre), o URL del servidor (Seguimiento):
- * ".pdf" → archivo (se abre fuera de la app); cualquier otra → imagen.
+ * Qué es un adjunto de comentario. Data-URI (local): imagen que el visor
+ * muestra → image; video → video; cualquier otra cosa (PDF, DOCX, HEIC…) →
+ * file. URL del servidor: por la extensión de la ruta; sin extensión o
+ * desconocida → remoteFile (se abre fuera de la app, nunca en el visor).
  */
 export function getCommentAttachmentKind(value: string): CommentAttachmentKind {
-  if (/^data:image\//i.test(value)) return "image";
+  const mime = dataUriMime(value);
+  if (mime) {
+    if (VIEWABLE_IMAGE_EXTENSIONS.includes(extensionFromMime(mime))) return "image";
+    if (mime.startsWith("video/")) return "video";
+    return "file";
+  }
   if (/^data:/i.test(value)) return "file";
-  return /\.pdf(?:[?#]|$)/i.test(value) ? "remoteFile" : "remoteImage";
+  const ext = getFileExtension(value);
+  if (VIEWABLE_IMAGE_EXTENSIONS.includes(ext)) return "remoteImage";
+  if (VIDEO_EXTENSIONS.includes(ext)) return "remoteVideo";
+  return "remoteFile";
+}
+
+/**
+ * Etiqueta de la miniatura de archivo ("PDF", "DOCX"): la extensión del
+ * nombre, si no la del mime (local) o la de la ruta (servidor). Nada → "".
+ */
+export function getAttachmentTypeLabel(value: string, name?: string): string {
+  const ext =
+    getFileExtension(name ?? "") ||
+    (/^data:/i.test(value) ? extensionFromMime(dataUriMime(value)) : getFileExtension(value));
+  return ext.toUpperCase();
 }
 
 export interface AddressField {

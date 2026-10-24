@@ -24,7 +24,7 @@ import {
   fitTaskerAttachments,
   getDataUriFileBytes,
   getTaskerCommentsAttachmentBytes,
-  TASKER_REPORT_ATTACHMENTS_MAX_BYTES,
+  TASKER_ATTACHMENTS_MAX_BYTES,
   isTaskerAddressComplete,
   nextTaskerAddressId,
   removeTaskerAddress,
@@ -345,9 +345,9 @@ describe("comentarios de Seguimiento", () => {
     it("data-URI de otro tipo (PDF) → file", () => {
       expect(getCommentAttachmentKind(PDF)).toBe("file");
     });
-    it("URL del servidor → remoteImage, salvo .pdf → remoteFile", () => {
+    it("URL del servidor → por extensión; sin extensión → remoteFile (nunca al visor)", () => {
       expect(getCommentAttachmentKind("https://x.test/files/adjunto-1.jpg")).toBe("remoteImage");
-      expect(getCommentAttachmentKind("https://x.test/files/sin-extension")).toBe("remoteImage");
+      expect(getCommentAttachmentKind("https://x.test/files/sin-extension")).toBe("remoteFile");
       expect(getCommentAttachmentKind("https://x.test/files/informe.PDF")).toBe("remoteFile");
       expect(getCommentAttachmentKind("https://x.test/files/informe.pdf?v=2")).toBe("remoteFile");
     });
@@ -616,8 +616,8 @@ describe("comentarios de Seguimiento", () => {
         dataUri: fileOf(bytes),
       });
 
-      it("el tope de Reportar es 7 MB", () => {
-        expect(TASKER_REPORT_ATTACHMENTS_MAX_BYTES).toBe(7 * 1024 * 1024);
+      it("el tope de adjuntos es 7 MB", () => {
+        expect(TASKER_ATTACHMENTS_MAX_BYTES).toBe(7 * 1024 * 1024);
       });
       it("getDataUriFileBytes: bytes del archivo decodificado, sin encabezado ni relleno", () => {
         for (const bytes of [0, 1, 2, 3, 4, 5, 1000, 1001]) {
@@ -643,18 +643,21 @@ describe("comentarios de Seguimiento", () => {
         );
         expect(result.accepted.map((a) => a.name)).toEqual(["a.jpg", "c.jpg"]);
         expect(result.rejected).toHaveLength(1);
-        expect(result.rejected[0]).toMatch(/^b\.pdf \(supera el límite total de /);
+        expect(result.rejected[0].name).toBe("b.pdf");
+        expect(result.rejected[0].reason).toMatch(/^pesa .* MB y solo quedan .* MB de los 0\.1 MB$/);
       });
       it("fitTaskerAttachments: el texto del rechazo lleva el tope en MB", () => {
-        const max = TASKER_REPORT_ATTACHMENTS_MAX_BYTES;
+        const max = TASKER_ATTACHMENTS_MAX_BYTES;
         const used = getTaskerCommentsAttachmentBytes(list);
         const result = fitTaskerAttachments([attachment("foto.jpg", max - used + 1)], used, max);
         expect(result.accepted).toEqual([]);
-        expect(result.rejected).toEqual(["foto.jpg (supera el límite total de 7MB)"]);
+        expect(result.rejected).toEqual([
+          { name: "foto.jpg", reason: "pesa 7 MB y solo quedan 6.9 MB de los 7 MB" },
+        ]);
         expect(fitTaskerAttachments([attachment("ok.jpg", max - used)], used, max).accepted).toHaveLength(1);
       });
       it("7 MB de archivos caben en el cuerpo de 9.5 MB", () => {
-        const base64Chars = Math.ceil(TASKER_REPORT_ATTACHMENTS_MAX_BYTES / 3) * 4;
+        const base64Chars = Math.ceil(TASKER_ATTACHMENTS_MAX_BYTES / 3) * 4;
         expect(base64Chars).toBeLessThan(9.5 * 1024 * 1024);
       });
     });
@@ -761,7 +764,7 @@ describe("comentarios de Seguimiento", () => {
         expect(result).toEqual({ kind: "unsaved", canSave: true });
       });
       it("por defecto usa el tope de Reportar (7 MB)", () => {
-        const over = TASKER_REPORT_ATTACHMENTS_MAX_BYTES - 70 + 1;
+        const over = TASKER_ATTACHMENTS_MAX_BYTES - 70 + 1;
         expect(
           getUnsavedCommentOnSend(
             { target: add, initial: EMPTY, current: draft("", [attachment("a", over)]) },

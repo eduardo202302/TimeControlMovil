@@ -252,7 +252,8 @@ export function mapTaskerSession(data: unknown): TaskerSession {
 export const TASKER_ACTIONS_ERROR = "No se pudieron cargar las averías.";
 export const TASKER_SEND_ERROR = "No se pudo enviar el reporte. Intente nuevamente.";
 export const TASKER_NETWORK_ERROR = "No se pudo conectar. Revisa tu conexión.";
-export const TASKER_ATTACHMENTS_TOO_LARGE_ERROR = "Los adjuntos superan el tamaño permitido.";
+/** Última barrera (JSON > 9.5 MB): el tope que ve el usuario es el de 7 MB de archivos. */
+export const TASKER_ATTACHMENTS_TOO_LARGE_ERROR = "Los adjuntos superan el límite de 7 MB.";
 
 /**
  * `message` de una respuesta success:false: puede venir como texto u objeto.

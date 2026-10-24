@@ -253,7 +253,8 @@ export interface TaskerFormRules {
 
 /**
  * Adjunto local de un comentario (Reportar Avería y Seguimiento), todavía sin
- * subir. Tasker acepta solo imágenes (comprimidas a JPEG) y PDF.
+ * subir: fotos (comprimidas a JPEG), videos (comprimidos a mp4 540p) o
+ * cualquier otro archivo tal cual.
  */
 export interface TaskerAttachment {
   id: string;

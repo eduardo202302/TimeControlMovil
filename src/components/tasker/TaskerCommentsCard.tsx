@@ -51,7 +51,7 @@ import {
   getTaskerCommentsAttachmentBytes,
   resolveCommentComposer,
   sortComments,
-  TASKER_REPORT_ATTACHMENTS_MAX_BYTES,
+  TASKER_ATTACHMENTS_MAX_BYTES,
   taskerCommentDraftFrom,
   type CommentComposerTarget,
   type CommentOrder,
@@ -112,11 +112,13 @@ interface TaskerCommentsCardProps {
   order?: CommentOrder;
   onOrderChange?: (order: CommentOrder) => void;
   /**
-   * Todos los comentarios van en un solo envío (Reportar Avería): tope de 7 MB
-   * de archivos reales (TASKER_REPORT_ATTACHMENTS_MAX_BYTES) sumando los de
-   * los demás comentarios.
+   * Todos los comentarios van en un solo envío (Reportar Avería): el tope de
+   * 7 MB de archivos reales (TASKER_ATTACHMENTS_MAX_BYTES) suma los de los
+   * demás comentarios. Sin él (Seguimiento), 7 MB por comentario.
    */
   sharedAttachmentLimit?: boolean;
+  /** El formulario abierto está eligiendo o procesando un adjunto (Reportar no deja enviar). */
+  onAttachmentBusyChange?: (busy: boolean) => void;
   /** ScrollView de la pantalla, para llevar el formulario a la vista. */
   scrollRef?: RefObject<ScrollView | null>;
   /**
@@ -135,9 +137,10 @@ interface TaskerCommentsCardProps {
 
 /**
  * Tarjeta "Comentarios (n)" de Reportar Avería y Seguimiento. Como en Tasker,
- * las imágenes y PDF siempre viven dentro de un comentario (texto, adjuntos o
- * ambos). La lista vive en la pantalla; la tarjeta guarda el orden, el visor
- * y qué formulario está abierto (ninguno, agregar o editar uno), de a uno.
+ * los adjuntos (fotos, videos y archivos) siempre viven dentro de un
+ * comentario (texto, adjuntos o ambos). La lista vive en la pantalla; la
+ * tarjeta guarda el orden, el visor y qué formulario está abierto (ninguno,
+ * agregar o editar uno), de a uno.
  * Seguimiento solo agrega (sin lápiz ni papelera).
  */
 export default function TaskerCommentsCard({
@@ -152,6 +155,7 @@ export default function TaskerCommentsCard({
   order: controlledOrder,
   onOrderChange,
   sharedAttachmentLimit = false,
+  onAttachmentBusyChange,
   scrollRef,
   resetKey = 0,
   compact = false,
@@ -303,7 +307,7 @@ export default function TaskerCommentsCard({
       attachmentLimit={
         sharedAttachmentLimit
           ? {
-              maxBytes: TASKER_REPORT_ATTACHMENTS_MAX_BYTES,
+              maxBytes: TASKER_ATTACHMENTS_MAX_BYTES,
               usedElsewhere: getTaskerCommentsAttachmentBytes(
                 comments,
                 editingId ?? undefined,
@@ -311,6 +315,7 @@ export default function TaskerCommentsCard({
             }
           : undefined
       }
+      onBusyChange={onAttachmentBusyChange}
       onOpenImage={setViewerUri}
       scrollRef={scrollRef}
       compact={compact}
