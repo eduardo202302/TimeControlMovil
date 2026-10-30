@@ -21,9 +21,11 @@
 import {
   LAST_KNOWN_REQUIRED_ACCURACY_M,
   promptLocationPermission,
+  withTimeout,
   type LocationApi,
 } from "./punchLocation";
 import type { ReportLocationState } from "./taskerRules";
+import type { TaskerDevicePosition } from "../../types/typesTasker/TaskerTypes";
 
 /** Lectura de expo-location; `timestamp` (ms epoch) viene siempre del sistema. */
 export interface TaskerPositionReading {
@@ -415,5 +417,39 @@ export async function requestReportLocation(
   } catch (error) {
     log(`error inesperado (${errorMessage(error)})`);
     return FAILED;
+  }
+}
+
+// ─── Posición al enviar el reporte ──────────────────────────────────────────
+
+/** Tope de la captura, permiso incluido: nunca retrasa el envío más que esto. */
+export const SEND_POSITION_TIMEOUT_MS = 5_000;
+
+/** Subconjunto de la API que usa la captura: lee el permiso, nunca lo pide. */
+export type SendPositionApi = Pick<
+  LocationApi,
+  "getForegroundPermissionsAsync" | "getCurrentPositionAsync"
+>;
+
+/**
+ * Posición del teléfono justo antes de enviar. Sin permiso, con error o sin
+ * respuesta en `timeoutMs` → `fallback` (la que la pantalla ya obtuvo en esta
+ * visita, o null: el reporte sale sin coordenadas). Nunca lanza ni pide permiso.
+ */
+export async function captureSendPosition(
+  api: SendPositionApi,
+  fallback: TaskerDevicePosition | null,
+  timeoutMs: number = SEND_POSITION_TIMEOUT_MS,
+): Promise<TaskerDevicePosition | null> {
+  const readCurrent = async () => {
+    const permission = await api.getForegroundPermissionsAsync();
+    if (permission.status !== "granted") return null;
+    const reading = await api.getCurrentPositionAsync();
+    return reading.coords;
+  };
+  try {
+    return (await withTimeout(readCurrent(), timeoutMs)) ?? fallback;
+  } catch {
+    return fallback;
   }
 }

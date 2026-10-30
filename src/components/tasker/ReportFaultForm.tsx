@@ -101,6 +101,8 @@ import {
   TASKER_ACTIONS_ERROR,
   TASKER_SEND_ERROR,
 } from "../../utils/taskerApi";
+import { expoSendPositionApi } from "../../utils/locationApi";
+import { captureSendPosition } from "../../utils/taskerLocation";
 import * as Storage from "../../utils/storage";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import type {
@@ -514,18 +516,23 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
   const sendReport = useCallback(
     async (toSend: TaskerComment[]) => {
       if (sendingRef.current) return;
-      const body = buildTaskrTaskBody({
-        appliesFault: config.appliesFault === true,
-        clientId: client.id,
-        faultIds,
-        description,
-        address: getSelectedTaskerAddress(addresses),
-        comments: toSend,
-      });
       sendingRef.current = true;
       setSending(true);
       try {
+        // Credenciales primero: un cambio de sesión durante la captura no desvía el reporte.
         const credentials = await sessionCredentials();
+        const position = credentials
+          ? await captureSendPosition(expoSendPositionApi, coords)
+          : null;
+        const body = buildTaskrTaskBody({
+          appliesFault: config.appliesFault === true,
+          clientId: client.id,
+          faultIds,
+          description,
+          address: getSelectedTaskerAddress(addresses),
+          comments: toSend,
+          position,
+        });
         const response = credentials
           ? await createTaskerTask({ ...credentials, body })
           : { ok: false as const, message: TASKER_SEND_ERROR };
@@ -549,7 +556,7 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
         if (mountedRef.current) setSending(false);
       }
     },
-    [config.appliesFault, client.id, faultIds, description, addresses, resetForm],
+    [config.appliesFault, client.id, faultIds, description, addresses, coords, resetForm],
   );
 
   /** "Entendido": cierra; tras un envío exitoso, además al primer bloque. */

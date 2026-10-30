@@ -119,7 +119,7 @@ export function toAccurateCoordinates(
 }
 
 /** Resuelve null si `promise` no termina en `ms`; limpia el timer si gana. */
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<null>((resolve) => {
     timer = setTimeout(() => resolve(null), ms);

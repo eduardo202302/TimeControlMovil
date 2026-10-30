@@ -18,6 +18,7 @@ import type {
   TaskerComment,
   TaskerCommentDraft,
   TaskerCompanyConfig,
+  TaskerDevicePosition,
   TaskerFaultAction,
   TaskerPriority,
   TaskerSession,
@@ -31,6 +32,7 @@ import type {
   TaskrTaskAddress,
   TaskrTaskBody,
   TaskrTaskComment,
+  TaskrTaskCoordinate,
 } from "../../types/typesTasker/TaskerTypes";
 import {
   buildTaskrFileUrl,
@@ -345,6 +347,8 @@ export interface TaskrTaskForm {
   /** La dirección marcada (getSelectedTaskerAddress). */
   address: TaskerAddress | null | undefined;
   comments: Pick<TaskerComment, "comment" | "images">[];
+  /** Posición del teléfono al enviar (captureSendPosition). */
+  position?: TaskerDevicePosition | null;
 }
 
 /** Texto de la dirección: string tal cual; cualquier otra cosa → "". */
@@ -384,16 +388,38 @@ export function buildTaskrTaskAddress(address: TaskerAddress): TaskrTaskAddress 
   return result;
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/**
+ * Posición del teléfono → `coordinates` de la tarea. Sin lat/lng numéricos →
+ * null; accuracy solo si es número (si no, sin la clave).
+ */
+function buildTaskrTaskCoordinates(
+  position: TaskerDevicePosition | null | undefined,
+): TaskrTaskCoordinate[] | null {
+  if (!position || !isFiniteNumber(position.latitude) || !isFiniteNumber(position.longitude)) {
+    return null;
+  }
+  const { latitude, longitude, accuracy } = position;
+  return [{ latitude, longitude, ...(isFiniteNumber(accuracy) ? { accuracy } : {}) }];
+}
+
 /**
  * Cuerpo de POST /taskr/tasks. Con averías: actionIds en orden y la
  * descripción como action ("" si no hay). Sin averías: solo action. Un
  * elemento de taskComments por comentario, con `comment` siempre presente;
- * sin comentarios, sin la clave. Nunca lleva token.
+ * sin comentarios, sin la clave. `coordinates` es la posición del teléfono
+ * (`address` sigue con la de la dirección elegida); sin posición válida, sin la
+ * clave. Nunca lleva token.
  */
 export function buildTaskrTaskBody(form: TaskrTaskForm): TaskrTaskBody {
   const body: TaskrTaskBody = { clientId: form.clientId, action: form.description.trim() };
   if (form.appliesFault) body.actionIds = [...form.faultIds];
   if (form.address) body.address = buildTaskrTaskAddress(form.address);
+  const coordinates = buildTaskrTaskCoordinates(form.position);
+  if (coordinates) body.coordinates = coordinates;
   if (form.comments.length > 0) {
     body.taskComments = form.comments.map(
       (c): TaskrTaskComment => ({

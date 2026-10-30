@@ -1,7 +1,7 @@
 import * as Device from "expo-device";
 import * as Location from "expo-location";
 import type { LocationApi } from "./punchLocation";
-import type { TaskerLocationApi } from "./taskerLocation";
+import type { SendPositionApi, TaskerLocationApi } from "./taskerLocation";
 
 /**
  * Adaptador real de expo-location para las reglas de punchLocation.ts. Vive
@@ -32,6 +32,20 @@ export const expoTaskerLocationApi: TaskerLocationApi = {
       { accuracy: Location.Accuracy.Balanced, timeInterval: 1000, distanceInterval: 0 },
       onReading,
     ),
+};
+
+/**
+ * Posición al enviar el reporte (ver captureSendPosition): en Android, sin
+ * mayShowUserSettingsDialog false, con el proveedor de red apagado se abre el
+ * diálogo del sistema y la lectura queda esperando al usuario.
+ */
+export const expoSendPositionApi: SendPositionApi = {
+  getForegroundPermissionsAsync: () => Location.getForegroundPermissionsAsync(),
+  getCurrentPositionAsync: () =>
+    Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+      mayShowUserSettingsDialog: false,
+    }),
 };
 
 /**

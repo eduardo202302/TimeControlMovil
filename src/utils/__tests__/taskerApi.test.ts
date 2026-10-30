@@ -573,6 +573,60 @@ describe("buildTaskrTaskBody", () => {
   });
 });
 
+describe("buildTaskrTaskBody: coordinates (posición del teléfono)", () => {
+  const POSITION = { latitude: 18.4706, longitude: -69.9389, accuracy: 12.5 };
+  const withPosition = (position: unknown) =>
+    buildTaskrTaskBody(form({ position: position as TaskrTaskForm["position"] }));
+  const addressAlone = buildTaskrTaskBody(form()).address;
+
+  it("posición completa → un elemento con latitude, longitude y accuracy", () => {
+    const body = withPosition(POSITION);
+    expect(body.coordinates).toEqual([POSITION]);
+    expect(body.address).toEqual(addressAlone);
+  });
+  it("solo esas tres claves, aunque la lectura traiga más", () => {
+    const body = withPosition({ ...POSITION, altitude: 40, heading: 0, speed: 0 });
+    expect(body.coordinates).toEqual([POSITION]);
+  });
+  it("accuracy 0 es un número: se envía", () => {
+    expect(withPosition({ ...POSITION, accuracy: 0 }).coordinates![0].accuracy).toBe(0);
+  });
+  it("accuracy null, ausente o no numérica → sin la clave", () => {
+    const { accuracy: _accuracy, ...noAccuracy } = POSITION;
+    for (const position of [
+      { ...POSITION, accuracy: null },
+      noAccuracy,
+      { ...POSITION, accuracy: "12" },
+      { ...POSITION, accuracy: Number.NaN },
+    ]) {
+      const body = withPosition(position);
+      expect(body.coordinates).toEqual([noAccuracy]);
+      expect(body.coordinates![0]).not.toHaveProperty("accuracy");
+      expect(body.address).toEqual(addressAlone);
+    }
+  });
+  it("sin posición → sin la clave", () => {
+    for (const position of [null, undefined]) {
+      const body = withPosition(position);
+      expect(body).not.toHaveProperty("coordinates");
+      expect(body.address).toEqual(addressAlone);
+    }
+  });
+  it("lat/lng inválidos → sin la clave", () => {
+    for (const position of [
+      { ...POSITION, latitude: null },
+      { ...POSITION, longitude: undefined },
+      { ...POSITION, latitude: "18.47" },
+      { ...POSITION, longitude: Number.NaN },
+      { ...POSITION, latitude: Number.POSITIVE_INFINITY },
+    ]) {
+      const body = withPosition(position);
+      expect(body).not.toHaveProperty("coordinates");
+      expect(body.address).toEqual(addressAlone);
+    }
+  });
+});
+
 // ─── Tamaño ─────────────────────────────────────────────────────────────────
 
 describe("tamaño del cuerpo (≤ 9.5 MB)", () => {

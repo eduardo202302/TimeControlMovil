@@ -1,5 +1,6 @@
 /// <reference types="jest" />
 import {
+  captureSendPosition,
   chooseReportPosition,
   CURRENT_POSITION_WAIT_MS,
   EMULATOR_LAST_KNOWN_MAX_AGE_MS,
@@ -11,6 +12,7 @@ import {
   REPORT_LAST_KNOWN_MAX_AGE_MS,
   REPORT_LOCATION_TIMEOUT_MS,
   requestReportLocation,
+  SEND_POSITION_TIMEOUT_MS,
   watchFirstPosition,
   type TaskerLocationApi,
   type TaskerPositionReading,
@@ -488,5 +490,71 @@ describe("requestReportLocation — logs", () => {
     await requestReportLocation(api, FAST);
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
+  });
+});
+
+// ─── Posición al enviar el reporte ──────────────────────────────────────────
+
+describe("captureSendPosition", () => {
+  const SCREEN = { latitude: 18.5, longitude: -69.9 };
+  const FAST_MS = 20;
+
+  it("el tope es 5 s", () => {
+    expect(SEND_POSITION_TIMEOUT_MS).toBe(5_000);
+  });
+  it("posición actual con su precisión; gana a la de la pantalla", async () => {
+    const { api } = fakeApi();
+    await expect(captureSendPosition(api, SCREEN, FAST_MS)).resolves.toEqual({
+      latitude: 18.4706,
+      longitude: -69.9389,
+      accuracy: 10,
+    });
+  });
+  it("sin permiso → la de la pantalla, sin pedirlo ni leer posición", async () => {
+    const { api } = fakeApi({
+      getForegroundPermissionsAsync: jest.fn(async () => ({ status: "denied", canAskAgain: true })),
+    });
+    await expect(captureSendPosition(api, SCREEN, FAST_MS)).resolves.toBe(SCREEN);
+    expect(api.requestForegroundPermissionsAsync).not.toHaveBeenCalled();
+    expect(api.getCurrentPositionAsync).not.toHaveBeenCalled();
+  });
+  it("con permiso tampoco lo pide", async () => {
+    const { api } = fakeApi();
+    await captureSendPosition(api, SCREEN, FAST_MS);
+    expect(api.requestForegroundPermissionsAsync).not.toHaveBeenCalled();
+  });
+  it("la lectura falla → la de la pantalla", async () => {
+    const { api } = fakeApi({
+      getCurrentPositionAsync: jest.fn(async () => {
+        throw new Error("ubicación apagada");
+      }),
+    });
+    await expect(captureSendPosition(api, SCREEN, FAST_MS)).resolves.toBe(SCREEN);
+  });
+  it("leer el permiso falla → la de la pantalla", async () => {
+    const { api } = fakeApi({
+      getForegroundPermissionsAsync: jest.fn(async () => {
+        throw new Error("x");
+      }),
+    });
+    await expect(captureSendPosition(api, SCREEN, FAST_MS)).resolves.toBe(SCREEN);
+  });
+  it("la lectura no responde → la de la pantalla al vencer el tope", async () => {
+    const { api } = fakeApi({ getCurrentPositionAsync: jest.fn(() => never()) });
+    await expect(captureSendPosition(api, SCREEN, FAST_MS)).resolves.toBe(SCREEN);
+  });
+  it("el tope también cubre leer el permiso", async () => {
+    const { api } = fakeApi({ getForegroundPermissionsAsync: jest.fn(() => never()) });
+    await expect(captureSendPosition(api, SCREEN, FAST_MS)).resolves.toBe(SCREEN);
+  });
+  it("sin posición ni respaldo → null, sin lanzar", async () => {
+    const { api } = fakeApi({
+      getCurrentPositionAsync: jest.fn(async () => {
+        throw new Error("x");
+      }),
+    });
+    await expect(captureSendPosition(api, null, FAST_MS)).resolves.toBeNull();
+    const { api: hung } = fakeApi({ getCurrentPositionAsync: jest.fn(() => never()) });
+    await expect(captureSendPosition(hung, null, FAST_MS)).resolves.toBeNull();
   });
 });

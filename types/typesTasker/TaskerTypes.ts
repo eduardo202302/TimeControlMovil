@@ -302,6 +302,20 @@ export interface TaskrTaskComment {
   taskListId: null;
 }
 
+/** Posición del teléfono al enviar el reporte (no la de la dirección elegida). */
+export interface TaskerDevicePosition {
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+}
+
+/** Elemento de `coordinates` en POST /taskr/tasks; sin precisión, sin la clave. */
+export interface TaskrTaskCoordinate {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+}
+
 /** Cuerpo de POST /taskr/tasks (buildTaskrTaskBody). */
 export interface TaskrTaskBody {
   clientId: number;
@@ -309,6 +323,7 @@ export interface TaskrTaskBody {
   actionIds?: number[];
   address?: TaskrTaskAddress;
   taskComments?: TaskrTaskComment[];
+  coordinates?: TaskrTaskCoordinate[];
 }
 
 /** Cuerpo de PATCH /taskr/tasks/{id} para agregar un comentario (buildTaskrCommentBody). */
