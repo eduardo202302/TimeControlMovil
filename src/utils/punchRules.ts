@@ -771,6 +771,86 @@ export function findLastJornadaPunch(
     );
 }
 
+// ─── Anclas reales del Break (ponches, no horario) ───────────────────────────
+
+/**
+ * Ponche más reciente por createdDate. Igual que getNewestPunch, salvo que un
+ * empate exacto de createdDate lo gana el que va DESPUÉS en el array (el orden
+ * en que llegan de /punches/today). Fechas no parseables se ignoran.
+ */
+function getLatestPunchByDate(punches: PunchEvent[]): PunchEvent | null {
+  let latest: PunchEvent | null = null;
+  let latestTime = -Infinity;
+  for (const p of punches) {
+    const time = parseBackendDate(String(p.createdDate ?? ""))?.getTime();
+    if (time !== undefined && time >= latestTime) {
+      latest = p;
+      latestTime = time;
+    }
+  }
+  return latest;
+}
+
+/** El ponche viene marcado como la jornada abierta de un día anterior. */
+function isOpenDayMarked(punch: PunchEvent): boolean {
+  return punch.hasOpenDay === true || (punch.hasOpenDay as unknown) === "true";
+}
+
+/**
+ * Ponche de inicio (InicioJornada, InicioJornadaAdicional o InicioJornadaFH)
+ * de la jornada ABIERTA, o null.
+ *
+ * Solo cuenta ponches de jornada válidos (fuera de INVALID_TIMELINE_STATUSES)
+ * y sin hasOpenDay, y toma el más reciente por createdDate (no por orden del
+ * array). Si ese último ponche de jornada es un fin (la jornada está
+ * cerrada) → null.
+ */
+export function getOpenJornadaStartPunch(
+  punches: PunchEvent[],
+): PunchEvent | null {
+  const last = getLatestPunchByDate(
+    punches.filter(
+      (p) =>
+        (isJornadaStartType(p.type) || isJornadaEndType(p.type)) &&
+        isValidTimelinePunch(p) &&
+        !isOpenDayMarked(p),
+    ),
+  );
+  return last && isJornadaStartType(last.type) ? last : null;
+}
+
+/**
+ * Último FinAlmuerzo válido (fuera de INVALID_TIMELINE_STATUSES) cuyo
+ * createdDate cae en el mismo día RD que `now`, por createdDate; o null.
+ */
+export function getTodayLunchExitPunch(
+  punches: PunchEvent[],
+  now: Date = new Date(),
+): PunchEvent | null {
+  const today = toRDDateString(now);
+  return getLatestPunchByDate(
+    punches.filter((p) => {
+      if (p.type !== "FinAlmuerzo" || !isValidTimelinePunch(p)) return false;
+      const date = parseBackendDate(String(p.createdDate ?? ""));
+      return date !== null && toRDDateString(date) === today;
+    }),
+  );
+}
+
+/**
+ * Minutos RD (desde medianoche) del createdDate del ponche si es del mismo día
+ * RD que `now`; null si no hay ponche, no se puede parsear o es de otro día.
+ */
+function getPunchRDMinutesToday(
+  punch: PunchEvent | null,
+  now: Date,
+): number | null {
+  if (!punch) return null;
+  const date = parseBackendDate(String(punch.createdDate ?? ""));
+  if (!date || toRDDateString(date) !== toRDDateString(now)) return null;
+  return getRDMinutes(date);
+}
+
 // ─── Feriado de hoy ───────────────────────────────────────────────────────────
 
 /**
@@ -1323,24 +1403,42 @@ export function isAlmuerzoVisible(
 
 /**
  * Visibilidad de la pestaña de Break, en este orden:
- * 1. Break abierto (InicioBreak sin FinBreak) → visible siempre, para poder
- *    cerrarlo.
- * 2. Almuerzo activo (InicioAlmuerzo sin FinAlmuerzo) → oculta, no se puede
- *    estar en ambas actividades a la vez.
- * 3. Espera entre breaks: si el último FinBreak válido de hoy (fuera de
- *    INVALID_TIMELINE_STATUSES) fue hace menos de config.cooldownAfterBreak
- *    minutos (hora RD, desde su createdDate) → oculta. Se suma a las
- *    ventanas: hay que cumplir las dos.
+ * 1. Break abierto → visible siempre, para poder cerrarlo. Abierto = el
+ *    último ponche de Break VÁLIDO (fuera de INVALID_TIMELINE_STATUSES), el
+ *    más reciente por createdDate, es un InicioBreak. Un InicioBreak
+ *    rechazado no abre nada.
+ * 2. Almuerzo abierto (mismo criterio: el último ponche de Almuerzo válido
+ *    por createdDate es un InicioAlmuerzo) → oculta, no se puede estar en
+ *    ambas actividades a la vez.
+ * 3. Espera entre breaks: si el último FinBreak válido de hoy fue hace menos
+ *    de config.cooldownAfterBreak minutos (hora RD, desde su createdDate) →
+ *    oculta. Se suma a las ventanas: hay que cumplir las dos.
  * 4. Todo en 0 = sin restricción de horario: si los 5 valores de `config`
  *    son 0 → visible a cualquier hora (la jornada iniciada la exige
  *    punchinout.tsx).
  * 5. Sin horario → visible (no hay referencia para la ventana).
  * 6. Con horario → solo dentro de las ventanas de `config` (por defecto
- *    getBreakWindowConfig()), medidas desde las horas del horario, no de los
- *    ponches: [entrada + startAfterEntry, almuerzo − endBeforeLunch) y
- *    [fin almuerzo + startAfterLunch, salida − endBeforeExit), o
- *    [entrada + startAfterEntry, salida − endBeforeExit) si el horario no
- *    tiene almuerzo. Una ventana vacía o invertida (horario corto)
+ *    getBreakWindowConfig()), todas [inicio, fin), en minutos RD. Las de
+ *    "después de" se anclan a la hora REAL de los ponches; las de "antes de"
+ *    siguen con las horas del horario:
+ *    - entryAnchor = hora del inicio de la jornada abierta
+ *      (getOpenJornadaStartPunch: InicioJornada, Adicional o FH) si es de
+ *      hoy. Respaldo: workEntryTime del horario (sin jornada abierta, o
+ *      ponche de otro día / sin fecha legible).
+ *    - Con almuerzo en el horario:
+ *      · mañana: [entryAnchor + startAfterEntry,
+ *                 lunchEntryTime − endBeforeLunch)
+ *      · tarde:  [max(entryAnchor + startAfterEntry,
+ *                     lunchAnchor + startAfterLunch),
+ *                 workExitTime − endBeforeExit)
+ *        lunchAnchor = hora del FinAlmuerzo válido de hoy
+ *        (getTodayLunchExitPunch). Sin FinAlmuerzo: si la jornada empezó a
+ *        partir de lunchExitTime (entró después del almuerzo del horario) no
+ *        hay ancla de almuerzo y la tarde empieza en entryAnchor +
+ *        startAfterEntry; si no, lunchAnchor = lunchExitTime del horario.
+ *    - Sin almuerzo en el horario: [entryAnchor + startAfterEntry,
+ *      workExitTime − endBeforeExit).
+ *    Una ventana vacía o invertida (horario corto, entrada tardía)
  *    simplemente no muestra nada.
  */
 export function isBreakVisible(
@@ -1349,14 +1447,20 @@ export function isBreakVisible(
   schedule: UserSchedule | null,
   config: BreakWindowConfig = getBreakWindowConfig(),
 ): boolean {
-  const lastBreak = [...punches]
-    .reverse()
-    .find((p) => p.type === "InicioBreak" || p.type === "FinBreak");
+  const validPunches = punches.filter(isValidTimelinePunch);
+
+  const lastBreak = getLatestPunchByDate(
+    validPunches.filter(
+      (p) => p.type === "InicioBreak" || p.type === "FinBreak",
+    ),
+  );
   if (lastBreak?.type === "InicioBreak") return true;
 
-  const lastAlmuerzo = [...punches]
-    .reverse()
-    .find((p) => p.type === "InicioAlmuerzo" || p.type === "FinAlmuerzo");
+  const lastAlmuerzo = getLatestPunchByDate(
+    validPunches.filter(
+      (p) => p.type === "InicioAlmuerzo" || p.type === "FinAlmuerzo",
+    ),
+  );
   if (lastAlmuerzo?.type === "InicioAlmuerzo") return false;
 
   const current = getRDMinutes(now);
@@ -1392,21 +1496,32 @@ export function isBreakVisible(
   const inWindow = (start: number, end: number) =>
     current >= start && current < end;
 
-  const morningStart =
-    timeStrToMinutes(schedule.workEntryTime) + config.startAfterEntry;
+  // Ancla de entrada: el ponche real; respaldo, la hora de entrada del horario
+  const entryAnchor =
+    getPunchRDMinutesToday(getOpenJornadaStartPunch(punches), now) ??
+    timeStrToMinutes(schedule.workEntryTime);
+  const afterEntry = entryAnchor + config.startAfterEntry;
   const dayEnd = timeStrToMinutes(schedule.workExitTime) - config.endBeforeExit;
 
   if (schedule.lunchEntryTime && schedule.lunchExitTime) {
     const morningEnd =
       timeStrToMinutes(schedule.lunchEntryTime) - config.endBeforeLunch;
+
+    const scheduledLunchExit = timeStrToMinutes(schedule.lunchExitTime);
+    const lunchAnchor =
+      getPunchRDMinutesToday(getTodayLunchExitPunch(punches, now), now) ??
+      (entryAnchor >= scheduledLunchExit ? null : scheduledLunchExit);
     const afternoonStart =
-      timeStrToMinutes(schedule.lunchExitTime) + config.startAfterLunch;
+      lunchAnchor === null
+        ? afterEntry
+        : Math.max(afterEntry, lunchAnchor + config.startAfterLunch);
+
     return (
-      inWindow(morningStart, morningEnd) || inWindow(afternoonStart, dayEnd)
+      inWindow(afterEntry, morningEnd) || inWindow(afternoonStart, dayEnd)
     );
   }
 
-  return inWindow(morningStart, dayEnd);
+  return inWindow(afterEntry, dayEnd);
 }
 
 /**

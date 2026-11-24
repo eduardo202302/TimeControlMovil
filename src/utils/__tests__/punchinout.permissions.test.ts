@@ -812,7 +812,8 @@ describe("16bis. isBreakVisible — ventanas de tiempo", () => {
     cooldownAfterBreak: 30,
   };
 
-  /** 09:00–18:00, almuerzo 13:30–14:30 → [10:00, 13:30) y [15:30, 17:00) */
+  /** 09:00–18:00, almuerzo 13:30–14:30 → [10:00, 13:30) y [15:30, 17:00)
+   * con entrada puntual a las 09:00 */
   const horario: UserSchedule = {
     ...schedule,
     workEntryTime: "09:00:00",
@@ -821,10 +822,19 @@ describe("16bis. isBreakVisible — ventanas de tiempo", () => {
     lunchExitTime: "14:30:00",
   };
 
+  /** Ponche con createdDate a la hora RD h:m del día de rd() */
+  const at = (type: string, h: number, m: number) =>
+    punch(type, { createdDate: rd(h, m).toISOString() });
+
+  /** El ancla de "después de la entrada" es ahora el InicioJornada real: la
+   * entrada puntual a las 09:00 deja las mismas ventanas que antes medía el
+   * horario. (PUNCHES.jornadaIniciada entra a las 08:00 RD.) */
+  const entradaPuntual = [at("InicioJornada", 9, 0)];
+
   const verBreak = (
     now: Date,
     sched: UserSchedule | null,
-    punches: PunchEvent[] = PUNCHES.jornadaIniciada,
+    punches: PunchEvent[] = entradaPuntual,
   ) => isBreakVisible(punches, now, sched, BREAK_CFG);
 
   it.each([
@@ -843,6 +853,13 @@ describe("16bis. isBreakVisible — ventanas de tiempo", () => {
     expect(verBreak(rd(h, m), horario)).toBe(esperado);
   });
 
+  it("entrada real 08:00 con horario 09:00 → visible desde 09:00 (ancla = ponche)", () => {
+    // Antes la ventana se medía desde workEntryTime (09:00 + 60 = 10:00).
+    expect(verBreak(rd(8, 59), horario, PUNCHES.jornadaIniciada)).toBe(false);
+    expect(verBreak(rd(9, 0), horario, PUNCHES.jornadaIniciada)).toBe(true);
+    expect(verBreak(rd(9, 59), horario, PUNCHES.jornadaIniciada)).toBe(true);
+  });
+
   it("break abierto fuera de ventana (13:45) → visible para poder cerrarlo", () => {
     const conBreak = [punch("InicioJornada"), punch("InicioBreak")];
     expect(verBreak(rd(13, 45), horario, conBreak)).toBe(true);
@@ -857,8 +874,10 @@ describe("16bis. isBreakVisible — ventanas de tiempo", () => {
     [9, 0, true],
     [15, 59, true],
     [16, 0, false],
-  ])("sin almuerzo (08:00–17:00): %i:%i → %s", (h, m, esperado) => {
-    expect(verBreak(rd(h, m), scheduleSinAlmuerzo)).toBe(esperado);
+  ])("sin almuerzo (08:00–17:00, entra 08:00): %i:%i → %s", (h, m, esperado) => {
+    expect(
+      verBreak(rd(h, m), scheduleSinAlmuerzo, PUNCHES.jornadaIniciada),
+    ).toBe(esperado);
   });
 
   it("sin horario → visible (sin referencia)", () => {
@@ -876,10 +895,11 @@ describe("16bis. isBreakVisible — ventanas de tiempo", () => {
       lunchEntryTime: "08:45:00",
       lunchExitTime: "09:15:00",
     };
+    const entra08 = PUNCHES.jornadaIniciada;
     for (const [h, m] of [[8, 0], [8, 30], [9, 0], [9, 30], [9, 59]]) {
-      expect(() => verBreak(rd(h, m), corto)).not.toThrow();
-      expect(verBreak(rd(h, m), corto)).toBe(false);
-      expect(verBreak(rd(h, m), cortoConAlmuerzo)).toBe(false);
+      expect(() => verBreak(rd(h, m), corto, entra08)).not.toThrow();
+      expect(verBreak(rd(h, m), corto, entra08)).toBe(false);
+      expect(verBreak(rd(h, m), cortoConAlmuerzo, entra08)).toBe(false);
     }
   });
 
@@ -905,7 +925,7 @@ describe("16bis. isBreakVisible — ventanas de tiempo", () => {
       cooldownAfterBreak: 30,
     };
     const ver = (h: number, m: number) =>
-      isBreakVisible(PUNCHES.jornadaIniciada, rd(h, m), horario, cfg30);
+      isBreakVisible(entradaPuntual, rd(h, m), horario, cfg30);
     expect(ver(9, 29)).toBe(false);
     expect(ver(9, 30)).toBe(true);
     expect(ver(12, 59)).toBe(true);
@@ -917,7 +937,7 @@ describe("16bis. isBreakVisible — ventanas de tiempo", () => {
   it("config leída de school.settings (breakShowAfterEntryMinutes 30)", () => {
     const cfg = getBreakWindowConfig({ breakShowAfterEntryMinutes: 30 });
     const ver = (h: number, m: number) =>
-      isBreakVisible(PUNCHES.jornadaIniciada, rd(h, m), horario, cfg);
+      isBreakVisible(entradaPuntual, rd(h, m), horario, cfg);
     expect(ver(9, 29)).toBe(false);
     expect(ver(9, 30)).toBe(true);
     // El resto sigue en respaldo: almuerzo 13:30 (−0), fin 14:30 (+60),
@@ -972,9 +992,16 @@ describe("16ter. isBreakVisible — espera entre breaks", () => {
   });
 
   it("FinBreak con status inválido no cuenta para la espera", () => {
+    // Break válido 09:30–09:45 y otro rechazado 10:15–10:30: la espera se
+    // mide desde el FinBreak válido de 09:45 (ya cumplida a las 10:45), no
+    // desde el rechazado de 10:30. (Antes el par rechazado era InicioBreak
+    // válido + FinBreak inválido; con el fix de "break abierto" eso deja el
+    // break abierto y daba true por otra regla.)
     const invalido = [
       punch("InicioJornada"),
-      at("InicioBreak", 10, 15),
+      at("InicioBreak", 9, 30),
+      at("FinBreak", 9, 45),
+      at("InicioBreak", 10, 15, { status: "Fuera perímetro" }),
       at("FinBreak", 10, 30, { status: "Fuera perímetro" }),
     ];
     expect(isBreakVisible(invalido, rd(10, 45), horario, BREAK_CFG)).toBe(true);
@@ -1054,6 +1081,182 @@ describe("16quater. isBreakVisible — config todo en 0", () => {
     expect(
       isBreakVisible(PUNCHES.jornadaIniciada, rd(12, 30), schedule, soloEsperaCero),
     ).toBe(false);
+  });
+});
+
+// ─── 16quinquies. isBreakVisible — "después de" anclado a los ponches reales ─
+
+describe("16quinquies. isBreakVisible — anclas reales (entrada y fin de almuerzo)", () => {
+  /** Respaldo de constants/breakWindow.ts, explícito: 60 / 0 / 60 / 60 / 30 */
+  const DEFAULTS = {
+    startAfterEntry: 60,
+    endBeforeLunch: 0,
+    startAfterLunch: 60,
+    endBeforeExit: 60,
+    cooldownAfterBreak: 30,
+  };
+
+  /** Ponche con createdDate a la hora RD h:m del día de rd() */
+  const at = (type: string, h: number, m: number, extra: Partial<PunchEvent> = {}) =>
+    punch(type, { createdDate: rd(h, m).toISOString(), ...extra });
+
+  // `schedule`: 08:00–17:00, almuerzo 12:00–13:00
+  const ver = (punches: PunchEvent[], h: number, m = 0) =>
+    isBreakVisible(punches, rd(h, m), schedule, DEFAULTS);
+
+  it("entra 10:00 → oculto 10:59, visible 11:00", () => {
+    const entra10 = [at("InicioJornada", 10, 0)];
+    expect(ver(entra10, 10, 59)).toBe(false);
+    expect(ver(entra10, 11, 0)).toBe(true);
+    expect(ver(entra10, 11, 59)).toBe(true);
+    expect(ver(entra10, 12, 0)).toBe(false);
+  });
+
+  it("entra 08:00 → visible 09:00 (igual que con el horario)", () => {
+    const entra08 = [at("InicioJornada", 8, 0)];
+    expect(ver(entra08, 8, 59)).toBe(false);
+    expect(ver(entra08, 9, 0)).toBe(true);
+  });
+
+  it("FinAlmuerzo real 13:20 → tarde oculta 14:19, visible 14:20", () => {
+    const almuerzo = [
+      at("InicioJornada", 8, 0),
+      at("InicioAlmuerzo", 12, 20),
+      at("FinAlmuerzo", 13, 20),
+    ];
+    expect(ver(almuerzo, 14, 19)).toBe(false);
+    expect(ver(almuerzo, 14, 20)).toBe(true);
+    expect(ver(almuerzo, 15, 59)).toBe(true);
+    expect(ver(almuerzo, 16, 0)).toBe(false);
+  });
+
+  it("FinAlmuerzo rechazado no es ancla → tarde desde lunchExitTime + 60", () => {
+    const almuerzo = [
+      at("InicioJornada", 8, 0),
+      at("InicioAlmuerzo", 12, 0),
+      at("FinAlmuerzo", 12, 50),
+      at("FinAlmuerzo", 13, 40, { status: "Fuera de área" }),
+    ];
+    // Ancla = FinAlmuerzo válido 12:50 → 13:50
+    expect(ver(almuerzo, 13, 49)).toBe(false);
+    expect(ver(almuerzo, 13, 50)).toBe(true);
+  });
+
+  it("sin FinAlmuerzo, entrada 08:00 → tarde desde 14:00 (horario)", () => {
+    const entra08 = [at("InicioJornada", 8, 0)];
+    expect(ver(entra08, 12, 30)).toBe(false);
+    expect(ver(entra08, 13, 59)).toBe(false);
+    expect(ver(entra08, 14, 0)).toBe(true);
+  });
+
+  it("entra 14:00 (después del almuerzo del horario), sin almuerzo → visible desde 15:00", () => {
+    const entra14 = [at("InicioJornada", 14, 0)];
+    expect(ver(entra14, 14, 59)).toBe(false);
+    expect(ver(entra14, 15, 0)).toBe(true);
+    expect(ver(entra14, 15, 59)).toBe(true);
+    expect(ver(entra14, 16, 0)).toBe(false);
+  });
+
+  it("entra 12:30 (dentro del almuerzo del horario), sin almuerzo → tarde desde 14:00", () => {
+    // entryAnchor 12:30 < lunchExitTime 13:00 → ancla de almuerzo = horario:
+    // max(12:30 + 60, 13:00 + 60) = 14:00
+    const entra1230 = [at("InicioJornada", 12, 30)];
+    expect(ver(entra1230, 13, 59)).toBe(false);
+    expect(ver(entra1230, 14, 0)).toBe(true);
+  });
+
+  it.each(["InicioJornadaAdicional", "InicioJornadaFH"])(
+    "jornada %s abierta → ancla en su ponche, no en el InicioJornada",
+    (tipo) => {
+      const punches = [
+        at("InicioJornada", 8, 0),
+        at("FinJornada", 9, 0),
+        at(tipo, 10, 30),
+      ];
+      expect(ver(punches, 11, 29)).toBe(false);
+      expect(ver(punches, 11, 30)).toBe(true);
+    },
+  );
+
+  it("InicioJornada con Error de Imagen seguido de uno válido → ancla en el válido", () => {
+    const punches = [
+      at("InicioJornada", 8, 0, { status: "Error de Imagen" }),
+      at("InicioJornada", 10, 0),
+    ];
+    // Con el rechazado como ancla sería visible desde 09:00
+    expect(ver(punches, 10, 59)).toBe(false);
+    expect(ver(punches, 11, 0)).toBe(true);
+  });
+
+  it("sin jornada abierta → respaldo workEntryTime del horario", () => {
+    expect(ver([], 8, 59)).toBe(false);
+    expect(ver([], 9, 0)).toBe(true);
+    const cerrada = [at("InicioJornada", 10, 0), at("FinJornada", 10, 30)];
+    expect(ver(cerrada, 9, 0)).toBe(true);
+  });
+
+  it("inicio con hasOpenDay o de otro día → respaldo workEntryTime", () => {
+    const openDay = [at("InicioJornada", 10, 0, { hasOpenDay: true })];
+    expect(ver(openDay, 9, 0)).toBe(true);
+    const ayer = [
+      punch("InicioJornada", {
+        createdDate: new Date(rd(10, 0).getTime() - 24 * 60 * 60000).toISOString(),
+      }),
+    ];
+    expect(ver(ayer, 9, 0)).toBe(true);
+  });
+
+  it("InicioBreak rechazado no deja el Break abierto", () => {
+    const rechazado = [
+      at("InicioJornada", 8, 0),
+      at("InicioBreak", 12, 30, { status: "Error de Imagen" }),
+    ];
+    // 12:30 está fuera de ventana: solo un break abierto lo haría visible
+    expect(ver(rechazado, 12, 30)).toBe(false);
+    const valido = [at("InicioJornada", 8, 0), at("InicioBreak", 12, 30)];
+    expect(ver(valido, 12, 30)).toBe(true);
+  });
+
+  it("InicioAlmuerzo rechazado no oculta el Break", () => {
+    const punches = [
+      at("InicioJornada", 8, 0),
+      at("InicioAlmuerzo", 10, 0, { status: "Fuera de área" }),
+    ];
+    expect(ver(punches, 10, 30)).toBe(true);
+  });
+
+  it("break abierto / cerrado se decide por createdDate, no por orden del array", () => {
+    // El InicioBreak de 10:15 va último en el array pero el FinBreak 10:30 es
+    // posterior: el break está cerrado. A las 12:30 (fuera de ventana) → oculto.
+    const desordenado = [
+      at("InicioJornada", 8, 0),
+      at("FinBreak", 10, 30),
+      at("InicioBreak", 10, 15),
+    ];
+    expect(ver(desordenado, 12, 30)).toBe(false);
+  });
+
+  it("cooldown sigue aplicando con ancla real (entra 10:00, FinBreak 11:20)", () => {
+    const punches = [
+      at("InicioJornada", 10, 0),
+      at("InicioBreak", 11, 10),
+      at("FinBreak", 11, 20),
+    ];
+    expect(ver(punches, 11, 49)).toBe(false);
+    expect(ver(punches, 11, 50)).toBe(true);
+  });
+
+  it("todo en 0 sigue siendo visible a cualquier hora", () => {
+    const CERO = {
+      startAfterEntry: 0,
+      endBeforeLunch: 0,
+      startAfterLunch: 0,
+      endBeforeExit: 0,
+      cooldownAfterBreak: 0,
+    };
+    const entra10 = [at("InicioJornada", 10, 0)];
+    expect(isBreakVisible(entra10, rd(10, 5), schedule, CERO)).toBe(true);
+    expect(isBreakVisible(entra10, rd(12, 30), schedule, CERO)).toBe(true);
   });
 });
 
@@ -1442,6 +1645,8 @@ describe("20. isApplyFlagEnabled", () => {
     expect(flag && boton).toBe(false);
   });
 
+  // Ancla de entrada = InicioJornada real de PUNCHES.jornadaIniciada (08:00
+  // RD), igual a workEntryTime de `schedule` → ventana [09:00, 12:00).
   it("20e. isApplyBreak false → sin Break aunque esté en ventana", () => {
     const flag = isApplyFlagEnabled(
       { isApplyBreak: false },
