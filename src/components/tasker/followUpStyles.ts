@@ -40,6 +40,18 @@ import {
 } from "@/styles/surfaces";
 import { TASKER_LAYOUT as L, TASKER_TOUCH_MIN, taskerTitleMetrics } from "./taskerCompact";
 
+/** Alto de cada pestaña (Ticket / Dirección / Acciones), antes de verticalScale. */
+export const SEGMENT_HEIGHT = 34;
+
+/**
+ * Área táctil de las pestañas: SEGMENT_HEIGHT + 5 arriba y abajo = 44. Solo
+ * vertical (a los lados están las otras pestañas).
+ */
+export const SEGMENT_HIT_SLOP = { top: 5, bottom: 5, left: 0, right: 0 };
+
+/** Ícono de las pestañas (un punto menos que el de las tarjetas). */
+export const SEGMENT_ICON_SIZE = 15;
+
 /**
  * Un solo createStyles para Seguimiento: FollowUpView lo memoiza y lo pasa
  * por prop a las tres pestañas (ninguna llama useResponsive()). Tarjetas,
@@ -53,6 +65,8 @@ export function createFollowUpStyles(
 ) {
   const title = taskerTitleMetrics(font);
   const touchMin = Math.max(TASKER_TOUCH_MIN, verticalScale(44));
+  /** Pestañas: más bajas que touchMin; el resto del área táctil lo pone SEGMENT_HIT_SLOP. */
+  const segmentHeight = verticalScale(SEGMENT_HEIGHT);
 
   return StyleSheet.create({
     screen: { flex: 1, backgroundColor: APP_BACKGROUND_V2 },
@@ -78,8 +92,8 @@ export function createFollowUpStyles(
     segmented: {
       ...SEGMENTED_SURFACE,
       flexDirection: "row",
-      padding: scale(3),
-      gap: scale(3),
+      padding: scale(2),
+      gap: scale(2),
     },
     // Ícono, texto y badge siempre en una fila: el texto se encoge (una
     // línea, adjustsFontSizeToFit); ícono y badge no.
@@ -88,13 +102,13 @@ export function createFollowUpStyles(
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: scale(6),
-      minHeight: touchMin,
+      gap: scale(5),
+      minHeight: segmentHeight,
       paddingHorizontal: scale(6),
       borderRadius: RADIUS_SM,
     },
     segmentActive: { ...SEGMENT_ACTIVE },
-    segmentText: { flexShrink: 1, fontSize: font(13), fontWeight: "600", color: TEXT_MUTED },
+    segmentText: { flexShrink: 1, fontSize: font(12), fontWeight: "600", color: TEXT_MUTED },
     segmentTextActive: { color: ON_PRIMARY, fontWeight: "700" },
     segmentBadge: {
       flexShrink: 0,

@@ -1,10 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useMemo, useState, type ReactNode } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -40,6 +50,7 @@ import {
 } from "@/styles/surfaces";
 import { formatTaskerVideoProgress, TASKER_COMMENT_MAX_LENGTH } from "../../utils/taskerRules";
 import { canSaveEvaluation, evaluationRequirements } from "../../utils/taskerFollowUpRules";
+import { scrollIntoView } from "./scrollIntoView";
 import type {
   TaskerAttachment,
   TaskerTaskListItem,
@@ -60,6 +71,9 @@ export type TaskStatesCatalog =
 const REMOVE_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 };
 
 type Styles = ReturnType<typeof createStyles>;
+
+/** ScrollView del cuerpo de la hoja abierta: el campo de comentario se lleva a la vista. */
+const SheetScrollContext = createContext<RefObject<ScrollView | null> | null>(null);
 
 function useSheetStyles(): Styles {
   const { scale, verticalScale, font } = useResponsive();
@@ -83,7 +97,9 @@ interface ShellProps {
 /**
  * Hoja que sube desde abajo (BOTTOM_SHEET_CARD), con título, subtítulo, "×",
  * cuerpo con scroll y "Atrás" / "Guardar". Enviando: nada se cierra ni se
- * edita y "Guardar" muestra el indicador.
+ * edita y "Guardar" muestra el indicador. Con el teclado abierto la hoja
+ * entera sube sobre él (KAV "padding" en las dos plataformas, patrón de
+ * login): el cuerpo se achica y el pie con los botones queda a la vista.
  */
 function ReviewSheetShell({
   visible,
@@ -103,6 +119,7 @@ function ReviewSheetShell({
     if (!saving) onClose();
   };
   const disabled = !canSave || saving;
+  const scrollRef = useRef<ScrollView>(null);
 
   return (
     <Modal
@@ -112,10 +129,7 @@ function ReviewSheetShell({
       onRequestClose={close}
       onDismiss={onDismiss}
     >
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <KeyboardAvoidingView style={styles.overlay} behavior="padding" keyboardVerticalOffset={0}>
         <TouchableOpacity
           style={styles.backdrop}
           activeOpacity={1}
@@ -139,12 +153,13 @@ function ReviewSheetShell({
           </View>
 
           <ScrollView
+            ref={scrollRef}
             style={styles.body}
             contentContainerStyle={styles.bodyContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {children}
+            <SheetScrollContext.Provider value={scrollRef}>{children}</SheetScrollContext.Provider>
           </ScrollView>
 
           <View style={styles.footer}>
@@ -173,7 +188,11 @@ function ReviewSheetShell({
   );
 }
 
-/** "Comentario" multilínea con el contador; asterisco si es obligatorio. */
+/**
+ * "Comentario" multilínea con el contador; asterisco si es obligatorio. Al
+ * enfocarlo (o al terminar de abrir el teclado) el cuerpo de la hoja se
+ * desplaza hasta verlo entero; "Atrás" / "Guardar" van en el pie fijo.
+ */
 function CommentField({
   value,
   onChange,
@@ -187,15 +206,36 @@ function CommentField({
   editable: boolean;
   styles: Styles;
 }) {
+  const scrollRef = useContext(SheetScrollContext);
+  const fieldRef = useRef<View>(null);
+  const inputRef = useRef<TextInput>(null);
+
+  const reveal = useCallback(() => {
+    void scrollIntoView(scrollRef?.current, fieldRef.current);
+  }, [scrollRef]);
+
+  // keyboardDidShow: el teclado terminó de abrir y la hoja ya subió (KAV).
+  useEffect(() => {
+    const subscription = Keyboard.addListener("keyboardDidShow", () => {
+      if (inputRef.current?.isFocused()) reveal();
+    });
+    return () => subscription.remove();
+  }, [reveal]);
+
   return (
-    <View style={styles.field}>
+    <View ref={fieldRef} style={styles.field}>
       <Text style={styles.label}>
         Comentario{required && <Text style={styles.required}> *</Text>}
       </Text>
       <TextInput
+        ref={inputRef}
         style={styles.input}
         value={value}
         onChangeText={onChange}
+        // Teclado ya abierto (venía de otro campo): no habrá keyboardDidShow.
+        onFocus={() => {
+          if (Keyboard.isVisible()) reveal();
+        }}
         editable={editable}
         placeholder="Escriba un comentario"
         placeholderTextColor={TEXT_PLACEHOLDER}
@@ -475,7 +515,8 @@ function createStyles(
     headerBody: { flex: 1, gap: verticalScale(2) },
     title: { fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
     subtitle: { fontSize: font(14), fontWeight: "600", color: TEXT_SECONDARY },
-    body: { flexGrow: 0 },
+    // Se achica (con scroll) cuando el teclado sube la hoja: el pie no se sale.
+    body: { flexGrow: 0, flexShrink: 1 },
     bodyContent: { gap: verticalScale(14), paddingBottom: verticalScale(4) },
     hint: { fontSize: font(13), lineHeight: font(18), color: TEXT_MUTED },
     catalogNotice: {

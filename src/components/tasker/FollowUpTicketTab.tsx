@@ -402,6 +402,7 @@ export default function FollowUpTicketTab({
         resetKey={commentsResetKey}
         scrollRef={scrollRef}
         compact
+        revealActionsOnFocus
       />
 
       {/* ── Revisión: Completada / Incompleta (solo en 7) ── */}

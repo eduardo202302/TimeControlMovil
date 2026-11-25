@@ -7,7 +7,6 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Modal,
-  Platform,
   RefreshControl,
   ScrollView,
   StatusBar,
@@ -71,7 +70,7 @@ import { FollowUpNotice, SolidLabel, StateChip } from "./FollowUpParts";
 import type { TaskStatesCatalog } from "./FollowUpReviewSheets";
 import FollowUpTicketCard from "./FollowUpTicketCard";
 import FollowUpTicketTab from "./FollowUpTicketTab";
-import { createFollowUpStyles } from "./followUpStyles";
+import { createFollowUpStyles, SEGMENT_HIT_SLOP, SEGMENT_ICON_SIZE } from "./followUpStyles";
 import { getTaskerCredentials } from "./taskerCredentials";
 import type { TaskerCommentsCardHandle } from "./TaskerCommentsCard";
 import { useNowMs } from "./useNowMs";
@@ -304,6 +303,30 @@ export default function FollowUpView({
     });
   }, [runExclusive, loadList]);
 
+  /**
+   * Tras un cambio propio con éxito (comentario, evaluación, Completada,
+   * Incompleta): detalle y lista ya, sin esperar los 30 s y sin indicador.
+   * Toma el turno de las recargas: si hay una en curso espera a que termine
+   * (pudo pedir datos de antes del cambio) y la de 30 s no se le encima.
+   * Resuelve con el detalle al día (quien llama cierra su hoja); la lista
+   * llega después, dentro del mismo turno.
+   */
+  const refreshAfterChange = useCallback(
+    (id: number) =>
+      new Promise<void>((detailDone) => {
+        void runExclusive.queue(async () => {
+          try {
+            await loadDetail(id, true);
+          } finally {
+            detailDone();
+          }
+          // "gone" ya cerró el modal: la lista lo saca de la tarjeta igual.
+          await loadList("silent");
+        });
+      }),
+    [runExclusive, loadDetail, loadList],
+  );
+
   const openDetail = useCallback(
     async (id: number) => {
       if ((await loadDetail(id, false)) === "gone") reloadListAfterGone();
@@ -355,11 +378,11 @@ export default function FollowUpView({
         }
         return false;
       }
-      // La respuesta no trae activities: se pide el detalle completo.
-      if ((await loadDetail(id, true)) === "gone") reloadListAfterGone();
+      // La respuesta no trae activities: se pide el detalle completo (y la lista).
+      await refreshAfterChange(id);
       return true;
     },
-    [loadDetail, closeDetail, reloadListAfterGone],
+    [refreshAfterChange, closeDetail, reloadListAfterGone],
   );
 
   // ── Revisión: catálogos (una vez por pantalla), evaluación y cambio de estado ──
@@ -383,7 +406,7 @@ export default function FollowUpView({
 
   /**
    * PATCH del ticket abierto y, si sale bien, el detalle completo (la
-   * respuesta no trae activities). "Ticket no disponible": avisa, cierra el
+   * respuesta no trae activities) y la lista. "Ticket no disponible": avisa, cierra el
    * modal y recarga la lista, como los comentarios. El resto lo muestra quien llama.
    */
   const sendReviewPatch = useCallback(
@@ -402,10 +425,11 @@ export default function FollowUpView({
         }
         return result;
       }
-      if ((await loadDetail(id, true)) === "gone") reloadListAfterGone();
+      // La tarjeta de la lista también muestra el estado nuevo, ya.
+      await refreshAfterChange(id);
       return result;
     },
-    [loadDetail, closeDetail, reloadListAfterGone],
+    [refreshAfterChange, closeDetail, reloadListAfterGone],
   );
 
   const handleEvaluate = useCallback(
@@ -619,11 +643,16 @@ export default function FollowUpView({
                     key={key}
                     style={[styles.segment, active && styles.segmentActive]}
                     onPress={() => setTab(key)}
+                    hitSlop={SEGMENT_HIT_SLOP}
                     activeOpacity={0.8}
                     accessibilityRole="tab"
                     accessibilityState={{ selected: active }}
                   >
-                    <Ionicons name={icon} size={16} color={active ? ON_PRIMARY : TEXT_MUTED} />
+                    <Ionicons
+                      name={icon}
+                      size={SEGMENT_ICON_SIZE}
+                      color={active ? ON_PRIMARY : TEXT_MUTED}
+                    />
                     {/* Una sola línea: con fuente grande se achica hasta 80 %, nunca salta de fila. */}
                     <Text
                       style={[styles.segmentText, active && styles.segmentTextActive]}
@@ -649,11 +678,12 @@ export default function FollowUpView({
             </View>
           </View>
 
-          {/* Mismo criterio que ReportFaultForm: en iOS el teclado achica el área de scroll. */}
-          <KeyboardAvoidingView
-            style={styles.flex}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-          >
+          {/*
+            Patrón de login/registro: "padding" en las dos plataformas. Con
+            edge-to-edge (Android) la ventana ya no se achica sola; si alguna
+            vez lo hace, el KAV mide 0 de solape y no suma nada.
+          */}
+          <KeyboardAvoidingView style={styles.flex} behavior="padding" keyboardVerticalOffset={0}>
             {/* key = pestaña: cada una arranca desde arriba. Las recargas no la remontan. */}
             <ScrollView
               key={tab}

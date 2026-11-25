@@ -80,6 +80,27 @@ interface TaskerCommentComposerProps {
    * hasta 5 y luego hace scroll interno). Sin él, el formulario de siempre.
    */
   compact?: boolean;
+  /**
+   * Al enfocar el texto, lleva a la vista desde el campo hasta "Cancelar" /
+   * "Guardar" (Seguimiento). Sin él, solo el campo (Reportar).
+   */
+  revealActionsOnFocus?: boolean;
+}
+
+/**
+ * Lo que va de `from` (arriba) a `to` (abajo) como un solo bloque a medir.
+ * Si falta `to`, solo `from`.
+ */
+function spanOf(from: View | null, to: View | null): Pick<View, "measureInWindow"> | null {
+  if (!from || !to) return from;
+  return {
+    measureInWindow: (callback) =>
+      from.measureInWindow((x, y, width) =>
+        to.measureInWindow((_x, toY, _width, toHeight) =>
+          callback(x, y, width, Math.max(0, toY + toHeight - y)),
+        ),
+      ),
+  };
 }
 
 /**
@@ -100,6 +121,7 @@ export default function TaskerCommentComposer({
   saving = false,
   scrollRef,
   compact = false,
+  revealActionsOnFocus = false,
 }: TaskerCommentComposerProps) {
   const { scale, verticalScale, font } = useResponsive();
   const styles = useMemo(
@@ -140,6 +162,7 @@ export default function TaskerCommentComposer({
   const containerRef = useRef<View>(null);
   const inputBlockRef = useRef<View>(null);
   const inputRef = useRef<TextInput>(null);
+  const actionsRef = useRef<View>(null);
   const openedRef = useRef(false);
 
   const handleContainerLayout = () => {
@@ -149,8 +172,11 @@ export default function TaskerCommentComposer({
   };
 
   const revealInput = useCallback(() => {
-    scrollIntoView(scrollRef?.current, inputBlockRef.current);
-  }, [scrollRef]);
+    const target = revealActionsOnFocus
+      ? spanOf(inputBlockRef.current, actionsRef.current)
+      : inputBlockRef.current;
+    scrollIntoView(scrollRef?.current, target);
+  }, [scrollRef, revealActionsOnFocus]);
 
   // keyboardDidShow: el teclado ya terminó de abrir (y KeyboardAvoidingView ya se ajustó).
   useEffect(() => {
@@ -241,7 +267,7 @@ export default function TaskerCommentComposer({
       </View>
       <TaskerAttachmentSheet {...picker.sheet} />
 
-      <View style={styles.actions}>
+      <View ref={actionsRef} style={styles.actions}>
         <TouchableOpacity
           style={[styles.actionBtn, styles.cancelBtn]}
           onPress={onCancel}

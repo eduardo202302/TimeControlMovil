@@ -654,6 +654,59 @@ describe("createExclusiveRunner", () => {
     await expect(run(() => Promise.reject(new Error("x")))).rejects.toThrow("x");
     await expect(run(async () => undefined)).resolves.toBe(true);
   });
+  it("queue: libre → corre ya y ocupa el turno", async () => {
+    const run = createExclusiveRunner();
+    let release!: () => void;
+    const queued = run.queue(() => new Promise<void>((resolve) => (release = resolve)));
+    await expect(run(async () => undefined)).resolves.toBe(false);
+    release();
+    await queued;
+    await expect(run(async () => undefined)).resolves.toBe(true);
+  });
+  it("queue: ocupado → espera a la anterior y no se encima con ella", async () => {
+    const run = createExclusiveRunner();
+    const order: string[] = [];
+    let release!: () => void;
+    const first = run(async () => {
+      order.push("first:start");
+      await new Promise<void>((resolve) => (release = resolve));
+      order.push("first:end");
+    });
+    const queued = run.queue(async () => {
+      order.push("queued");
+    });
+    await Promise.resolve();
+    expect(order).toEqual(["first:start"]);
+    release();
+    await Promise.all([first, queued]);
+    expect(order).toEqual(["first:start", "first:end", "queued"]);
+  });
+  it("queue: corre aunque la anterior falle", async () => {
+    const run = createExclusiveRunner();
+    const failing = run(() => Promise.reject(new Error("x")));
+    const task = jest.fn(async () => undefined);
+    const queued = run.queue(task);
+    await expect(failing).rejects.toThrow("x");
+    await queued;
+    expect(task).toHaveBeenCalledTimes(1);
+  });
+  it("queue: dos en cola corren de a una, en orden", async () => {
+    const run = createExclusiveRunner();
+    const order: string[] = [];
+    let release!: () => void;
+    const first = run(() => new Promise<void>((resolve) => (release = resolve)));
+    const a = run.queue(async () => {
+      order.push("a:start");
+      await Promise.resolve();
+      order.push("a:end");
+    });
+    const b = run.queue(async () => {
+      order.push("b");
+    });
+    release();
+    await Promise.all([first, a, b]);
+    expect(order).toEqual(["a:start", "a:end", "b"]);
+  });
 });
 
 // ─── Comentario nuevo (PATCH) ───────────────────────────────────────────────

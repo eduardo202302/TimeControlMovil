@@ -189,22 +189,45 @@ export function resolveRequestedTicket(
   return requestedId !== null && isTaskInList(tasks, requestedId) ? requestedId : null;
 }
 
+export interface ExclusiveRunner {
+  /** Si la anterior no terminó, la nueva se descarta (false). */
+  (task: () => Promise<void>): Promise<boolean>;
+  /**
+   * Espera su turno y corre: si hay una en curso, arranca al terminar ella
+   * (antes que cualquier otra descartable). Para la recarga tras un cambio
+   * propio, que no puede perderse ni usar datos pedidos antes del cambio.
+   */
+  queue: (task: () => Promise<void>) => Promise<void>;
+}
+
 /**
- * Corre una tarea a la vez: si la anterior no terminó, la nueva se descarta
- * (devuelve false). Así la recarga automática nunca se encima.
+ * Corre una tarea a la vez. Así la recarga automática nunca se encima con
+ * otra recarga (la de 30 s, la de deslizar o la que sigue a un cambio).
  */
-export function createExclusiveRunner(): (task: () => Promise<void>) => Promise<boolean> {
-  let running = false;
-  return async (task) => {
-    if (running) return false;
-    running = true;
-    try {
-      await task();
-      return true;
-    } finally {
-      running = false;
-    }
+export function createExclusiveRunner(): ExclusiveRunner {
+  let running: Promise<void> | null = null;
+  const start = (task: () => Promise<void>): Promise<void> => {
+    const current = (async () => {
+      try {
+        await task();
+      } finally {
+        running = null;
+      }
+    })();
+    running = current;
+    return current;
   };
+  const run = (async (task: () => Promise<void>) => {
+    if (running) return false;
+    await start(task);
+    return true;
+  }) as ExclusiveRunner;
+  run.queue = async (task) => {
+    // Bucle: al liberarse el turno puede tomarlo otra tarea en cola.
+    while (running) await running.catch(() => undefined);
+    await start(task);
+  };
+  return run;
 }
 
 // ─── Tarjetas de la lista de tickets ────────────────────────────────────────

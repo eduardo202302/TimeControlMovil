@@ -139,6 +139,11 @@ interface TaskerCommentsCardProps {
    * botón circular "+" / "×". Sin él, la tarjeta de siempre.
    */
   compact?: boolean;
+  /**
+   * Seguimiento: al enfocar el texto se desplaza hasta ver también
+   * "Cancelar" / "Guardar" sobre el teclado. Sin él, solo el campo.
+   */
+  revealActionsOnFocus?: boolean;
 }
 
 /**
@@ -165,6 +170,7 @@ export default function TaskerCommentsCard({
   scrollRef,
   resetKey = 0,
   compact = false,
+  revealActionsOnFocus = false,
 }: TaskerCommentsCardProps) {
   const { scale, verticalScale, font } = useResponsive();
   const styles = useMemo(
@@ -330,6 +336,7 @@ export default function TaskerCommentsCard({
       onOpenImage={setViewerUri}
       scrollRef={scrollRef}
       compact={compact}
+      revealActionsOnFocus={revealActionsOnFocus}
     />
   );
 
