@@ -46,7 +46,6 @@ import {
   createExclusiveRunner,
   getCommentDiscardedNotice,
   getTaskerClientName,
-  getTaskerStateLabel,
   getTicketGoneNotice,
   getTicketsTitle,
   isTaskInList,
@@ -66,7 +65,7 @@ import type {
 } from "../../../types/typesTasker/TaskerTypes";
 import FollowUpActionsTab from "./FollowUpActionsTab";
 import FollowUpAddressTab from "./FollowUpAddressTab";
-import { FollowUpNotice, SolidLabel, StateChip } from "./FollowUpParts";
+import { FollowUpNotice, StateChip } from "./FollowUpParts";
 import type { TaskStatesCatalog } from "./FollowUpReviewSheets";
 import FollowUpTicketCard from "./FollowUpTicketCard";
 import FollowUpTicketTab from "./FollowUpTicketTab";
@@ -527,9 +526,6 @@ export default function FollowUpView({
   const task = detail?.status === "ready" ? detail.task : null;
   const stateActivities = useMemo(() => (task ? getStateActivities(task.activities) : []), [task]);
   const listTasks = list.status === "ready" ? list.tasks : null;
-  /** Estado del topbar: el del detalle o, mientras carga, el de la tarjeta. */
-  const headerState =
-    task?.state ?? listTasks?.find((item) => item.id === shownId)?.state ?? null;
 
   const renderCard: ListRenderItem<TaskerTaskSummary> = ({ item }) => (
     <FollowUpTicketCard
@@ -622,15 +618,6 @@ export default function FollowUpView({
             <Text style={styles.modalTitle} numberOfLines={1}>
               Ticket #{shownId}
             </Text>
-            {headerState && (
-              <View style={styles.modalState}>
-                <SolidLabel
-                  color={headerState.color}
-                  label={getTaskerStateLabel(headerState)}
-                  styles={styles}
-                />
-              </View>
-            )}
           </View>
 
           {/* ── Pestañas fijas ── */}

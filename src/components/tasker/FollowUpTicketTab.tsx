@@ -39,6 +39,7 @@ import {
   getReviewStateName,
   getStateChangeSuccessTitle,
   getTaskerClientName,
+  getTaskerStateLabel,
   getTaskListProgress,
   getTaskListStateName,
   shouldCloseReviewSheet,
@@ -59,7 +60,7 @@ import type {
   TaskerTaskListItem,
   TaskerTaskState,
 } from "../../../types/typesTasker/TaskerTypes";
-import { FollowUpCardHeader } from "./FollowUpParts";
+import { FollowUpCardHeader, SolidLabel } from "./FollowUpParts";
 import {
   TaskerEvaluationSheet,
   TaskerIncompleteSheet,
@@ -291,23 +292,32 @@ export default function FollowUpTicketTab({
 
   return (
     <>
-      {/* ── Ticket: número y estado ya van en el topbar del modal ── */}
+      {/* ── Ticket: el número va en el topbar; el estado, junto al cliente ── */}
       <View style={styles.card}>
         <View style={styles.clientRow}>
-          <Text style={styles.clientName}>{getTaskerClientName(task.client)}</Text>
-          {task.tags.length > 0 && (
-            <View style={styles.tagChips}>
-              {task.tags.map((tag, index) => {
-                const tone = getTagChipTone(index);
-                return (
-                  <View key={tag.id} style={[styles.tagChip, { backgroundColor: tone.background }]}>
-                    <Text style={[styles.tagChipText, { color: tone.text }]}>{tag.name}</Text>
-                  </View>
-                );
-              })}
-            </View>
-          )}
+          <Text style={styles.clientName} numberOfLines={2}>
+            {getTaskerClientName(task.client)}
+          </Text>
+          <View style={styles.clientState}>
+            <SolidLabel
+              color={task.state.color}
+              label={getTaskerStateLabel(task.state)}
+              styles={styles}
+            />
+          </View>
         </View>
+        {task.tags.length > 0 && (
+          <View style={styles.tagChips}>
+            {task.tags.map((tag, index) => {
+              const tone = getTagChipTone(index);
+              return (
+                <View key={tag.id} style={[styles.tagChip, { backgroundColor: tone.background }]}>
+                  <Text style={[styles.tagChipText, { color: tone.text }]}>{tag.name}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
         {!!task.client?.phone && (
           <View style={styles.phoneRow}>
             <Ionicons name="call-outline" size={14} color={TEXT_MUTED} />

@@ -73,7 +73,7 @@ export function StateChip({
 }
 
 /**
- * Label macizo de las tarjetas de la lista y del topbar del detalle (estado y
+ * Label macizo de las tarjetas de la lista y de la pestaña Ticket (estado y
  * prioridad): fondo con el color de Tasker y texto blanco u oscuro según el
  * contraste.
  */

@@ -270,7 +270,6 @@ export function createFollowUpStyles(
       color: HEADER_TEXT,
       fontVariant: ["tabular-nums"],
     },
-    modalState: { flexShrink: 1, maxWidth: "45%" },
 
     /* ── Chip de estado (colores en línea desde getStateChipColors) ── */
     stateChip: {
@@ -305,12 +304,14 @@ export function createFollowUpStyles(
       justifyContent: "space-between",
       gap: scale(8),
     },
-    clientName: { flexShrink: 1, fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
+    // El nombre ocupa lo que sobra y se corta en 2 líneas: nunca empuja al estado.
+    clientName: { flex: 1, fontSize: font(16), fontWeight: "700", color: TEXT_PRIMARY },
+    clientState: { flexShrink: 0, maxWidth: "45%" },
     tagChips: {
       flexDirection: "row",
       flexWrap: "wrap",
-      justifyContent: "flex-end",
       gap: scale(4),
+      marginTop: verticalScale(6),
     },
     tagChip: {
       paddingHorizontal: scale(10),
