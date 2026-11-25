@@ -4,7 +4,6 @@ import { useEffect, useRef } from "react";
 import { Alert, AppState, StatusBar } from "react-native";
 import { useSchoolStore } from "../../store/useSchoolStore";
 import { refreshSchoolData } from "../../api/authorization";
-import { resolveMobilePath } from "../constants/mobileRoutes";
 import {
   clearSession,
   isTokenExpired,
@@ -17,6 +16,7 @@ import {
   restoreTaskerSession,
 } from "../utils/taskerSession";
 import { toRDDateString } from "../utils/punchRules";
+import { resolveLandingPath } from "../utils/reportJornada";
 import {
   LAST_COMPANY_STORAGE_KEY,
   resolveLastCompany,
@@ -97,7 +97,9 @@ export default function RootLayout() {
         initialLoadDone.current = true;
         const { role } = useSchoolStore.getState();
         console.log("Role from store:", role);
-        router.replace(resolveMobilePath(role?.defaultMenu?.path) as never);
+        // Reportar si la regla de jornada aplica y hay jornada abierta hoy
+        // (tope de 3 s); si no, resolveMobilePath(role.defaultMenu).
+        router.replace((await resolveLandingPath()) as never);
         return;
       }
       console.log("No valid authorization found. Redirecting to login.");

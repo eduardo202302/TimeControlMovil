@@ -6,6 +6,7 @@ import {
   filterFaultActionsForClient,
   filterTaskerMenu,
   getDefaultClientAddressId,
+  getJornadaOnVisit,
   getLocationOnVisit,
   getNearestElsewhereHint,
   getRemovedFaultsNotice,
@@ -26,6 +27,7 @@ import {
   formatReportSentAt,
   hasSharedCoordinatesAcrossClients,
   haversineMeters,
+  isJornadaReadyForReport,
   isTaskerEnabled,
   isTaskerPath,
   parseStoredTaskerClients,
@@ -728,6 +730,91 @@ describe("getReportGate", () => {
     expect(
       getReportGate({ config: config(), clients, location: { status: "refreshing" } }),
     ).toBe("ready");
+  });
+
+  describe("jornada (regla: Reportar solo con jornada abierta hoy)", () => {
+    it("sin jornada → notRequired: todo como antes", () => {
+      expect(getReportGate({ config: config(), clients, location: ok })).toBe("ready");
+      expect(
+        getReportGate({ config: config(), clients, jornada: { status: "notRequired" }, location: pending }),
+      ).toBe("locating");
+    });
+    it("consultando → checkingJornada, antes que la posición", () => {
+      expect(
+        getReportGate({ config: config(), clients, jornada: { status: "checking" }, location: pending }),
+      ).toBe("checkingJornada");
+      expect(
+        getReportGate({ config: config(), clients, jornada: { status: "checking" }, location: failed }),
+      ).toBe("checkingJornada");
+    });
+    it("cerrada → noJornada (después de noClients, antes de locating)", () => {
+      expect(
+        getReportGate({ config: config(), clients, jornada: { status: "closed" }, location: pending }),
+      ).toBe("noJornada");
+      expect(
+        getReportGate({ config: config(), clients, jornada: { status: "closed" }, location: ok }),
+      ).toBe("noJornada");
+      expect(
+        getReportGate({ config: config(), clients: [], jornada: { status: "closed" }, location: ok }),
+      ).toBe("noClients");
+      expect(
+        getReportGate({
+          config: config({ connected: false }),
+          clients,
+          jornada: { status: "closed" },
+          location: ok,
+        }),
+      ).toBe("unavailable");
+    });
+    it("falló la consulta → jornadaError (no deja reportar)", () => {
+      expect(
+        getReportGate({ config: config(), clients, jornada: { status: "failed" }, location: ok }),
+      ).toBe("jornadaError");
+    });
+    it("abierta → sigue con la posición", () => {
+      expect(
+        getReportGate({ config: config(), clients, jornada: { status: "open" }, location: pending }),
+      ).toBe("locating");
+      expect(
+        getReportGate({ config: config(), clients, jornada: { status: "open" }, location: ok }),
+      ).toBe("ready");
+    });
+    it("re-consultando con el formulario abierto → ready (no se desmonta)", () => {
+      expect(
+        getReportGate({
+          config: config(),
+          clients,
+          jornada: { status: "rechecking" },
+          location: { status: "refreshing" },
+        }),
+      ).toBe("ready");
+    });
+  });
+});
+
+describe("getJornadaOnVisit (la jornada se consulta en cada visita)", () => {
+  it("sin la regla → notRequired, venga de donde venga", () => {
+    expect(getJornadaOnVisit({ status: "open" }, false)).toEqual({ status: "notRequired" });
+    expect(getJornadaOnVisit({ status: "closed" }, false)).toEqual({ status: "notRequired" });
+  });
+  it("tras open (o re-consultando) → rechecking", () => {
+    expect(getJornadaOnVisit({ status: "open" }, true)).toEqual({ status: "rechecking" });
+    expect(getJornadaOnVisit({ status: "rechecking" }, true)).toEqual({ status: "rechecking" });
+  });
+  it("cualquier otro → checking", () => {
+    for (const status of ["notRequired", "checking", "closed", "failed"] as const) {
+      expect(getJornadaOnVisit({ status }, true)).toEqual({ status: "checking" });
+    }
+  });
+});
+
+describe("isJornadaReadyForReport (pedir el GPS)", () => {
+  it("solo sin la regla o con la jornada abierta confirmada", () => {
+    expect(isJornadaReadyForReport({ status: "notRequired" })).toBe(true);
+    expect(isJornadaReadyForReport({ status: "open" })).toBe(true);
+    for (const status of ["checking", "rechecking", "closed", "failed"] as const) {
+      expect(isJornadaReadyForReport({ status })).toBe(false);
+    }
   });
 });
 

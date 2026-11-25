@@ -79,6 +79,12 @@ export interface TaskerCommentsCardHandle {
   getOpenDraft: () => TaskerOpenCommentDraft | null;
   /** Lleva el formulario abierto a la vista (sin formulario, nada). */
   revealComposer: () => void;
+  /**
+   * "Atrás" con el formulario abierto: lo cierra como "Cancelar" (con
+   * "¿Descartar cambios?" si cambió; mientras envía, no hace nada). true = había
+   * formulario y el atrás se consumió; false = no había ninguno.
+   */
+  closeComposer: () => boolean;
 }
 
 interface TaskerCommentsCardProps {
@@ -207,24 +213,6 @@ export default function TaskerCommentsCard({
     setOpenTarget(next);
   }, []);
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      getOpenDraft: () => {
-        if (!composer) return null;
-        const initial =
-          composer.mode === "edit"
-            ? taskerCommentDraftFrom(comments.find((c) => c.id === composer.id) ?? null)
-            : EMPTY_DRAFT;
-        return { target: composer, initial, current: draftRef.current ?? initial };
-      },
-      revealComposer: () => {
-        if (composer) void scrollIntoView(scrollRef?.current, composerRef.current);
-      },
-    }),
-    [composer, comments, scrollRef],
-  );
-
   const requestComposer = (next: CommentComposerTarget) => {
     const transition = getCommentComposerTransition(
       composer,
@@ -247,6 +235,29 @@ export default function TaskerCommentsCard({
       );
     }
   };
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getOpenDraft: () => {
+        if (!composer) return null;
+        const initial =
+          composer.mode === "edit"
+            ? taskerCommentDraftFrom(comments.find((c) => c.id === composer.id) ?? null)
+            : EMPTY_DRAFT;
+        return { target: composer, initial, current: draftRef.current ?? initial };
+      },
+      revealComposer: () => {
+        if (composer) void scrollIntoView(scrollRef?.current, composerRef.current);
+      },
+      closeComposer: () => {
+        if (!composer) return false;
+        if (!saving) requestComposer(null);
+        return true;
+      },
+    }),
+    // Sin lista: closeComposer usa requestComposer, que es nuevo en cada render.
+  );
 
   const handleChangedChange = useCallback((changed: boolean) => {
     changedRef.current = changed;

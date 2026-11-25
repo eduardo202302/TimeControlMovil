@@ -23,7 +23,14 @@ import {
   buildTaskrFileUrl,
   canCommentOnTask,
   createExclusiveRunner,
+  formatTaskListProgress,
   getActivityActorName,
+  getSolidLabelColors,
+  getTaskListProgress,
+  formatTicketCardDate,
+  getTicketDue,
+  getTicketsTitle,
+  parseTaskerInstant,
   getClosedTaskNotice,
   getCommentDiscardedNotice,
   getStateActivityTitle,
@@ -43,6 +50,7 @@ import {
   TASKR_TASK_GONE_MESSAGE,
 } from "../taskerFollowUpRules";
 import { getActivityTime, getStateActivities, sortComments } from "../taskerRules";
+import { ON_PRIMARY, TEXT_PLACEHOLDER, TEXT_PRIMARY } from "../../constants/colors";
 import type {
   TaskerAttachment,
   TaskerComment,
@@ -199,13 +207,49 @@ describe("mapTaskrTasks", () => {
       {
         id: 4045,
         createdDate: "2026-10-20T08:15:00",
+        action: "",
         stateId: 3,
         state: { id: 3, name: "Iniciada", color: "#D97706" },
         client: { id: 301, name: "Clínica Las Marías", phone: "8095550100" },
         assignedUser: { id: 22, name: "Jeremy Móvil" },
         priority: { id: 2, name: "Alta", color: "#DC2626" },
+        dueDate: null,
+        province: "",
       },
     ]);
+  });
+  it("vencimiento y provincia (address.province) de la tarjeta, recortados", () => {
+    const [task] = mapTaskrTasks({
+      items: [
+        {
+          ...LIST_ITEM,
+          dueDate: " 2026-11-05T15:07:00.000Z ",
+          address: { province: " Santiago ", city: "Santiago" },
+        },
+      ],
+    }).tasks;
+    expect(task.dueDate).toBe("2026-11-05T15:07:00.000Z");
+    expect(task.province).toBe("Santiago");
+  });
+  it("sin vencimiento, vacío o no texto → null; sin address o sin provincia → ''", () => {
+    const tasks = mapTaskrTasks({
+      items: [
+        { ...LIST_ITEM, id: 1, dueDate: "", address: null },
+        { ...LIST_ITEM, id: 2, dueDate: 123, address: { province: null } },
+        { ...LIST_ITEM, id: 3, dueDate: null, address: "Santiago" },
+      ],
+    }).tasks;
+    expect(tasks.map((t) => t.dueDate)).toEqual([null, null, null]);
+    expect(tasks.map((t) => t.province)).toEqual(["", "", ""]);
+  });
+  it("descripción (action) de la tarjeta: tal cual; ausente o no texto → ''", () => {
+    const { tasks } = mapTaskrTasks({
+      items: [
+        { ...LIST_ITEM, id: 1, action: "No enfría" },
+        { ...LIST_ITEM, id: 2, action: 42 },
+      ],
+    });
+    expect(tasks.map((t) => t.action)).toEqual(["No enfría", ""]);
   });
   it("sin cliente, sin responsable y sin prioridad → null", () => {
     const [task] = mapTaskrTasks({
@@ -254,15 +298,58 @@ describe("mapTaskrTaskDetail", () => {
     expect(task.client?.name).toBe("Clínica Las Marías");
     expect(task.assignedUser?.name).toBe("Jeremy Móvil");
   });
-  it("averías: textos de taskList ordenados por order, sin vacíos", () => {
-    expect(task.faults).toEqual(["Compresor", "Termostato"]);
+  it("averías: taskList ordenada por order, sin vacíos; sin marca → unchecked", () => {
+    expect(task.faults).toEqual([
+      { id: 1, text: "Compresor", order: 1, isChecked: "unchecked", checkedDate: null, isDisabled: false, taskStateId: null, taskState: null },
+      { id: 3, text: "Termostato", order: 2, isChecked: "unchecked", checkedDate: null, isDisabled: false, taskStateId: null, taskState: null },
+    ]);
   });
   it("averías: sin order van al final en su orden; acepta text o name", () => {
     const t = mapTaskrTaskDetail({
       ...DETAIL,
       taskList: [{ name: "B" }, { text: "A", order: 1 }, { name: "C" }],
     }, URL)!;
-    expect(t.faults).toEqual(["A", "B", "C"]);
+    expect(t.faults.map((f) => f.text)).toEqual(["A", "B", "C"]);
+    expect(t.faults.map((f) => f.order)).toEqual([1, null, null]);
+    expect(t.faults.map((f) => f.id)).toEqual([null, null, null]);
+  });
+  it("averías: isDisabled solo con true (título de grupo); cualquier otro valor → false", () => {
+    const t = mapTaskrTaskDetail({
+      ...DETAIL,
+      taskList: [
+        { id: 1, text: "Sala de máquinas", order: 1, isDisabled: true },
+        { id: 2, text: "Compresor", order: 2, isDisabled: false },
+        { id: 3, text: "Termostato", order: 3 },
+        { id: 4, text: "Filtro", order: 4, isDisabled: "true" },
+        { id: 5, text: "Drenaje", order: 5, isDisabled: 1 },
+      ],
+    }, URL)!;
+    expect(t.faults.map((f) => [f.text, f.isDisabled])).toEqual([
+      ["Sala de máquinas", true],
+      ["Compresor", false],
+      ["Termostato", false],
+      ["Filtro", false],
+      ["Drenaje", false],
+    ]);
+  });
+  it("averías: isChecked y checkedDate tal cual; valores raros → unchecked / null", () => {
+    const t = mapTaskrTaskDetail({
+      ...DETAIL,
+      taskList: [
+        { id: 1, text: "A", order: 1, isChecked: "checked", checkedDate: "2026-10-20T09:30:00" },
+        { id: 2, text: "B", order: 2, isChecked: "indeterminate", checkedDate: "2026-10-20T09:40:00" },
+        { id: 3, text: "C", order: 3, isChecked: "unchecked", checkedDate: null },
+        { id: 4, text: "D", order: 4, isChecked: true, checkedDate: "" },
+        { id: 5, text: "E", order: 5, isChecked: "CHECKED", checkedDate: 123 },
+      ],
+    }, URL)!;
+    expect(t.faults.map((f) => [f.isChecked, f.checkedDate])).toEqual([
+      ["checked", "2026-10-20T09:30:00"],
+      ["indeterminate", "2026-10-20T09:40:00"],
+      ["unchecked", null],
+      ["unchecked", null],
+      ["unchecked", null],
+    ]);
   });
   it("dirección: lat/lng numéricos (texto numérico se convierte)", () => {
     expect(task.address).toMatchObject({
@@ -453,7 +540,7 @@ describe("getTaskerCommentAuthorName", () => {
 });
 
 describe("canCommentOnTask", () => {
-  it.each([1, 2, 3, 4, 7, 8])("estado %i → se puede comentar", (stateId) => {
+  it.each([1, 2, 3, 4, 7, 8, 9])("estado %i → se puede comentar", (stateId) => {
     expect(canCommentOnTask(stateId)).toBe(true);
   });
   it.each([5, 6])("estado %i (Completada / Cancelada) → no", (stateId) => {
@@ -574,27 +661,29 @@ describe("createExclusiveRunner", () => {
 describe("buildTaskrCommentBody", () => {
   it("texto recortado + data URIs", () => {
     expect(buildTaskrCommentBody(draft("  hola  ", [file("a", PNG), file("b", PDF)]))).toEqual({
-      taskComments: [{ comment: "hola", images: [PNG, PDF] }],
+      taskComments: [{ comment: "hola", images: [PNG, PDF], taskListId: null }],
     });
   });
   it("solo imágenes → comment '' (siempre presente)", () => {
     const body = buildTaskrCommentBody(draft("   ", [file("a", PNG)]));
     expect(body.taskComments[0]).toHaveProperty("comment", "");
     expect(JSON.parse(JSON.stringify(body))).toEqual({
-      taskComments: [{ comment: "", images: [PNG] }],
+      taskComments: [{ comment: "", images: [PNG], taskListId: null }],
     });
   });
   it("sin adjuntos → images []; descarta lo que no es data URI", () => {
     expect(buildTaskrCommentBody(draft("x", [file("a", "uploads/a.jpg")]))).toEqual({
-      taskComments: [{ comment: "x", images: [] }],
+      taskComments: [{ comment: "x", images: [], taskListId: null }],
     });
   });
 });
 
 describe("serializeTaskrCommentBody (tope de 9.5 MB)", () => {
   const bodyOfBytes = (total: number) => {
-    const empty = JSON.stringify({ taskComments: [{ comment: "", images: [] }] });
-    return { taskComments: [{ comment: "a".repeat(total - empty.length), images: [] }] };
+    const empty = JSON.stringify({ taskComments: [{ comment: "", images: [], taskListId: null }] });
+    return {
+      taskComments: [{ comment: "a".repeat(total - empty.length), images: [], taskListId: null }],
+    };
   };
   it("justo en el tope → se envía", () => {
     const result = serializeTaskrCommentBody(bodyOfBytes(TASKR_TASK_MAX_BYTES));
@@ -682,7 +771,7 @@ describe("fetchTaskerTask", () => {
     const result = await fetchTaskerTask({ ...AUTH, id: 4045 });
     expect(mockedGet.mock.calls[0][0]).toBe(`${URL}/taskr/tasks/4045`);
     expect(mockedGet.mock.calls[0][1].headers).toEqual({ Authorization: `Bearer ${TOKEN}` });
-    expect(result.ok && result.task.faults).toEqual(["Compresor", "Termostato"]);
+    expect(result.ok && result.task.faults.map((f) => f.text)).toEqual(["Compresor", "Termostato"]);
   });
   it("'La tarea ya no está disponible.' → gone", async () => {
     mockedGet.mockResolvedValue({ data: { success: false, message: TASKR_TASK_GONE_MESSAGE } });
@@ -711,7 +800,7 @@ describe("fetchTaskerTask", () => {
 describe("addTaskerTaskComment", () => {
   const body = buildTaskrCommentBody(draft("", [file("a", PNG)]));
 
-  it("PATCH /taskr/tasks/{id} con { taskComments: [{ comment, images }] }", async () => {
+  it("PATCH /taskr/tasks/{id} con { taskComments: [{ comment, images, taskListId: null }] }", async () => {
     mockedPatch.mockResolvedValue({ data: { success: true, data: { id: 4045, comments: [] } } });
     await expect(addTaskerTaskComment({ ...AUTH, id: 4045, body })).resolves.toEqual({
       ok: true,
@@ -719,7 +808,9 @@ describe("addTaskerTaskComment", () => {
     });
     const [url, json, config] = mockedPatch.mock.calls[0];
     expect(url).toBe(`${URL}/taskr/tasks/4045`);
-    expect(JSON.parse(json)).toEqual({ taskComments: [{ comment: "", images: [PNG] }] });
+    expect(JSON.parse(json)).toEqual({
+      taskComments: [{ comment: "", images: [PNG], taskListId: null }],
+    });
     expect(config.headers).toEqual({
       Authorization: `Bearer ${TOKEN}`,
       "Content-Type": "application/json",
@@ -744,7 +835,9 @@ describe("addTaskerTaskComment", () => {
     });
   });
   it("pasa de 9.5 MB → no envía", async () => {
-    const big = { taskComments: [{ comment: "a".repeat(TASKR_TASK_MAX_BYTES), images: [] }] };
+    const big = {
+      taskComments: [{ comment: "a".repeat(TASKR_TASK_MAX_BYTES), images: [], taskListId: null }],
+    };
     await expect(addTaskerTaskComment({ ...AUTH, id: 4045, body: big })).resolves.toEqual({
       ok: false,
       message: TASKER_ATTACHMENTS_TOO_LARGE_ERROR,
@@ -793,5 +886,124 @@ describe("resolveRequestedTicket (selección inicial de Seguimiento)", () => {
   });
   it("lista vacía → null", () => {
     expect(resolveRequestedTicket([], 482)).toBeNull();
+  });
+});
+
+describe("getTaskListProgress (avance de las acciones)", () => {
+  const item = (isChecked: "checked" | "unchecked" | "indeterminate", isDisabled = false) => ({
+    isChecked,
+    isDisabled,
+  });
+  it("checked e indeterminate cuentan como hechas; % redondeado", () => {
+    const progress = getTaskListProgress([item("checked"), item("indeterminate"), item("unchecked")]);
+    expect(progress).toEqual({ done: 2, total: 3, pct: 67 });
+    expect(formatTaskListProgress(progress)).toBe("2 de 3 · 67%");
+  });
+  it("todas hechas → 100 %; ninguna → 0 %", () => {
+    expect(getTaskListProgress([item("checked"), item("checked")])).toEqual({ done: 2, total: 2, pct: 100 });
+    expect(getTaskListProgress([item("unchecked")])).toEqual({ done: 0, total: 1, pct: 0 });
+  });
+  it("sin títulos de grupo: cuentan todas las filas", () => {
+    expect(
+      getTaskListProgress([item("checked"), item("unchecked"), item("unchecked"), item("indeterminate")]),
+    ).toEqual({ done: 2, total: 4, pct: 50 });
+  });
+  it("títulos de grupo (isDisabled) fuera de X y de N, aunque vengan marcados", () => {
+    const progress = getTaskListProgress([
+      item("unchecked", true),
+      item("checked"),
+      item("unchecked"),
+      item("checked", true),
+      item("indeterminate"),
+    ]);
+    expect(progress).toEqual({ done: 2, total: 3, pct: 67 });
+    expect(formatTaskListProgress(progress)).toBe("2 de 3 · 67%");
+  });
+  it("solo títulos → 0 de 0 (la barra no se muestra)", () => {
+    expect(getTaskListProgress([item("unchecked", true), item("checked", true)])).toEqual({
+      done: 0,
+      total: 0,
+      pct: 0,
+    });
+  });
+  it("sin acciones → 0 de 0, sin dividir por cero", () => {
+    expect(getTaskListProgress([])).toEqual({ done: 0, total: 0, pct: 0 });
+    expect(formatTaskListProgress(getTaskListProgress([]))).toBe("0 de 0 · 0%");
+  });
+});
+
+describe("getSolidLabelColors (estado y prioridad de la tarjeta)", () => {
+  it("fondo = color de Tasker; texto blanco sobre fondos oscuros", () => {
+    expect(getSolidLabelColors("#1D4ED8")).toEqual({ background: "#1D4ED8", text: ON_PRIMARY });
+    expect(getSolidLabelColors("#DC2626")).toEqual({ background: "#DC2626", text: ON_PRIMARY });
+  });
+  it("texto oscuro sobre fondos claros (también #RGB)", () => {
+    expect(getSolidLabelColors("#FDE68A")).toEqual({ background: "#FDE68A", text: TEXT_PRIMARY });
+    expect(getSolidLabelColors("#fff").text).toBe(TEXT_PRIMARY);
+  });
+  it("color ausente o mal formado → gris de respaldo", () => {
+    for (const bad of [null, undefined, "", "red", "#12345"]) {
+      expect(getSolidLabelColors(bad).background).toBe(TEXT_PLACEHOLDER);
+    }
+  });
+});
+
+describe("getTicketsTitle", () => {
+  it("encabezado de la lista con la cantidad", () => {
+    expect(getTicketsTitle(0)).toBe("Tickets (0)");
+    expect(getTicketsTitle(12)).toBe("Tickets (12)");
+  });
+});
+
+describe("parseTaskerInstant", () => {
+  it("sin zona = hora RD (UTC-4)", () => {
+    expect(parseTaskerInstant("2026-11-05 15:07:00")).toBe(Date.UTC(2026, 10, 5, 19, 7, 0));
+    expect(parseTaskerInstant("2026-11-05T15:07")).toBe(Date.UTC(2026, 10, 5, 19, 7, 0));
+    expect(parseTaskerInstant("2026-11-05T22:30:15.250")).toBe(Date.UTC(2026, 10, 6, 2, 30, 15));
+  });
+  it("con zona se respeta", () => {
+    expect(parseTaskerInstant("2026-11-05T19:07:00.000Z")).toBe(Date.UTC(2026, 10, 5, 19, 7, 0));
+    expect(parseTaskerInstant("2026-11-05T15:07:00-04:00")).toBe(Date.UTC(2026, 10, 5, 19, 7, 0));
+  });
+  it("vacía, nula, solo fecha o basura → null", () => {
+    for (const bad of [null, undefined, "", "  ", "2026-11-05", "mañana", "2026-13-45T99:99Z"]) {
+      expect(parseTaskerInstant(bad)).toBeNull();
+    }
+  });
+});
+
+describe("formatTicketCardDate (D/M/YY h:mm A en hora RD)", () => {
+  it("texto sin zona: tal cual (ya es hora RD)", () => {
+    expect(formatTicketCardDate("2026-11-05 15:07:00")).toBe("5/11/26 3:07 PM");
+    expect(formatTicketCardDate("2026-01-09T00:05:00")).toBe("9/1/26 12:05 AM");
+    expect(formatTicketCardDate("2026-12-31T12:00:00")).toBe("31/12/26 12:00 PM");
+  });
+  it("con zona: se pasa a RD", () => {
+    expect(formatTicketCardDate("2026-11-05T02:30:00.000Z")).toBe("4/11/26 10:30 PM");
+  });
+  it("inválida → ''", () => {
+    expect(formatTicketCardDate(null)).toBe("");
+    expect(formatTicketCardDate("x")).toBe("");
+  });
+});
+
+describe("getTicketDue (pie \"Vence:\" de la tarjeta)", () => {
+  const due = "2026-11-05 15:07:00"; // 19:07 UTC
+  it("antes del vencimiento → no vencida", () => {
+    expect(getTicketDue(due, Date.UTC(2026, 10, 5, 19, 6, 59))).toEqual({
+      text: "5/11/26 3:07 PM",
+      expired: false,
+    });
+  });
+  it("justo en el vencimiento → todavía no (isAfter estricto)", () => {
+    expect(getTicketDue(due, Date.UTC(2026, 10, 5, 19, 7, 0))!.expired).toBe(false);
+  });
+  it("pasado el vencimiento → vencida", () => {
+    expect(getTicketDue(due, Date.UTC(2026, 10, 5, 19, 7, 1))!.expired).toBe(true);
+  });
+  it("sin vencimiento o ilegible → null (la tarjeta muestra la creación)", () => {
+    expect(getTicketDue(null, 0)).toBeNull();
+    expect(getTicketDue("", 0)).toBeNull();
+    expect(getTicketDue("pronto", 0)).toBeNull();
   });
 });

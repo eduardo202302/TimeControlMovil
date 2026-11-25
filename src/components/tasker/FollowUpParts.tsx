@@ -17,7 +17,7 @@ import {
 import { useResponsive } from "@/constants/responsive";
 import SectionIcon from "@/components/ui/SectionIcon";
 import { getStateChipColors } from "../../utils/taskerRules";
-import { getTaskerStateLabel } from "../../utils/taskerFollowUpRules";
+import { getSolidLabelColors, getTaskerStateLabel } from "../../utils/taskerFollowUpRules";
 import type { TaskerState } from "../../../types/typesTasker/TaskerTypes";
 import type { FollowUpStyles } from "./followUpStyles";
 import { taskerTitleMetrics } from "./taskerCompact";
@@ -72,6 +72,30 @@ export function StateChip({
   );
 }
 
+/**
+ * Label macizo de las tarjetas de la lista y del topbar del detalle (estado y
+ * prioridad): fondo con el color de Tasker y texto blanco u oscuro según el
+ * contraste.
+ */
+export function SolidLabel({
+  color,
+  label,
+  styles,
+}: {
+  color: string | null | undefined;
+  label: string;
+  styles: FollowUpStyles;
+}) {
+  const { background, text } = getSolidLabelColors(color);
+  return (
+    <View style={[styles.solidLabel, { backgroundColor: background }]}>
+      <Text style={[styles.solidLabelText, { color: text }]} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 interface NoticeProps {
   styles: FollowUpStyles;
   message: string;
@@ -82,7 +106,7 @@ interface NoticeProps {
   action?: { label: string; onPress: () => void };
 }
 
-/** Tarjeta de estado dentro de una pestaña: cargando, vacío, error o "selecciona un ticket". */
+/** Tarjeta de estado (lista o pestaña del detalle): cargando, vacío o error. */
 export function FollowUpNotice({
   styles,
   message,

@@ -214,11 +214,70 @@ export interface TaskerPriority {
 export interface TaskerTaskSummary {
   id: number;
   createdDate: string;
+  /** Descripción de la avería ("" si no viene). */
+  action: string;
   stateId: number;
   state: TaskerState;
   client: TaskerClient | null;
   assignedUser: TaskerUserRef | null;
   priority: TaskerPriority | null;
+  /** Vencimiento (texto de Taskr); null si no viene. */
+  dueDate: string | null;
+  /** address.province de la tarea ("" si no viene). */
+  province: string;
+}
+
+/** Marca de una acción en Tasker: hecha, pendiente o marcada en rojo. */
+export type TaskerCheckState = "checked" | "unchecked" | "indeterminate";
+
+/**
+ * Evaluación de una acción tal como viene en taskList[].taskState. Taskr trae
+ * más campos; la fila solo muestra el nombre.
+ */
+export interface TaskerTaskListState {
+  id: number;
+  name: string;
+}
+
+/**
+ * Elemento de taskList[] del detalle. La app no marca (isChecked es del
+ * técnico); en Revisión sí evalúa (taskStateId). Taskr trae más campos
+ * (userId, priority…); se ignoran.
+ */
+export interface TaskerTaskListItem {
+  /** null si Taskr no trae un id numérico. */
+  id: number | null;
+  text: string;
+  order: number | null;
+  /** Valor desconocido o ausente → "unchecked". */
+  isChecked: TaskerCheckState;
+  /** Cuándo se marcó; null si no viene. */
+  checkedDate: string | null;
+  /**
+   * Título de grupo, no una acción: sin marca ni fecha y fuera del progreso
+   * (etaskr-mobile Tabs/Actions.js:165 y constants/Utils.js:475). Solo
+   * `true` cuenta; cualquier otro valor → false.
+   */
+  isDisabled: boolean;
+  /** Evaluación elegida (GET /taskr/taskStates); null = sin evaluar. */
+  taskStateId: number | null;
+  /** Lo que trae Taskr de esa evaluación; null si no viene con nombre. */
+  taskState: TaskerTaskListState | null;
+}
+
+/**
+ * Opción de evaluación de una acción (GET /taskr/taskStates, por compañía).
+ * Las tres banderas solo valen con `true`.
+ */
+export interface TaskerTaskState {
+  id: number;
+  name: string;
+  /** Pide comentario o imagen para guardar. */
+  requiresComment: boolean;
+  /** Al guardar se envía startDate = ahora. */
+  requiresDate: boolean;
+  /** Muestra el bloque "Imágenes"; sin él no se envían adjuntos. */
+  suggestImage: boolean;
 }
 
 /** Detalle de GET /taskr/tasks/{id} (Seguimiento). */
@@ -238,8 +297,8 @@ export interface TaskerTask {
   priority: TaskerPriority | null;
   tags: TaskerTag[];
   address: TaskerAddress | null;
-  /** Textos de taskList[], ya ordenados por `order`. */
-  faults: string[];
+  /** taskList[] (acciones/averías), ya ordenadas por `order`. */
+  faults: TaskerTaskListItem[];
   comments: TaskerComment[];
   activities: TaskerActivity[];
 }
@@ -326,12 +385,37 @@ export interface TaskrTaskBody {
   coordinates?: TaskrTaskCoordinate[];
 }
 
-/** Cuerpo de PATCH /taskr/tasks/{id} para agregar un comentario (buildTaskrCommentBody). */
-export interface TaskrCommentBody {
-  taskComments: {
-    /** Siempre presente ("" si solo trae adjuntos). */
-    comment: string;
-    /** Data URIs completos ("data:<mime>;base64,…"). */
-    images: string[];
-  }[];
+/** Estados de la tarea que la app puede poner desde Revisión: Completada (5) e Incompleta (9). */
+export type TaskerReviewStateId = 5 | 9;
+
+/** Comentario del PATCH /taskr/tasks/{id}. */
+export interface TaskrPatchComment {
+  /** Siempre presente ("" si solo trae adjuntos). */
+  comment: string;
+  /** Data URIs completos ("data:<mime>;base64,…"). */
+  images: string[];
+  /** Acción evaluada; null en los comentarios normales y de cambio de estado. */
+  taskListId: number | null;
 }
+
+/** Evaluación de una acción en el PATCH. */
+export interface TaskrPatchListItem {
+  id: number;
+  taskStateId: number;
+  /** Solo si el taskState tiene requiresDate: "YYYY-MM-DD HH:mm:ss" (hora RD). */
+  startDate?: string;
+}
+
+/**
+ * Cuerpo de PATCH /taskr/tasks/{id} (patchTaskerTask): comentarios,
+ * evaluaciones y/o cambio de estado. `stateId` siempre número (5 o 9).
+ */
+export interface TaskrPatchBody {
+  list?: TaskrPatchListItem[];
+  stateId?: TaskerReviewStateId;
+  taskComments: TaskrPatchComment[];
+  taskCommentsD?: number[];
+}
+
+/** Cuerpo de PATCH /taskr/tasks/{id} para agregar un comentario (buildTaskrCommentBody). */
+export type TaskrCommentBody = Pick<TaskrPatchBody, "taskComments">;

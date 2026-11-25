@@ -4,52 +4,77 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Alert,
   AppState,
+  FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   RefreshControl,
   ScrollView,
+  StatusBar,
   Text,
   TouchableOpacity,
   View,
+  type ListRenderItem,
 } from "react-native";
-import { ON_PRIMARY, PRIMARY_COLOR, TEXT_MUTED } from "@/constants/colors";
+import { HEADER_TEXT, ON_PRIMARY, PRIMARY_COLOR, TEXT_MUTED } from "@/constants/colors";
 import { useResponsive } from "@/constants/responsive";
-import { getStateActivities, type CommentOrder } from "../../utils/taskerRules";
+import { useSchoolStore } from "../../../store/useSchoolStore";
+import {
+  getStateActivities,
+  getTaskerClientLabel,
+  type CommentOrder,
+} from "../../utils/taskerRules";
 import {
   addTaskerTaskComment,
+  buildEvaluationBody,
+  buildStateChangeBody,
   buildTaskrCommentBody,
+  fetchTaskerStates,
   fetchTaskerTask,
   fetchTaskerTasks,
+  fetchTaskerTaskStates,
+  patchTaskerTask,
   TASKER_COMMENT_SEND_ERROR,
+  TASKER_EVALUATION_SEND_ERROR,
+  TASKER_STATE_CHANGE_ERROR,
   TASKER_TASK_ERROR,
+  TASKER_TASK_STATES_ERROR,
   TASKER_TASKS_ERROR,
+  type PatchTaskerTaskResult,
   type TaskrFailure,
 } from "../../utils/taskerApi";
 import {
   createExclusiveRunner,
   getCommentDiscardedNotice,
   getTaskerClientName,
+  getTaskerStateLabel,
   getTicketGoneNotice,
+  getTicketsTitle,
   isTaskInList,
   resolveRequestedTicket,
   SEGUIMIENTO_REFRESH_MS,
   shouldDiscardOpenComment,
   TASKER_NO_TICKETS_MESSAGE,
-  TASKER_SELECT_TICKET_MESSAGE,
 } from "../../utils/taskerFollowUpRules";
 import type {
   TaskerCommentDraft,
+  TaskerReviewStateId,
+  TaskerState,
   TaskerTask,
+  TaskerTaskState,
   TaskerTaskSummary,
+  TaskrPatchBody,
 } from "../../../types/typesTasker/TaskerTypes";
 import FollowUpActionsTab from "./FollowUpActionsTab";
 import FollowUpAddressTab from "./FollowUpAddressTab";
-import { FollowUpNotice, StateChip } from "./FollowUpParts";
-import FollowUpTicketPicker from "./FollowUpTicketPicker";
+import { FollowUpNotice, SolidLabel, StateChip } from "./FollowUpParts";
+import type { TaskStatesCatalog } from "./FollowUpReviewSheets";
+import FollowUpTicketCard from "./FollowUpTicketCard";
 import FollowUpTicketTab from "./FollowUpTicketTab";
 import { createFollowUpStyles } from "./followUpStyles";
 import { getTaskerCredentials } from "./taskerCredentials";
 import type { TaskerCommentsCardHandle } from "./TaskerCommentsCard";
+import { useNowMs } from "./useNowMs";
 
 type FollowUpTab = "ticket" | "address" | "actions";
 
@@ -76,10 +101,21 @@ type DetailState =
  */
 type LoadMode = "initial" | "pull" | "silent";
 
-/** "stale": mientras llegaba se eligió otro ticket (o ninguno). */
+/** "stale": mientras llegaba se abrió otro ticket (o se cerró el modal). */
 type DetailLoad = "ok" | "gone" | "error" | "stale";
 
 const noSession = (message: string): TaskrFailure => ({ ok: false, message, gone: false });
+
+/** Evaluaciones (GET /taskr/taskStates) como estado de la hoja. Nunca lanza. */
+async function requestTaskStates(): Promise<TaskStatesCatalog> {
+  const credentials = await getTaskerCredentials();
+  const result = credentials
+    ? await fetchTaskerTaskStates(credentials)
+    : noSession(TASKER_TASK_STATES_ERROR);
+  return result.ok
+    ? { status: "ready", taskStates: result.taskStates }
+    : { status: "error", message: result.message };
+}
 
 interface FollowUpViewProps {
   /**
@@ -92,13 +128,13 @@ interface FollowUpViewProps {
 }
 
 /**
- * Seguimiento de los tickets de Tasker. La lista se carga al entrar y no se
- * elige ninguno (salvo `requestedTicketId`, si está en la lista: se elige, se
- * pide su detalle y su tarjeta se lleva a la vista); al tocar una tarjeta se
- * pide su detalle. Mientras la
- * pantalla tiene el foco y la app está en primer plano, lista y detalle se
- * recargan solos cada SEGUIMIENTO_REFRESH_MS, sin indicador y sin tocar el
- * formulario de comentario abierto (salvo que el ticket se cierre).
+ * Seguimiento de los tickets de Tasker: lista vertical de tarjetas y, al
+ * tocar una, su detalle en un modal a pantalla completa (pestañas Ticket /
+ * Dirección / Acciones). `requestedTicketId`, si está en la lista, abre su
+ * modal al cargar. Mientras la pantalla tiene el foco y la app está en primer
+ * plano, lista y detalle abierto se recargan solos cada
+ * SEGUIMIENTO_REFRESH_MS, sin indicador y sin tocar el formulario de
+ * comentario abierto (salvo que el ticket se cierre).
  */
 export default function FollowUpView({
   requestedTicketId = null,
@@ -119,6 +155,7 @@ export default function FollowUpView({
   const [commentsResetKey, setCommentsResetKey] = useState(0);
 
   const [list, setList] = useState<ListState>({ status: "loading" });
+  /** Ticket abierto en el modal; null = modal cerrado. */
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<DetailState | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -132,9 +169,6 @@ export default function FollowUpView({
   const [runExclusive] = useState(createExclusiveRunner);
   /** Ticket pedido que espera a la próxima lista cargada con éxito. */
   const pendingTicketRef = useRef<number | null>(null);
-  /** Tarjeta a llevar a la vista en la fila de tickets (solo la pedida). */
-  const [revealId, setRevealId] = useState<number | null>(null);
-  const clearReveal = useCallback(() => setRevealId(null), []);
 
   const updateList = useCallback((next: ListState) => {
     listRef.current = next;
@@ -146,16 +180,24 @@ export default function FollowUpView({
     setDetail(next);
   }, []);
 
-  /** Sin ticket elegido, Dirección y Acciones se bloquean: se vuelve a Ticket. */
+  /** Abre (id) o cierra (null) el modal. Cada ticket abierto arranca en Ticket. */
   const updateSelection = useCallback(
     (id: number | null, nextDetail: DetailState | null) => {
+      if (id !== null && id !== selectedIdRef.current) setTab("ticket");
       selectedIdRef.current = id;
       setSelectedId(id);
       updateDetail(nextDetail);
-      if (id === null) setTab("ticket");
     },
     [updateDetail],
   );
+
+  /**
+   * Cierra el modal. El detalle se conserva para que la animación de salida
+   * no muestre "Cargando…"; el próximo ticket que se abra lo reemplaza.
+   */
+  const closeDetail = useCallback(() => {
+    updateSelection(null, detailRef.current);
+  }, [updateSelection]);
 
   /** Detalle nuevo. Si el ticket acaba de cerrarse con un comentario a medio escribir, lo descarta y avisa. */
   const applyTask = useCallback(
@@ -201,24 +243,23 @@ export default function FollowUpView({
       if (target !== null) {
         if (target !== selectedIdRef.current) updateSelection(target, { status: "loading" });
         setTab("ticket");
-        setRevealId(target);
         return true;
       }
       const id = selectedIdRef.current;
       if (id !== null && !isTaskInList(result.tasks, id)) {
-        updateSelection(null, null);
+        closeDetail();
         Alert.alert("Ticket no disponible", getTicketGoneNotice(id));
         return false;
       }
       return true;
     },
-    [updateList, updateSelection],
+    [updateList, updateSelection, closeDetail],
   );
 
   /**
    * Detalle del ticket `id`. Sin `silent` muestra el indicador y, si falla,
    * el error con "Reintentar". "La tarea ya no está disponible." → avisa y
-   * deselecciona (quien llama recarga la lista).
+   * cierra el modal (quien llama recarga la lista).
    */
   const loadDetail = useCallback(
     async (id: number, silent: boolean): Promise<DetailLoad> => {
@@ -233,17 +274,17 @@ export default function FollowUpView({
         return "ok";
       }
       if (result.gone) {
-        updateSelection(null, null);
+        closeDetail();
         Alert.alert("Ticket no disponible", result.message);
         return "gone";
       }
       if (!silent) updateDetail({ status: "error", message: result.message });
       return "error";
     },
-    [applyTask, updateDetail, updateSelection],
+    [applyTask, updateDetail, closeDetail],
   );
 
-  /** Lista y, si el elegido sigue en ella, su detalle (sin indicador). */
+  /** Lista y, si el abierto sigue en ella, su detalle (sin indicador). */
   const reloadAll = useCallback(
     async (mode: LoadMode) => {
       const keepsSelection = await loadList(mode);
@@ -305,7 +346,7 @@ export default function FollowUpView({
         : noSession(TASKER_COMMENT_SEND_ERROR);
       if (!result.ok) {
         if (result.gone) {
-          if (selectedIdRef.current === id) updateSelection(null, null);
+          if (selectedIdRef.current === id) closeDetail();
           Alert.alert("Ticket no disponible", result.message);
           reloadListAfterGone();
         } else {
@@ -318,18 +359,92 @@ export default function FollowUpView({
       if ((await loadDetail(id, true)) === "gone") reloadListAfterGone();
       return true;
     },
-    [loadDetail, updateSelection, reloadListAfterGone],
+    [loadDetail, closeDetail, reloadListAfterGone],
+  );
+
+  // ── Revisión: catálogos (una vez por pantalla), evaluación y cambio de estado ──
+  const [taskStates, setTaskStates] = useState<TaskStatesCatalog>({ status: "loading" });
+  /** GET /taskr/states: solo nombres de Completada / Incompleta; si falla, los de respaldo. */
+  const [states, setStates] = useState<TaskerState[]>([]);
+
+  useEffect(() => {
+    void requestTaskStates().then(setTaskStates);
+    void (async () => {
+      const credentials = await getTaskerCredentials();
+      const result = credentials ? await fetchTaskerStates(credentials) : null;
+      if (result?.ok) setStates(result.states);
+    })();
+  }, []);
+
+  const retryTaskStates = useCallback(() => {
+    setTaskStates({ status: "loading" });
+    void requestTaskStates().then(setTaskStates);
+  }, []);
+
+  /**
+   * PATCH del ticket abierto y, si sale bien, el detalle completo (la
+   * respuesta no trae activities). "Ticket no disponible": avisa, cierra el
+   * modal y recarga la lista, como los comentarios. El resto lo muestra quien llama.
+   */
+  const sendReviewPatch = useCallback(
+    async (body: TaskrPatchBody, errorMessage: string): Promise<PatchTaskerTaskResult> => {
+      const id = selectedIdRef.current;
+      if (id === null) return { ok: false, message: errorMessage, gone: false };
+      const credentials = await getTaskerCredentials();
+      const result = credentials
+        ? await patchTaskerTask({ ...credentials, id, body, errorMessage })
+        : noSession(errorMessage);
+      if (!result.ok) {
+        if (result.gone) {
+          if (selectedIdRef.current === id) closeDetail();
+          Alert.alert("Ticket no disponible", result.message);
+          reloadListAfterGone();
+        }
+        return result;
+      }
+      if ((await loadDetail(id, true)) === "gone") reloadListAfterGone();
+      return result;
+    },
+    [loadDetail, closeDetail, reloadListAfterGone],
+  );
+
+  const handleEvaluate = useCallback(
+    (
+      item: { id: number; text: string },
+      taskState: TaskerTaskState,
+      comment: string,
+      images: string[],
+    ) =>
+      sendReviewPatch(
+        buildEvaluationBody(item, taskState, comment, images, new Date()),
+        TASKER_EVALUATION_SEND_ERROR,
+      ),
+    [sendReviewPatch],
+  );
+
+  const handleChangeState = useCallback(
+    async (stateId: TaskerReviewStateId, comment?: string): Promise<PatchTaskerTaskResult> => {
+      const built = buildStateChangeBody(stateId, comment);
+      if (!built.ok) return { ok: false, message: built.message, gone: false };
+      return sendReviewPatch(built.body, TASKER_STATE_CHANGE_ERROR);
+    },
+    [sendReviewPatch],
   );
 
   // ── Actualización automática: solo con foco y en primer plano ──
   const [focused, setFocused] = useState(false);
   const [appActive, setAppActive] = useState(() => AppState.currentState !== "background");
 
+  // Al perder el foco (otra pantalla) se cierra el modal: un Modal nativo
+  // abierto quedaría encima de la pantalla nueva.
   useFocusEffect(
     useCallback(() => {
       setFocused(true);
-      return () => setFocused(false);
-    }, []),
+      return () => {
+        setFocused(false);
+        closeDetail();
+      };
+    }, [closeDetail]),
   );
 
   useEffect(() => {
@@ -367,35 +482,43 @@ export default function FollowUpView({
     return () => clearInterval(timer);
   }, [live, runExclusive, reloadAll]);
 
+  /**
+   * "Atrás" (flecha o botón de Android): con el formulario de comentario
+   * abierto, lo cierra primero; si no, cierra el modal. Las hojas de
+   * evaluación e Incompleta son Modals propios: el atrás les llega a ellas.
+   */
+  const handleBack = useCallback(() => {
+    if (commentsCardRef.current?.closeComposer()) return;
+    closeDetail();
+  }, [closeDetail]);
+
+  const clientLabel = useSchoolStore((state) => getTaskerClientLabel(state.taskerConfig));
+  /** Para "Vence:" en rojo: se pone al día cada minuto (como Home.js). */
+  const nowMs = useNowMs(live, 60_000);
+
+  // Título del modal: el último ticket abierto, también durante la animación de salida.
+  const [shownId, setShownId] = useState<number | null>(null);
+  if (selectedId !== null && selectedId !== shownId) setShownId(selectedId);
+
   const task = detail?.status === "ready" ? detail.task : null;
   const stateActivities = useMemo(() => (task ? getStateActivities(task.activities) : []), [task]);
+  const listTasks = list.status === "ready" ? list.tasks : null;
+  /** Estado del topbar: el del detalle o, mientras carga, el de la tarjeta. */
+  const headerState =
+    task?.state ?? listTasks?.find((item) => item.id === shownId)?.state ?? null;
 
-  /** Sin detalle a la vista: elegir (solo en Ticket), cargando o error con "Reintentar". */
-  const renderDetailPlaceholder = () => {
-    if (selectedId === null) {
-      return (
-        <FollowUpNotice
-          styles={styles}
-          icon="hand-left-outline"
-          message={TASKER_SELECT_TICKET_MESSAGE}
-        />
-      );
-    }
-    if (detail?.status === "error") {
-      return (
-        <FollowUpNotice
-          styles={styles}
-          tone="red"
-          icon="alert-circle-outline"
-          message={detail.message}
-          action={{ label: "Reintentar", onPress: retryDetail }}
-        />
-      );
-    }
-    return <FollowUpNotice styles={styles} loading message="Cargando ticket…" />;
-  };
+  const renderCard: ListRenderItem<TaskerTaskSummary> = ({ item }) => (
+    <FollowUpTicketCard
+      task={item}
+      clientLabel={clientLabel}
+      nowMs={nowMs}
+      onPress={handleSelect}
+      styles={styles}
+    />
+  );
 
-  const renderTicketTab = () => {
+  /** Lista sin tarjetas: cargando, error con "Reintentar" o vacía. */
+  const renderListEmpty = () => {
     if (list.status === "loading") {
       return <FollowUpNotice styles={styles} loading message="Cargando tickets…" />;
     }
@@ -410,134 +533,193 @@ export default function FollowUpView({
         />
       );
     }
-    if (list.tasks.length === 0) {
+    return (
+      <FollowUpNotice styles={styles} icon="file-tray-outline" message={TASKER_NO_TICKETS_MESSAGE} />
+    );
+  };
+
+  /** Detalle sin cargar: indicador o error con "Reintentar". */
+  const renderDetailPlaceholder = () => {
+    if (detail?.status === "error") {
       return (
-        <FollowUpNotice styles={styles} icon="file-tray-outline" message={TASKER_NO_TICKETS_MESSAGE} />
+        <FollowUpNotice
+          styles={styles}
+          tone="red"
+          icon="alert-circle-outline"
+          message={detail.message}
+          action={{ label: "Reintentar", onPress: retryDetail }}
+        />
       );
     }
-    return (
-      <>
-        <FollowUpTicketPicker
-          tasks={list.tasks}
-          selectedId={selectedId}
-          onSelect={handleSelect}
-          styles={styles}
-          revealId={revealId}
-          onRevealed={clearReveal}
-        />
-        {task ? (
-          <FollowUpTicketTab
-            key={task.id}
-            task={task}
-            styles={styles}
-            live={live}
-            commentOrder={commentOrder}
-            onCommentOrderChange={setCommentOrder}
-            onAddComment={handleAddComment}
-            commentsCardRef={commentsCardRef}
-            commentsResetKey={commentsResetKey}
-            scrollRef={scrollRef}
-          />
-        ) : (
-          renderDetailPlaceholder()
-        )}
-      </>
-    );
+    return <FollowUpNotice styles={styles} loading message="Cargando ticket…" />;
   };
 
   return (
     <View style={styles.screen}>
-      {/* ── Pestañas fijas ── */}
-      <View style={[styles.tabsWrap, isTablet && styles.contentTablet]}>
-        <View style={styles.segmented}>
-          {TABS.map(({ key, label, icon }) => {
-            const active = tab === key;
-            // Dirección y Acciones necesitan un ticket elegido; Ticket, nunca bloqueada.
-            const disabled = key !== "ticket" && selectedId === null;
-            return (
-              <TouchableOpacity
-                key={key}
-                style={[
-                  styles.segment,
-                  active && styles.segmentActive,
-                  disabled && styles.segmentDisabled,
-                ]}
-                onPress={() => setTab(key)}
-                disabled={disabled}
-                activeOpacity={0.8}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active, disabled }}
-              >
-                <Ionicons name={icon} size={16} color={active ? ON_PRIMARY : TEXT_MUTED} />
-                <Text style={[styles.segmentText, active && styles.segmentTextActive]}>
-                  {label}
-                </Text>
-                {key === "actions" && task && (
-                  <View style={[styles.segmentBadge, active && styles.segmentBadgeActive]}>
-                    <Text
-                      style={[styles.segmentBadgeText, active && styles.segmentBadgeTextActive]}
-                    >
-                      {stateActivities.length}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
+      <FlatList
+        data={listTasks ?? []}
+        extraData={nowMs}
+        renderItem={renderCard}
+        keyExtractor={(item) => String(item.id)}
+        contentContainerStyle={[styles.listContent, isTablet && styles.contentTablet]}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          listTasks && listTasks.length > 0 ? (
+            <Text style={styles.listTitle} accessibilityRole="header">
+              {getTicketsTitle(listTasks.length)}
+            </Text>
+          ) : null
+        }
+        ListEmptyComponent={renderListEmpty()}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handlePull}
+            colors={[PRIMARY_COLOR]}
+            tintColor={PRIMARY_COLOR}
+          />
+        }
+      />
 
-      {/* Mismo criterio que ReportFaultForm: en iOS el teclado achica el área de scroll. */}
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        {/* key = pestaña: cada una arranca desde arriba. Las recargas no la remontan. */}
-        <ScrollView
-          key={tab}
-          ref={scrollRef}
-          style={styles.flex}
-          contentContainerStyle={[styles.content, isTablet && styles.contentTablet]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handlePull}
-              colors={[PRIMARY_COLOR]}
-              tintColor={PRIMARY_COLOR}
-            />
-          }
-        >
-          {tab === "ticket" && renderTicketTab()}
-
-          {tab !== "ticket" && !task && renderDetailPlaceholder()}
-
-          {tab !== "ticket" && task && (
-            <>
-              <View style={styles.strip}>
-                <View style={styles.stripBody}>
-                  <Text style={styles.stripTitle}>Ticket #{task.id}</Text>
-                  <Text style={styles.stripClient} numberOfLines={1}>
-                    {getTaskerClientName(task.client)}
-                  </Text>
-                </View>
-                <StateChip state={task.state} styles={styles} />
-              </View>
-              {tab === "address" && <FollowUpAddressTab address={task.address} styles={styles} />}
-              {tab === "actions" && (
-                <FollowUpActionsTab
-                  activities={stateActivities}
-                  stateId={task.stateId}
-                  owner={task}
-                  live={live}
+      <Modal visible={selectedId !== null} animationType="slide" onRequestClose={handleBack}>
+        {/* TopBar navy: íconos claros mientras está abierto. */}
+        <StatusBar barStyle="light-content" />
+        <View style={styles.screen}>
+          <View style={styles.modalTopBar}>
+            <TouchableOpacity
+              style={styles.modalBackBtn}
+              onPress={handleBack}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Volver a la lista"
+            >
+              <Ionicons name="arrow-back" size={22} color={HEADER_TEXT} />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle} numberOfLines={1}>
+              Ticket #{shownId}
+            </Text>
+            {headerState && (
+              <View style={styles.modalState}>
+                <SolidLabel
+                  color={headerState.color}
+                  label={getTaskerStateLabel(headerState)}
                   styles={styles}
                 />
+              </View>
+            )}
+          </View>
+
+          {/* ── Pestañas fijas ── */}
+          <View style={[styles.tabsWrap, isTablet && styles.contentTablet]}>
+            <View style={styles.segmented}>
+              {TABS.map(({ key, label, icon }) => {
+                const active = tab === key;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.segment, active && styles.segmentActive]}
+                    onPress={() => setTab(key)}
+                    activeOpacity={0.8}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: active }}
+                  >
+                    <Ionicons name={icon} size={16} color={active ? ON_PRIMARY : TEXT_MUTED} />
+                    {/* Una sola línea: con fuente grande se achica hasta 80 %, nunca salta de fila. */}
+                    <Text
+                      style={[styles.segmentText, active && styles.segmentTextActive]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
+                    >
+                      {label}
+                    </Text>
+                    {key === "actions" && task && (
+                      <View style={[styles.segmentBadge, active && styles.segmentBadgeActive]}>
+                        <Text
+                          style={[styles.segmentBadgeText, active && styles.segmentBadgeTextActive]}
+                          numberOfLines={1}
+                        >
+                          {stateActivities.length}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Mismo criterio que ReportFaultForm: en iOS el teclado achica el área de scroll. */}
+          <KeyboardAvoidingView
+            style={styles.flex}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          >
+            {/* key = pestaña: cada una arranca desde arriba. Las recargas no la remontan. */}
+            <ScrollView
+              key={tab}
+              ref={scrollRef}
+              style={styles.flex}
+              contentContainerStyle={[styles.content, isTablet && styles.contentTablet]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handlePull}
+                  colors={[PRIMARY_COLOR]}
+                  tintColor={PRIMARY_COLOR}
+                />
+              }
+            >
+              {!task && renderDetailPlaceholder()}
+
+              {tab === "ticket" && task && (
+                <FollowUpTicketTab
+                  key={task.id}
+                  task={task}
+                  styles={styles}
+                  live={live}
+                  commentOrder={commentOrder}
+                  onCommentOrderChange={setCommentOrder}
+                  onAddComment={handleAddComment}
+                  commentsCardRef={commentsCardRef}
+                  commentsResetKey={commentsResetKey}
+                  scrollRef={scrollRef}
+                  taskStates={taskStates}
+                  states={states}
+                  onRetryTaskStates={retryTaskStates}
+                  onEvaluate={handleEvaluate}
+                  onChangeState={handleChangeState}
+                />
               )}
-            </>
-          )}
-        </ScrollView>
-      </KeyboardAvoidingView>
+
+              {tab !== "ticket" && task && (
+                <>
+                  <View style={styles.strip}>
+                    <View style={styles.stripBody}>
+                      <Text style={styles.stripTitle}>Ticket #{task.id}</Text>
+                      <Text style={styles.stripClient} numberOfLines={1}>
+                        {getTaskerClientName(task.client)}
+                      </Text>
+                    </View>
+                    <StateChip state={task.state} styles={styles} />
+                  </View>
+                  {tab === "address" && <FollowUpAddressTab address={task.address} styles={styles} />}
+                  {tab === "actions" && (
+                    <FollowUpActionsTab
+                      activities={stateActivities}
+                      stateId={task.stateId}
+                      owner={task}
+                      live={live}
+                      styles={styles}
+                    />
+                  )}
+                </>
+              )}
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
     </View>
   );
 }

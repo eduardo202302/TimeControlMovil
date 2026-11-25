@@ -136,7 +136,7 @@ const HAS_TZ_RE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
  * - "2026-08-29T14:51:16.716Z" → instante UTC explícito, se respeta tal cual.
  * - "2026-08-29T10:51:16"      → sin zona: el backend habla en hora RD.
  */
-function parseBackendDate(raw: string): Date | null {
+export function parseBackendDate(raw: string): Date | null {
   const s = raw.trim();
   if (!s) return null;
   const iso = DATE_ONLY_RE.test(s)

@@ -34,7 +34,7 @@ import {
   buildAttendancesToday,
   useSchoolStore,
 } from "../../../store/useSchoolStore";
-import { resolveMobilePath } from "../../constants/mobileRoutes";
+import { resolveLandingPath } from "../../utils/reportJornada";
 import { LoginType } from "../../../types/typesLogin/LoginType";
 import { SchoolUser } from "../../../types/typeStore/SchoolStoreType";
 import * as Storage from "../../utils/storage";
@@ -158,11 +158,9 @@ export default function FormLogin() {
         tipo: "success",
       });
 
-      router.replace(
-        resolveMobilePath(
-          useSchoolStore.getState().role?.defaultMenu?.path,
-        ) as never,
-      );
+      // Reportar si la regla de jornada aplica y hay jornada abierta hoy; si
+      // no, resolveMobilePath(role.defaultMenu) como siempre.
+      router.replace((await resolveLandingPath()) as never);
     },
     [remember, urlColegio],
   );

@@ -147,6 +147,12 @@ import {
 } from "../../utils/punchRules";
 import * as Storage from "../../utils/storage";
 import { getActiveSchoolId } from "../../utils/chooseCompany";
+import { fetchPunchesToday } from "../../utils/punchesTodayApi";
+import {
+  hasOpenJornadaToday,
+  userRequiresJornadaForReport,
+} from "../../utils/reportJornadaRules";
+import { TASKER_REPORT_PATH } from "../../utils/taskerRules";
 import { expoLocationApi } from "../../utils/locationApi";
 import {
   getBestEffortCoordinates,
@@ -606,6 +612,15 @@ export default function PunchInOut() {
   // Parpadeo del ponche recién registrado (solo inicios de jornada)
   const [blinkPunchId, setBlinkPunchId] = useState<number | null>(null);
   const blinkRequestedRef = useRef(false);
+  // Regla de Reportar (Tasker + ponchador en el menú): un inicio de jornada
+  // exitoso lleva a Reportar al TERMINAR su parpadeo. El pedido se toma con
+  // el de parpadeo y queda atado al id del ponche que parpadea.
+  const reportAfterBlinkRequestedRef = useRef(false);
+  const reportAfterBlinkIdRef = useRef<number | null>(null);
+  // Para navegar solo si el usuario sigue en el ponchador.
+  const focusedRef = useRef(false);
+  // Ponches vigentes al terminar el parpadeo (el efecto del blink no depende de ellos).
+  const punchesRef = useRef<PunchEvent[]>([]);
   const blinkOpacity = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<ScrollView>(null);
   const [nextDayExitModal, setNextDayExitModal] = useState(false);
@@ -1006,15 +1021,11 @@ export default function PunchInOut() {
         setLoadingPunches(true);
         const token = await getToken();
         if (!urlColegio || !token) return null;
-        const response = await axios.get(`${urlColegio}/punches/today`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        console.log("TODAY PUNCHES RESPONSE:", {
-          clientTimestamp: new Date().toISOString(),
-          data: response.data,
-        });
-        if (!response.data.success) return null;
-        const data: PunchEvent[] = response.data.data ?? [];
+        // GET /punches/today (punchesTodayApi): nunca lanza; registra la
+        // respuesta y los errores con los mismos console.log/error de antes.
+        const result = await fetchPunchesToday({ urlColegio, token });
+        if (!result.ok) return null;
+        const data: PunchEvent[] = result.punches;
         setPunches(data);
         // findOpenDayPunch es código muerto con el contrato actual (ver su
         // doc): /punches/today no marca la jornada abierta. Se deja por si el
@@ -1083,12 +1094,28 @@ export default function PunchInOut() {
     setNextDayExitModal(true);
   }, [pendingOpenDayKey, pendingOpenDay, closedOpenDayKey]);
 
+  useEffect(() => {
+    punchesRef.current = punches;
+  }, [punches]);
+
+  useFocusEffect(
+    useCallback(() => {
+      focusedRef.current = true;
+      return () => {
+        focusedRef.current = false;
+      };
+    }, []),
+  );
+
   // fetchTodayPunches no devuelve la lista: el pedido de parpadeo se resuelve
-  // cuando llegan los ponches nuevos.
+  // cuando llegan los ponches nuevos. El de ir a Reportar se ata a ese ponche.
   useEffect(() => {
     if (!blinkRequestedRef.current) return;
     blinkRequestedRef.current = false;
     const newest = getNewestPunch(punches);
+    reportAfterBlinkIdRef.current =
+      reportAfterBlinkRequestedRef.current && newest ? newest.id : null;
+    reportAfterBlinkRequestedRef.current = false;
     if (newest) setBlinkPunchId(newest.id);
   }, [punches]);
 
@@ -1119,8 +1146,24 @@ export default function PunchInOut() {
       // quedaba fijo. Solo limpia SU id: el stop() del cleanup no debe borrar
       // el de un ponche más nuevo.
       const id = blinkPunchId;
-      animation.start(() => {
+      animation.start(({ finished }) => {
         setBlinkPunchId((current) => (current === id ? null : current));
+        // Ir a Reportar: solo si el parpadeo de ESE ponche terminó completo
+        // (el stop() del cleanup al salir da finished false), el usuario
+        // sigue en el ponchador y la jornada quedó abierta hoy (un inicio
+        // "Fuera de área" no cuenta: Reportar lo bloquearía).
+        if (reportAfterBlinkIdRef.current !== id) return;
+        reportAfterBlinkIdRef.current = null;
+        if (
+          finished &&
+          focusedRef.current &&
+          hasOpenJornadaToday(
+            punchesRef.current,
+            useSchoolStore.getState().pendingOpenDay,
+          )
+        ) {
+          router.push(TASKER_REPORT_PATH as never);
+        }
       });
     }, 500);
     return () => {
@@ -1775,6 +1818,12 @@ export default function PunchInOut() {
           if (isJornadaStartType(apiType)) setTolerancesExpanded(false);
           setHistoryExpanded(true);
           blinkRequestedRef.current = true;
+          // Inicio de jornada (base, Adicional o FH) con la regla de Reportar
+          // → a Reportar cuando termine el parpadeo.
+          const { allowedMenuItems, taskerConfig } = useSchoolStore.getState();
+          reportAfterBlinkRequestedRef.current =
+            isJornadaStartType(apiType) &&
+            userRequiresJornadaForReport(allowedMenuItems, taskerConfig);
         }
 
         if (response.data?.status === "Fuera de área") {

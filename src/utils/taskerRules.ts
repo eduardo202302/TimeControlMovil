@@ -843,6 +843,11 @@ export const TASKER_CLIENT_LABEL_FALLBACK = "Cliente";
 export const TASKER_UNAVAILABLE_MESSAGE = "No disponible para su compañía";
 export const TASKER_NO_CLIENTS_MESSAGE =
   "No es posible generar el reporte, el usuario no tiene clientes asignados, por favor comuníquese con administración.";
+export const TASKER_NO_JORNADA_MESSAGE = "Debes iniciar tu jornada para reportar.";
+export const TASKER_JORNADA_ERROR_MESSAGE =
+  "No se pudo verificar tu jornada. Revisa tu conexión e intenta nuevamente.";
+/** Botón de "noJornada": lleva al ponchador. */
+export const TASKER_GO_TO_PUNCH_LABEL = "Ir a Registrar Acceso";
 export const TASKER_NO_LOCATION_MESSAGE =
   "Active la ubicación de su teléfono e intente nuevamente, si el problema persiste contacte a tecnología.";
 
@@ -1281,24 +1286,77 @@ export function getLocationOnVisit(previous: ReportLocationState): ReportLocatio
     : { status: "pending" };
 }
 
-export type ReportGate = "unavailable" | "noClients" | "locating" | "noLocation" | "ready";
+/**
+ * Jornada para Reportar (regla "solo con jornada abierta hoy"):
+ * - notRequired: la regla no aplica (Tasker no conectado o sin ponchador en el menú).
+ * - checking: consultando GET /punches/today sin un "open" previo.
+ * - rechecking: consultando de nuevo tras un "open" (al volver a entrar): el
+ *   formulario abierto sigue a la vista mientras llega.
+ * - open / closed: resultado de la consulta.
+ * - failed: la consulta falló (red): no deja reportar, ofrece Reintentar.
+ */
+export type ReportJornadaState =
+  | { status: "notRequired" }
+  | { status: "checking" }
+  | { status: "rechecking" }
+  | { status: "open" }
+  | { status: "closed" }
+  | { status: "failed" };
+
+/**
+ * Al entrar a Reportar y al salir: la jornada se vuelve a consultar en cada
+ * visita. Tras un "open" (o con la consulta en curso tras uno) → rechecking;
+ * si no → checking. Sin la regla → notRequired.
+ */
+export function getJornadaOnVisit(
+  previous: ReportJornadaState,
+  required: boolean,
+): ReportJornadaState {
+  if (!required) return { status: "notRequired" };
+  return previous.status === "open" || previous.status === "rechecking"
+    ? { status: "rechecking" }
+    : { status: "checking" };
+}
+
+/** ¿La jornada deja seguir (pedir la posición y mostrar el formulario)? */
+export function isJornadaReadyForReport(jornada: ReportJornadaState): boolean {
+  return jornada.status === "notRequired" || jornada.status === "open";
+}
+
+export type ReportGate =
+  | "unavailable"
+  | "noClients"
+  | "checkingJornada"
+  | "noJornada"
+  | "jornadaError"
+  | "locating"
+  | "noLocation"
+  | "ready";
 
 /**
  * Qué muestra Reportar, en este orden estricto: compañía no conectada →
- * usuario sin clientes → buscando la posición → sin posición → formulario
- * (también mientras se refresca la posición con el formulario abierto).
+ * usuario sin clientes → jornada (consultando / sin jornada hoy / error) →
+ * buscando la posición → sin posición → formulario (también mientras se
+ * refresca la posición, o se vuelve a consultar la jornada, con el
+ * formulario abierto). La jornada va antes de la posición: sin jornada no se
+ * pide el GPS. Sin `jornada` → notRequired (como antes de la regla).
  */
 export function getReportGate({
   config,
   clients,
+  jornada = { status: "notRequired" },
   location,
 }: {
   config: TaskerCompanyConfig | null | undefined;
   clients: TaskerUserClient[];
+  jornada?: ReportJornadaState;
   location: ReportLocationState;
 }): ReportGate {
   if (!isTaskerEnabled(config)) return "unavailable";
   if (clients.length === 0) return "noClients";
+  if (jornada.status === "checking") return "checkingJornada";
+  if (jornada.status === "closed") return "noJornada";
+  if (jornada.status === "failed") return "jornadaError";
   if (location.status === "pending") return "locating";
   if (location.status === "failed") return "noLocation";
   return "ready";

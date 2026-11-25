@@ -3,14 +3,20 @@ import {
   APP_BACKGROUND_V2,
   CARD_BACKGROUND,
   CARD_BORDER,
+  ERROR_COLOR,
+  ERROR_TEXT,
+  ERROR_TINT_BACKGROUND,
   FIELD_BACKGROUND,
   FIELD_DISABLED_BACKGROUND,
   FOOTER_BORDER,
+  HEADER_BUTTON_BACKGROUND,
+  HEADER_TEXT,
   ON_PRIMARY,
   PRIMARY_700,
   PRIMARY_COLOR,
   PRIMARY_TINT_50,
   PRIMARY_TINT_BORDER,
+  SUCCESS_ACCENT,
   TEXT_MUTED,
   TEXT_PLACEHOLDER,
   TEXT_PRIMARY,
@@ -19,6 +25,7 @@ import {
 import {
   MAX_CONTENT_WIDTH,
   RADIUS_LG,
+  RADIUS_MD,
   RADIUS_PILL,
   RADIUS_SM,
 } from "@/constants/responsive";
@@ -27,6 +34,7 @@ import {
   CARD_FORM,
   CARD_ROW,
   FOOTER_BTN_SAVE,
+  MODAL_TOPBAR,
   SEGMENTED_SURFACE,
   SEGMENT_ACTIVE,
 } from "@/styles/surfaces";
@@ -73,6 +81,8 @@ export function createFollowUpStyles(
       padding: scale(3),
       gap: scale(3),
     },
+    // Ícono, texto y badge siempre en una fila: el texto se encoge (una
+    // línea, adjustsFontSizeToFit); ícono y badge no.
     segment: {
       flex: 1,
       flexDirection: "row",
@@ -80,14 +90,14 @@ export function createFollowUpStyles(
       justifyContent: "center",
       gap: scale(6),
       minHeight: touchMin,
+      paddingHorizontal: scale(6),
       borderRadius: RADIUS_SM,
     },
     segmentActive: { ...SEGMENT_ACTIVE },
-    // Bloqueada (sin ticket elegido): atenuada, como los botones deshabilitados.
-    segmentDisabled: { opacity: 0.4 },
-    segmentText: { fontSize: font(13), fontWeight: "600", color: TEXT_MUTED },
+    segmentText: { flexShrink: 1, fontSize: font(13), fontWeight: "600", color: TEXT_MUTED },
     segmentTextActive: { color: ON_PRIMARY, fontWeight: "700" },
     segmentBadge: {
+      flexShrink: 0,
       minWidth: scale(18),
       paddingHorizontal: scale(5),
       borderRadius: RADIUS_PILL,
@@ -147,35 +157,106 @@ export function createFollowUpStyles(
     },
     noticeBtnText: { fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
 
-    /* ── Selector de tickets (fila horizontal) ── */
-    // Sangra hasta el borde de la pantalla: la fila se desliza bajo el padding.
-    picker: { marginHorizontal: -scale(L.screenPadding) },
-    pickerContent: {
-      paddingHorizontal: scale(L.screenPadding),
-      // Aire para la sombra de las tarjetas (el scroll horizontal la recorta).
-      paddingVertical: verticalScale(4),
-      gap: scale(10),
+    /* ── Lista de tickets (padding 16 y gap 12, como Home.js de etaskr-mobile) ── */
+    listContent: {
+      flexGrow: 1,
+      padding: scale(16),
+      gap: verticalScale(12),
     },
-    pickerCard: {
+    listTitle: {
+      fontSize: font(15),
+      fontWeight: "700",
+      color: TEXT_PRIMARY,
+    },
+    // Tarjeta calcada de TaskCard.js: cabecera (#id + estado), campos, divisor,
+    // descripción y pie (vencimiento + prioridad).
+    ticketCard: {
       ...CARD_ROW,
-      width: scale(156),
-      gap: verticalScale(6),
-      paddingHorizontal: scale(12),
-      paddingVertical: verticalScale(10),
+      gap: verticalScale(8),
+      padding: scale(16),
     },
-    pickerCardSelected: {
-      borderColor: PRIMARY_COLOR,
-      backgroundColor: PRIMARY_TINT_50,
+    ticketHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: scale(8),
     },
-    pickerId: {
-      fontSize: font(14),
-      fontWeight: "800",
+    ticketId: {
+      flexShrink: 0,
+      fontSize: font(17),
+      fontWeight: "700",
       color: TEXT_PRIMARY,
       fontVariant: ["tabular-nums"],
     },
-    pickerIdSelected: { color: PRIMARY_700 },
-    pickerClient: { fontSize: font(12), color: TEXT_MUTED },
-    pickerChip: { alignSelf: "flex-start" },
+    // Label macizo (estado, prioridad): colores en línea con getSolidLabelColors.
+    solidLabel: {
+      flexShrink: 1,
+      justifyContent: "center",
+      paddingHorizontal: scale(8),
+      paddingVertical: verticalScale(3),
+      borderRadius: RADIUS_PILL,
+    },
+    solidLabelText: { fontSize: font(11), fontWeight: "700" },
+    ticketField: { flexDirection: "row", alignItems: "center" },
+    ticketFieldLabel: {
+      width: scale(82),
+      fontSize: font(12),
+      fontWeight: "500",
+      color: TEXT_SECONDARY,
+    },
+    ticketFieldValue: { flex: 1, fontSize: font(12), color: TEXT_PRIMARY },
+    // Divisor: 1 de alto fijo.
+    ticketDivider: { height: 1, backgroundColor: FOOTER_BORDER },
+    ticketAction: {
+      fontSize: font(13),
+      lineHeight: font(18),
+      fontWeight: "600",
+      color: TEXT_PRIMARY,
+    },
+    ticketActionEmpty: { fontWeight: "400", color: TEXT_MUTED },
+    ticketFooter: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: scale(8),
+    },
+    ticketDate: { flexDirection: "row", alignItems: "center", gap: scale(4), flexShrink: 1 },
+    // Color en línea: TEXT_SECONDARY, o ERROR_TEXT si venció.
+    ticketDateText: {
+      flexShrink: 1,
+      fontSize: font(11),
+      fontVariant: ["tabular-nums"],
+    },
+    ticketDateExpired: { fontWeight: "700" },
+
+    /* ── Modal del detalle (patrón de los modales a pantalla completa) ── */
+    modalTopBar: {
+      ...MODAL_TOPBAR,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: scale(12),
+      paddingHorizontal: scale(16),
+      // El Modal cubre la SafeAreaView del layout: reserva la status bar.
+      paddingTop: verticalScale(48),
+      paddingBottom: verticalScale(14),
+    },
+    /** Tamaño fijo: botón de ícono, mismo criterio que PermissionDetailView. */
+    modalBackBtn: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: RADIUS_MD,
+      backgroundColor: HEADER_BUTTON_BACKGROUND,
+    },
+    modalTitle: {
+      flex: 1,
+      fontSize: font(17),
+      fontWeight: "700",
+      color: HEADER_TEXT,
+      fontVariant: ["tabular-nums"],
+    },
+    modalState: { flexShrink: 1, maxWidth: "45%" },
 
     /* ── Chip de estado (colores en línea desde getStateChipColors) ── */
     stateChip: {
@@ -266,18 +347,93 @@ export function createFollowUpStyles(
     },
     descriptionText: { fontSize: font(14), lineHeight: font(20), color: TEXT_SECONDARY },
     faultList: { gap: verticalScale(8) },
+    // Avance de las acciones: texto + barra (relleno con el % en línea).
+    progress: { gap: verticalScale(6), marginBottom: verticalScale(12) },
+    progressText: {
+      fontSize: font(12),
+      fontWeight: "600",
+      color: TEXT_SECONDARY,
+      fontVariant: ["tabular-nums"],
+    },
+    // Barra: 6 de alto fijo.
+    progressTrack: {
+      height: 6,
+      overflow: "hidden",
+      borderRadius: RADIUS_PILL,
+      backgroundColor: PRIMARY_TINT_50,
+    },
+    progressFill: { height: "100%", borderRadius: RADIUS_PILL, backgroundColor: PRIMARY_COLOR },
     faultRow: {
       flexDirection: "row",
-      alignItems: "center",
+      alignItems: "flex-start",
       gap: scale(10),
       paddingHorizontal: scale(12),
       paddingVertical: verticalScale(10),
       borderRadius: RADIUS_LG,
       backgroundColor: FIELD_BACKGROUND,
     },
-    // Punto de cada avería: 6×6 fijo.
-    faultDot: { width: 6, height: 6, borderRadius: RADIUS_PILL, backgroundColor: PRIMARY_COLOR },
-    faultText: { flex: 1, fontSize: font(14), lineHeight: font(20), color: TEXT_PRIMARY },
+    // Marcada en rojo (indeterminate): fondo y texto de error.
+    faultRowDanger: { backgroundColor: ERROR_TINT_BACKGROUND },
+    faultBody: { flex: 1 },
+    faultText: { fontSize: font(14), lineHeight: font(20), color: TEXT_PRIMARY },
+    faultTextDanger: { color: ERROR_TEXT },
+    // Título de grupo (isDisabled): sin fondo de fila ni ícono.
+    faultTitleRow: { paddingHorizontal: scale(4), paddingTop: verticalScale(4) },
+    faultTitleText: {
+      fontSize: font(14),
+      lineHeight: font(20),
+      fontWeight: "700",
+      color: TEXT_SECONDARY,
+    },
+    faultDate: {
+      marginTop: verticalScale(2),
+      fontSize: font(12),
+      color: TEXT_MUTED,
+      fontVariant: ["tabular-nums"],
+    },
+    // Evaluación de la acción: chip neutro bajo el texto. Borde para que se
+    // distinga sobre la fila, que tiene el mismo FIELD_BACKGROUND.
+    evalChip: {
+      alignSelf: "flex-start",
+      marginTop: verticalScale(6),
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(3),
+      borderRadius: RADIUS_PILL,
+      borderWidth: 1,
+      borderColor: CARD_BORDER,
+      backgroundColor: FIELD_BACKGROUND,
+    },
+    evalChipText: { fontSize: font(12), fontWeight: "600", color: TEXT_SECONDARY },
+    // Botón "Evaluar" (36×36 + hitSlop = 44 de área táctil).
+    evalBtn: {
+      width: scale(36),
+      height: scale(36),
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: RADIUS_LG,
+      borderWidth: 1,
+      borderColor: PRIMARY_TINT_BORDER,
+      backgroundColor: CARD_BACKGROUND,
+    },
+    evalBtnDisabled: { opacity: 0.5 },
+
+    /* ── Revisión: Completada / Incompleta ── */
+    reviewText: { fontSize: font(13), lineHeight: font(18), color: TEXT_SECONDARY },
+    reviewButtons: { flexDirection: "row", gap: scale(10), marginTop: verticalScale(12) },
+    reviewBtn: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: scale(8),
+      minHeight: touchMin,
+      paddingHorizontal: scale(12),
+      borderRadius: RADIUS_LG,
+    },
+    reviewBtnSuccess: { backgroundColor: SUCCESS_ACCENT },
+    reviewBtnError: { backgroundColor: ERROR_COLOR },
+    reviewBtnDisabled: { opacity: 0.5 },
+    reviewBtnText: { flexShrink: 1, fontSize: font(14), fontWeight: "700", color: ON_PRIMARY },
     /* ── Pestaña Dirección ── */
     addressGrid: {
       flexDirection: "row",

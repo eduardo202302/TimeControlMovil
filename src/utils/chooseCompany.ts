@@ -12,9 +12,9 @@ import type {
   SchoolUser,
   User,
 } from "../../types/typeStore/SchoolStoreType";
-import { resolveMobilePath } from "../constants/mobileRoutes";
 import { buildLastCompany } from "./lastCompany";
 import { buildOpenDayFromChooseSchool, buildTodayHoliday } from "./punchRules";
+import { resolveLandingPath } from "./reportJornada";
 import * as Storage from "./storage";
 import { persistTaskerSession } from "./taskerSession";
 
@@ -443,8 +443,8 @@ export type SwitchCompanyResult =
 /**
  * "Cambiar Empresa" del drawer. Si algo falla ANTES de persistir (red,
  * success:false, empresa ajena) no se toca nada: la sesión sigue en la
- * empresa actual. Con éxito devuelve la ruta de inicio del rol nuevo
- * (`resolveMobilePath(role.defaultMenu)`, igual que el login).
+ * empresa actual. Con éxito devuelve la ruta de inicio de la sesión nueva
+ * (`resolveLandingPath`, igual que el login).
  */
 export async function switchCompany(
   schoolId: number,
@@ -496,8 +496,5 @@ export async function switchCompany(
     return { ok: false, message: SWITCH_COMPANY_ERROR };
   }
 
-  return {
-    ok: true,
-    path: resolveMobilePath(useSchoolStore.getState().role?.defaultMenu?.path),
-  };
+  return { ok: true, path: await resolveLandingPath() };
 }

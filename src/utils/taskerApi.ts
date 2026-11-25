@@ -2,7 +2,9 @@
  * Puente de Tasker con FaceClass/Taskr. Reportar: lo que llega de
  * chooseschool, el catálogo de averías (GET /taskr/actions) y la tarea nueva
  * (POST /taskr/tasks). Seguimiento: la lista (GET /taskr/tasks), el detalle
- * (GET /taskr/tasks/{id}) y los comentarios (PATCH /taskr/tasks/{id}). Las
+ * (GET /taskr/tasks/{id}), los catálogos de estados (GET /taskr/taskStates y
+ * /taskr/states) y el PATCH /taskr/tasks/{id} (comentarios, evaluación de
+ * acciones y Completada / Incompleta). Las
  * funciones de mapeo y armado son puras; los servicios de red nunca lanzan y
  * devuelven { ok, ..., message }.
  *
@@ -13,6 +15,7 @@ import axios from "axios";
 import type {
   TaskerActivity,
   TaskerAddress,
+  TaskerCheckState,
   TaskerClient,
   TaskerClientAddress,
   TaskerComment,
@@ -25,19 +28,29 @@ import type {
   TaskerState,
   TaskerTag,
   TaskerTask,
+  TaskerReviewStateId,
+  TaskerTaskListItem,
+  TaskerTaskListState,
+  TaskerTaskState,
   TaskerTaskSummary,
   TaskerUserClient,
   TaskerUserRef,
   TaskrCommentBody,
+  TaskrPatchBody,
+  TaskrPatchComment,
   TaskrTaskAddress,
   TaskrTaskBody,
   TaskrTaskComment,
   TaskrTaskCoordinate,
 } from "../../types/typesTasker/TaskerTypes";
+import { toRD } from "./punchRules";
 import {
   buildTaskrFileUrl,
   getTaskerCommentAuthorName,
   isTaskrTaskGoneMessage,
+  TASKER_INCOMPLETE_COMMENT_REQUIRED,
+  TASKER_STATE_COMPLETED,
+  TASKER_STATE_INCOMPLETE,
 } from "./taskerFollowUpRules";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -541,7 +554,11 @@ function mapState(raw: unknown, stateId: number): TaskerState {
   return { id: stateId, name: textOrEmpty(state.name), color: textOrEmpty(state.color) };
 }
 
-/** Una tarea de GET /taskr/tasks → tarjeta del selector. Sin id numérico → null. */
+/**
+ * Una tarea de GET /taskr/tasks → tarjeta de la lista. Sin id numérico → null.
+ * La lista no trae tags ni activities (getIntegrationTasks solo pide state,
+ * client, assignedUser y priority); dueDate y address son columnas y sí llegan.
+ */
 export function mapTaskrTaskSummary(raw: unknown): TaskerTaskSummary | null {
   if (!isRecord(raw)) return null;
   const id = idOrNull(raw.id);
@@ -550,11 +567,14 @@ export function mapTaskrTaskSummary(raw: unknown): TaskerTaskSummary | null {
   return {
     id,
     createdDate: textOrEmpty(raw.createdDate),
+    action: textOrEmpty(raw.action),
     stateId,
     state: mapState(raw.state, stateId),
     client: mapTaskClient(raw.client),
     assignedUser: mapUserRef(raw.assignedUser),
     priority: mapPriority(raw.priority),
+    dueDate: textOrEmpty(raw.dueDate).trim() || null,
+    province: isRecord(raw.address) ? textOrEmpty(raw.address.province).trim() : "",
   };
 }
 
@@ -594,15 +614,56 @@ function mapTags(raw: unknown): TaskerTag[] {
 /** Primer texto no vacío de un elemento de taskList. */
 const TASK_LIST_TEXT_KEYS = ["action", "text", "name", "description"] as const;
 
-/** taskList[] → textos ordenados por `order` (sin order, al final en su orden). */
-export function mapTaskrTaskList(raw: unknown): string[] {
+const TASK_CHECK_STATES: readonly TaskerCheckState[] = ["checked", "unchecked", "indeterminate"];
+
+/** isChecked de Taskr; cualquier otro valor (o ninguno) → "unchecked". */
+function readCheckState(value: unknown): TaskerCheckState {
+  return TASK_CHECK_STATES.find((state) => state === value) ?? "unchecked";
+}
+
+/**
+ * taskList[].taskState → { id, name }. Sin nombre → null (la fila lo busca en
+ * el catálogo por taskStateId). Sin id propio toma el de la acción.
+ */
+function mapTaskListState(raw: unknown, taskStateId: number | null): TaskerTaskListState | null {
+  if (!isRecord(raw)) return null;
+  const id = idOrNull(raw.id) ?? taskStateId;
+  const name = textOrEmpty(raw.name).trim();
+  return id !== null && name ? { id, name } : null;
+}
+
+/**
+ * taskList[] → acciones ordenadas por `order` (sin order, al final en su
+ * orden). Sin texto → se descarta. taskStateId: el de la acción o, si falta,
+ * el id de su taskState.
+ */
+export function mapTaskrTaskList(raw: unknown): TaskerTaskListItem[] {
   const items = (Array.isArray(raw) ? raw : []).flatMap((item, index) => {
     if (!isRecord(item)) return [];
     const text = TASK_LIST_TEXT_KEYS.map((key) => textOrEmpty(item[key]).trim()).find(Boolean);
     if (!text) return [];
-    return [{ text, order: idOrNull(item.order) ?? Number.POSITIVE_INFINITY, index }];
+    const order = idOrNull(item.order);
+    const checkedDate =
+      typeof item.checkedDate === "string" && item.checkedDate.trim() !== ""
+        ? item.checkedDate
+        : null;
+    const taskStateId =
+      idOrNull(item.taskStateId) ?? (isRecord(item.taskState) ? idOrNull(item.taskState.id) : null);
+    const mapped: TaskerTaskListItem = {
+      id: idOrNull(item.id),
+      text,
+      order,
+      isChecked: readCheckState(item.isChecked),
+      checkedDate,
+      isDisabled: item.isDisabled === true,
+      taskStateId,
+      taskState: taskStateId === null ? null : mapTaskListState(item.taskState, taskStateId),
+    };
+    return [{ mapped, sortKey: order ?? Number.POSITIVE_INFINITY, index }];
   });
-  return items.sort((a, b) => a.order - b.order || a.index - b.index).map((item) => item.text);
+  return items
+    .sort((a, b) => a.sortKey - b.sortKey || a.index - b.index)
+    .map((item) => item.mapped);
 }
 
 /** Coordenadas de una actividad: `coordinates` o lat/lng sueltos. Inválidas → null. */
@@ -696,27 +757,114 @@ export function mapTaskrTaskDetail(data: unknown, urlColegio: string): TaskerTas
   };
 }
 
-// ─── Seguimiento: comentario nuevo (PATCH /taskr/tasks/{id}) ────────────────
+// ─── Seguimiento: cuerpos del PATCH /taskr/tasks/{id} ───────────────────────
+
+/** Solo data URIs ("data:<mime>;base64,…"): lo único que Taskr guarda como adjunto. */
+function onlyDataUris(values: readonly unknown[]): string[] {
+  return values.filter(
+    (value): value is string => typeof value === "string" && /^data:/i.test(value),
+  );
+}
 
 /**
- * Cuerpo del PATCH: un comentario con `comment` siempre presente ("" si solo
- * trae adjuntos) y los adjuntos como data URIs.
+ * Comentario normal: `comment` siempre presente ("" si solo trae adjuntos),
+ * los adjuntos como data URIs y taskListId null (no es de ninguna acción).
  */
 export function buildTaskrCommentBody(draft: TaskerCommentDraft): TaskrCommentBody {
   return {
     taskComments: [
       {
         comment: draft.text.trim(),
-        images: draft.attachments
-          .map((a) => a.dataUri)
-          .filter((value) => typeof value === "string" && /^data:/i.test(value)),
+        images: onlyDataUris(draft.attachments.map((a) => a.dataUri)),
+        taskListId: null,
       },
     ],
   };
 }
 
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+/**
+ * Fecha para Taskr: "YYYY-MM-DD HH:mm:ss" en hora RD, como etaskr-mobile
+ * (`moment().format("YYYY-MM-DD HH:mm:ss")`, TaskDetails.js:486). Sin zona a
+ * propósito: etaskr-api la reformatea con moment() en la zona del servidor
+ * (Tasks/handlers.js:2908), así que un ISO con "Z" quedaría corrido.
+ */
+export function formatTaskrDateTime(now: Date): string {
+  const rd = toRD(now);
+  return `${rd.year}-${pad2(rd.month + 1)}-${pad2(rd.day)} ${pad2(rd.hours)}:${pad2(rd.minutes)}:${pad2(rd.seconds)}`;
+}
+
+/**
+ * Evaluación de una acción, calcando etaskr-mobile:
+ * - list: [{ id, taskStateId }] y, solo si la evaluación tiene requiresDate,
+ *   startDate = ahora (TaskDetails.js:483-487);
+ * - comentario automático solo si hay comentario (trim) o imágenes:
+ *   "Evaluación de {texto} [{estado}]" + "\n{comentario}" si lo hay, con
+ *   taskListId = la acción (TaskDetails.js:252-253);
+ * - las imágenes solo viajan si la evaluación las muestra (suggestImage,
+ *   modals/Evaluation.js:26).
+ */
+export function buildEvaluationBody(
+  item: { id: number; text: string },
+  taskState: Pick<TaskerTaskState, "id" | "name" | "requiresDate" | "suggestImage">,
+  comment: string,
+  images: readonly string[],
+  now: Date,
+): TaskrPatchBody {
+  const text = comment.trim();
+  const sentImages = taskState.suggestImage ? onlyDataUris(images) : [];
+  const title = `Evaluación de ${item.text} [${taskState.name}]`;
+  const taskComments: TaskrPatchComment[] =
+    text || sentImages.length > 0
+      ? [{ comment: text ? `${title}\n${text}` : title, images: sentImages, taskListId: item.id }]
+      : [];
+  return {
+    list: [
+      {
+        id: item.id,
+        taskStateId: taskState.id,
+        ...(taskState.requiresDate ? { startDate: formatTaskrDateTime(now) } : {}),
+      },
+    ],
+    taskComments,
+  };
+}
+
+export type BuildStateChangeResult =
+  | { ok: true; body: TaskrPatchBody }
+  | { ok: false; message: string };
+
+/**
+ * Completada (5) o Incompleta (9) desde Revisión. Incompleta exige comentario
+ * (trim). Con comentario va uno sin adjuntos ni acción.
+ */
+export function buildStateChangeBody(
+  stateId: TaskerReviewStateId,
+  comment = "",
+): BuildStateChangeResult {
+  const text = comment.trim();
+  if (stateId === TASKER_STATE_INCOMPLETE && !text) {
+    return { ok: false, message: TASKER_INCOMPLETE_COMMENT_REQUIRED };
+  }
+  return {
+    ok: true,
+    body: {
+      stateId,
+      taskComments: text ? [{ comment: text, images: [], taskListId: null }] : [],
+    },
+  };
+}
+
+/** ¿stateId permitido en el PATCH? Solo los números 5 y 9 (nunca texto). */
+function isReviewStateId(value: unknown): value is TaskerReviewStateId {
+  return value === TASKER_STATE_COMPLETED || value === TASKER_STATE_INCOMPLETE;
+}
+
 /** El JSON del PATCH, o el error si pasa de TASKR_TASK_MAX_BYTES (9.5 MB). */
-export function serializeTaskrCommentBody(body: TaskrCommentBody): SerializedBody {
+export function serializeTaskrCommentBody(body: TaskrPatchBody): SerializedBody {
   return serializeWithinLimit(body);
 }
 
@@ -802,19 +950,34 @@ export async function fetchTaskerTask({
   }
 }
 
-export type AddTaskerCommentResult = { ok: true; message: string } | TaskrFailure;
+export const TASKER_PATCH_ERROR = "No se pudo guardar el cambio. Intente nuevamente.";
+export const TASKER_EVALUATION_SEND_ERROR = "No se pudo guardar la evaluación. Intente nuevamente.";
+export const TASKER_STATE_CHANGE_ERROR = "No se pudo cambiar el estado. Intente nuevamente.";
+
+export type PatchTaskerTaskResult = { ok: true; message: string } | TaskrFailure;
 
 /**
- * Agrega un comentario. Antes valida el tamaño (no envía si se pasa). La
- * respuesta trae la tarea sin activities: quien llama vuelve a pedir el detalle.
+ * PATCH /taskr/tasks/{id}: comentarios, evaluaciones (`list`) y/o cambio de
+ * estado (`stateId`, solo el número 5 o 9; otro valor no se envía). Antes
+ * valida el tamaño (no envía si se pasa). La respuesta trae la tarea sin
+ * activities: quien llama vuelve a pedir el detalle. `errorMessage` es el
+ * genérico de success:false sin message de texto.
  */
-export async function addTaskerTaskComment({
+export async function patchTaskerTask({
   token,
   urlColegio,
   id,
   body,
-}: AuthArgs & { id: number; body: TaskrCommentBody }): Promise<AddTaskerCommentResult> {
-  if (!isTaskId(id)) return { ok: false, message: TASKER_COMMENT_SEND_ERROR, gone: false };
+  errorMessage = TASKER_PATCH_ERROR,
+}: AuthArgs & {
+  id: number;
+  body: TaskrPatchBody;
+  errorMessage?: string;
+}): Promise<PatchTaskerTaskResult> {
+  if (!isTaskId(id)) return { ok: false, message: errorMessage, gone: false };
+  if ("stateId" in body && !isReviewStateId(body.stateId)) {
+    return { ok: false, message: errorMessage, gone: false };
+  }
   const serialized = serializeTaskrCommentBody(body);
   if (!serialized.ok) return { ...serialized, gone: false };
   try {
@@ -823,11 +986,101 @@ export async function addTaskerTaskComment({
       timeout: TASKER_SEND_TIMEOUT_MS,
     });
     if (response.data?.success !== true) {
-      return taskrFailure(response.data?.message, TASKER_COMMENT_SEND_ERROR);
+      return taskrFailure(response.data?.message, errorMessage);
     }
     return { ok: true, message: "" };
   } catch (error: any) {
-    console.warn("addTaskerTaskComment:", error?.message ?? "error desconocido");
-    return failureFromError(error, TASKER_COMMENT_SEND_ERROR);
+    console.warn("patchTaskerTask:", error?.message ?? "error desconocido");
+    return failureFromError(error, errorMessage);
+  }
+}
+
+export type AddTaskerCommentResult = PatchTaskerTaskResult;
+
+/** Agrega un comentario (patchTaskerTask con el genérico de comentarios). */
+export function addTaskerTaskComment(
+  args: AuthArgs & { id: number; body: TaskrCommentBody },
+): Promise<AddTaskerCommentResult> {
+  return patchTaskerTask({ ...args, errorMessage: TASKER_COMMENT_SEND_ERROR });
+}
+
+// ─── Seguimiento: catálogos de estados ──────────────────────────────────────
+
+export const TASKER_TASK_STATES_ERROR = "No se pudieron cargar las evaluaciones.";
+export const TASKER_STATES_ERROR = "No se pudieron cargar los estados.";
+
+/** GET /taskr/taskStates → evaluaciones con id y nombre; las banderas solo con `true`. */
+export function mapTaskrTaskStates(raw: unknown): TaskerTaskState[] {
+  return (Array.isArray(raw) ? raw : []).flatMap((item): TaskerTaskState[] => {
+    if (!isRecord(item)) return [];
+    const id = idOrNull(item.id);
+    const name = textOrEmpty(item.name).trim();
+    if (id === null || !name) return [];
+    return [
+      {
+        id,
+        name,
+        requiresComment: item.requiresComment === true,
+        requiresDate: item.requiresDate === true,
+        suggestImage: item.suggestImage === true,
+      },
+    ];
+  });
+}
+
+/** GET /taskr/states → estados de la tarea con id y nombre (color "" si no viene). */
+export function mapTaskrStates(raw: unknown): TaskerState[] {
+  return (Array.isArray(raw) ? raw : []).flatMap((item): TaskerState[] => {
+    if (!isRecord(item)) return [];
+    const id = idOrNull(item.id);
+    const name = textOrEmpty(item.name).trim();
+    if (id === null || !name) return [];
+    return [{ id, name, color: textOrEmpty(item.color) }];
+  });
+}
+
+export type FetchTaskerTaskStatesResult =
+  | { ok: true; taskStates: TaskerTaskState[]; message: string }
+  | TaskrFailure;
+
+export async function fetchTaskerTaskStates({
+  token,
+  urlColegio,
+}: AuthArgs): Promise<FetchTaskerTaskStatesResult> {
+  try {
+    const response = await axios.get(`${urlColegio}/taskr/taskStates`, {
+      headers: authHeaders(token),
+      timeout: TASKER_FETCH_TIMEOUT_MS,
+    });
+    if (response.data?.success !== true) {
+      return taskrFailure(response.data?.message, TASKER_TASK_STATES_ERROR);
+    }
+    return { ok: true, taskStates: mapTaskrTaskStates(response.data.data), message: "" };
+  } catch (error: any) {
+    console.warn("fetchTaskerTaskStates:", error?.message ?? "error desconocido");
+    return failureFromError(error, TASKER_TASK_STATES_ERROR);
+  }
+}
+
+export type FetchTaskerStatesResult =
+  | { ok: true; states: TaskerState[]; message: string }
+  | TaskrFailure;
+
+export async function fetchTaskerStates({
+  token,
+  urlColegio,
+}: AuthArgs): Promise<FetchTaskerStatesResult> {
+  try {
+    const response = await axios.get(`${urlColegio}/taskr/states`, {
+      headers: authHeaders(token),
+      timeout: TASKER_FETCH_TIMEOUT_MS,
+    });
+    if (response.data?.success !== true) {
+      return taskrFailure(response.data?.message, TASKER_STATES_ERROR);
+    }
+    return { ok: true, states: mapTaskrStates(response.data.data), message: "" };
+  } catch (error: any) {
+    console.warn("fetchTaskerStates:", error?.message ?? "error desconocido");
+    return failureFromError(error, TASKER_STATES_ERROR);
   }
 }
