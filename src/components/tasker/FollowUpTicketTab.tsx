@@ -59,7 +59,7 @@ import type {
   TaskerTaskListItem,
   TaskerTaskState,
 } from "../../../types/typesTasker/TaskerTypes";
-import { FollowUpCardHeader, StateChip } from "./FollowUpParts";
+import { FollowUpCardHeader } from "./FollowUpParts";
 import {
   TaskerEvaluationSheet,
   TaskerIncompleteSheet,
@@ -291,17 +291,8 @@ export default function FollowUpTicketTab({
 
   return (
     <>
-      {/* ── Ticket ── */}
+      {/* ── Ticket: número y estado ya van en el topbar del modal ── */}
       <View style={styles.card}>
-        <FollowUpCardHeader
-          styles={styles}
-          tone="blue"
-          icon="document-text-outline"
-          title={`Ticket #${task.id}`}
-        >
-          <StateChip state={task.state} styles={styles} />
-        </FollowUpCardHeader>
-
         <View style={styles.clientRow}>
           <Text style={styles.clientName}>{getTaskerClientName(task.client)}</Text>
           {task.tags.length > 0 && (
@@ -390,21 +381,6 @@ export default function FollowUpTicketTab({
         </View>
       )}
 
-      {/* ── Comentarios: solo agregar; cerrado (5/6) → solo lectura ── */}
-      <TaskerCommentsCard
-        ref={commentsCardRef}
-        comments={task.comments}
-        onAdd={onAddComment}
-        canAdd={canComment}
-        closedNotice={canComment ? undefined : getClosedTaskNotice(task.stateId)}
-        order={commentOrder}
-        onOrderChange={onCommentOrderChange}
-        resetKey={commentsResetKey}
-        scrollRef={scrollRef}
-        compact
-        revealActionsOnFocus
-      />
-
       {/* ── Revisión: Completada / Incompleta (solo en 7) ── */}
       {canReview && (
         <View style={styles.card}>
@@ -439,6 +415,21 @@ export default function FollowUpTicketTab({
           </View>
         </View>
       )}
+
+      {/* ── Comentarios (al final): solo agregar; cerrado (5/6) → solo lectura ── */}
+      <TaskerCommentsCard
+        ref={commentsCardRef}
+        comments={task.comments}
+        onAdd={onAddComment}
+        canAdd={canComment}
+        closedNotice={canComment ? undefined : getClosedTaskNotice(task.stateId)}
+        order={commentOrder}
+        onOrderChange={onCommentOrderChange}
+        resetKey={commentsResetKey}
+        scrollRef={scrollRef}
+        compact
+        revealActionsOnFocus
+      />
 
       <TaskerEvaluationSheet
         key={`eval-${sheetKey}`}

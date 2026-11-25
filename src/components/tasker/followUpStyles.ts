@@ -215,10 +215,10 @@ export function createFollowUpStyles(
     ticketFieldLabel: {
       width: scale(82),
       fontSize: font(12),
-      fontWeight: "500",
-      color: TEXT_SECONDARY,
+      fontWeight: "400",
+      color: TEXT_MUTED,
     },
-    ticketFieldValue: { flex: 1, fontSize: font(12), color: TEXT_PRIMARY },
+    ticketFieldValue: { flex: 1, fontSize: font(12), fontWeight: "700", color: TEXT_PRIMARY },
     // Divisor: 1 de alto fijo.
     ticketDivider: { height: 1, backgroundColor: FOOTER_BORDER },
     ticketAction: {
@@ -325,13 +325,13 @@ export function createFollowUpStyles(
       marginTop: verticalScale(6),
     },
     phoneText: { fontSize: font(13), color: TEXT_MUTED, fontVariant: ["tabular-nums"] },
-    infoList: { gap: verticalScale(8), marginTop: verticalScale(12) },
+    infoList: { gap: verticalScale(6), marginTop: verticalScale(10) },
     infoRow: {
       flexDirection: "row",
       alignItems: "center",
-      gap: scale(10),
-      paddingHorizontal: scale(12),
-      paddingVertical: verticalScale(10),
+      gap: scale(8),
+      paddingHorizontal: scale(10),
+      paddingVertical: verticalScale(6),
       borderRadius: RADIUS_LG,
       backgroundColor: FIELD_BACKGROUND,
     },
@@ -340,17 +340,17 @@ export function createFollowUpStyles(
       borderWidth: 1,
       borderColor: PRIMARY_TINT_BORDER,
     },
-    // Círculo del ícono de cada fila: 32×32 fijo.
+    // Círculo del ícono de cada fila (compacto).
     infoIcon: {
-      width: 32,
-      height: 32,
+      width: scale(30),
+      height: scale(30),
       borderRadius: RADIUS_PILL,
       backgroundColor: CARD_BACKGROUND,
       alignItems: "center",
       justifyContent: "center",
     },
     infoBody: { flex: 1 },
-    infoLabel: { fontSize: font(11), fontWeight: "600", color: TEXT_MUTED },
+    infoLabel: { fontSize: font(11), fontWeight: "600", color: TEXT_MUTED, marginBottom: -2 },
     infoLabelHighlight: { color: PRIMARY_700 },
     infoValue: { fontSize: font(14), fontWeight: "600", color: TEXT_PRIMARY },
     infoValueStrong: { fontWeight: "700", fontVariant: ["tabular-nums"] },
