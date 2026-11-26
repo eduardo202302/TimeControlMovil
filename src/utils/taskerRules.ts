@@ -890,6 +890,11 @@ export function getReportSubjectLabel(label: string | null | undefined): string 
   return trimmedLabel(label, TASKER_REPORT_TITLE_FALLBACK).replace(/^reportar\s+/i, "");
 }
 
+export function getNoJornadaMessage(label: string | null | undefined): string {
+  if (!label?.trim()) return TASKER_NO_JORNADA_MESSAGE;
+  return `Debes iniciar tu jornada para reportar ${getReportSubjectLabel(label).toLowerCase()}.`;
+}
+
 const MONTHS_SHORT = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
 /** Fecha de Tasker sin zona ("2026-10-23T13:12:05"): ya es hora de RD. */

@@ -100,7 +100,8 @@ export function createFollowUpStyles(
     // Ícono, texto y badge siempre en una fila: el texto se encoge (una
     // línea, adjustsFontSizeToFit); ícono y badge no.
     segment: {
-      flex: 1,
+      flexGrow: 1,
+      flexShrink: 1,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",

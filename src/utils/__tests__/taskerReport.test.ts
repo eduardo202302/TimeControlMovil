@@ -23,6 +23,7 @@ import {
   getFaultSelectPlaceholder,
   getTaskerFormRules,
   getTaskerReportTitle,
+  getNoJornadaMessage,
   getReportSubjectLabel,
   formatReportSentAt,
   hasSharedCoordinatesAcrossClients,
@@ -1282,5 +1283,19 @@ describe("formatReportSentAt (fecha y hora del reporte, hora RD)", () => {
     expect(formatReportSentAt("no es fecha")).toBe("");
     expect(formatReportSentAt(new Date(Number.NaN))).toBe("");
     expect(formatReportSentAt("2026-13-01T10:00:00")).toBe("");
+  });
+});
+
+describe("getNoJornadaMessage", () => {
+  it("con label → lo reportado en minúscula", () => {
+    expect(getNoJornadaMessage("Reportar Avería")).toBe("Debes iniciar tu jornada para reportar avería.");
+    expect(getNoJornadaMessage(" Reportar Servicios ")).toBe(
+      "Debes iniciar tu jornada para reportar servicios.",
+    );
+  });
+  it("sin label → el texto sin {x}", () => {
+    for (const label of ["", "   ", null, undefined]) {
+      expect(getNoJornadaMessage(label)).toBe("Debes iniciar tu jornada para reportar.");
+    }
   });
 });

@@ -43,6 +43,7 @@ import {
   type TaskrFailure,
 } from "../../utils/taskerApi";
 import {
+  canEvaluateTask,
   createExclusiveRunner,
   getCommentDiscardedNotice,
   getTaskerClientName,
@@ -74,12 +75,13 @@ import { getTaskerCredentials } from "./taskerCredentials";
 import type { TaskerCommentsCardHandle } from "./TaskerCommentsCard";
 import { useNowMs } from "./useNowMs";
 
-type FollowUpTab = "ticket" | "address" | "actions";
+type FollowUpTab = "ticket" | "address" | "actions" | "review";
 
 const TABS: { key: FollowUpTab; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: "ticket", label: "Ticket", icon: "document-text-outline" },
-  { key: "address", label: "Dirección", icon: "location-outline" },
+  { key: "address", label: "Dir.", icon: "location-outline" },
   { key: "actions", label: "Acciones", icon: "time-outline" },
+  { key: "review", label: "Revisión", icon: "clipboard-outline" },
 ];
 
 type ListState =
@@ -103,6 +105,11 @@ type LoadMode = "initial" | "pull" | "silent";
 type DetailLoad = "ok" | "gone" | "error" | "stale";
 
 const noSession = (message: string): TaskrFailure => ({ ok: false, message, gone: false });
+
+function getInitialTab(list: ListState, id: number): FollowUpTab {
+  const summary = list.status === "ready" ? list.tasks.find((t) => t.id === id) : undefined;
+  return summary && canEvaluateTask(summary.stateId) ? "review" : "ticket";
+}
 
 /** Evaluaciones (GET /taskr/taskStates) como estado de la hoja. Nunca lanza. */
 async function requestTaskStates(): Promise<TaskStatesCatalog> {
@@ -128,7 +135,7 @@ interface FollowUpViewProps {
 /**
  * Seguimiento de los tickets de Tasker: lista vertical de tarjetas y, al
  * tocar una, su detalle en un modal a pantalla completa (pestañas Ticket /
- * Dirección / Acciones). `requestedTicketId`, si está en la lista, abre su
+ * Dir. / Acciones / Revisión). `requestedTicketId`, si está en la lista, abre su
  * modal al cargar. Mientras la pantalla tiene el foco y la app está en primer
  * plano, lista y detalle abierto se recargan solos cada
  * SEGUIMIENTO_REFRESH_MS, sin indicador y sin tocar el formulario de
@@ -178,10 +185,10 @@ export default function FollowUpView({
     setDetail(next);
   }, []);
 
-  /** Abre (id) o cierra (null) el modal. Cada ticket abierto arranca en Ticket. */
+  /** Abre (id) o cierra (null) el modal. */
   const updateSelection = useCallback(
     (id: number | null, nextDetail: DetailState | null) => {
-      if (id !== null && id !== selectedIdRef.current) setTab("ticket");
+      if (id !== null && id !== selectedIdRef.current) setTab(getInitialTab(listRef.current, id));
       selectedIdRef.current = id;
       setSelectedId(id);
       updateDetail(nextDetail);
@@ -240,7 +247,7 @@ export default function FollowUpView({
       const target = resolveRequestedTicket(result.tasks, requested);
       if (target !== null) {
         if (target !== selectedIdRef.current) updateSelection(target, { status: "loading" });
-        setTab("ticket");
+        setTab(getInitialTab(listRef.current, target));
         return true;
       }
       const id = selectedIdRef.current;
@@ -690,26 +697,6 @@ export default function FollowUpView({
             >
               {!task && renderDetailPlaceholder()}
 
-              {tab === "ticket" && task && (
-                <FollowUpTicketTab
-                  key={task.id}
-                  task={task}
-                  styles={styles}
-                  live={live}
-                  commentOrder={commentOrder}
-                  onCommentOrderChange={setCommentOrder}
-                  onAddComment={handleAddComment}
-                  commentsCardRef={commentsCardRef}
-                  commentsResetKey={commentsResetKey}
-                  scrollRef={scrollRef}
-                  taskStates={taskStates}
-                  states={states}
-                  onRetryTaskStates={retryTaskStates}
-                  onEvaluate={handleEvaluate}
-                  onChangeState={handleChangeState}
-                />
-              )}
-
               {tab !== "ticket" && task && (
                 <>
                   <View style={styles.strip}>
@@ -732,6 +719,27 @@ export default function FollowUpView({
                     />
                   )}
                 </>
+              )}
+
+              {(tab === "ticket" || tab === "review") && task && (
+                <FollowUpTicketTab
+                  key={task.id}
+                  section={tab}
+                  task={task}
+                  styles={styles}
+                  live={live}
+                  commentOrder={commentOrder}
+                  onCommentOrderChange={setCommentOrder}
+                  onAddComment={handleAddComment}
+                  commentsCardRef={commentsCardRef}
+                  commentsResetKey={commentsResetKey}
+                  scrollRef={scrollRef}
+                  taskStates={taskStates}
+                  states={states}
+                  onRetryTaskStates={retryTaskStates}
+                  onEvaluate={handleEvaluate}
+                  onChangeState={handleChangeState}
+                />
               )}
             </ScrollView>
           </KeyboardAvoidingView>

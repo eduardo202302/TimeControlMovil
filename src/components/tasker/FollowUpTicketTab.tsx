@@ -83,6 +83,7 @@ interface ReviewResult {
 }
 
 interface FollowUpTicketTabProps {
+  section: "ticket" | "review";
   task: TaskerTask;
   styles: FollowUpStyles;
   /** Seguimiento a la vista y app en primer plano: "Transcurrido" corre. */
@@ -120,6 +121,7 @@ interface FollowUpTicketTabProps {
 }
 
 export default function FollowUpTicketTab({
+  section,
   task,
   styles,
   live,
@@ -292,154 +294,162 @@ export default function FollowUpTicketTab({
 
   return (
     <>
-      {/* ── Ticket: el número va en el topbar; el estado, junto al cliente ── */}
-      <View style={styles.card}>
-        <View style={styles.clientRow}>
-          <Text style={styles.clientName} numberOfLines={2}>
-            {getTaskerClientName(task.client)}
-          </Text>
-          <View style={styles.clientState}>
-            <SolidLabel
-              color={task.state.color}
-              label={getTaskerStateLabel(task.state)}
-              styles={styles}
-            />
+      {section === "ticket" && (
+        <>
+          {/* ── Ticket: el número va en el topbar; el estado, junto al cliente ── */}
+          <View style={styles.card}>
+            <View style={styles.clientRow}>
+              <Text style={styles.clientName} numberOfLines={2}>
+                {getTaskerClientName(task.client)}
+              </Text>
+              <View style={styles.clientState}>
+                <SolidLabel
+                  color={task.state.color}
+                  label={getTaskerStateLabel(task.state)}
+                  styles={styles}
+                />
+              </View>
+            </View>
+            {task.tags.length > 0 && (
+              <View style={styles.tagChips}>
+                {task.tags.map((tag, index) => {
+                  const tone = getTagChipTone(index);
+                  return (
+                    <View key={tag.id} style={[styles.tagChip, { backgroundColor: tone.background }]}>
+                      <Text style={[styles.tagChipText, { color: tone.text }]}>{tag.name}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+            {!!task.client?.phone && (
+              <View style={styles.phoneRow}>
+                <Ionicons name="call-outline" size={14} color={TEXT_MUTED} />
+                <Text style={styles.phoneText}>{formatPhone(task.client.phone)}</Text>
+              </View>
+            )}
+
+            <View style={styles.infoList}>
+              <InfoRow
+                styles={styles}
+                icon="person-outline"
+                label="Solicitado por"
+                value={task.externalUserName.trim() || "—"}
+              />
+              <InfoRow
+                styles={styles}
+                icon="construct-outline"
+                label="Responsable"
+                value={task.assignedUser?.name.trim() || TASKER_UNASSIGNED_LABEL}
+              />
+              <InfoRow
+                styles={styles}
+                icon="calendar-outline"
+                label="Fecha"
+                value={formatTaskerDate(task.createdDate)}
+              />
+              <ElapsedRow styles={styles} createdDate={task.createdDate} live={live} />
+            </View>
           </View>
-        </View>
-        {task.tags.length > 0 && (
-          <View style={styles.tagChips}>
-            {task.tags.map((tag, index) => {
-              const tone = getTagChipTone(index);
-              return (
-                <View key={tag.id} style={[styles.tagChip, { backgroundColor: tone.background }]}>
-                  <Text style={[styles.tagChipText, { color: tone.text }]}>{tag.name}</Text>
+
+          {/* ── Descripción (solo lectura) ── */}
+          <View style={styles.card}>
+            <FollowUpCardHeader styles={styles} tone="violet" icon="list-outline" title="Descripción" />
+            <View style={styles.descriptionBox}>
+              <Text style={styles.descriptionText}>{task.action.trim() || "Sin descripción."}</Text>
+            </View>
+          </View>
+        </>
+      )}
+
+      {section === "review" && (
+        <>
+          {/* ── Averías (taskList, ya en orden): la app no marca; en Revisión evalúa ── */}
+          {task.faults.length > 0 && (
+            <View style={styles.card}>
+              <FollowUpCardHeader
+                styles={styles}
+                tone="amber"
+                icon="build-outline"
+                title={`${faultLabel} (${progress.total})`}
+              />
+              {/* Sin acciones (solo títulos) no hay avance, como Tabs/Actions.js:223 y :239. */}
+              {progress.total > 0 && (
+                <View style={styles.progress}>
+                  <Text style={styles.progressText}>{formatTaskListProgress(progress)}</Text>
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${progress.pct}%` }]} />
+                  </View>
                 </View>
-              );
-            })}
-          </View>
-        )}
-        {!!task.client?.phone && (
-          <View style={styles.phoneRow}>
-            <Ionicons name="call-outline" size={14} color={TEXT_MUTED} />
-            <Text style={styles.phoneText}>{formatPhone(task.client.phone)}</Text>
-          </View>
-        )}
-
-        <View style={styles.infoList}>
-          <InfoRow
-            styles={styles}
-            icon="person-outline"
-            label="Solicitado por"
-            value={task.externalUserName.trim() || "—"}
-          />
-          <InfoRow
-            styles={styles}
-            icon="construct-outline"
-            label="Responsable"
-            value={task.assignedUser?.name.trim() || TASKER_UNASSIGNED_LABEL}
-          />
-          <InfoRow
-            styles={styles}
-            icon="calendar-outline"
-            label="Fecha"
-            value={formatTaskerDate(task.createdDate)}
-          />
-          <ElapsedRow styles={styles} createdDate={task.createdDate} live={live} />
-        </View>
-      </View>
-
-      {/* ── Descripción (solo lectura) ── */}
-      <View style={styles.card}>
-        <FollowUpCardHeader styles={styles} tone="violet" icon="list-outline" title="Descripción" />
-        <View style={styles.descriptionBox}>
-          <Text style={styles.descriptionText}>{task.action.trim() || "Sin descripción."}</Text>
-        </View>
-      </View>
-
-      {/* ── Averías (taskList, ya en orden): la app no marca; en Revisión evalúa ── */}
-      {task.faults.length > 0 && (
-        <View style={styles.card}>
-          <FollowUpCardHeader
-            styles={styles}
-            tone="amber"
-            icon="build-outline"
-            title={`${faultLabel} (${progress.total})`}
-          />
-          {/* Sin acciones (solo títulos) no hay avance, como Tabs/Actions.js:223 y :239. */}
-          {progress.total > 0 && (
-            <View style={styles.progress}>
-              <Text style={styles.progressText}>{formatTaskListProgress(progress)}</Text>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${progress.pct}%` }]} />
+              )}
+              <View style={styles.faultList}>
+                {task.faults.map((fault, index) => (
+                  <FaultRow
+                    key={fault.id ?? `i${index}`}
+                    fault={fault}
+                    stateName={getTaskListStateName(fault, catalog)}
+                    onEvaluate={
+                      canReview && canEvaluateItem(fault) ? () => openEvaluation(fault) : undefined
+                    }
+                    disabled={sending !== null}
+                    styles={styles}
+                  />
+                ))}
               </View>
             </View>
           )}
-          <View style={styles.faultList}>
-            {task.faults.map((fault, index) => (
-              <FaultRow
-                key={fault.id ?? `i${index}`}
-                fault={fault}
-                stateName={getTaskListStateName(fault, catalog)}
-                onEvaluate={
-                  canReview && canEvaluateItem(fault) ? () => openEvaluation(fault) : undefined
-                }
-                disabled={sending !== null}
-                styles={styles}
-              />
-            ))}
-          </View>
-        </View>
-      )}
 
-      {/* ── Revisión: Completada / Incompleta (solo en 7) ── */}
-      {canReview && (
-        <View style={styles.card}>
-          <FollowUpCardHeader
-            styles={styles}
-            tone="teal"
-            icon="clipboard-outline"
-            title="Revisión"
+          {/* ── Comentarios: solo agregar; cerrado (5/6) → solo lectura ── */}
+          <TaskerCommentsCard
+            ref={commentsCardRef}
+            comments={task.comments}
+            onAdd={onAddComment}
+            canAdd={canComment}
+            closedNotice={canComment ? undefined : getClosedTaskNotice(task.stateId)}
+            order={commentOrder}
+            onOrderChange={onCommentOrderChange}
+            resetKey={commentsResetKey}
+            scrollRef={scrollRef}
+            compact
+            revealActionsOnFocus
           />
-          <Text style={styles.reviewText}>
-            Evalúa las acciones y elige cómo queda el ticket.
-          </Text>
-          <View style={styles.reviewButtons}>
-            <ReviewButton
-              label={completedName}
-              icon="checkmark-circle-outline"
-              toneStyle={styles.reviewBtnSuccess}
-              busy={sending === "complete"}
-              disabled={sending !== null}
-              onPress={confirmComplete}
-              styles={styles}
-            />
-            <ReviewButton
-              label={incompleteName}
-              icon="close-circle-outline"
-              toneStyle={styles.reviewBtnError}
-              busy={false}
-              disabled={sending !== null}
-              onPress={openIncomplete}
-              styles={styles}
-            />
-          </View>
-        </View>
-      )}
 
-      {/* ── Comentarios (al final): solo agregar; cerrado (5/6) → solo lectura ── */}
-      <TaskerCommentsCard
-        ref={commentsCardRef}
-        comments={task.comments}
-        onAdd={onAddComment}
-        canAdd={canComment}
-        closedNotice={canComment ? undefined : getClosedTaskNotice(task.stateId)}
-        order={commentOrder}
-        onOrderChange={onCommentOrderChange}
-        resetKey={commentsResetKey}
-        scrollRef={scrollRef}
-        compact
-        revealActionsOnFocus
-      />
+          {/* ── Revisión: Completada / Incompleta (solo en 7) ── */}
+          {canReview && (
+            <View style={styles.card}>
+              <FollowUpCardHeader
+                styles={styles}
+                tone="teal"
+                icon="clipboard-outline"
+                title="Revisión"
+              />
+              <Text style={styles.reviewText}>
+                Evalúa las acciones y elige cómo queda el ticket.
+              </Text>
+              <View style={styles.reviewButtons}>
+                <ReviewButton
+                  label={completedName}
+                  icon="checkmark-circle-outline"
+                  toneStyle={styles.reviewBtnSuccess}
+                  busy={sending === "complete"}
+                  disabled={sending !== null}
+                  onPress={confirmComplete}
+                  styles={styles}
+                />
+                <ReviewButton
+                  label={incompleteName}
+                  icon="close-circle-outline"
+                  toneStyle={styles.reviewBtnError}
+                  busy={false}
+                  disabled={sending !== null}
+                  onPress={openIncomplete}
+                  styles={styles}
+                />
+              </View>
+            </View>
+          )}
+        </>
+      )}
 
       <TaskerEvaluationSheet
         key={`eval-${sheetKey}`}

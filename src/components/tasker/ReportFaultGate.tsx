@@ -9,13 +9,13 @@ import { requestReportLocation } from "../../utils/taskerLocation";
 import {
   getJornadaOnVisit,
   getLocationOnVisit,
+  getNoJornadaMessage,
   getReportGate,
   isJornadaReadyForReport,
   isTaskerEnabled,
   TASKER_GO_TO_PUNCH_LABEL,
   TASKER_JORNADA_ERROR_MESSAGE,
   TASKER_NO_CLIENTS_MESSAGE,
-  TASKER_NO_JORNADA_MESSAGE,
   TASKER_NO_LOCATION_MESSAGE,
   TASKER_UNAVAILABLE_MESSAGE,
   type ReportJornadaState,
@@ -176,7 +176,7 @@ export default function ReportFaultGate() {
       return (
         <TaskerBlockedState
           icon="time-outline"
-          message={TASKER_NO_JORNADA_MESSAGE}
+          message={getNoJornadaMessage(config?.failureReportMenuLabel)}
           action={{
             label: TASKER_GO_TO_PUNCH_LABEL,
             icon: "finger-print-outline",
