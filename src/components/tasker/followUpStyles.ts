@@ -10,6 +10,7 @@ import {
   FIELD_DISABLED_BACKGROUND,
   FOOTER_BORDER,
   HEADER_BUTTON_BACKGROUND,
+  HEADER_NAVY,
   HEADER_TEXT,
   ON_PRIMARY,
   PRIMARY_700,
@@ -28,6 +29,7 @@ import {
   RADIUS_MD,
   RADIUS_PILL,
   RADIUS_SM,
+  RADIUS_XL,
 } from "@/constants/responsive";
 import { SHADOW_SM } from "@/constants/shadows";
 import {
@@ -194,12 +196,19 @@ export function createFollowUpStyles(
       alignItems: "center",
       justifyContent: "space-between",
       gap: scale(8),
+      marginTop: -scale(16),
+      marginHorizontal: -scale(16),
+      paddingHorizontal: scale(16),
+      paddingVertical: verticalScale(12),
+      borderTopLeftRadius: RADIUS_XL,
+      borderTopRightRadius: RADIUS_XL,
+      backgroundColor: HEADER_NAVY,
     },
     ticketId: {
       flexShrink: 0,
       fontSize: font(17),
       fontWeight: "700",
-      color: TEXT_PRIMARY,
+      color: HEADER_TEXT,
       fontVariant: ["tabular-nums"],
     },
     // Label macizo (estado, prioridad): colores en línea con getSolidLabelColors.
@@ -406,8 +415,6 @@ export function createFollowUpStyles(
       color: TEXT_MUTED,
       fontVariant: ["tabular-nums"],
     },
-    // Evaluación de la acción: chip neutro bajo el texto. Borde para que se
-    // distinga sobre la fila, que tiene el mismo FIELD_BACKGROUND.
     evalChip: {
       alignSelf: "flex-start",
       marginTop: verticalScale(6),
@@ -415,10 +422,10 @@ export function createFollowUpStyles(
       paddingVertical: verticalScale(3),
       borderRadius: RADIUS_PILL,
       borderWidth: 1,
-      borderColor: CARD_BORDER,
-      backgroundColor: FIELD_BACKGROUND,
+      borderColor: PRIMARY_COLOR,
+      backgroundColor: PRIMARY_COLOR,
     },
-    evalChipText: { fontSize: font(12), fontWeight: "600", color: TEXT_SECONDARY },
+    evalChipText: { fontSize: font(12), fontWeight: "600", color: ON_PRIMARY },
     // Botón "Evaluar" (36×36 + hitSlop = 44 de área táctil).
     evalBtn: {
       width: scale(36),
