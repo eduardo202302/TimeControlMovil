@@ -333,6 +333,16 @@ export interface TodayHoliday {
 
 // ─── Store type extendido ─────────────────────────────────────────────────────
 
+export interface ReportPosition {
+  coords: { latitude: number; longitude: number };
+  at: number | null;
+}
+
+export interface LastJornadaCheck {
+  open: boolean;
+  at: number;
+}
+
 export interface SchoolStore {
   // Campos existentes
   school: School | null;
@@ -382,6 +392,8 @@ export interface SchoolStore {
   // Nombre del cliente (localidad) elegido en Reportar: subtítulo del header
   // en /reportfault. Solo en memoria; null = sin formulario montado.
   taskerReportClientName: string | null;
+  reportPosition: ReportPosition | null;
+  lastJornadaCheck: LastJornadaCheck | null;
 
   // Acciones existentes
   setSchool: (school: School) => void;
@@ -401,6 +413,8 @@ export interface SchoolStore {
   setClosedOpenDayKey: (key: string | null) => void;
   setTaskerSession: (session: TaskerSession) => void;
   setTaskerReportClientName: (name: string | null) => void;
+  setReportPosition: (position: ReportPosition | null) => void;
+  setLastJornadaCheck: (check: LastJornadaCheck | null) => void;
   /** Actualiza el store y la persiste en SecureStore. */
   setLastCompany: (lastCompany: LastCompany) => Promise<void>;
   /** La saca del store y la borra de SecureStore. */

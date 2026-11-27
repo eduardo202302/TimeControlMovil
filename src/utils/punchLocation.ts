@@ -10,6 +10,8 @@
  * aquí las reglas de precisión (sección "Precisión").
  */
 
+import type { User } from "../../types/typeStore/SchoolStoreType";
+
 export interface PunchCoordinates {
   latitude: number;
   longitude: number;
@@ -41,6 +43,21 @@ export interface LocationApi {
   }): Promise<LocationReading | null>;
   /** Posición nueva con precisión Balanced (la fija el adaptador). */
   getCurrentPositionAsync(): Promise<LocationReading>;
+}
+
+export function isLocationValidationEnabled(
+  userSettings: { isValidLocation?: boolean } | null | undefined,
+  schoolSettings: { isValidLocation?: boolean } | null | undefined,
+): boolean {
+  return Boolean(userSettings?.isValidLocation ?? schoolSettings?.isValidLocation);
+}
+
+export function userValidatesLocation(user: User | null | undefined): boolean {
+  const schoolUser = user?.user?.schoolUsers?.[0];
+  return isLocationValidationEnabled(
+    schoolUser?.settings,
+    schoolUser?.school?.settings ?? user?.school?.settings,
+  );
 }
 
 /** Antigüedad máxima aceptada de la última posición conocida. */

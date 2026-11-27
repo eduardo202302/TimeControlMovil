@@ -153,11 +153,14 @@ import {
   userRequiresJornadaForReport,
 } from "../../utils/reportJornadaRules";
 import { TASKER_REPORT_PATH } from "../../utils/taskerRules";
+import { recordJornadaCheck } from "../../utils/reportJornada";
 import { expoLocationApi } from "../../utils/locationApi";
 import {
   getBestEffortCoordinates,
   isApproximateLocationPermission,
+  isLocationValidationEnabled,
   promptLocationPermission,
+  userValidatesLocation,
   readWithAccuracyRetry,
   resolveLocationCardStatus,
   startOptionalPunchCoordinates,
@@ -674,9 +677,7 @@ export default function PunchInOut() {
   const isImageRequired: boolean = Boolean(
     schoolUserSettings?.isImageRequired ?? schoolSettings?.isImageRequired,
   );
-  const isValidLocation: boolean = Boolean(
-    schoolUserSettings?.isValidLocation ?? schoolSettings?.isValidLocation,
-  );
+  const isValidLocation = isLocationValidationEnabled(schoolUserSettings, schoolSettings);
 
   /**
    * Categoría de los "Motivos del break", de la config de la escuela
@@ -1019,13 +1020,14 @@ export default function PunchInOut() {
     useCallback(async (): Promise<PunchEvent | null> => {
       try {
         setLoadingPunches(true);
+        const sessionUser = useSchoolStore.getState().user;
         const token = await getToken();
         if (!urlColegio || !token) return null;
-        // GET /punches/today (punchesTodayApi): nunca lanza; registra la
-        // respuesta y los errores con los mismos console.log/error de antes.
+        // GET /punches/today (punchesTodayApi): nunca lanza.
         const result = await fetchPunchesToday({ urlColegio, token });
         if (!result.ok) return null;
         const data: PunchEvent[] = result.punches;
+        recordJornadaCheck(data, sessionUser);
         setPunches(data);
         // findOpenDayPunch es código muerto con el contrato actual (ver su
         // doc): /punches/today no marca la jornada abierta. Se deja por si el
@@ -1820,10 +1822,11 @@ export default function PunchInOut() {
           blinkRequestedRef.current = true;
           // Inicio de jornada (base, Adicional o FH) con la regla de Reportar
           // → a Reportar cuando termine el parpadeo.
-          const { allowedMenuItems, taskerConfig } = useSchoolStore.getState();
+          const { allowedMenuItems, taskerConfig, user: sessionUser } = useSchoolStore.getState();
           reportAfterBlinkRequestedRef.current =
             isJornadaStartType(apiType) &&
-            userRequiresJornadaForReport(allowedMenuItems, taskerConfig);
+            userRequiresJornadaForReport(allowedMenuItems, taskerConfig) &&
+            userValidatesLocation(sessionUser);
         }
 
         if (response.data?.status === "Fuera de área") {

@@ -32,10 +32,6 @@ export async function fetchPunchesToday({
       headers: { Authorization: `Bearer ${token}` },
       ...(timeoutMs !== undefined && { timeout: timeoutMs }),
     });
-    console.log("TODAY PUNCHES RESPONSE:", {
-      clientTimestamp: new Date().toISOString(),
-      data: response?.data,
-    });
     // Mismo criterio que tenía el ponchador: cualquier success falsy es fallo.
     if (!response?.data?.success) return { ok: false, punches: [] };
     const data = response.data.data;

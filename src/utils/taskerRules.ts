@@ -850,6 +850,8 @@ export const TASKER_JORNADA_ERROR_MESSAGE =
 export const TASKER_GO_TO_PUNCH_LABEL = "Ir a Registrar Acceso";
 export const TASKER_NO_LOCATION_MESSAGE =
   "Active la ubicación de su teléfono e intente nuevamente, si el problema persiste contacte a tecnología.";
+export const TASKER_LOCATION_NOT_ENABLED_MESSAGE =
+  "Tu usuario no tiene habilitada la validación de ubicación. Contacta a tecnología.";
 
 /** ¿La compañía activa está conectada a Tasker? Sin config → no. */
 export function isTaskerEnabled(config: TaskerCompanyConfig | null | undefined): boolean {
@@ -1278,7 +1280,7 @@ export type ReportLocationState =
   | { status: "pending" }
   | { status: "refreshing" }
   | { status: "failed"; canAskAgain: boolean }
-  | { status: "ok"; coords: { latitude: number; longitude: number } };
+  | { status: "ok"; coords: { latitude: number; longitude: number }; timestamp?: number };
 
 /**
  * Al entrar a Reportar y al salir: la posición nunca pasa de una visita a la
@@ -1331,6 +1333,7 @@ export function isJornadaReadyForReport(jornada: ReportJornadaState): boolean {
 export type ReportGate =
   | "unavailable"
   | "noClients"
+  | "locationNotEnabled"
   | "checkingJornada"
   | "noJornada"
   | "jornadaError"
@@ -1349,16 +1352,19 @@ export type ReportGate =
 export function getReportGate({
   config,
   clients,
+  locationEnabled = true,
   jornada = { status: "notRequired" },
   location,
 }: {
   config: TaskerCompanyConfig | null | undefined;
   clients: TaskerUserClient[];
+  locationEnabled?: boolean;
   jornada?: ReportJornadaState;
   location: ReportLocationState;
 }): ReportGate {
   if (!isTaskerEnabled(config)) return "unavailable";
   if (clients.length === 0) return "noClients";
+  if (!locationEnabled) return "locationNotEnabled";
   if (jornada.status === "checking") return "checkingJornada";
   if (jornada.status === "closed") return "noJornada";
   if (jornada.status === "failed") return "jornadaError";

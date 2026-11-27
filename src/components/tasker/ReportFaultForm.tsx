@@ -102,7 +102,7 @@ import {
   TASKER_SEND_ERROR,
 } from "../../utils/taskerApi";
 import { expoSendPositionApi } from "../../utils/locationApi";
-import { captureSendPosition } from "../../utils/taskerLocation";
+import { captureSendPosition, getRecentSendPosition } from "../../utils/taskerLocation";
 import * as Storage from "../../utils/storage";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import type {
@@ -522,7 +522,8 @@ export default function ReportFaultForm({ config, clients, coords }: ReportFault
         // Credenciales primero: un cambio de sesión durante la captura no desvía el reporte.
         const credentials = await sessionCredentials();
         const position = credentials
-          ? await captureSendPosition(expoSendPositionApi, coords)
+          ? (getRecentSendPosition(useSchoolStore.getState().reportPosition, Date.now()) ??
+            (await captureSendPosition(expoSendPositionApi, coords)))
           : null;
         const body = buildTaskrTaskBody({
           appliesFault: config.appliesFault === true,

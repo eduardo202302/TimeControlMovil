@@ -3,7 +3,13 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Linking } from "react-native";
 import { useSchoolStore } from "../../../store/useSchoolStore";
 import { expoTaskerLocationApi, isDevEmulator } from "../../utils/locationApi";
-import { checkOpenJornadaToday, REPORT_JORNADA_TIMEOUT_MS } from "../../utils/reportJornada";
+import { userValidatesLocation } from "../../utils/punchLocation";
+import {
+  checkOpenJornadaToday,
+  getRecentJornadaCheck,
+  REPORT_JORNADA_TIMEOUT_MS,
+  type OpenJornadaCheck,
+} from "../../utils/reportJornada";
 import { PUNCHINOUT_PATH, userRequiresJornadaForReport } from "../../utils/reportJornadaRules";
 import { requestReportLocation } from "../../utils/taskerLocation";
 import {
@@ -15,6 +21,7 @@ import {
   isTaskerEnabled,
   TASKER_GO_TO_PUNCH_LABEL,
   TASKER_JORNADA_ERROR_MESSAGE,
+  TASKER_LOCATION_NOT_ENABLED_MESSAGE,
   TASKER_NO_CLIENTS_MESSAGE,
   TASKER_NO_LOCATION_MESSAGE,
   TASKER_UNAVAILABLE_MESSAGE,
@@ -29,17 +36,22 @@ import TaskerBlockedState from "./TaskerBlockedState";
  * compañía no conectada → usuario sin clientes → jornada abierta hoy (si la
  * regla aplica: Tasker + ponchador en el menú) → buscando la posición → sin
  * posición → formulario. La jornada se consulta (GET /punches/today) en cada
- * entrada; la posición se pide recién cuando todo lo anterior pasa, y NUEVA
- * en cada entrada a la pantalla y con cada sesión nueva (volver a iniciar
- * sesión o cambiar de empresa). Al salir se descarta: nunca pasa de una
- * visita a otra.
+ * entrada; la posición se pide recién cuando todo lo anterior pasa.
  */
+function savedLocation(): ReportLocationState | null {
+  const saved = useSchoolStore.getState().reportPosition;
+  return saved ? { status: "ok", coords: saved.coords } : null;
+}
+
 export default function ReportFaultGate() {
   const config = useSchoolStore((state) => state.taskerConfig);
   const clients = useSchoolStore((state) => state.taskerClients);
   const allowedMenuItems = useSchoolStore((state) => state.allowedMenuItems);
+  const locationEnabled = userValidatesLocation(useSchoolStore((state) => state.user));
   const jornadaRequired = userRequiresJornadaForReport(allowedMenuItems, config);
-  const [location, setLocation] = useState<ReportLocationState>({ status: "pending" });
+  const [location, setLocation] = useState<ReportLocationState>(
+    () => savedLocation() ?? { status: "pending" },
+  );
   const [jornada, setJornada] = useState<ReportJornadaState>(() =>
     getJornadaOnVisit({ status: "checking" }, jornadaRequired),
   );
@@ -54,7 +66,7 @@ export default function ReportFaultGate() {
   const openedSettingsRef = useRef(false);
 
   /** Busca la posición; el estado solo cambia cuando llega la respuesta. */
-  const locate = useCallback(() => {
+  const locate = useCallback((background: boolean) => {
     const id = ++requestRef.current;
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -62,25 +74,38 @@ export default function ReportFaultGate() {
     void requestReportLocation(expoTaskerLocationApi, {
       signal: controller.signal,
       acceptStaleLastKnown: isDevEmulator,
-    }).then((result) => {
-      if (id === requestRef.current) setLocation(result);
+      promptPermission: !background,
+    }).then(async (result) => {
+      if (id !== requestRef.current) return;
+      if (result.status === "ok") {
+        useSchoolStore.getState().setReportPosition({ coords: result.coords, at: result.timestamp ?? null });
+        setLocation(result);
+      } else if (!background) {
+        setLocation(result);
+      } else {
+        const permission = await expoTaskerLocationApi.getForegroundPermissionsAsync().catch(() => null);
+        if (permission && permission.status !== "granted") useSchoolStore.getState().setReportPosition(null);
+      }
     });
   }, []);
 
   /** Reintento: vuelve al indicador de carga y busca de nuevo. */
   const relocate = useCallback(() => {
     setLocation({ status: "pending" });
-    locate();
+    locate(false);
   }, [locate]);
 
   /** Consulta la jornada; el estado solo cambia cuando llega la respuesta. */
   const checkJornada = useCallback(() => {
     const id = ++jornadaRequestRef.current;
-    void checkOpenJornadaToday(REPORT_JORNADA_TIMEOUT_MS).then((result) => {
+    const apply = (result: OpenJornadaCheck) => {
       if (id !== jornadaRequestRef.current) return;
       if (!result.ok) setJornada({ status: "failed" });
       else setJornada({ status: result.open ? "open" : "closed" });
-    });
+    };
+    const recent = getRecentJornadaCheck();
+    if (recent) apply(recent);
+    else void checkOpenJornadaToday(REPORT_JORNADA_TIMEOUT_MS).then(apply);
   }, []);
 
   /** Reintento tras un fallo de red: vuelve al indicador y consulta de nuevo. */
@@ -107,7 +132,8 @@ export default function ReportFaultGate() {
   // se corta la consulta y queda marcada para volver a consultarse: tras un
   // "open" pasa a rechecking, así el formulario abierto no se desmonta mientras
   // llega la nueva respuesta y la posición no se pide hasta confirmarla.
-  const jornadaApplies = jornadaRequired && isTaskerEnabled(config) && clients.length > 0;
+  const jornadaApplies =
+    jornadaRequired && isTaskerEnabled(config) && clients.length > 0 && locationEnabled;
   useFocusEffect(
     useCallback(() => {
       setJornada((prev) => getJornadaOnVisit(prev, jornadaRequired));
@@ -120,17 +146,18 @@ export default function ReportFaultGate() {
     }, [jornadaRequired, jornadaApplies, checkJornada, config, clients]),
   );
 
-  // Cada entrada a Reportar pide una posición nueva; al salir se corta la
-  // búsqueda y se descarta la posición (con el formulario abierto, este sigue
-  // y espera la nueva: ver getLocationOnVisit).
   // Sin jornada confirmada (regla aplicada) no se pide el GPS.
   const needsLocation =
-    isTaskerEnabled(config) && clients.length > 0 && isJornadaReadyForReport(jornada);
+    isTaskerEnabled(config) &&
+    clients.length > 0 &&
+    locationEnabled &&
+    isJornadaReadyForReport(jornada);
   useFocusEffect(
     useCallback(() => {
       if (!needsLocation) return undefined;
-      setLocation(getLocationOnVisit);
-      locate();
+      const saved = savedLocation();
+      setLocation(saved ?? getLocationOnVisit);
+      locate(saved !== null);
       return () => {
         requestRef.current += 1;
         abortRef.current?.abort();
@@ -163,13 +190,15 @@ export default function ReportFaultGate() {
     relocate();
   }, [location, relocate]);
 
-  const gate = getReportGate({ config, clients, jornada, location });
+  const gate = getReportGate({ config, clients, locationEnabled, jornada, location });
 
   switch (gate) {
     case "unavailable":
       return <TaskerBlockedState icon="ban-outline" tone="red" message={TASKER_UNAVAILABLE_MESSAGE} />;
     case "noClients":
       return <TaskerBlockedState icon="people-outline" message={TASKER_NO_CLIENTS_MESSAGE} />;
+    case "locationNotEnabled":
+      return <TaskerBlockedState icon="location-outline" message={TASKER_LOCATION_NOT_ENABLED_MESSAGE} />;
     case "checkingJornada":
       return <TaskerBlockedState loading message="Verificando tu jornada…" />;
     case "noJornada":

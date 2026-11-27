@@ -103,6 +103,8 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   taskerConfig: null,
   taskerClients: [],
   taskerReportClientName: null,
+  reportPosition: null,
+  lastJornadaCheck: null,
 
   // ─── Acciones existentes (sin cambios) ──────────────────────────────────────
   setSchool: (school) => set({ school }),
@@ -131,6 +133,8 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       taskerConfig: null,
       taskerClients: [],
       taskerReportClientName: null,
+      reportPosition: null,
+      lastJornadaCheck: null,
     }),
 
   // ─── Cerrar sesión — conserva urlColegio y school para poder volver a login ─
@@ -152,6 +156,8 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
       taskerConfig: null,
       taskerClients: [],
       taskerReportClientName: null,
+      reportPosition: null,
+      lastJornadaCheck: null,
     }),
 
   // ─── Acción nueva: resuelve app + ruta + menú tras el login ─────────────────
@@ -178,8 +184,10 @@ export const useSchoolStore = create<SchoolStore>((set) => ({
   setPendingOpenDay: (pendingOpenDay) => set({ pendingOpenDay }),
   setClosedOpenDayKey: (closedOpenDayKey) => set({ closedOpenDayKey }),
   setTaskerSession: ({ config, clients }) =>
-    set({ taskerConfig: config, taskerClients: clients }),
+    set({ taskerConfig: config, taskerClients: clients, reportPosition: null, lastJornadaCheck: null }),
   setTaskerReportClientName: (taskerReportClientName) => set({ taskerReportClientName }),
+  setReportPosition: (reportPosition) => set({ reportPosition }),
+  setLastJornadaCheck: (lastJornadaCheck) => set({ lastJornadaCheck }),
 
   // ─── Última compañía — fuera de clear()/logout() a propósito ────────────────
   setLastCompany: async (lastCompany) => {

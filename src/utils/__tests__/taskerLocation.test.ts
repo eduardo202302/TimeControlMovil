@@ -6,6 +6,7 @@ import {
   EMULATOR_LAST_KNOWN_MAX_AGE_MS,
   formatCoordsForLog,
   getCurrentPositionWaitMs,
+  getRecentSendPosition,
   getPermissionStep,
   getReadingAgeSeconds,
   isLastKnownFresh,
@@ -13,6 +14,7 @@ import {
   REPORT_LOCATION_TIMEOUT_MS,
   requestReportLocation,
   SEND_POSITION_TIMEOUT_MS,
+  SEND_RECENT_POSITION_MAX_AGE_MS,
   watchFirstPosition,
   type TaskerLocationApi,
   type TaskerPositionReading,
@@ -266,6 +268,34 @@ describe("requestReportLocation — permiso y ubicación", () => {
   });
 });
 
+describe("requestReportLocation — sin pedir permiso y tope tras el permiso", () => {
+  it("promptPermission false → no abre el diálogo; sin conceder → failed", async () => {
+    const { api } = fakeApi({
+      getForegroundPermissionsAsync: jest.fn(async () => ({ status: "undetermined", canAskAgain: true })),
+    });
+    await expect(
+      requestReportLocation(api, { ...FAST, promptPermission: false, log: () => undefined }),
+    ).resolves.toEqual({ status: "failed", canAskAgain: true });
+    expect(api.requestForegroundPermissionsAsync).not.toHaveBeenCalled();
+    expect(api.getForegroundPermissionsAsync).toHaveBeenCalledTimes(1);
+  });
+  it("el tope cuenta desde que se resolvió el permiso", async () => {
+    let offset = 0;
+    const { api } = fakeApi({
+      getForegroundPermissionsAsync: jest.fn(async () => {
+        offset += 1_000;
+        return { status: "granted", canAskAgain: true };
+      }),
+      getCurrentPositionAsync: jest.fn(
+        () => new Promise((resolve) => setTimeout(() => resolve(reading(1, 2)), 40)),
+      ),
+    });
+    await expect(
+      requestReportLocation(api, { ...FAST, now: () => Date.now() + offset, log: () => undefined }),
+    ).resolves.toEqual({ status: "ok", coords: { latitude: 1, longitude: 2 } });
+  });
+});
+
 describe("requestReportLocation — posición nueva primero", () => {
   it("siempre pide una nueva; la última conocida ni se consulta si llega", async () => {
     const now = 1_000_000;
@@ -275,7 +305,7 @@ describe("requestReportLocation — posición nueva primero", () => {
     });
     await expect(
       requestReportLocation(api, { ...FAST, now: () => now, log: () => undefined }),
-    ).resolves.toEqual({ status: "ok", coords: { latitude: 18.4706, longitude: -69.9389 } });
+    ).resolves.toEqual({ status: "ok", coords: { latitude: 18.4706, longitude: -69.9389 }, timestamp: now });
     expect(api.getCurrentPositionAsync).toHaveBeenCalledTimes(1);
     expect(api.getLastKnownPositionAsync).not.toHaveBeenCalled();
   });
@@ -299,7 +329,7 @@ describe("requestReportLocation — respaldo con la última conocida", () => {
     const api = noFresh({ getLastKnownPositionAsync: jest.fn(async () => reading(1, 2, now - 90_000)) });
     await expect(
       requestReportLocation(api, { ...FAST, now: () => now, log: () => undefined }),
-    ).resolves.toEqual({ status: "ok", coords: { latitude: 1, longitude: 2 } });
+    ).resolves.toEqual({ status: "ok", coords: { latitude: 1, longitude: 2 }, timestamp: now - 90_000 });
     expect(api.getLastKnownPositionAsync).toHaveBeenCalledWith(
       expect.objectContaining({ maxAge: REPORT_LAST_KNOWN_MAX_AGE_MS }),
     );
@@ -322,7 +352,7 @@ describe("requestReportLocation — respaldo con la última conocida", () => {
         log: (l) => lines.push(l),
         acceptStaleLastKnown: true,
       }),
-    ).resolves.toEqual({ status: "ok", coords: { latitude: 1, longitude: 2 } });
+    ).resolves.toEqual({ status: "ok", coords: { latitude: 1, longitude: 2 }, timestamp: now - 300_000 });
     expect(api.getLastKnownPositionAsync).toHaveBeenCalledWith(
       expect.objectContaining({ maxAge: EMULATOR_LAST_KNOWN_MAX_AGE_MS }),
     );
@@ -494,6 +524,19 @@ describe("requestReportLocation — logs", () => {
 });
 
 // ─── Posición al enviar el reporte ──────────────────────────────────────────
+
+describe("getRecentSendPosition", () => {
+  const saved = { coords: { latitude: 1, longitude: 2 }, at: 1_000_000 };
+  it("sin hora de lectura → null", () => {
+    expect(getRecentSendPosition({ ...saved, at: null }, saved.at)).toBeNull();
+  });
+  it("menos de 60 s → la guardada; 60 s o más, o sin guardada → null", () => {
+    expect(SEND_RECENT_POSITION_MAX_AGE_MS).toBe(60_000);
+    expect(getRecentSendPosition(saved, saved.at + 59_999)).toBe(saved.coords);
+    expect(getRecentSendPosition(saved, saved.at + 60_000)).toBeNull();
+    expect(getRecentSendPosition(null, saved.at)).toBeNull();
+  });
+});
 
 describe("captureSendPosition", () => {
   const SCREEN = { latitude: 18.5, longitude: -69.9 };

@@ -11,6 +11,7 @@ import {
   getNearestElsewhereHint,
   getRemovedFaultsNotice,
   getReportGate,
+  TASKER_LOCATION_NOT_ENABLED_MESSAGE,
   getSelectedTaskerAddress,
   formatAddressCandidatesTable,
   formatDistanceAway,
@@ -731,6 +732,62 @@ describe("getReportGate", () => {
     expect(
       getReportGate({ config: config(), clients, location: { status: "refreshing" } }),
     ).toBe("ready");
+  });
+
+  describe("validación de ubicación del usuario (isValidLocation)", () => {
+    it("apagada → locationNotEnabled, después de noClients y antes de la jornada y la posición", () => {
+      expect(
+        getReportGate({ config: config(), clients, locationEnabled: false, location: ok }),
+      ).toBe("locationNotEnabled");
+      expect(
+        getReportGate({
+          config: config(),
+          clients,
+          locationEnabled: false,
+          jornada: { status: "checking" },
+          location: pending,
+        }),
+      ).toBe("locationNotEnabled");
+      expect(
+        getReportGate({
+          config: config(),
+          clients,
+          locationEnabled: false,
+          jornada: { status: "closed" },
+          location: failed,
+        }),
+      ).toBe("locationNotEnabled");
+      expect(
+        getReportGate({ config: config(), clients: [], locationEnabled: false, location: ok }),
+      ).toBe("noClients");
+      expect(
+        getReportGate({
+          config: config({ connected: false }),
+          clients,
+          locationEnabled: false,
+          location: ok,
+        }),
+      ).toBe("unavailable");
+    });
+    it("encendida (o sin indicar) → sigue como antes", () => {
+      expect(getReportGate({ config: config(), clients, locationEnabled: true, location: ok })).toBe(
+        "ready",
+      );
+      expect(
+        getReportGate({
+          config: config(),
+          clients,
+          locationEnabled: true,
+          jornada: { status: "checking" },
+          location: pending,
+        }),
+      ).toBe("checkingJornada");
+    });
+    it("mensaje exacto", () => {
+      expect(TASKER_LOCATION_NOT_ENABLED_MESSAGE).toBe(
+        "Tu usuario no tiene habilitada la validación de ubicación. Contacta a tecnología.",
+      );
+    });
   });
 
   describe("jornada (regla: Reportar solo con jornada abierta hoy)", () => {

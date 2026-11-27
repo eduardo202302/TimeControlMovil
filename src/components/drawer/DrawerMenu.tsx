@@ -614,9 +614,10 @@ export default function DrawerMenu({
   const handleNavigate = useCallback(
     (path: string) => {
       onClose();
+      if (path === pathname) return;
       router.push(path as never);
     },
-    [onClose, router],
+    [onClose, router, pathname],
   );
 
   const handleLogout = useCallback(() => {

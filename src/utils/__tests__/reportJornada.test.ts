@@ -8,7 +8,10 @@ import { fetchPunchesToday } from "../punchesTodayApi";
 import type { PunchEvent } from "../punchRules";
 import {
   checkOpenJornadaToday,
+  getRecentJornadaCheck,
   LANDING_JORNADA_TIMEOUT_MS,
+  RECENT_JORNADA_CHECK_MAX_AGE_MS,
+  recordJornadaCheck,
   resolveLandingPath,
 } from "../reportJornada";
 import {
@@ -227,11 +230,15 @@ function session({
   menu = [PUNCH_ITEM, PERMS_ITEM],
   tasker = CONNECTED,
   token = TOKEN as string | null,
+  userSettings = undefined as { isValidLocation?: boolean } | undefined,
+  schoolValidatesLocation = true,
 }: {
   defaultPath?: string;
   menu?: MenuItem[];
   tasker?: TaskerCompanyConfig;
   token?: string | null;
+  userSettings?: { isValidLocation?: boolean };
+  schoolValidatesLocation?: boolean;
 } = {}) {
   const role: RoleItem = {
     id: 10,
@@ -240,7 +247,12 @@ function session({
     menu: menu.map((m) => m.id),
     defaultMenu: { icon: "x", id: 2, name: "x", order: 1, parentId: 0, path: defaultPath, type: "item" },
   };
-  const user = { roleId: 10, role } as unknown as User;
+  const user = {
+    roleId: 10,
+    role,
+    school: { settings: { isValidLocation: schoolValidatesLocation } },
+    user: { schoolUsers: [{ settings: userSettings }] },
+  } as unknown as User;
   const store = useSchoolStore.getState();
   store.setUrlColegio(URL);
   if (token) store.setToken(token);
@@ -280,6 +292,55 @@ describe("checkOpenJornadaToday", () => {
   });
 });
 
+describe("última consulta de jornada (reutilizable 10 s)", () => {
+  it("checkOpenJornadaToday la guarda y se reutiliza antes de 10 s", async () => {
+    session();
+    mockedGet.mockResolvedValueOnce({
+      data: { success: true, data: [punch(1, "InicioJornada", todayNaive(0))] },
+    });
+    await checkOpenJornadaToday(1000);
+    const { at } = useSchoolStore.getState().lastJornadaCheck!;
+    expect(RECENT_JORNADA_CHECK_MAX_AGE_MS).toBe(10_000);
+    expect(getRecentJornadaCheck(at + 9_999)).toEqual({ ok: true, open: true });
+    expect(getRecentJornadaCheck(at + 10_000)).toBeNull();
+  });
+  it("una consulta fallida no se guarda", async () => {
+    session();
+    mockedGet.mockRejectedValueOnce(new Error("Network Error"));
+    await checkOpenJornadaToday(1000);
+    expect(useSchoolStore.getState().lastJornadaCheck).toBeNull();
+    expect(getRecentJornadaCheck()).toBeNull();
+  });
+  it("recordJornadaCheck no guarda si la sesión cambió", () => {
+    session();
+    const before = useSchoolStore.getState().user;
+    session();
+    expect(recordJornadaCheck([punch(1, "InicioJornada", todayNaive(0))], before)).toBe(true);
+    expect(useSchoolStore.getState().lastJornadaCheck).toBeNull();
+    recordJornadaCheck([], useSchoolStore.getState().user);
+    expect(useSchoolStore.getState().lastJornadaCheck).toMatchObject({ open: false });
+  });
+  it("logout, clear y setTaskerSession la borran, junto con reportPosition", () => {
+    const fill = () => {
+      useSchoolStore.getState().setLastJornadaCheck({ open: true, at: 1 });
+      useSchoolStore.getState().setReportPosition({ coords: { latitude: 1, longitude: 2 }, at: 1 });
+    };
+    const empty = () => {
+      expect(useSchoolStore.getState().lastJornadaCheck).toBeNull();
+      expect(useSchoolStore.getState().reportPosition).toBeNull();
+    };
+    fill();
+    useSchoolStore.getState().logout();
+    empty();
+    fill();
+    useSchoolStore.getState().clear();
+    empty();
+    fill();
+    useSchoolStore.getState().setTaskerSession({ config: CONNECTED, clients: [] });
+    empty();
+  });
+});
+
 describe("resolveLandingPath", () => {
   it("regla + jornada abierta hoy → /reportfault (consulta con tope corto)", async () => {
     session();
@@ -306,6 +367,20 @@ describe("resolveLandingPath", () => {
     session({ menu: [PERMS_ITEM] });
     await expect(resolveLandingPath()).resolves.toBe("/mypermissions");
     expect(mockedGet).not.toHaveBeenCalled();
+  });
+  it("regla + jornada abierta pero sin validación de ubicación → la ruta de siempre, sin consultar", async () => {
+    session({ schoolValidatesLocation: false });
+    await expect(resolveLandingPath()).resolves.toBe("/mypermissions");
+    session({ userSettings: { isValidLocation: false } });
+    await expect(resolveLandingPath()).resolves.toBe("/mypermissions");
+    expect(mockedGet).not.toHaveBeenCalled();
+  });
+  it("el setting del usuario manda sobre el de la sede", async () => {
+    session({ schoolValidatesLocation: false, userSettings: { isValidLocation: true } });
+    mockedGet.mockResolvedValueOnce({
+      data: { success: true, data: [punch(1, "InicioJornada", todayNaive(0))] },
+    });
+    await expect(resolveLandingPath()).resolves.toBe("/reportfault");
   });
   it("defaultMenu no válido en el móvil → /punchinout (resolveMobilePath)", async () => {
     session({ defaultPath: "/roles", tasker: TASKER_DISCONNECTED_CONFIG });

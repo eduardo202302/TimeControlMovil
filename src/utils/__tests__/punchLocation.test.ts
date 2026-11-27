@@ -4,6 +4,8 @@ import {
   getBestEffortCoordinates,
   isAccuracySufficient,
   isApproximateLocationPermission,
+  isLocationValidationEnabled,
+  userValidatesLocation,
   LAST_KNOWN_MAX_AGE_MS,
   LAST_KNOWN_REQUIRED_ACCURACY_M,
   pickMoreAccurate,
@@ -383,5 +385,25 @@ describe("resolveLocationCardStatus", () => {
 
   it("sin dato de precisión → veredicto normal", () => {
     expect(resolveLocationCardStatus(null, 70_000, 150)).toBe("outside");
+  });
+});
+
+describe("isLocationValidationEnabled", () => {
+  it("el del usuario manda; sin él, el de la sede; sin ninguno, false", () => {
+    expect(isLocationValidationEnabled({ isValidLocation: false }, { isValidLocation: true })).toBe(false);
+    expect(isLocationValidationEnabled({ isValidLocation: true }, { isValidLocation: false })).toBe(true);
+    expect(isLocationValidationEnabled({}, { isValidLocation: true })).toBe(true);
+    expect(isLocationValidationEnabled(undefined, undefined)).toBe(false);
+  });
+});
+
+describe("userValidatesLocation", () => {
+  it("lee schoolUsers[0].settings y, sin él, la sede (schoolUsers[0].school o user.school)", () => {
+    const user = (u: unknown, su: unknown, s: unknown) =>
+      ({ school: { settings: s }, user: { schoolUsers: [{ settings: u, school: { settings: su } }] } }) as never;
+    expect(userValidatesLocation(user({ isValidLocation: false }, { isValidLocation: true }, {}))).toBe(false);
+    expect(userValidatesLocation(user(undefined, { isValidLocation: true }, {}))).toBe(true);
+    expect(userValidatesLocation({ school: { settings: { isValidLocation: true } } } as never)).toBe(true);
+    expect(userValidatesLocation(null)).toBe(false);
   });
 });

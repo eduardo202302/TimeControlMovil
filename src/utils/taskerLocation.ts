@@ -4,7 +4,7 @@
  * poder testearla en node. A diferencia del ponche, aquí la ubicación es
  * obligatoria: sin posición no se muestra el formulario.
  *
- * Se pide en CADA entrada a Reportar; nada se guarda entre visitas. Pasos:
+ * Pasos:
  *   1. permiso de primer plano (se pide si el sistema todavía deja);
  *   2. ubicación del teléfono encendida;
  *   3. posición NUEVA (getCurrentPositionAsync, Balanced) dentro de
@@ -71,6 +71,7 @@ export interface RequestReportLocationOptions {
    * dispositivo real y en producción, siempre false.
    */
   acceptStaleLastKnown?: boolean;
+  promptPermission?: boolean;
 }
 
 // ─── Reglas puras ───────────────────────────────────────────────────────────
@@ -236,7 +237,12 @@ export function watchFirstPosition(
 
 function ok(reading: TaskerPositionReading): ReportLocationResult {
   const { latitude, longitude } = reading.coords;
-  return { status: "ok", coords: { latitude, longitude } };
+  const { timestamp } = reading;
+  return {
+    status: "ok",
+    coords: { latitude, longitude },
+    ...(typeof timestamp === "number" && Number.isFinite(timestamp) && { timestamp }),
+  };
 }
 
 const FAILED: ReportLocationResult = { status: "failed", canAskAgain: true };
@@ -347,8 +353,9 @@ export async function requestReportLocation(
     log = defaultLog,
     now = Date.now,
     acceptStaleLastKnown = false,
+    promptPermission = true,
   } = options;
-  const deadline = now() + timeoutMs;
+  let deadline = 0;
   const remaining = () => Math.max(0, deadline - now());
   const aborted = () => {
     if (!signal?.aborted) return false;
@@ -358,8 +365,9 @@ export async function requestReportLocation(
 
   try {
     // Se suma a la petición del (app)/_layout si sigue abierta: un solo diálogo.
-    await promptLocationPermission(api);
+    if (promptPermission) await promptLocationPermission(api);
     const permission = await api.getForegroundPermissionsAsync();
+    deadline = now() + timeoutMs;
     log(`permiso: ${permission.status} (canAskAgain=${permission.canAskAgain})`);
     let step = getPermissionStep(permission, null);
     if (step !== "continue") return step;
@@ -424,6 +432,15 @@ export async function requestReportLocation(
 
 /** Tope de la captura, permiso incluido: nunca retrasa el envío más que esto. */
 export const SEND_POSITION_TIMEOUT_MS = 5_000;
+export const SEND_RECENT_POSITION_MAX_AGE_MS = 60_000;
+
+export function getRecentSendPosition(
+  saved: { coords: TaskerDevicePosition; at: number | null } | null,
+  nowMs: number,
+  maxAgeMs: number = SEND_RECENT_POSITION_MAX_AGE_MS,
+): TaskerDevicePosition | null {
+  return saved && saved.at !== null && nowMs - saved.at < maxAgeMs ? saved.coords : null;
+}
 
 /** Subconjunto de la API que usa la captura: lee el permiso, nunca lo pide. */
 export type SendPositionApi = Pick<

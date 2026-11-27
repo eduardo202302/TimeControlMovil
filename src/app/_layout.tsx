@@ -88,21 +88,17 @@ export default function RootLayout() {
 
       if (isAuthorized === "true" && userRaw && menuItemsRaw && token) {
         const user = JSON.parse(userRaw);
-        console.log("User from storage:", user);
         const menuItems = JSON.parse(menuItemsRaw);
         // Tasker guardado (AsyncStorage); ausente o corrupto → no conectada
         // hasta el próximo chooseschool.
         useSchoolStore.getState().setTaskerSession(await restoreTaskerSession());
         setMenuResolution(user, menuItems);
         initialLoadDone.current = true;
-        const { role } = useSchoolStore.getState();
-        console.log("Role from store:", role);
         // Reportar si la regla de jornada aplica y hay jornada abierta hoy
         // (tope de 3 s); si no, resolveMobilePath(role.defaultMenu).
         router.replace((await resolveLandingPath()) as never);
         return;
       }
-      console.log("No valid authorization found. Redirecting to login.");
       initialLoadDone.current = true;
       router.replace("/login");
     };
